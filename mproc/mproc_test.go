@@ -47,18 +47,18 @@ func TestManageProcess(t *testing.T) {
 
 func TestEndKeepAlive(t *testing.T) {
 	mp := New()
-	proc := proc.New("/bin/sleep", nil, "1")
+	proc := proc.New("/bin/sleep", nil, "10")
 	if proc == nil {
 		t.Error("Could not create process")
 	}
-	_, err := mp.ManageProcess(proc, true)
+	id, err := mp.ManageProcess(proc, true)
 	if err != nil {
 		t.Error("Process was not started")
 	}
 
 	err = mp.EndKeepAlive(id)
 	if err != nil {
-		t.Error("EndKeepAlive failed")
+		t.Errorf("EndKeepAlive failed: %v", err)
 	}
 
 }
