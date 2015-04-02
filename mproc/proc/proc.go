@@ -13,8 +13,18 @@ type Process struct {
 	procState *os.ProcessState
 	prog      string
 	argv      []string
-	restart   bool
 	mu        sync.Mutex
+	started   bool
+}
+
+func New(p string, pA *os.ProcAttr, argv ...string) *Process {
+	return &Process{prog: p, procAttr: pA, argv: argv}
+}
+
+func (p *Process) Prog() string {
+	defer p.mu.Unlock()
+	p.mu.Lock()
+	return p.prog
 }
 
 func (p *Process) Pid() (int, error) {
@@ -25,14 +35,16 @@ func (p *Process) Pid() (int, error) {
 		glog.V(3).Infoln("Getting Pid for process: %d", p.proc.Pid)
 		return p.proc.Pid, nil
 	}
-	if glog.V(2) {
-		glog.Errorln("Attempted to get Pid for unstarted process: %v", p)
-	}
+	glog.Errorln("Attempted to get Pid for unstarted process: %v", p)
 	return 0, errors.New("The Process is not yet started")
 }
 
 func (p *Process) Start() (int, error) {
-
+	defer p.mu.Unlock()
+	p.mu.Lock()
+	if p.started {
+		return p.Pid()
+	}
 	if p.argv == nil {
 		p.argv = []string{}
 	}
@@ -70,6 +82,9 @@ func (p *Process) Signal(sig os.Signal) error {
 	defer p.mu.Unlock()
 	p.mu.Lock()
 	if p.proc != nil {
+		if glog.V(1) {
+			glog.Infof("Signaling PID: %d with signal %v\n", p.proc.Pid, sig)
+		}
 		return p.proc.Signal(sig)
 	}
 	return errors.New("Cannot Signal a process that hasn't started)")
@@ -79,6 +94,9 @@ func (p *Process) Kill() error {
 	defer p.mu.Unlock()
 	p.mu.Lock()
 	if p.proc != nil {
+		if glog.V(1) {
+			glog.Infof("Killing PID: %d", p.proc.Pid)
+		}
 		return p.proc.Kill()
 	}
 	return errors.New("Cannot Kill a process that hasn't started)")
@@ -91,6 +109,9 @@ func (p *Process) Wait() chan error {
 	go func() {
 		defer p.mu.Unlock()
 		p.mu.Lock()
+		if glog.V(1) {
+			glog.Infof("Waiting on PID: %d", p.proc.Pid)
+		}
 		state, err := p.proc.Wait()
 		if err == nil {
 			done <- err
@@ -101,41 +122,6 @@ func (p *Process) Wait() chan error {
 	return done
 }
 
-/*
-func (p *Process) KeepAlive() {
-	if !p.restart {
-		return
-	}
-	psChan := make(chan *os.ProcessState, 1)
-	errChan := make(chan error, 1)
-	go func() {
-		state, err := p.proc.Wait()
-		if err != nil {
-			errChan <- err
-			return
-		}
-		psChan <- state
-	}()
-
-	select {
-
-	case ps := <-psChan:
-		{
-			p.procState = ps
-			_, errs := p.Start()
-			if errs == nil && p.restart {
-				//p.keepAlive()
-			}
-		}
-
-	case ec := <-errChan:
-		{
-			log.Println("Error on wait: %v", ec)
-			return
-		}
-	}
-}
-*/
 func (p *Process) GetWaitStatus() *os.ProcessState {
 	defer p.mu.Unlock()
 	p.mu.Lock()
