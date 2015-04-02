@@ -30,6 +30,16 @@ func create(p *proc.Process, keepAlive bool) *managedP {
 	return &managedP{p: p, keepAlive: keepAlive}
 }
 
+func (mp *mProc) KillAll() {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	for _, v := range mp.managedProcs {
+		v.mu.Lock()
+		v.p.Kill()
+		v.mu.Unlock()
+	}
+}
+
 var id = 0
 
 //ManageProcess: Add a process to the manager and start it.
@@ -83,26 +93,27 @@ func (mp *mProc) keepAlive(id int) {
 			return
 		}
 		glog.Errorf("mProc Failed to wait on PID: %d cannot restart", pid)
+
 	}()
 }
 
 // Stop keep alive
 func (mp *mProc) EndKeepAlive(id int) error {
-	mp.mu.Lock()
 	p := mp.getMp(id)
 	if p == nil {
-		defer mp.mu.Unlock()
 		return errors.New(
 			fmt.Sprintf("Error: Process with ID: %d does not exist", id))
 	}
+
 	pid, _ := p.p.Pid()
 	if glog.V(2) {
 		glog.Infof("Ending keep alive on PID: %d", pid)
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	mp.mu.Unlock()
+	mp.mu.Lock()
 	p.keepAlive = false
+
 	return nil
 }
 
