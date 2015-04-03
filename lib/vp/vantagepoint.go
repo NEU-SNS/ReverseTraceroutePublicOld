@@ -1,4 +1,4 @@
-package lib
+package vantagepoint
 
 type Vantagepoint struct {
 	version  int

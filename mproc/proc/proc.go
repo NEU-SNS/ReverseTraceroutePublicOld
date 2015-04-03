@@ -22,15 +22,14 @@ func New(p string, pA *os.ProcAttr, argv ...string) *Process {
 }
 
 func (p *Process) Prog() string {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.prog
 }
 
 func (p *Process) Pid() (int, error) {
-	defer p.mu.Unlock()
 	p.mu.Lock()
-
+	defer p.mu.Unlock()
 	if p.proc != nil {
 		glog.V(3).Infoln("Getting Pid for process: %d", p.proc.Pid)
 		return p.proc.Pid, nil
@@ -40,8 +39,8 @@ func (p *Process) Pid() (int, error) {
 }
 
 func (p *Process) Start() (int, error) {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.started {
 		return p.Pid()
 	}
@@ -73,14 +72,14 @@ func (p *Process) Start() (int, error) {
 }
 
 func (p *Process) HasProc() bool {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.proc != nil
 }
 
 func (p *Process) Signal(sig os.Signal) error {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.proc != nil {
 		if glog.V(1) {
 			glog.Infof("Signaling PID: %d with signal %v\n", p.proc.Pid, sig)
@@ -91,8 +90,8 @@ func (p *Process) Signal(sig os.Signal) error {
 }
 
 func (p *Process) Kill() error {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.proc != nil {
 		if glog.V(1) {
 			glog.Infof("Killing PID: %d", p.proc.Pid)
@@ -103,12 +102,12 @@ func (p *Process) Kill() error {
 }
 
 func (p *Process) Wait() chan error {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	done := make(chan error, 1)
 	go func() {
-		defer p.mu.Unlock()
 		p.mu.Lock()
+		defer p.mu.Unlock()
 		if glog.V(1) {
 			glog.Infof("Waiting on PID: %d", p.proc.Pid)
 		}
@@ -123,8 +122,8 @@ func (p *Process) Wait() chan error {
 }
 
 func (p *Process) GetWaitStatus() *os.ProcessState {
-	defer p.mu.Unlock()
 	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if p.procState == nil {
 		return nil
