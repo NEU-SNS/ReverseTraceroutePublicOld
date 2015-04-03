@@ -35,6 +35,16 @@ import (
 	"sync"
 )
 
+type MProc interface {
+	ManageProcess(p *proc.Process, ka bool) (int, error)
+	KillAll()
+	EndKeepAlive(id int) error
+	SignalProc(id int, sig os.Signal) error
+	WaitProc(id int) chan error
+	GetProc(id int) *proc.Process
+	KillProc(id int) error
+}
+
 type mProc struct {
 	mu           sync.Mutex
 	managedProcs map[int]*managedP
@@ -47,7 +57,7 @@ type managedP struct {
 }
 
 //New: Return a pointer to a newly created mProc.
-func New() *mProc {
+func New() MProc {
 	return &mProc{managedProcs: make(map[int]*managedP, 10)}
 
 }
