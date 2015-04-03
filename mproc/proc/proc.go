@@ -65,7 +65,7 @@ func (p *Process) Start() (int, error) {
 	proc, err := os.StartProcess(p.prog,
 		append([]string{p.prog}, p.argv...), p.procAttr)
 	if err != nil {
-		glog.Errorf("")
+		glog.Errorf("Failed to start proc: %s error: %v", p.prog, err)
 		return 0, err
 	}
 	p.proc = proc
