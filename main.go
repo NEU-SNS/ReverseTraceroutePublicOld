@@ -2,14 +2,12 @@ package main
 
 import (
 	"flag"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
+	"github.com/NEU-SNS/ReverseTraceroute/controller"
+	"runtime"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
-	mp := mproc.New()
-	proc := proc.New("/bin/sleep", nil, "10")
-	mp.ManageProcess(proc, true)
-	select {}
+	controller.Start("tcp", "45000")
 }
