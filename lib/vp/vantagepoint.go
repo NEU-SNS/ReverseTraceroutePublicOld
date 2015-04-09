@@ -1,4 +1,4 @@
-package vantagepoint
+package vp
 
 type Vantagepoint struct {
 	version  int

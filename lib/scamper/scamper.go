@@ -38,7 +38,7 @@ func checkScamperSockDir(sockDir string) error {
 	return nil
 }
 
-func GetScamperProc(sockDir, scampPort, scamperPath string) *proc.Process {
+func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 
 	err := checkScamperSockDir(sockDir)
 	if err != nil {
@@ -48,7 +48,7 @@ func GetScamperProc(sockDir, scampPort, scamperPath string) *proc.Process {
 		IPv4, PORT, scampPort, SOCKET_DIR, sockDir)
 }
 
-func GetScamperMeasurementTool(sockDir string) *scamperTool {
+func GetMeasurementTool(sockDir string) *scamperTool {
 	return nil
 }
 
