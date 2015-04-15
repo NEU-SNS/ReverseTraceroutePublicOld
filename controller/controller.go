@@ -1,95 +1,133 @@
 package controller
 
 import (
-	"github.com/NEU-SNS/ReverseTraceroute/lib/vp"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
+	"errors"
+	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/golang/glog"
-	"io/ioutil"
 	"net"
+	"net/rpc"
+	"net/rpc/jsonrpc"
+	"strconv"
+	"strings"
+	"time"
 )
 
-type MeasurementTool interface {
-	TraceRoute()
-	Ping()
-	RRPing()
-	TSPing()
-	SpoofTr()
-}
-
 type controllerT struct {
-	port          int
-	ip            string
-	vps           map[string]*vp.Vantagepoint
-	started       bool
-	listener      net.Listener
-	mt            MeasurementTool
-	manager       mproc.MProc
-	procId        int
-	init          bool
-	managedProcId int
+	port     int
+	ip       net.IP
+	ptype    string
+	db       da.DataAccess
+	router   router.Router
+	requests uint64
+	time     time.Duration
 }
 
-var controller controllerT
+var (
+	controller     controllerT
+	ErrorInvalidIP = errors.New("Invalid IP address passed to Start")
+)
 
-func initController(mt MeasurementTool) {
-	if controller.init {
-		return
-	}
-	controller.vps = make(map[string]*vp.Vantagepoint, 10)
-	controller.manager = mproc.New()
-	controller.mt = mt
-	controller.init = true
-}
+const (
+	IP   = 0
+	PORT = 1
+)
 
-func Start(n, laddr string, mt MeasurementTool, procs *proc.Process) {
-	initController(mt)
-	if controller.started {
-		return
-	}
-	controller.started = true
-	id, err := controller.manager.ManageProcess(procs, true)
+func parseAddrArg(addr string) (int, net.IP, error) {
+	parts := strings.Split(addr, ":")
+	ip := parts[IP]
+	port := parts[PORT]
+	pport, err := strconv.Atoi(port)
 	if err != nil {
-		glog.Fatalf("Controller: manage process failed: %v", err)
+		glog.Errorf("Failed to parse port")
+		return 0, nil, err
 	}
-	controller.managedProcId = id
+	pip := net.ParseIP(ip)
+	if pip == nil {
+		glog.Errorf("Invalid IP passed to Start")
+		return 0, nil, ErrorInvalidIP
+	}
+	return pport, pip, nil
+}
 
-	l, err := net.Listen(n, laddr)
+func Start(n, laddr string, db da.DataAccess, r router.Router) chan error {
+	errChan := make(chan error, 1)
+	if db == nil || r == nil {
+		glog.Fatalf("Nil paramter in Controller Start")
+	}
+	controller.ptype = n
+	controller.db = db
+	controller.router = r
+	port, ip, err := parseAddrArg(laddr)
 	if err != nil {
-		glog.Fatalf("Controller failed to start. net: %s, addr: %s, error: ",
-			n, laddr, err)
+		glog.Errorf("Failed to start Controller")
+		errChan <- err
 	}
-	glog.Infof("Controller started, listening on %s", laddr)
-	controller.listener = l
+	controller.ip = ip
+	controller.port = port
+	go startRpc(n, laddr, errChan)
+	return errChan
 }
 
-func handleConnection(c net.Conn) {
-	glog.Infof("Connected to RemoteAddr: %s, LocalAddr: %s", c.RemoteAddr(), c.LocalAddr())
-	go func() {
-		data, err := ioutil.ReadAll(c)
-		if err != nil {
-			glog.Errorf(`Failed to read from connection: RemoteAddr: %s, 
-					 LocalAddr: %s, Error: %v`, c.RemoteAddr(), c.LocalAddr(), err)
-			return
-		}
-		if len(data) > 0 {
-			glog.Infof("Received %d bytes: %s", len(data), data)
-			c.Write(data)
-			c.Close()
-		} else {
-			glog.Infof("Recieved no data from: %s", c.RemoteAddr())
-		
-	}()
+type ControllerApi int
+
+type MArg struct {
+	SArg interface{}
+}
+
+type PingArg struct {
+}
+
+type MReturn struct {
+	SRet interface{}
+}
+
+type PingReturn struct {
+}
+
+func (c ControllerApi) Register(arg int, reply *int) error {
+	glog.Info("Register Called")
+	*reply = 5
+	return nil
+}
+
+func (c ControllerApi) Ping(arg MArg, ret *MReturn) error {
+
+	return nil
+}
+
+func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
+	return nil
+}
+
+type Request struct {
+	Stime time.Time
+	Etime time.Time
+	Oargs *Marg
+	Key   string
+}
+
+func (c controllerT) routeRequest(r Request) {
 
 }
 
-func Accept() error {
+func generateRequest(marg *MArg) Request {
+
+}
+
+func startRpc(n, laddr string, eChan chan error) {
+	api := new(ControllerApi)
+	server := rpc.NewServer()
+	server.Register(api)
+	l, e := net.Listen(n, laddr)
+	if e != nil {
+		glog.Fatalln("Failed to listen: %v", e)
+	}
 	for {
-		c, err := controller.listener.Accept()
+		conn, err := l.Accept()
 		if err != nil {
-			glog.Errorf("Controller: Failed to Accept connection: %v", err)
-			continue
+			glog.Fatalf("Accept failed: %v", err)
 		}
-		handleConnection(c)
+		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 	}
 }

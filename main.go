@@ -3,20 +3,36 @@ package main
 import (
 	"flag"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/golang/glog"
+	"net"
+	"net/rpc/jsonrpc"
 	"runtime"
+)
+
+const (
+	PING       = "ControllerApi.Ping"
+	TRACEROUTE = "ControllerApi.Traceroute"
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
-	ps := scamper.GetProc("/tmp/scamper_sockets",
-		"35000", "/usr/local/bin/sc_remoted")
-	mt := scamper.GetMeasurementTool("/tmp/scamper_sockets")
-	controller.Start("tcp", ":45000", mt, ps)
-	err := controller.Accept()
+	controller.Start("tcp", "localhost:45000")
+	conn, err := net.Dial("tcp", "localhost:45000")
+
 	if err != nil {
-		glog.Errorf("Controller: Listen returned error: %v", err)
+		panic(err)
 	}
+	defer conn.Close()
+
+	c := jsonrpc.NewClient(conn)
+	var result int
+	glog.Info("Calling CApi")
+	err = c.Call(PING, 5, &result)
+	glog.Infof("Done with remote call")
+	if err != nil {
+		panic(err)
+	}
+	glog.Infof("Results %d", result)
+	glog.Flush()
 }

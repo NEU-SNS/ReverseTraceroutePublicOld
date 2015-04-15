@@ -59,15 +59,3 @@ func (st *scamperTool) TraceRoute() {
 func (st *scamperTool) Ping() {
 
 }
-
-func (st *scamperTool) RRPing() {
-
-}
-
-func (st *scamperTool) TSPing() {
-
-}
-
-func (st *scamperTool) SpoofTr() {
-
-}
