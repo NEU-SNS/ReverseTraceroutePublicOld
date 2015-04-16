@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
-	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/golang/glog"
 	"github.com/nu7hatch/gouuid"
 	"net"
@@ -20,7 +19,7 @@ type controllerT struct {
 	ip       net.IP
 	ptype    string
 	db       da.DataAccess
-	router   router.Router
+	router   Router
 	requests uint64
 	time     time.Duration
 }
@@ -66,14 +65,14 @@ func parseAddrArg(addr string) (int, net.IP, error) {
 	return pport, pip, nil
 }
 
-func Start(n, laddr string, db da.DataAccess, r router.Router) chan error {
+func Start(n, laddr string, db da.DataAccess) chan error {
 	errChan := make(chan error, 1)
-	if db == nil || r == nil {
-		glog.Fatalf("Nil paramter in Controller Start")
+	if db == nil {
+		glog.Fatalf("Nil db in Controller Start")
 	}
 	controller.ptype = n
 	controller.db = db
-	controller.router = r
+	controller.router = createRouter()
 	port, ip, err := parseAddrArg(laddr)
 	if err != nil {
 		glog.Errorf("Failed to start Controller")
@@ -97,7 +96,6 @@ type PingArg struct {
 
 type MReturn struct {
 	Status MRequestStatus
-	err    error
 	SRet   interface{}
 }
 
@@ -120,28 +118,31 @@ func (c ControllerApi) Register(arg int, reply *int) error {
 }
 
 func (c ControllerApi) Ping(arg MArg, ret *MReturn) error {
-
-	return nil
+	mr, err := controller.handleMeasurement(&arg)
+	ret = mr
+	return err
 }
 
 func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
-	return nil
+	mr, err := controller.handleMeasurement(&arg)
+	ret = mr
+	return err
 }
 
-func (c controllerT) handleMeasurement(arg *MArg) *MReturn {
+func (c controllerT) handleMeasurement(arg *MArg) (*MReturn, error) {
 	r, err := generateRequest(arg)
 	if err != nil {
-		return &MReturn{Status: ERROR, err: MRequestError{cause: GenRequest, causeErr: err}}
+		return &MReturn{Status: ERROR}, MRequestError{cause: GenRequest, causeErr: err}
 	}
 	rr, err := controller.routeRequest(r)
 	if err != nil {
-		return &MReturn{Status: ERROR, err: MRequestError{cause: RequestRoute, causeErr: err}}
+		return &MReturn{Status: ERROR}, MRequestError{cause: RequestRoute, causeErr: err}
 	}
 	rChan, err := rr()
 	if err != nil {
-		return &MReturn{Status: ERROR, err: MRequestError{cause: ExecuteRequest, causeErr: err}}
+		return &MReturn{Status: ERROR}, MRequestError{cause: ExecuteRequest, causeErr: err}
 	}
-	return <-rChan
+	return <-rChan, nil
 }
 
 type Request struct {
@@ -155,7 +156,11 @@ type Request struct {
 type RoutedRequest func() (chan *MReturn, error)
 
 func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
-	return nil, nil
+	rr, err := c.router.RouteRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	return rr, err
 }
 
 func generateRequest(marg *MArg) (Request, error) {

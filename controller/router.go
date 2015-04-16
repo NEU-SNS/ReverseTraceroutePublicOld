@@ -1,4 +1,4 @@
-package router
+package controller
 
 import (
 	"net"
@@ -19,25 +19,31 @@ func (s *Service) IP() net.IP {
 }
 
 type router struct {
-	services []*Service
+	services map[string]*Service
 }
 
-func New() Router {
-	s := make([]*Service, 0, 10)
+func createRouter() Router {
+	s := make(map[string]*Service)
+	return &router{services: s}
+}
+
+func NewRouter() Router {
+	s := make(map[string]*Service)
 	return &router{services: s}
 }
 
 type Router interface {
 	RegisterServices(services ...*Service)
-	RouteRequest(interface{})
+	RouteRequest(r Request) (RoutedRequest, error)
 }
 
 func (r *router) RegisterServices(services ...*Service) {
 	for _, service := range services {
-		r.services = append(r.services, service)
+		r.services[service.Key] = service
 	}
 }
 
-func (r *router) RouteRequest(x interface{}) {
+func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
 
+	return nil, nil
 }
