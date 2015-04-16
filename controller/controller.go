@@ -2,9 +2,11 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/golang/glog"
+	"github.com/nu7hatch/gouuid"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -31,6 +33,20 @@ var (
 const (
 	IP   = 0
 	PORT = 1
+)
+
+type MRequestStatus string
+type MRequestState string
+
+const (
+	GenRequest     MRequestState = "generating request"
+	RequestRoute   MRequestState = "routing request"
+	ExecuteRequest MRequestState = "executing request"
+)
+
+const (
+	SUCCESS MRequestStatus = "SUCCESS"
+	ERROR   MRequestStatus = "ERROR"
 )
 
 func parseAddrArg(addr string) (int, net.IP, error) {
@@ -72,17 +88,29 @@ func Start(n, laddr string, db da.DataAccess, r router.Router) chan error {
 type ControllerApi int
 
 type MArg struct {
-	SArg interface{}
+	Service string
+	SArg    interface{}
 }
 
 type PingArg struct {
 }
 
 type MReturn struct {
-	SRet interface{}
+	Status MRequestStatus
+	err    error
+	SRet   interface{}
 }
 
 type PingReturn struct {
+}
+
+type MRequestError struct {
+	cause    MRequestState
+	causeErr error
+}
+
+func (m MRequestError) Error() string {
+	return fmt.Sprintf("Error occured while %s caused by: %v", m.cause, m.causeErr)
 }
 
 func (c ControllerApi) Register(arg int, reply *int) error {
@@ -100,19 +128,46 @@ func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
 	return nil
 }
 
+func (c controllerT) handleMeasurement(arg *MArg) *MReturn {
+	r, err := generateRequest(arg)
+	if err != nil {
+		return &MReturn{Status: ERROR, err: MRequestError{cause: GenRequest, causeErr: err}}
+	}
+	rr, err := controller.routeRequest(r)
+	if err != nil {
+		return &MReturn{Status: ERROR, err: MRequestError{cause: RequestRoute, causeErr: err}}
+	}
+	rChan, err := rr()
+	if err != nil {
+		return &MReturn{Status: ERROR, err: MRequestError{cause: ExecuteRequest, causeErr: err}}
+	}
+	return <-rChan
+}
+
 type Request struct {
+	Id    *uuid.UUID
 	Stime time.Time
-	Etime time.Time
-	Oargs *Marg
+	Dur   time.Duration
+	Args  interface{}
 	Key   string
 }
 
-func (c controllerT) routeRequest(r Request) {
+type RoutedRequest func() (chan *MReturn, error)
 
+func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
+	return nil, nil
 }
 
-func generateRequest(marg *MArg) Request {
-
+func generateRequest(marg *MArg) (Request, error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		glog.Errorf("Failed to generate UUID: %v", err)
+		return Request{}, err
+	}
+	return Request{
+		Id:   id,
+		Args: marg,
+		Key:  marg.Service}, nil
 }
 
 func startRpc(n, laddr string, eChan chan error) {
