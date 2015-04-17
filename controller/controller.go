@@ -1,9 +1,9 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/golang/glog"
 	"github.com/nu7hatch/gouuid"
 	"net"
@@ -24,29 +24,7 @@ type controllerT struct {
 	time     time.Duration
 }
 
-var (
-	controller     controllerT
-	ErrorInvalidIP = errors.New("Invalid IP address passed to Start")
-)
-
-const (
-	IP   = 0
-	PORT = 1
-)
-
-type MRequestStatus string
-type MRequestState string
-
-const (
-	GenRequest     MRequestState = "generating request"
-	RequestRoute   MRequestState = "routing request"
-	ExecuteRequest MRequestState = "executing request"
-)
-
-const (
-	SUCCESS MRequestStatus = "SUCCESS"
-	ERROR   MRequestStatus = "ERROR"
-)
+var controller controllerT
 
 func parseAddrArg(addr string) (int, net.IP, error) {
 	parts := strings.Split(addr, ":")
@@ -84,29 +62,6 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 	return errChan
 }
 
-type ControllerApi int
-
-type MArg struct {
-	Service string
-	SArg    interface{}
-}
-
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-}
-
-type PingReturn struct {
-}
-
-type MRequestError struct {
-	cause    MRequestState
-	causeErr error
-}
-
 func (m MRequestError) Error() string {
 	return fmt.Sprintf("Error occured while %s caused by: %v", m.cause, m.causeErr)
 }
@@ -118,42 +73,39 @@ func (c ControllerApi) Register(arg int, reply *int) error {
 }
 
 func (c ControllerApi) Ping(arg MArg, ret *MReturn) error {
-	mr, err := controller.handleMeasurement(&arg)
+	mr, err := controller.handleMeasurement(&arg, PING)
 	ret = mr
 	return err
 }
 
 func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
-	mr, err := controller.handleMeasurement(&arg)
+	mr, err := controller.handleMeasurement(&arg, TRACEROUTE)
 	ret = mr
 	return err
 }
 
-func (c controllerT) handleMeasurement(arg *MArg) (*MReturn, error) {
-	r, err := generateRequest(arg)
+func makeErrorReturn(cause MRequestState, err error) (*MReturn, error) {
+	return &MReturn{Status: ERROR}, MRequestError{cause: cause, causeErr: err}
+}
+
+func (c controllerT) handleMeasurement(arg *MArg, mt dm.MType) (*MReturn, error) {
+	r, err := generateRequest(arg, mt)
 	if err != nil {
-		return &MReturn{Status: ERROR}, MRequestError{cause: GenRequest, causeErr: err}
+		glog.Errorf("Error generating request: %v", err)
+		return makeErrorReturn(GenRequest, err)
 	}
 	rr, err := controller.routeRequest(r)
 	if err != nil {
-		return &MReturn{Status: ERROR}, MRequestError{cause: RequestRoute, causeErr: err}
+		glog.Errorf("%s: Failed to route request: %v, with error: %v", r.Id, r, err)
+		return makeErrorReturn(RequestRoute, err)
 	}
-	rChan, err := rr()
+	result, err := rr()
 	if err != nil {
-		return &MReturn{Status: ERROR}, MRequestError{cause: ExecuteRequest, causeErr: err}
+		glog.Errorf("%s: Failed to execute request: %v, with error: %v", r.Id, rr, err)
+		return makeErrorReturn(ExecuteRequest, err)
 	}
-	return <-rChan, nil
+	return result, nil
 }
-
-type Request struct {
-	Id    *uuid.UUID
-	Stime time.Time
-	Dur   time.Duration
-	Args  interface{}
-	Key   string
-}
-
-type RoutedRequest func() (chan *MReturn, error)
 
 func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
 	rr, err := c.router.RouteRequest(r)
@@ -163,16 +115,19 @@ func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
 	return rr, err
 }
 
-func generateRequest(marg *MArg) (Request, error) {
+func generateRequest(marg *MArg, mt dm.MType) (Request, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		glog.Errorf("Failed to generate UUID: %v", err)
 		return Request{}, err
 	}
-	return Request{
+	r := Request{
 		Id:   id,
 		Args: marg,
-		Key:  marg.Service}, nil
+		Key:  marg.Service,
+		Type: mt}
+	glog.Infof("%s: Generated Request: %v", id, r)
+	return r, nil
 }
 
 func startRpc(n, laddr string, eChan chan error) {
@@ -181,12 +136,14 @@ func startRpc(n, laddr string, eChan chan error) {
 	server.Register(api)
 	l, e := net.Listen(n, laddr)
 	if e != nil {
-		glog.Fatalln("Failed to listen: %v", e)
+		glog.Fatalf("Failed to listen: %v", e)
 	}
+	glog.Infof("Controller started, listening on: %s", laddr)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			glog.Fatalf("Accept failed: %v", err)
+			glog.Errorf("Accept failed: %v", err)
+			continue
 		}
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 	}
