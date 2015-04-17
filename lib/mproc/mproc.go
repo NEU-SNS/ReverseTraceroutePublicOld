@@ -29,7 +29,7 @@ package mproc
 import (
 	"errors"
 	"fmt"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
 	"github.com/golang/glog"
 	"os"
 	"sync"

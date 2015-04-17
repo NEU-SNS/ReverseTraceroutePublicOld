@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the University of Washington nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,19 +24,62 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package dataaccess
+package controller
 
 import (
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"net/rpc/jsonrpc"
+	"time"
 )
 
-type DataAccess interface {
-	GetServices()
+type router struct {
+	services map[string]*dm.Service
 }
 
-type dataAccess struct {
+func createRouter() Router {
+	s := make(map[string]*dm.Service)
+	return &router{services: s}
 }
 
-func (d *dataAccess) GetServices(ip string) []*dm.Service {
-	return nil
+func NewRouter() Router {
+	s := make(map[string]*dm.Service)
+	return &router{services: s}
+}
+
+type Router interface {
+	RegisterServices(services ...*dm.Service)
+	RouteRequest(r Request) (RoutedRequest, error)
+}
+
+func (r *router) RegisterServices(services ...*dm.Service) {
+	for _, service := range services {
+		r.services[service.Key] = service
+	}
+}
+
+func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
+	s := r.services[req.Key]
+	if s == nil {
+		return nil, ErrorServiceNotFound
+	}
+	return wrapRequest(req, s), nil
+}
+
+func wrapRequest(req Request, s *dm.Service) RoutedRequest {
+	return func() (*MReturn, error) {
+
+		req.Stime = time.Now()
+		c, err := jsonrpc.Dial(s.Proto, s.FormatIp())
+		if err != nil {
+			return nil, err
+		}
+		defer c.Close()
+		err = c.Call(s.Api[req.Type], nil, nil)
+		req.Dur = time.Since(req.Stime)
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
 }
