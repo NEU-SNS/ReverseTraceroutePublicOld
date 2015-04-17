@@ -42,13 +42,21 @@ func createRouter() Router {
 }
 
 func NewRouter() Router {
-	s := make(map[string]*dm.Service)
-	return &router{services: s}
+	return createRouter()
 }
 
 type Router interface {
 	RegisterServices(services ...*dm.Service)
-	RouteRequest(r Request) (RoutedRequest, error)
+	RouteRequest(req Request) (RoutedRequest, error)
+	GetServices() []*dm.Service
+}
+
+func (r *router) GetServices() []*dm.Service {
+	serv := make([]*dm.Service, len(r.services), len(r.services))
+	for _, service := range r.services {
+		serv = append(serv, service)
+	}
+	return serv
 }
 
 func (r *router) RegisterServices(services ...*dm.Service) {
@@ -62,10 +70,10 @@ func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
 	if s == nil {
 		return nil, ErrorServiceNotFound
 	}
-	return wrapRequest(req, s), nil
+	return wrapRequest(req, s)
 }
 
-func wrapRequest(req Request, s *dm.Service) RoutedRequest {
+func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
 	return func() (*MReturn, error) {
 
 		req.Stime = time.Now()
@@ -80,6 +88,6 @@ func wrapRequest(req Request, s *dm.Service) RoutedRequest {
 			return nil, err
 		}
 		return nil, nil
-	}
+	}, nil
 
 }

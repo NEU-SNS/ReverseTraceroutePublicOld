@@ -27,11 +27,12 @@
 package controller
 
 import (
+	"code.google.com/p/go-uuid/uuid"
+	"errors"
 	"fmt"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
-	"github.com/nu7hatch/gouuid"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -55,6 +56,9 @@ var controller controllerT
 func parseAddrArg(addr string) (int, net.IP, error) {
 	parts := strings.Split(addr, ":")
 	ip := parts[IP]
+	if ip == "localhost" {
+		ip = "127.0.0.1"
+	}
 	port := parts[PORT]
 	pport, err := strconv.Atoi(port)
 	if err != nil {
@@ -63,7 +67,7 @@ func parseAddrArg(addr string) (int, net.IP, error) {
 	}
 	pip := net.ParseIP(ip)
 	if pip == nil {
-		glog.Errorf("Invalid IP passed to Start")
+		glog.Errorf("Invalid IP passed to Start: %s", ip)
 		return 0, nil, ErrorInvalidIP
 	}
 	return pport, pip, nil
@@ -72,7 +76,9 @@ func parseAddrArg(addr string) (int, net.IP, error) {
 func Start(n, laddr string, db da.DataAccess) chan error {
 	errChan := make(chan error, 1)
 	if db == nil {
-		glog.Fatalf("Nil db in Controller Start")
+		glog.Errorf("Nil db in Controller Start")
+		errChan <- errors.New("Controller Start, nil DB")
+		return errChan
 	}
 	controller.ptype = n
 	controller.db = db
@@ -90,24 +96,6 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 
 func (m MRequestError) Error() string {
 	return fmt.Sprintf("Error occured while %s caused by: %v", m.cause, m.causeErr)
-}
-
-func (c ControllerApi) Register(arg int, reply *int) error {
-	glog.Info("Register Called")
-	*reply = 5
-	return nil
-}
-
-func (c ControllerApi) Ping(arg MArg, ret *MReturn) error {
-	mr, err := controller.handleMeasurement(&arg, PING)
-	ret = mr
-	return err
-}
-
-func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
-	mr, err := controller.handleMeasurement(&arg, TRACEROUTE)
-	ret = mr
-	return err
 }
 
 func makeErrorReturn(cause MRequestState, err error) (*MReturn, error) {
@@ -142,11 +130,7 @@ func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
 }
 
 func generateRequest(marg *MArg, mt dm.MType) (Request, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		glog.Errorf("Failed to generate UUID: %v", err)
-		return Request{}, err
-	}
+	id := uuid.NewRandom()
 	r := Request{
 		Id:   id,
 		Args: marg,
@@ -156,19 +140,21 @@ func generateRequest(marg *MArg, mt dm.MType) (Request, error) {
 	return r, nil
 }
 
-func startRpc(n, laddr string, eChan chan error) {
+func startRpc(n, laddr string, eChan chan error) error {
 	api := new(ControllerApi)
 	server := rpc.NewServer()
 	server.Register(api)
 	l, e := net.Listen(n, laddr)
 	if e != nil {
-		glog.Fatalf("Failed to listen: %v", e)
+		glog.Errorf("Failed to listen: %v", e)
+		eChan <- e
 	}
 	glog.Infof("Controller started, listening on: %s", laddr)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			glog.Errorf("Accept failed: %v", err)
+			eChan <- err
 			continue
 		}
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))

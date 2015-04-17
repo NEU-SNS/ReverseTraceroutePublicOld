@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the University of Washington nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,65 +24,22 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package controller
+package testdataaccess
 
 import (
-	"code.google.com/p/go-uuid/uuid"
-	"errors"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"time"
 )
 
-const (
-	IP                            = 0
-	PORT                          = 1
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           dm.MType       = "PING"
-	TRACEROUTE     dm.MType       = "TRACEROUTE"
-)
+type testAccess struct{}
 
-var (
-	ErrorInvalidIP       = errors.New("invalid IP address passed to Start")
-	ErrorServiceNotFound = errors.New("service not found")
-)
-
-type MRequestStatus string
-type MRequestState string
-type ControllerApi struct{}
-type RoutedRequest func() (*MReturn, error)
-
-type MArg struct {
-	Service string
-	SArg    interface{}
-	Src     string
-	Dst     string
+func (da *testAccess) GetServices(ip string) []*dm.Service {
+	return []*dm.Service{&dm.Service{Key: "TEST",
+		IPAddr: "192.168.1.1",
+		Port:   9999,
+		Proto:  "unix",
+		Api:    nil}}
 }
 
-type Request struct {
-	Id    uuid.UUID
-	Stime time.Time
-	Dur   time.Duration
-	Args  interface{}
-	Key   string
-	Type  dm.MType
-}
-
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-}
-
-type PingReturn struct {
-}
-
-type MRequestError struct {
-	cause    MRequestState
-	causeErr error
+func New() *testAccess {
+	return &testAccess{}
 }

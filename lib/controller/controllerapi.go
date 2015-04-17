@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the University of Washington nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -26,63 +26,19 @@
 */
 package controller
 
-import (
-	"code.google.com/p/go-uuid/uuid"
-	"errors"
-	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"time"
-)
-
-const (
-	IP                            = 0
-	PORT                          = 1
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           dm.MType       = "PING"
-	TRACEROUTE     dm.MType       = "TRACEROUTE"
-)
-
-var (
-	ErrorInvalidIP       = errors.New("invalid IP address passed to Start")
-	ErrorServiceNotFound = errors.New("service not found")
-)
-
-type MRequestStatus string
-type MRequestState string
-type ControllerApi struct{}
-type RoutedRequest func() (*MReturn, error)
-
-type MArg struct {
-	Service string
-	SArg    interface{}
-	Src     string
-	Dst     string
+func (c ControllerApi) Register(arg int, reply *int) error {
+	*reply = 5
+	return nil
 }
 
-type Request struct {
-	Id    uuid.UUID
-	Stime time.Time
-	Dur   time.Duration
-	Args  interface{}
-	Key   string
-	Type  dm.MType
+func (c ControllerApi) Ping(arg MArg, ret *MReturn) error {
+	mr, err := controller.handleMeasurement(&arg, PING)
+	ret = mr
+	return err
 }
 
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-}
-
-type PingReturn struct {
-}
-
-type MRequestError struct {
-	cause    MRequestState
-	causeErr error
+func (c ControllerApi) Traceroute(arg MArg, ret *MReturn) error {
+	mr, err := controller.handleMeasurement(&arg, TRACEROUTE)
+	ret = mr
+	return err
 }

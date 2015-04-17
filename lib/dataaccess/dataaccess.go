@@ -31,7 +31,7 @@ import (
 )
 
 type DataAccess interface {
-	GetServices()
+	GetServices(ip string) []*dm.Service
 }
 
 type dataAccess struct {
