@@ -47,6 +47,7 @@ const (
 
 var (
 	ErrorInvalidIP       = errors.New("invalid IP address passed to Start")
+	ErrorInvalidPort     = errors.New("invalid port passed to Start")
 	ErrorServiceNotFound = errors.New("service not found")
 )
 

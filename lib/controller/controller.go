@@ -65,6 +65,10 @@ func parseAddrArg(addr string) (int, net.IP, error) {
 		glog.Errorf("Failed to parse port")
 		return 0, nil, err
 	}
+	if pport < 1 || pport > 65535 {
+		glog.Errorf("Invalid port passed to Start: %d", pport)
+		return 0, nil, ErrorInvalidPort
+	}
 	pip := net.ParseIP(ip)
 	if pip == nil {
 		glog.Errorf("Invalid IP passed to Start: %s", ip)
@@ -87,6 +91,7 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 	if err != nil {
 		glog.Errorf("Failed to start Controller")
 		errChan <- err
+		return errChan
 	}
 	controller.ip = ip
 	controller.port = port
