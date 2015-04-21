@@ -24,70 +24,40 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package controller
+package main
 
 import (
+	"flag"
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"net"
 	"net/rpc/jsonrpc"
-	"time"
+	"runtime"
 )
 
-type router struct {
-	services map[string]*dm.Service
-}
+const (
+	PING       = "ControllerApi.Ping"
+	TRACEROUTE = "ControllerApi.Traceroute"
+	GETSTATS   = "ControllerApi.GetStats"
+	REGISTER   = "ControllerApi.Register"
+)
 
-func createRouter() Router {
-	s := make(map[string]*dm.Service)
-	return &router{services: s}
-}
+func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	flag.Parse()
+	conn, err := net.Dial("tcp", "localhost:35000")
 
-func NewRouter() Router {
-	return createRouter()
-}
-
-type Router interface {
-	RegisterServices(services ...*dm.Service)
-	RouteRequest(req Request) (RoutedRequest, error)
-	GetServices() []*dm.Service
-}
-
-func (r *router) GetServices() []*dm.Service {
-	serv := make([]*dm.Service, len(r.services), len(r.services))
-	for _, service := range r.services {
-		serv = append(serv, service)
+	if err != nil {
+		panic(err)
 	}
-	return serv
-}
+	defer conn.Close()
 
-func (r *router) RegisterServices(services ...*dm.Service) {
-	for _, service := range services {
-		r.services[service.Key] = service
+	c := jsonrpc.NewClient(conn)
+	var stat dm.Stats
+	num := 8
+	err = c.Call(GETSTATS, &num, &stat)
+	fmt.Printf("Got stats: %v", stat)
+	if err != nil {
+		panic(err)
 	}
-}
-
-func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
-	s := r.services[req.Key]
-	if s == nil {
-		return nil, ErrorServiceNotFound
-	}
-	return wrapRequest(req, s)
-}
-
-func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
-	return func() (*dm.MReturn, *Request, error) {
-
-		req.Stime = time.Now()
-		c, err := jsonrpc.Dial(s.Proto, s.FormatIp())
-		if err != nil {
-			return nil, nil, err
-		}
-		defer c.Close()
-		err = c.Call(s.Api[req.Type], nil, nil)
-		req.Dur = time.Since(req.Stime)
-		if err != nil {
-			return nil, nil, err
-		}
-		return nil, &req, nil
-	}, nil
-
 }

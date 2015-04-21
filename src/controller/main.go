@@ -27,10 +27,60 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/controller"
-	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
+	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/testdataaccess"
+	"github.com/golang/glog"
+	"os"
 )
 
-func main() {
+var flags controller.Flags
+var closeStdStreams bool
 
+func init() {
+	flag.StringVar(&flags.Port, "p", "35000",
+		"The port that the controller will bind to.")
+
+	flag.StringVar(&flags.Ip, "i", "127.0.0.1",
+		"The IP that the controller will bind to.")
+
+	flag.StringVar(&flags.PType, "t", "tcp",
+		"Type protocol type the coltroller will use.")
+	flag.BoolVar(&closeStdStreams, "D", false,
+		"Determines if the sandard file descriptors are closed")
+}
+
+func main() {
+	flag.Parse()
+	if closeStdStreams {
+		glog.Info("Closing standard file descripters")
+		err := os.Stdin.Close()
+		if err != nil {
+			glog.Error("Failed to close Stdin")
+			glog.Flush()
+			os.Exit(1)
+		}
+		err = os.Stderr.Close()
+		if err != nil {
+			glog.Error("Failed to close Stderr")
+			glog.Flush()
+			os.Exit(1)
+		}
+		err = os.Stdout.Close()
+		if err != nil {
+			glog.Error("Failed to close Stdout")
+			glog.Flush()
+			os.Exit(1)
+		}
+	}
+
+	ipstr := fmt.Sprintf("%s:%s", flags.Ip, flags.Port)
+	err := <-controller.Start(flags.PType, ipstr, da.New())
+	if err != nil {
+		glog.Errorf("Controller Start returned with error: %v", err)
+		glog.Flush()
+		os.Exit(1)
+	}
+	glog.Flush()
 }

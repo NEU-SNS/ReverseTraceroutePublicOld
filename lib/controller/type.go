@@ -34,15 +34,8 @@ import (
 )
 
 const (
-	IP                            = 0
-	PORT                          = 1
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           dm.MType       = "PING"
-	TRACEROUTE     dm.MType       = "TRACEROUTE"
+	IP   = 0
+	PORT = 1
 )
 
 var (
@@ -51,17 +44,8 @@ var (
 	ErrorServiceNotFound = errors.New("service not found")
 )
 
-type MRequestStatus string
-type MRequestState string
 type ControllerApi struct{}
-type RoutedRequest func() (*MReturn, error)
-
-type MArg struct {
-	Service string
-	SArg    interface{}
-	Src     string
-	Dst     string
-}
+type RoutedRequest func() (*dm.MReturn, *Request, error)
 
 type Request struct {
 	Id    uuid.UUID
@@ -72,18 +56,8 @@ type Request struct {
 	Type  dm.MType
 }
 
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-}
-
-type PingReturn struct {
-}
-
-type MRequestError struct {
-	cause    MRequestState
-	causeErr error
+type Flags struct {
+	PType string
+	Ip    string
+	Port  string
 }

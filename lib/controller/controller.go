@@ -28,8 +28,8 @@ package controller
 
 import (
 	"code.google.com/p/go-uuid/uuid"
+	"encoding/json"
 	"errors"
-	"fmt"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
@@ -38,24 +38,87 @@ import (
 	"net/rpc/jsonrpc"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type controllerT struct {
-	port     int
-	ip       net.IP
-	ptype    string
-	db       da.DataAccess
-	router   Router
-	requests uint64
+	port      int
+	ip        net.IP
+	ptype     string
+	db        da.DataAccess
+	router    Router
+	startTime time.Time
+	mu        sync.Mutex
+	//the mutex protects the following
+	requests int64
 	time     time.Duration
 }
 
 var controller controllerT
 
+func (c *controllerT) getRequests() int64 {
+	c.mu.Lock()
+	req := c.requests
+	c.mu.Unlock()
+	return req
+}
+
+func (c *controllerT) addRequest() {
+	c.mu.Lock()
+	c.requests += 1
+	c.mu.Unlock()
+}
+
+func (c *controllerT) addTime(t time.Duration) {
+	c.mu.Lock()
+	c.time += t
+	c.mu.Unlock()
+}
+
+func (c *controllerT) getTime() time.Duration {
+	c.mu.Lock()
+	time := c.time
+	c.mu.Unlock()
+	return time
+}
+
+func (c *controllerT) addReqStats(req *Request) {
+	c.mu.Lock()
+	c.time += req.Dur
+	c.requests += 1
+	c.mu.Unlock()
+}
+
+func (c *controllerT) getStatsInfo() (t time.Duration, req int64) {
+	c.mu.Lock()
+	t, req = c.time, c.requests
+	c.mu.Unlock()
+	return
+}
+
+func (c *controllerT) getStats() *dm.Stats {
+	utime := time.Since(c.startTime)
+	t, req := c.getStatsInfo()
+	var tt time.Duration
+	if t == 0 {
+		tt = 0
+	} else {
+		tt = time.Duration(req / int64(t))
+	}
+	s := dm.Stats{StartTime: c.startTime,
+		UpTime: utime, Requests: req,
+		TotReqTime: t, AvgReqTime: tt}
+	b, _ := json.Marshal(s)
+	glog.Infof("Got stats: %s", b)
+	return &s
+}
+
 func parseAddrArg(addr string) (int, net.IP, error) {
 	parts := strings.Split(addr, ":")
 	ip := parts[IP]
+
+	//shortcut, maybe resolve?
 	if ip == "localhost" {
 		ip = "127.0.0.1"
 	}
@@ -84,9 +147,12 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 		errChan <- errors.New("Controller Start, nil DB")
 		return errChan
 	}
+	controller.startTime = time.Now()
 	controller.ptype = n
 	controller.db = db
 	controller.router = createRouter()
+	controller.router.RegisterServices(
+		db.GetServices(controller.ip.String())...)
 	port, ip, err := parseAddrArg(laddr)
 	if err != nil {
 		glog.Errorf("Failed to start Controller")
@@ -99,34 +165,31 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 	return errChan
 }
 
-func (m MRequestError) Error() string {
-	return fmt.Sprintf("Error occured while %s caused by: %v", m.cause, m.causeErr)
+func makeErrorReturn(cause dm.MRequestState, err error) (*dm.MReturn, error) {
+	return &dm.MReturn{Status: dm.ERROR}, dm.MRequestError{Cause: cause, CauseErr: err}
 }
 
-func makeErrorReturn(cause MRequestState, err error) (*MReturn, error) {
-	return &MReturn{Status: ERROR}, MRequestError{cause: cause, causeErr: err}
-}
-
-func (c controllerT) handleMeasurement(arg *MArg, mt dm.MType) (*MReturn, error) {
+func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn, error) {
 	r, err := generateRequest(arg, mt)
 	if err != nil {
 		glog.Errorf("Error generating request: %v", err)
-		return makeErrorReturn(GenRequest, err)
+		return makeErrorReturn(dm.GenRequest, err)
 	}
 	rr, err := controller.routeRequest(r)
 	if err != nil {
 		glog.Errorf("%s: Failed to route request: %v, with error: %v", r.Id, r, err)
-		return makeErrorReturn(RequestRoute, err)
+		return makeErrorReturn(dm.RequestRoute, err)
 	}
-	result, err := rr()
+	result, req, err := rr()
+	c.addReqStats(req)
 	if err != nil {
 		glog.Errorf("%s: Failed to execute request: %v, with error: %v", r.Id, rr, err)
-		return makeErrorReturn(ExecuteRequest, err)
+		return makeErrorReturn(dm.ExecuteRequest, err)
 	}
 	return result, nil
 }
 
-func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
+func (c *controllerT) routeRequest(r Request) (RoutedRequest, error) {
 	rr, err := c.router.RouteRequest(r)
 	if err != nil {
 		return nil, err
@@ -134,7 +197,7 @@ func (c controllerT) routeRequest(r Request) (RoutedRequest, error) {
 	return rr, err
 }
 
-func generateRequest(marg *MArg, mt dm.MType) (Request, error) {
+func generateRequest(marg *dm.MArg, mt dm.MType) (Request, error) {
 	id := uuid.NewRandom()
 	r := Request{
 		Id:   id,
@@ -162,6 +225,7 @@ func startRpc(n, laddr string, eChan chan error) error {
 			eChan <- err
 			continue
 		}
+		glog.Info("Serving reqeust")
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 	}
 }
