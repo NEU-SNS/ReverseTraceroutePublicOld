@@ -24,56 +24,71 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package datamodel
+package util
 
 import (
-	"fmt"
-	"time"
+	"errors"
+	"github.com/golang/glog"
+	"net"
+	"net/rpc"
+	"net/rpc/jsonrpc"
+	"strconv"
+	"strings"
 )
 
 const (
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           MType          = "PING"
-	TRACEROUTE     MType          = "TRACEROUTE"
+	IP   = 0
+	PORT = 1
 )
 
-type MRequestStatus string
-type MRequestState string
+var (
+	ErrorInvalidIP   = errors.New("invalid IP address")
+	ErrorInvalidPort = errors.New("invalid port")
+)
 
-type Stats struct {
-	StartTime  time.Time
-	UpTime     time.Duration
-	Requests   int64
-	AvgReqTime time.Duration
-	TotReqTime time.Duration
+func ParseAddrArg(addr string) (int, net.IP, error) {
+	parts := strings.Split(addr, ":")
+	ip := parts[IP]
+
+	//shortcut, maybe resolve?
+	if ip == "localhost" {
+		ip = "127.0.0.1"
+	}
+	port := parts[PORT]
+	pport, err := strconv.Atoi(port)
+	if err != nil {
+		glog.Errorf("Failed to parse port")
+		return 0, nil, err
+	}
+	if pport < 1 || pport > 65535 {
+		glog.Errorf("Invalid port passed to Start: %d", pport)
+		return 0, nil, ErrorInvalidPort
+	}
+	pip := net.ParseIP(ip)
+	if pip == nil {
+		glog.Errorf("Invalid IP passed to Start: %s", ip)
+		return 0, nil, ErrorInvalidIP
+	}
+	return pport, pip, nil
 }
 
-type MArg struct {
-	Service string
-	SArg    interface{}
-}
-
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-	Dur    time.Duration
-}
-
-type PingReturn struct {
-}
-
-func (m MRequestError) Error() string {
-	return fmt.Sprintf("Error occured while %s caused by: %v", m.Cause, m.CauseErr)
-}
-
-type MRequestError struct {
-	Cause    MRequestState
-	CauseErr error
+func StartRpc(n, laddr string, eChan chan error, api interface{}) error {
+	server := rpc.NewServer()
+	server.Register(api)
+	l, e := net.Listen(n, laddr)
+	if e != nil {
+		glog.Errorf("Failed to listen: %v", e)
+		eChan <- e
+	}
+	glog.Infof("Controller started, listening on: %s", laddr)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			glog.Errorf("Accept failed: %v", err)
+			eChan <- err
+			continue
+		}
+		glog.Info("Serving reqeust")
+		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
+	}
 }

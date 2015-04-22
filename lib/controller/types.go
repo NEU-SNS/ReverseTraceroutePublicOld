@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the University of Washington nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,56 +24,34 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package datamodel
+package controller
 
 import (
-	"fmt"
+	"code.google.com/p/go-uuid/uuid"
+	"errors"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"time"
 )
 
-const (
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           MType          = "PING"
-	TRACEROUTE     MType          = "TRACEROUTE"
+var (
+	ErrorServiceNotFound = errors.New("service not found")
 )
 
-type MRequestStatus string
-type MRequestState string
+type ControllerApi struct{}
+type RoutedRequest func() (*dm.MReturn, *Request, error)
 
-type Stats struct {
-	StartTime  time.Time
-	UpTime     time.Duration
-	Requests   int64
-	AvgReqTime time.Duration
-	TotReqTime time.Duration
+type Request struct {
+	Id    uuid.UUID
+	Stime time.Time
+	Dur   time.Duration
+	Args  interface{}
+	Key   string
+	Type  dm.MType
 }
 
-type MArg struct {
-	Service string
-	SArg    interface{}
-}
-
-type PingArg struct {
-}
-
-type MReturn struct {
-	Status MRequestStatus
-	SRet   interface{}
-	Dur    time.Duration
-}
-
-type PingReturn struct {
-}
-
-func (m MRequestError) Error() string {
-	return fmt.Sprintf("Error occured while %s caused by: %v", m.Cause, m.CauseErr)
-}
-
-type MRequestError struct {
-	Cause    MRequestState
-	CauseErr error
+type Flags struct {
+	PType      string
+	Ip         string
+	Port       string
+	CloseSocks bool
 }

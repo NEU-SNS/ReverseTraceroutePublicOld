@@ -36,7 +36,6 @@ import (
 )
 
 var flags controller.Flags
-var closeStdStreams bool
 
 func init() {
 	flag.StringVar(&flags.Port, "p", "35000",
@@ -47,13 +46,13 @@ func init() {
 
 	flag.StringVar(&flags.PType, "t", "tcp",
 		"Type protocol type the coltroller will use.")
-	flag.BoolVar(&closeStdStreams, "D", false,
+	flag.BoolVar(&flags.CloseSocks, "D", false,
 		"Determines if the sandard file descriptors are closed")
 }
 
 func main() {
 	flag.Parse()
-	if closeStdStreams {
+	if flags.CloseSocks {
 		glog.Info("Closing standard file descripters")
 		err := os.Stdin.Close()
 		if err != nil {

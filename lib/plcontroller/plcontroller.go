@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the University of Washington nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,104 +24,76 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package scamper
+package plcontroller
 
 import (
-	"errors"
-	"fmt"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	"net"
 	"os"
-	"strconv"
+	"sync"
+	"time"
 )
 
-var (
-	ErrorScamperBin = errors.New("scamper file is not an executable")
-)
-
-const (
-	IPv4       = "-4"
-	IPv6       = "-6"
-	PORT       = "-P"
-	SOCKET_DIR = "-U"
-	SUDO       = "/usr/bin/sudo"
-)
-
-type ScamperConfig struct {
-	Port   string
-	Path   string
-	ScPath string
+type plControllerT struct {
+	port      int
+	ip        net.IP
+	ptype     string
+	startTime time.Time
+	spid      int
+	spath     string
+	sip       net.IP
+	sport     string
+	mp        mproc.MProc
+	mu        sync.Mutex
+	//the mutex protects the following
+	requests int64
+	time     time.Duration
 }
 
-type scamperTool struct {
-	sockDir string
+func handleScamperStop(err error) bool {
+	glog.Error("Scamper stopped with error: %v", err)
+	switch err.(type) {
+	default:
+		return false
+	case *os.PathError:
+		return true
+	}
+
 }
 
-func ParseScamperConfig(sc ScamperConfig) error {
-	val, err := strconv.Atoi(sc.Port)
+var plController plControllerT
+
+func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
+	errChan := make(chan error, 1)
+	plController.startTime = time.Now()
+	port, ip, err := util.ParseAddrArg(laddr)
+
 	if err != nil {
-		return err
+		glog.Error("Failed to parse addr string")
+		errChan <- err
+		return errChan
 	}
-	if val < 1 || val > 65535 {
-		return util.ErrorInvalidPort
-	}
-	err = checkScamperSockDir(sc.Path)
+	err = scamper.ParseScamperConfig(sc)
 	if err != nil {
-		return err
+		glog.Errorf("Invalid scamper args: %v", err)
+		errChan <- err
+		return errChan
 	}
-	return checkScamperBinPath(sc.ScPath)
+	plController.sport = sc.Port
+	plController.spath = sc.Path
+	plController.ip = ip
+	plController.port = port
 
+	plController.mp = mproc.New()
+	plController.startScamperProc(sc)
+	go util.StartRpc(n, laddr, errChan, new(PlControllerApi))
+	return errChan
 }
 
-func checkScamperBinPath(binPath string) error {
-	fi, err := os.Stat(binPath)
-	if err != nil {
-		return err
-	}
-	if fi.IsDir() {
-		return ErrorScamperBin
-	}
-	return nil
-}
-
-func makeScamperDir(sockDir string) error {
-	return os.Mkdir(sockDir, os.ModeDir)
-}
-
-func checkScamperSockDir(sockDir string) error {
-	fi, err := os.Stat(sockDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return makeScamperDir(sockDir)
-		}
-		return err
-	}
-	if !fi.IsDir() {
-		return fmt.Errorf("Socket directory path: %s is not a directory",
-			sockDir)
-	}
-	return nil
-}
-
-func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
-
-	err := checkScamperSockDir(sockDir)
-	if err != nil {
-		glog.Fatal("Error with scamper socket directory: %v", err)
-	}
-	return proc.New(SUDO, nil, scamperPath,
-		IPv4, PORT, scampPort, SOCKET_DIR, sockDir)
-}
-
-func GetMeasurementTool(sockDir string) *scamperTool {
-	return nil
-}
-
-func (st *scamperTool) TraceRoute() {
-
-}
-
-func (st *scamperTool) Ping() {
-
+func (c *plControllerT) startScamperProc(sc scamper.ScamperConfig) {
+	sp := scamper.GetProc(sc.Path, sc.Port, sc.ScPath)
+	plController.mp.ManageProcess(sp, true, 10, handleScamperStop)
 }

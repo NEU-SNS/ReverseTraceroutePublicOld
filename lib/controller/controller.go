@@ -28,16 +28,12 @@ package controller
 
 import (
 	"code.google.com/p/go-uuid/uuid"
-	"encoding/json"
 	"errors"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"net"
-	"net/rpc"
-	"net/rpc/jsonrpc"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -109,35 +105,7 @@ func (c *controllerT) getStats() *dm.Stats {
 	s := dm.Stats{StartTime: c.startTime,
 		UpTime: utime, Requests: req,
 		TotReqTime: t, AvgReqTime: tt}
-	b, _ := json.Marshal(s)
-	glog.Infof("Got stats: %s", b)
 	return &s
-}
-
-func parseAddrArg(addr string) (int, net.IP, error) {
-	parts := strings.Split(addr, ":")
-	ip := parts[IP]
-
-	//shortcut, maybe resolve?
-	if ip == "localhost" {
-		ip = "127.0.0.1"
-	}
-	port := parts[PORT]
-	pport, err := strconv.Atoi(port)
-	if err != nil {
-		glog.Errorf("Failed to parse port")
-		return 0, nil, err
-	}
-	if pport < 1 || pport > 65535 {
-		glog.Errorf("Invalid port passed to Start: %d", pport)
-		return 0, nil, ErrorInvalidPort
-	}
-	pip := net.ParseIP(ip)
-	if pip == nil {
-		glog.Errorf("Invalid IP passed to Start: %s", ip)
-		return 0, nil, ErrorInvalidIP
-	}
-	return pport, pip, nil
 }
 
 func Start(n, laddr string, db da.DataAccess) chan error {
@@ -153,7 +121,7 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 	controller.router = createRouter()
 	controller.router.RegisterServices(
 		db.GetServices(controller.ip.String())...)
-	port, ip, err := parseAddrArg(laddr)
+	port, ip, err := util.ParseAddrArg(laddr)
 	if err != nil {
 		glog.Errorf("Failed to start Controller")
 		errChan <- err
@@ -161,7 +129,7 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 	}
 	controller.ip = ip
 	controller.port = port
-	go startRpc(n, laddr, errChan)
+	go util.StartRpc(n, laddr, errChan, new(ControllerApi))
 	return errChan
 }
 
@@ -206,26 +174,4 @@ func generateRequest(marg *dm.MArg, mt dm.MType) (Request, error) {
 		Type: mt}
 	glog.Infof("%s: Generated Request: %v", id, r)
 	return r, nil
-}
-
-func startRpc(n, laddr string, eChan chan error) error {
-	api := new(ControllerApi)
-	server := rpc.NewServer()
-	server.Register(api)
-	l, e := net.Listen(n, laddr)
-	if e != nil {
-		glog.Errorf("Failed to listen: %v", e)
-		eChan <- e
-	}
-	glog.Infof("Controller started, listening on: %s", laddr)
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			glog.Errorf("Accept failed: %v", err)
-			eChan <- err
-			continue
-		}
-		glog.Info("Serving reqeust")
-		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-	}
 }

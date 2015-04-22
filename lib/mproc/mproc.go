@@ -33,37 +33,55 @@ import (
 	"github.com/golang/glog"
 	"os"
 	"sync"
+	"time"
 )
 
+const (
+	DELAY = 2
+)
+
+type FailFunc func(err error) bool
+
+func noop(err error) bool {
+	return false
+}
+
+var id uint32
+
 type MProc interface {
-	ManageProcess(p *proc.Process, ka bool) (int, error)
+	ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error)
 	KillAll()
-	EndKeepAlive(id int) error
-	SignalProc(id int, sig os.Signal) error
-	WaitProc(id int) chan error
-	GetProc(id int) *proc.Process
-	KillProc(id int) error
+	EndKeepAlive(id uint32) error
+	SignalProc(id uint32, sig os.Signal) error
+	WaitProc(id uint32) chan error
+	GetProc(id uint32) *proc.Process
+	KillProc(id uint32) error
 }
 
 type mProc struct {
 	mu           sync.Mutex
-	managedProcs map[int]*managedP
+	managedProcs map[uint32]*managedP
 }
 
 type managedP struct {
 	p         *proc.Process
 	mu        sync.Mutex
 	keepAlive bool
+	retry     uint
+	remRetry  uint
+	f         FailFunc
 }
 
-//New: Return a pointer to a newly created mProc.
 func New() MProc {
-	return &mProc{managedProcs: make(map[int]*managedP, 10)}
+	return &mProc{managedProcs: make(map[uint32]*managedP, 10)}
 
 }
 
-func create(p *proc.Process, keepAlive bool) *managedP {
-	return &managedP{p: p, keepAlive: keepAlive}
+func create(p *proc.Process, keepAlive bool, retry uint, f FailFunc) *managedP {
+	if f == nil {
+		f = noop
+	}
+	return &managedP{p: p, keepAlive: keepAlive, retry: retry, remRetry: retry, f: f}
 }
 
 func (mp *mProc) KillAll() {
@@ -76,11 +94,9 @@ func (mp *mProc) KillAll() {
 	}
 }
 
-var id = 0
+//If you want the process to restart indef. just use MaxUint32
+func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error) {
 
-//ManageProcess: Add a process to the manager and start it.
-//The function returns the id, error
-func (mp *mProc) ManageProcess(p *proc.Process, ka bool) (int, error) {
 	if p == nil {
 		return 0, errors.New("ManageProcess Argument nil: p")
 	}
@@ -91,7 +107,7 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	manp := create(p, ka)
+	manp := create(p, ka, retry, f)
 	mp.managedProcs[id] = manp
 	if ka {
 		mp.keepAlive(id)
@@ -101,10 +117,18 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool) (int, error) {
 	return rid, err
 }
 
-func (mp *mProc) keepAlive(id int) {
+func (mp *mProc) keepAlive(id uint32) {
 	go func() {
 		p := mp.getMp(id)
 		err := <-p.p.Wait()
+		if err != nil {
+			exit := p.f(err)
+			if exit {
+				p.keepAlive = false
+				p.remRetry = 0
+				return
+			}
+		}
 		glog.V(1).Infof("Keep Alive just returned from wait")
 		pid, e := p.p.Pid()
 		if e != nil {
@@ -118,13 +142,18 @@ func (mp *mProc) keepAlive(id int) {
 
 			mp.mu.Lock()
 			defer mp.mu.Unlock()
-			if p.keepAlive {
+			if p.keepAlive && p.remRetry > 0 {
+				<-time.After(DELAY * time.Second)
 				pid, err := p.p.Start()
 				if err != nil {
+					exit := p.f(err)
 					glog.Error("Failed to restart process in keepAlive")
-					return
+					if exit {
+						return
+					}
 				}
 				glog.Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
+				p.remRetry -= 1
 				mp.keepAlive(id)
 			}
 			return
@@ -134,8 +163,7 @@ func (mp *mProc) keepAlive(id int) {
 	}()
 }
 
-// Stop keep alive
-func (mp *mProc) EndKeepAlive(id int) error {
+func (mp *mProc) EndKeepAlive(id uint32) error {
 	p := mp.getMp(id)
 	if p == nil {
 		return errors.New(
@@ -154,15 +182,13 @@ func (mp *mProc) EndKeepAlive(id int) error {
 	return nil
 }
 
-//getMp: Get a managed proc, for internal use only.
-func (mp *mProc) getMp(id int) *managedP {
+func (mp *mProc) getMp(id uint32) *managedP {
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
 	return mp.managedProcs[id]
 }
 
-//SignalProc: Signal a process with the given pid and signal.
-func (mp *mProc) SignalProc(id int, sig os.Signal) error {
+func (mp *mProc) SignalProc(id uint32, sig os.Signal) error {
 	pro := mp.GetProc(id)
 	if pro == nil {
 		return errors.New(
@@ -171,14 +197,12 @@ func (mp *mProc) SignalProc(id int, sig os.Signal) error {
 	return pro.Signal(sig)
 }
 
-//WaitProc: Wait on a process with the given pid.
-func (mp *mProc) WaitProc(id int) chan error {
+func (mp *mProc) WaitProc(id uint32) chan error {
 	proc := mp.GetProc(id)
 	return proc.Wait()
 }
 
-//GetProc: Get a Process by pid.
-func (mp *mProc) GetProc(id int) *proc.Process {
+func (mp *mProc) GetProc(id uint32) *proc.Process {
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
 	p := mp.managedProcs[id]
@@ -188,7 +212,7 @@ func (mp *mProc) GetProc(id int) *proc.Process {
 	return nil
 }
 
-func (mp *mProc) KillProc(id int) error {
+func (mp *mProc) KillProc(id uint32) error {
 	proc := mp.GetProc(id)
 	if proc == nil {
 		return errors.New(

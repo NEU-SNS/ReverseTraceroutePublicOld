@@ -29,10 +29,12 @@ package controller
 import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"net/rpc/jsonrpc"
+	"sync"
 	"time"
 )
 
 type router struct {
+	rw       sync.RWMutex
 	services map[string]*dm.Service
 }
 
@@ -52,24 +54,30 @@ type Router interface {
 }
 
 func (r *router) GetServices() []*dm.Service {
+	r.rw.RLock()
 	serv := make([]*dm.Service, len(r.services), len(r.services))
 	for _, service := range r.services {
 		serv = append(serv, service)
 	}
+	r.rw.RUnlock()
 	return serv
 }
 
 func (r *router) RegisterServices(services ...*dm.Service) {
+	r.rw.Lock()
 	for _, service := range services {
 		r.services[service.Key] = service
 	}
+	r.rw.Unlock()
 }
 
 func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
+	r.rw.RLock()
 	s := r.services[req.Key]
 	if s == nil {
 		return nil, ErrorServiceNotFound
 	}
+	r.rw.RUnlock()
 	return wrapRequest(req, s)
 }
 
@@ -82,12 +90,13 @@ func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
 			return nil, nil, err
 		}
 		defer c.Close()
-		err = c.Call(s.Api[req.Type], nil, nil)
+		var ret dm.MReturn
+		err = c.Call(s.Api[req.Type], req.Args, &(ret.SRet))
 		req.Dur = time.Since(req.Stime)
 		if err != nil {
 			return nil, nil, err
 		}
-		return nil, &req, nil
+		return &ret, &req, nil
 	}, nil
 
 }
