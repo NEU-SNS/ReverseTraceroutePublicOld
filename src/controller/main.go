@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -30,7 +30,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/controller"
-	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/testdataaccess"
+	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"os"
 )
@@ -52,27 +53,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	if flags.CloseSocks {
-		glog.Info("Closing standard file descripters")
-		err := os.Stdin.Close()
-		if err != nil {
-			glog.Error("Failed to close Stdin")
-			glog.Flush()
-			os.Exit(1)
-		}
-		err = os.Stderr.Close()
-		if err != nil {
-			glog.Error("Failed to close Stderr")
-			glog.Flush()
-			os.Exit(1)
-		}
-		err = os.Stdout.Close()
-		if err != nil {
-			glog.Error("Failed to close Stdout")
-			glog.Flush()
-			os.Exit(1)
-		}
-	}
+	util.CloseStdFiles(flags.CloseSocks)
 
 	ipstr := fmt.Sprintf("%s:%s", flags.Ip, flags.Port)
 	err := <-controller.Start(flags.PType, ipstr, da.New())

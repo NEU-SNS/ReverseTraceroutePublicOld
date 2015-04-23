@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -38,14 +38,14 @@ var (
 )
 
 type ControllerApi struct{}
-type RoutedRequest func() (*dm.MReturn, *Request, error)
+type RoutedRequest func() (*dm.MReturn, Request, error)
 
 type Request struct {
 	Id    uuid.UUID
 	Stime time.Time
 	Dur   time.Duration
 	Args  interface{}
-	Key   string
+	Key   dm.ServiceT
 	Type  dm.MType
 }
 

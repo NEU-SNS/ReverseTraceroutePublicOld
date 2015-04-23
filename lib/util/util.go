@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -9,10 +9,10 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -32,6 +32,7 @@ import (
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -90,5 +91,27 @@ func StartRpc(n, laddr string, eChan chan error, api interface{}) error {
 		}
 		glog.Info("Serving reqeust")
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
+	}
+}
+
+func CloseStdFiles(c bool) {
+	glog.Info("Closing standard file descripters")
+	err := os.Stdin.Close()
+	if err != nil {
+		glog.Error("Failed to close Stdin")
+		glog.Flush()
+		os.Exit(1)
+	}
+	err = os.Stderr.Close()
+	if err != nil {
+		glog.Error("Failed to close Stderr")
+		glog.Flush()
+		os.Exit(1)
+	}
+	err = os.Stdout.Close()
+	if err != nil {
+		glog.Error("Failed to close Stdout")
+		glog.Flush()
+		os.Exit(1)
 	}
 }

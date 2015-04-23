@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -79,7 +79,7 @@ func (c *controllerT) getTime() time.Duration {
 	return time
 }
 
-func (c *controllerT) addReqStats(req *Request) {
+func (c *controllerT) addReqStats(req Request) {
 	c.mu.Lock()
 	c.time += req.Dur
 	c.requests += 1
@@ -93,7 +93,7 @@ func (c *controllerT) getStatsInfo() (t time.Duration, req int64) {
 	return
 }
 
-func (c *controllerT) getStats() *dm.Stats {
+func (c *controllerT) getStats() dm.Stats {
 	utime := time.Since(c.startTime)
 	t, req := c.getStatsInfo()
 	var tt time.Duration
@@ -105,7 +105,7 @@ func (c *controllerT) getStats() *dm.Stats {
 	s := dm.Stats{StartTime: c.startTime,
 		UpTime: utime, Requests: req,
 		TotReqTime: t, AvgReqTime: tt}
-	return &s
+	return s
 }
 
 func Start(n, laddr string, db da.DataAccess) chan error {
@@ -138,12 +138,14 @@ func makeErrorReturn(cause dm.MRequestState, err error) (*dm.MReturn, error) {
 }
 
 func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn, error) {
+	glog.Infof("Handling measurement: %v, type: %v", arg, mt)
 	r, err := generateRequest(arg, mt)
 	if err != nil {
 		glog.Errorf("Error generating request: %v", err)
 		return makeErrorReturn(dm.GenRequest, err)
 	}
 	rr, err := controller.routeRequest(r)
+	glog.Infof("%s: request routed: %v", r.Id, r)
 	if err != nil {
 		glog.Errorf("%s: Failed to route request: %v, with error: %v", r.Id, r, err)
 		return makeErrorReturn(dm.RequestRoute, err)
@@ -154,6 +156,8 @@ func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn,
 		glog.Errorf("%s: Failed to execute request: %v, with error: %v", r.Id, rr, err)
 		return makeErrorReturn(dm.ExecuteRequest, err)
 	}
+	glog.Infof("Finished Measurement: %v", req)
+	result.Status = dm.SUCCESS
 	return result, nil
 }
 
@@ -167,6 +171,7 @@ func (c *controllerT) routeRequest(r Request) (RoutedRequest, error) {
 
 func generateRequest(marg *dm.MArg, mt dm.MType) (Request, error) {
 	id := uuid.NewRandom()
+	glog.Infof("%s: Generating Request: %v", id, marg)
 	r := Request{
 		Id:   id,
 		Args: marg,

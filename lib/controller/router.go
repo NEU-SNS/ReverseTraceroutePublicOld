@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -28,6 +28,7 @@ package controller
 
 import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/golang/glog"
 	"net/rpc/jsonrpc"
 	"sync"
 	"time"
@@ -35,11 +36,11 @@ import (
 
 type router struct {
 	rw       sync.RWMutex
-	services map[string]*dm.Service
+	services map[dm.ServiceT]*dm.Service
 }
 
 func createRouter() Router {
-	s := make(map[string]*dm.Service)
+	s := make(map[dm.ServiceT]*dm.Service)
 	return &router{services: s}
 }
 
@@ -67,12 +68,14 @@ func (r *router) RegisterServices(services ...*dm.Service) {
 	r.rw.Lock()
 	for _, service := range services {
 		r.services[service.Key] = service
+		glog.Infof("Registered service: %v, with api: %v", service, service.Api)
 	}
 	r.rw.Unlock()
 }
 
 func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
 	r.rw.RLock()
+	glog.Infof("Trying to get API for %s", req.Key)
 	s := r.services[req.Key]
 	if s == nil {
 		return nil, ErrorServiceNotFound
@@ -82,21 +85,25 @@ func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
 }
 
 func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
-	return func() (*dm.MReturn, *Request, error) {
-
+	glog.Infof("Wrapping request: %v", req)
+	return func() (*dm.MReturn, Request, error) {
 		req.Stime = time.Now()
+		glog.Infof("Executing request: %v", req)
+		glog.Infof("Connecting to %s, %s", s.Proto, s.FormatIp())
 		c, err := jsonrpc.Dial(s.Proto, s.FormatIp())
 		if err != nil {
-			return nil, nil, err
+			glog.Errorf("Failed to connect: %v, %v, with err: %v", req, s, err)
+			return nil, req, err
 		}
 		defer c.Close()
-		var ret dm.MReturn
-		err = c.Call(s.Api[req.Type], req.Args, &(ret.SRet))
+		ret := new(dm.MReturn)
+		err = c.Call(s.Api[req.Type], req.Args, ret)
 		req.Dur = time.Since(req.Stime)
+		glog.Infof("Finished Request: %v", req)
 		if err != nil {
-			return nil, nil, err
+			return nil, req, err
 		}
-		return &ret, &req, nil
+		return ret, req, nil
 	}, nil
 
 }

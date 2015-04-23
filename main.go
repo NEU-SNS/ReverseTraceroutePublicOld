@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -32,6 +32,7 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"net"
 	"net/rpc/jsonrpc"
+	"reflect"
 	"runtime"
 )
 
@@ -53,10 +54,17 @@ func main() {
 	defer conn.Close()
 
 	c := jsonrpc.NewClient(conn)
-	var stat dm.Stats
-	num := 8
-	err = c.Call(GETSTATS, &num, &stat)
-	fmt.Printf("Got stats: %v", stat)
+	args := dm.MArg{Service: dm.PLANET_LAB}
+	var ret dm.MReturn
+	err = c.Call(GETSTATS, args, &ret)
+	fmt.Printf("%v", reflect.TypeOf(ret.SRet))
+	if stats, ok := (ret.SRet).(dm.Stats); ok {
+		fmt.Printf("Got response with status: %v\n", stats)
+		fmt.Printf("Response took: %s", ret.Dur.String())
+	} else {
+		fmt.Printf("Didn't receive dm.Stats\n")
+	}
+
 	if err != nil {
 		panic(err)
 	}

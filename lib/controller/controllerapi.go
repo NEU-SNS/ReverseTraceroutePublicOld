@@ -9,7 +9,7 @@
      * Redistributions in binary form must reproduce the above copyright
        notice, this list of conditions and the following disclaimer in the
        documentation and/or other materials provided with the distribution.
-     * Neither the name of the University of Washington nor the
+     * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
 
@@ -28,6 +28,7 @@ package controller
 
 import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/golang/glog"
 )
 
 func (c ControllerApi) Register(arg int, reply *int) error {
@@ -47,8 +48,9 @@ func (c ControllerApi) Traceroute(arg dm.MArg, ret *dm.MReturn) error {
 	return err
 }
 
-func (c ControllerApi) GetStats(arg *int, ret *dm.Stats) error {
-	stats := controller.getStats()
-	*ret = *stats
-	return nil
+func (c ControllerApi) GetStats(arg dm.MArg, ret *dm.MReturn) error {
+	glog.Info("Handling Stats Request")
+	mr, err := controller.handleMeasurement(&arg, dm.STATS)
+	*ret = *mr
+	return err
 }
