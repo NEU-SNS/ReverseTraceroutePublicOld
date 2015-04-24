@@ -51,7 +51,7 @@ type plControllerT struct {
 	mu        sync.Mutex
 	//the mutex protects the following
 	requests int64
-	time     time.Time
+	time     time.Duration
 }
 
 func handleScamperStop(err error) bool {

@@ -32,7 +32,6 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"net"
 	"net/rpc/jsonrpc"
-	"reflect"
 	"runtime"
 )
 
@@ -56,14 +55,11 @@ func main() {
 	c := jsonrpc.NewClient(conn)
 	args := dm.MArg{Service: dm.PLANET_LAB}
 	var ret dm.MReturn
+	var stat dm.Stats
+	ret.SRet = stat
 	err = c.Call(GETSTATS, args, &ret)
-	fmt.Printf("%v", reflect.TypeOf(ret.SRet))
-	if stats, ok := (ret.SRet).(dm.Stats); ok {
-		fmt.Printf("Got response with status: %v\n", stats)
-		fmt.Printf("Response took: %s", ret.Dur.String())
-	} else {
-		fmt.Printf("Didn't receive dm.Stats\n")
-	}
+	fmt.Printf("Got response with status: %v\n", ret.SRet)
+	fmt.Printf("Response took: %s", ret.Dur.String())
 
 	if err != nil {
 		panic(err)
