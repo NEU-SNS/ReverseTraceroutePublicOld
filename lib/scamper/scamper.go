@@ -86,7 +86,7 @@ func checkScamperBinPath(binPath string) error {
 }
 
 func makeScamperDir(sockDir string) error {
-	return os.Mkdir(sockDir, os.ModeDir)
+	return os.Mkdir(sockDir, os.ModeDir|0700)
 }
 
 func checkScamperSockDir(sockDir string) error {

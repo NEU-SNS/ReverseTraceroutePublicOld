@@ -54,8 +54,7 @@ type plControllerT struct {
 	time     time.Duration
 }
 
-func handleScamperStop(err error) bool {
-	glog.Error("Scamper stopped with error: %v", err)
+func handleScamperStop(err error, ps *os.ProcessState) bool {
 	switch err.(type) {
 	default:
 		return false
@@ -119,4 +118,14 @@ func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 func (c *plControllerT) startScamperProc(sc scamper.ScamperConfig) {
 	sp := scamper.GetProc(sc.Path, sc.Port, sc.ScPath)
 	plController.mp.ManageProcess(sp, true, 10, handleScamperStop)
+}
+
+func HandleSig(s os.Signal) {
+	plController.handleSig(s)
+}
+
+func (c *plControllerT) handleSig(s os.Signal) {
+	if c.mp != nil {
+		c.mp.KillAll()
+	}
 }

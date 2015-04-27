@@ -48,9 +48,13 @@ func (c ControllerApi) Traceroute(arg dm.MArg, ret *dm.MReturn) error {
 	return err
 }
 
-func (c ControllerApi) GetStats(arg dm.MArg, ret *dm.MReturn) error {
+func (c ControllerApi) GetStats(arg dm.MArg, ret *dm.StatsReturn) error {
 	glog.Info("Handling Stats Request")
 	mr, err := controller.handleMeasurement(&arg, dm.STATS)
-	*ret = *mr
+	ret.Status = mr.Status
+	ret.Dur = mr.Dur
+	if stats, ok := mr.SRet.(*dm.Stats); ok {
+		ret.Stats = *stats
+	}
 	return err
 }

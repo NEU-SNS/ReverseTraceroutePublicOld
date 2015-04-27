@@ -54,11 +54,9 @@ func main() {
 
 	c := jsonrpc.NewClient(conn)
 	args := dm.MArg{Service: dm.PLANET_LAB}
-	var ret dm.MReturn
-	var stat dm.Stats
-	ret.SRet = stat
+	var ret dm.StatsReturn
 	err = c.Call(GETSTATS, args, &ret)
-	fmt.Printf("Got response with status: %v\n", ret.SRet)
+	fmt.Printf("Got response with status: %v\n", ret.Stats)
 	fmt.Printf("Response took: %s", ret.Dur.String())
 
 	if err != nil {

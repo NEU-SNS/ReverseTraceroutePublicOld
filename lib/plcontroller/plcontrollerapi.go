@@ -37,9 +37,9 @@ func (c PlControllerApi) Ping(dm.PingArg, *dm.PingReturn) error {
 	return nil
 }
 
-func (c PlControllerApi) GetStats(arg struct{}, ret *dm.MReturn) error {
+func (c PlControllerApi) GetStats(arg struct{}, ret *dm.Stats) error {
 	glog.Infof("GetStats Called")
 	stat := plController.getStats()
-	ret.SRet = stat
+	*ret = stat
 	return nil
 }

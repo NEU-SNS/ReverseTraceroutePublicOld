@@ -39,7 +39,12 @@ type Service struct {
 	Key    ServiceT
 	ip     net.IP
 	Proto  string
-	Api    map[MType]string
+	Api    map[MType]Api
+}
+
+type Api struct {
+	Url  string
+	Type string
 }
 
 func (s *Service) FormatIp() string {

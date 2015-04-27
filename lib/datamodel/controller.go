@@ -31,6 +31,16 @@ import (
 	"time"
 )
 
+//http://stackoverflow.com/questions/10210188/instance-new-type-golang
+type Creator func() interface{}
+
+var TypeMap map[string]Creator
+
+func init() {
+	TypeMap = make(map[string]Creator, 10)
+	TypeMap["Stats"] = createStats
+}
+
 const (
 	GenRequest     MRequestState  = "generating request"
 	RequestRoute   MRequestState  = "routing request"
@@ -63,11 +73,21 @@ type PingArg struct {
 
 type MReturn struct {
 	Status MRequestStatus
-	SRet   interface{}
 	Dur    time.Duration
+	SRet   interface{}
 }
 
 type PingReturn struct {
+}
+
+type StatsReturn struct {
+	Stats  Stats
+	Status MRequestStatus
+	Dur    time.Duration
+}
+
+func createStats() interface{} {
+	return new(Stats)
 }
 
 func (m MRequestError) Error() string {

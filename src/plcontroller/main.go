@@ -34,6 +34,8 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 var flags plcontroller.Flags
@@ -57,12 +59,23 @@ func init() {
 	flag.StringVar(&flags.SockPath, "S", "/tmp/scamper_sockets",
 		"Directory that scamper will use for its sockets")
 
-	flag.StringVar(&flags.ScPath, "B", "/usr/local/bin/scamper",
+	flag.StringVar(&flags.ScPath, "B", "/usr/local/bin/sc_remoted",
 		"Path to the scamper binary")
 }
 
+func sigHandle() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	for sig := range c {
+		plcontroller.HandleSig(sig)
+		os.Exit(1)
+	}
+}
+
 func main() {
+	go sigHandle()
 	flag.Parse()
+	defer glog.Flush()
 	util.CloseStdFiles(flags.CloseSocks)
 
 	ipstr := fmt.Sprintf("%s:%s", flags.Ip, flags.Port)
@@ -73,8 +86,6 @@ func main() {
 	err := <-plcontroller.Start(flags.PType, ipstr, sa)
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
-		glog.Flush()
 		os.Exit(1)
 	}
-	glog.Flush()
 }

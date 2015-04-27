@@ -38,8 +38,8 @@ type dataAccess struct {
 }
 
 func (d *dataAccess) GetServices(ip string) []*dm.Service {
-	api := make(map[dm.MType]string, 1)
-	api[dm.STATS] = "PlControllerApi.GetStats"
+	api := make(map[dm.MType]dm.Api, 1)
+	api[dm.STATS] = dm.Api{Url: "PlControllerApi.GetStats", Type: "Stats"}
 	return []*dm.Service{&dm.Service{Port: 45000,
 		IPAddr: "127.0.0.1",
 		Key:    "PLANET_LAB",

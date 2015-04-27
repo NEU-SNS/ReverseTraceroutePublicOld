@@ -53,14 +53,13 @@ func init() {
 
 func main() {
 	flag.Parse()
+	defer glog.Flush()
 	util.CloseStdFiles(flags.CloseSocks)
 
 	ipstr := fmt.Sprintf("%s:%s", flags.Ip, flags.Port)
 	err := <-controller.Start(flags.PType, ipstr, da.New())
 	if err != nil {
 		glog.Errorf("Controller Start returned with error: %v", err)
-		glog.Flush()
 		os.Exit(1)
 	}
-	glog.Flush()
 }

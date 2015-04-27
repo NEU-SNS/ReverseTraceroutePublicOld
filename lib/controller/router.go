@@ -97,9 +97,13 @@ func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
 		}
 		defer c.Close()
 		ret := new(dm.MReturn)
-		err = c.Call(s.Api[req.Type], req.Args, ret)
+		api := s.Api[req.Type]
+		sret := dm.TypeMap[api.Type]()
+		err = c.Call(api.Url, req.Args, sret)
+		glog.Info("%v", sret)
 		req.Dur = time.Since(req.Stime)
 		ret.Dur = req.Dur
+		ret.SRet = sret
 		glog.Infof("Finished Request: %v", req)
 		if err != nil {
 			return nil, req, err
