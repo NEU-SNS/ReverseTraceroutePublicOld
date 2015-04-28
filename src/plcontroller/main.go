@@ -54,7 +54,7 @@ func init() {
 		"Determines if the sandard file descriptors are closed.")
 
 	flag.StringVar(&flags.SPort, "P", "55000",
-		"Socket that Scamper will use.")
+		"Port that Scamper will use.")
 
 	flag.StringVar(&flags.SockPath, "S", "/tmp/scamper_sockets",
 		"Directory that scamper will use for its sockets")

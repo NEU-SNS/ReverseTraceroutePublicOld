@@ -33,7 +33,9 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"os"
+	"path"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -45,13 +47,42 @@ const (
 	IPv6       = "-6"
 	PORT       = "-P"
 	SOCKET_DIR = "-U"
+	REMOTE     = "-R"
 	SUDO       = "/usr/bin/sudo"
 )
+
+type Socket struct {
+	fname string
+	ip    string
+	port  string
+}
+
+func (s Socket) IP() string {
+	if s.ip == "" {
+		s.ip = strings.Split(s.fname, ":")[util.IP]
+		return s.ip
+	}
+	return s.ip
+}
+
+func (s Socket) Port() string {
+	if s.port == "" {
+		s.port = strings.Split(s.fname, ":")[util.PORT]
+		return s.port
+	}
+	return s.port
+}
+
+func NewSocket(fname string) Socket {
+	trim := path.Base(fname)
+	return Socket{fname: trim}
+}
 
 type ScamperConfig struct {
 	Port   string
 	Path   string
 	ScPath string
+	Url    string
 }
 
 type scamperTool struct {
@@ -66,10 +97,13 @@ func ParseScamperConfig(sc ScamperConfig) error {
 	if val < 1 || val > 65535 {
 		return util.ErrorInvalidPort
 	}
-	err = checkScamperSockDir(sc.Path)
-	if err != nil {
-		return err
+	if sc.Path != "" {
+		err = checkScamperSockDir(sc.Path)
+		if err != nil {
+			return err
+		}
 	}
+
 	return checkScamperBinPath(sc.ScPath)
 
 }
@@ -77,6 +111,9 @@ func ParseScamperConfig(sc ScamperConfig) error {
 func checkScamperBinPath(binPath string) error {
 	fi, err := os.Stat(binPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrorScamperBin
+		}
 		return err
 	}
 	if fi.IsDir() {
@@ -86,32 +123,39 @@ func checkScamperBinPath(binPath string) error {
 }
 
 func makeScamperDir(sockDir string) error {
-	return os.Mkdir(sockDir, os.ModeDir|0700)
+	return util.MakeDir(sockDir, os.ModeDir|0700)
 }
 
 func checkScamperSockDir(sockDir string) error {
-	fi, err := os.Stat(sockDir)
+	isd, err := util.IsDir(sockDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return makeScamperDir(sockDir)
 		}
 		return err
 	}
-	if !fi.IsDir() {
-		return fmt.Errorf("Socket directory path: %s is not a directory",
-			sockDir)
+	if isd {
+		return nil
+
 	}
-	return nil
+	return fmt.Errorf("Socket directory path: %s is not a directory",
+		sockDir)
 }
 
 func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 
 	err := checkScamperSockDir(sockDir)
 	if err != nil {
-		glog.Fatal("Error with scamper socket directory: %v", err)
+		glog.Errorf("Error with scamper socket directory: %v", err)
+		return nil
 	}
 	return proc.New(SUDO, nil, scamperPath,
 		IPv4, PORT, scampPort, SOCKET_DIR, sockDir)
+}
+
+func GetVPProc(scpath, host, port string) *proc.Process {
+	faddr := fmt.Sprintf("%s:%s", host, port)
+	return proc.New(SUDO, nil, scpath, REMOTE, faddr)
 }
 
 func GetMeasurementTool(sockDir string) *scamperTool {

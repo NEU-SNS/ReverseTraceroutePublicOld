@@ -31,6 +31,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
+	"github.com/go-fsnotify/fsnotify"
 	"github.com/golang/glog"
 	"net"
 	"os"
@@ -44,14 +45,17 @@ type plControllerT struct {
 	ptype     string
 	startTime time.Time
 	spid      int
-	spath     string
-	sip       net.IP
-	sport     string
+	sc        scamper.ScamperConfig
 	mp        mproc.MProc
+	w         *fsnotify.Watcher
 	mu        sync.Mutex
 	//the mutex protects the following
 	requests int64
 	time     time.Duration
+
+	rw sync.RWMutex
+	//rwmutex protext the socks
+	socks map[string]scamper.Socket
 }
 
 func handleScamperStop(err error, ps *os.ProcessState) bool {
@@ -66,14 +70,14 @@ func handleScamperStop(err error, ps *os.ProcessState) bool {
 
 var plController plControllerT
 
-func (c plControllerT) getStatsInfo() (t time.Duration, req int64) {
+func (c *plControllerT) getStatsInfo() (t time.Duration, req int64) {
 	c.mu.Lock()
 	t, req = c.time, c.requests
 	c.mu.Unlock()
 	return
 }
 
-func (c plControllerT) getStats() dm.Stats {
+func (c *plControllerT) getStats() dm.Stats {
 	utime := time.Since(c.startTime)
 	t, req := c.getStatsInfo()
 	var tt time.Duration
@@ -86,6 +90,18 @@ func (c plControllerT) getStats() dm.Stats {
 		UpTime: utime, Requests: req,
 		TotReqTime: t, AvgReqTime: tt}
 	return s
+}
+
+func (c *plControllerT) addSocket(sock scamper.Socket) {
+	c.rw.Lock()
+	c.socks[sock.IP()] = sock
+	c.rw.Unlock()
+}
+
+func (c *plControllerT) removeSocket(sock scamper.Socket) {
+	c.rw.Lock()
+	delete(c.socks, sock.IP())
+	c.rw.Unlock()
 }
 
 func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
@@ -104,19 +120,18 @@ func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 		return errChan
 	}
 	plController.startTime = time.Now()
-	plController.sport = sc.Port
-	plController.spath = sc.Path
 	plController.ip = ip
 	plController.port = port
 	plController.mp = mproc.New()
-	plController.startScamperProc(sc)
+	plController.sc = sc
+	plController.startScamperProc()
 
 	go util.StartRpc(n, laddr, errChan, new(PlControllerApi))
 	return errChan
 }
 
-func (c *plControllerT) startScamperProc(sc scamper.ScamperConfig) {
-	sp := scamper.GetProc(sc.Path, sc.Port, sc.ScPath)
+func (c *plControllerT) startScamperProc() {
+	sp := scamper.GetProc(c.sc.Path, c.sc.Port, c.sc.ScPath)
 	plController.mp.ManageProcess(sp, true, 10, handleScamperStop)
 }
 

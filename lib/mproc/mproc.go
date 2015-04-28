@@ -102,7 +102,7 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc)
 	}
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
-
+	glog.Infof("Starting process: %s", p.String())
 	_, err := p.Start()
 	if err != nil {
 		return 0, err

@@ -27,15 +27,70 @@
 package plvp
 
 import (
+	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
+	"github.com/golang/glog"
+	"net"
+	"os"
 )
 
-type PLVantagepoint struct {
-	version  int
-	ip       string
+type plVantagepointT struct {
+	ip       net.IP
 	port     int
 	hostname string
-	socket   string
-	canspoof bool
 	sc       scamper.ScamperConfig
+	dest     string
+	mp       mproc.MProc
+}
+
+var plVantagepoint plVantagepointT
+
+func handleScamperStop(err error, ps *os.ProcessState) bool {
+	switch err.(type) {
+	default:
+		return false
+	case *os.PathError:
+		return true
+	}
+}
+
+func (c *plVantagepointT) handleSig(s os.Signal) {
+	c.mp.KillAll()
+}
+
+func HandleSig(s os.Signal) {
+	plVantagepoint.handleSig(s)
+}
+
+func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
+	glog.Info("Starting plvp")
+	defer glog.Flush()
+	errChan := make(chan error, 1)
+	port, ip, err := util.ParseAddrArg(laddr)
+
+	if err != nil {
+		glog.Error("Failed to parse addr string")
+		errChan <- err
+		return errChan
+	}
+
+	err = scamper.ParseScamperConfig(sc)
+	if err != nil {
+		glog.Errorf("Invalid scamper args: %v", err)
+		errChan <- err
+		return errChan
+	}
+	plVantagepoint.sc = sc
+	plVantagepoint.port = port
+	plVantagepoint.ip = ip
+	plVantagepoint.mp = mproc.New()
+	plVantagepoint.startScamperProc()
+	return errChan
+}
+
+func (c *plVantagepointT) startScamperProc() {
+	glog.Info("Starting scamper proc")
+	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.Url, c.sc.Port)
+	c.mp.ManageProcess(sp, true, 10, handleScamperStop)
 }

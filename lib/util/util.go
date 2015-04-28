@@ -47,6 +47,18 @@ var (
 	ErrorInvalidPort = errors.New("invalid port")
 )
 
+func IsDir(dir string) (bool, error) {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return false, err
+	}
+	return fi.IsDir(), nil
+}
+
+func MakeDir(path string, mode os.FileMode) error {
+	return os.Mkdir(path, mode)
+}
+
 func ParseAddrArg(addr string) (int, net.IP, error) {
 	parts := strings.Split(addr, ":")
 	ip := parts[IP]
@@ -96,22 +108,21 @@ func StartRpc(n, laddr string, eChan chan error, api interface{}) error {
 
 func CloseStdFiles(c bool) {
 	glog.Info("Closing standard file descripters")
+	defer glog.Flush()
 	err := os.Stdin.Close()
+
 	if err != nil {
 		glog.Error("Failed to close Stdin")
-		glog.Flush()
 		os.Exit(1)
 	}
 	err = os.Stderr.Close()
 	if err != nil {
 		glog.Error("Failed to close Stderr")
-		glog.Flush()
 		os.Exit(1)
 	}
 	err = os.Stdout.Close()
 	if err != nil {
 		glog.Error("Failed to close Stdout")
-		glog.Flush()
 		os.Exit(1)
 	}
 }
