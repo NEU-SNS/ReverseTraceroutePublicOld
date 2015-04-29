@@ -36,9 +36,15 @@ func (c ControllerApi) Register(arg int, reply *int) error {
 	return nil
 }
 
-func (c ControllerApi) Ping(arg dm.MArg, ret *dm.MReturn) error {
-	mr, err := controller.handleMeasurement(&arg, dm.PING)
-	*ret = *mr
+func (c ControllerApi) Ping(arg dm.PingArg, ret *dm.PingReturn) error {
+	glog.Info("Handling Ping Request")
+	marg := dm.MArg{Service: arg.Service, SArg: arg}
+	mr, err := controller.handleMeasurement(&marg, dm.PING)
+	ret.Status = mr.Status
+	ret.Dur = mr.Dur
+	if ping, ok := mr.SRet.(*dm.Ping); ok {
+		ret.Ping = *ping
+	}
 	return err
 }
 
@@ -48,9 +54,10 @@ func (c ControllerApi) Traceroute(arg dm.MArg, ret *dm.MReturn) error {
 	return err
 }
 
-func (c ControllerApi) GetStats(arg dm.MArg, ret *dm.StatsReturn) error {
+func (c ControllerApi) GetStats(arg dm.StatsArg, ret *dm.StatsReturn) error {
 	glog.Info("Handling Stats Request")
-	mr, err := controller.handleMeasurement(&arg, dm.STATS)
+	marg := dm.MArg{Service: arg.Service, SArg: arg}
+	mr, err := controller.handleMeasurement(&marg, dm.STATS)
 	ret.Status = mr.Status
 	ret.Dur = mr.Dur
 	if stats, ok := mr.SRet.(*dm.Stats); ok {

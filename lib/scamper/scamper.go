@@ -30,8 +30,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	"net"
 	"os"
 	"path"
 	"strconv"
@@ -39,7 +41,9 @@ import (
 )
 
 var (
-	ErrorScamperBin = errors.New("scamper file is not an executable")
+	ErrorScamperBin    = errors.New("scamper file is not an executable")
+	ErrorBadOKResponse = errors.New("Bad OK Response")
+	ErrorBadResponse   = errors.New("Bad Response")
 )
 
 const (
@@ -71,6 +75,19 @@ func (s Socket) Port() string {
 		return s.port
 	}
 	return s.port
+}
+
+func (s Socket) connect() (net.Conn, error) {
+	return net.Dial("unix", s.fname)
+}
+
+func (s Socket) Do(c scamper.Cmd) error {
+	conn, err := s.connect()
+	if err != nil {
+		return err
+	}
+	conn.Write(c.String())
+	return nil
 }
 
 func NewSocket(fname string) Socket {

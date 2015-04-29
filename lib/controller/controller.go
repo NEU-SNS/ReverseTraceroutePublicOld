@@ -174,7 +174,7 @@ func generateRequest(marg *dm.MArg, mt dm.MType) (Request, error) {
 	glog.Infof("%s: Generating Request: %v", id, marg)
 	r := Request{
 		Id:   id,
-		Args: marg,
+		Args: marg.SArg,
 		Key:  marg.Service,
 		Type: mt}
 	glog.Infof("%s: Generated Request: %v", id, r)

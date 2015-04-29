@@ -66,9 +66,24 @@ type Stats struct {
 
 type MArg struct {
 	Service ServiceT
+	SArg    interface{}
+}
+
+type ServiceArg struct {
+	Service ServiceT
 }
 
 type PingArg struct {
+	ServiceArg
+	Dst   string
+	Host  string
+	Spoof bool
+	RR    bool
+	TS    bool
+	SAddr string
+}
+
+type Ping struct {
 }
 
 type MReturn struct {
@@ -77,13 +92,23 @@ type MReturn struct {
 	SRet   interface{}
 }
 
+type ReturnT struct {
+	Status MRequestStatus
+	Dur    time.Duration
+}
+
 type PingReturn struct {
+	ReturnT
+	Ping Ping
 }
 
 type StatsReturn struct {
-	Stats  Stats
-	Status MRequestStatus
-	Dur    time.Duration
+	ReturnT
+	Stats Stats
+}
+
+type StatsArg struct {
+	ServiceArg
 }
 
 func createStats() interface{} {

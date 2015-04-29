@@ -28,6 +28,7 @@ package controller
 
 import (
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/testdataaccess"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"testing"
 	"time"
 )
@@ -88,7 +89,7 @@ func TestStartPortOutOfRange(t *testing.T) {
 }
 
 func TestGenerateRequest(t *testing.T) {
-	_, err := generateRequest(&MArg{Service: "TEST"}, PING)
+	_, err := generateRequest(&dm.MArg{Service: "TEST"}, dm.PING)
 	if err != nil {
 		t.Errorf("TestGenerateRequest failed error: %v", err)
 	}

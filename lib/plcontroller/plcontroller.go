@@ -27,6 +27,7 @@
 package plcontroller
 
 import (
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
@@ -92,10 +93,25 @@ func (c *plControllerT) getStats() dm.Stats {
 	return s
 }
 
+func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
+	sock, err := c.getSocket(pa.Host)
+	if err != nil {
+		return err
+	}
+}
+
 func (c *plControllerT) addSocket(sock scamper.Socket) {
 	c.rw.Lock()
 	c.socks[sock.IP()] = sock
 	c.rw.Unlock()
+}
+
+func (c *plControllerT) getSocket(n string) (scamper.Socket, error) {
+	c.rw.RLock()
+	if sock, ok := c.socks[n]; ok {
+		return sock, nil
+	}
+	return scamper.Socket{}, fmt.Errorf("Could not find socket: %s", n)
 }
 
 func (c *plControllerT) removeSocket(sock scamper.Socket) {
