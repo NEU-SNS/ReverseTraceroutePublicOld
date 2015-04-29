@@ -105,7 +105,7 @@ func (c *plControllerT) removeSocket(sock scamper.Socket) {
 }
 
 func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	port, ip, err := util.ParseAddrArg(laddr)
 
 	if err != nil {
@@ -125,7 +125,10 @@ func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 	plController.mp = mproc.New()
 	plController.sc = sc
 	plController.startScamperProc()
-
+	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
+	//best to call it after startScamperProc otherwise you'll send an error
+	//and trigger any error logic in whatever code is using this
+	plController.watchDir(sc.ScPath, errChan)
 	go util.StartRpc(n, laddr, errChan, new(PlControllerApi))
 	return errChan
 }
@@ -142,5 +145,8 @@ func HandleSig(s os.Signal) {
 func (c *plControllerT) handleSig(s os.Signal) {
 	if c.mp != nil {
 		c.mp.KillAll()
+	}
+	if c.w != nil {
+		c.w.Close()
 	}
 }

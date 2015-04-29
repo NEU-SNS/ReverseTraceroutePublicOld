@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -49,14 +49,23 @@ func (c plControllerT) handlEvents(ec chan error) {
 	}
 }
 
-func (c plControllerT) watchDir(dir string) chan error {
-	ec := make(chan error, 1)
+func (c plControllerT) watchDir(dir string, ec chan error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
+		glog.Infof("Failed to create watcher: %v", err)
 		ec <- err
-		return ec
+		return
+	}
+	err = w.Add(dir)
+	if err != nil {
+		glog.Infof("Failed to add dir: %s, %v", dir, err)
+		ec <- err
+		return
 	}
 	c.w = w
 	go c.handlEvents(ec)
-	return ec
+}
+
+func (c plControllerT) closeWatcher() {
+	c.w.Close()
 }
