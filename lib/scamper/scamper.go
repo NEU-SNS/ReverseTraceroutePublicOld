@@ -30,7 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"net"
@@ -41,9 +40,7 @@ import (
 )
 
 var (
-	ErrorScamperBin    = errors.New("scamper file is not an executable")
-	ErrorBadOKResponse = errors.New("Bad OK Response")
-	ErrorBadResponse   = errors.New("Bad Response")
+	ErrorScamperBin = errors.New("scamper file is not an executable")
 )
 
 const (
@@ -81,13 +78,23 @@ func (s Socket) connect() (net.Conn, error) {
 	return net.Dial("unix", s.fname)
 }
 
-func (s Socket) Do(c scamper.Cmd) error {
+func (s Socket) sendCmd() {
+}
+
+func (s Socket) Do(c Cmd) ([]byte, error) {
 	conn, err := s.connect()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	conn.Write(c.String())
-	return nil
+	rw := util.ConnToRW(conn)
+	_, err = rw.WriteString(c.String())
+	rw.Flush()
+	if err != nil {
+		glog.Errorf("Error sending request: %s, with error: %v", c, err)
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func NewSocket(fname string) Socket {
@@ -173,16 +180,4 @@ func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 func GetVPProc(scpath, host, port string) *proc.Process {
 	faddr := fmt.Sprintf("%s:%s", host, port)
 	return proc.New(SUDO, nil, scpath, REMOTE, faddr)
-}
-
-func GetMeasurementTool(sockDir string) *scamperTool {
-	return nil
-}
-
-func (st *scamperTool) TraceRoute() {
-
-}
-
-func (st *scamperTool) Ping() {
-
 }

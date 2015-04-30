@@ -94,10 +94,12 @@ func (c *plControllerT) getStats() dm.Stats {
 }
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
-	sock, err := c.getSocket(pa.Host)
+	ret := dm.Ping{}
+	_, err := c.getSocket(pa.Host)
 	if err != nil {
-		return err
+		return ret, err
 	}
+	return ret, nil
 }
 
 func (c *plControllerT) addSocket(sock scamper.Socket) {

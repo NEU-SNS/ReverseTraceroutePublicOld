@@ -27,6 +27,7 @@
 package util
 
 import (
+	"bufio"
 	"errors"
 	"github.com/golang/glog"
 	"net"
@@ -125,4 +126,11 @@ func CloseStdFiles(c bool) {
 		glog.Error("Failed to close Stdout")
 		os.Exit(1)
 	}
+}
+
+func ConnToRW(c net.Conn) *bufio.ReadWriter {
+	w := bufio.NewWriter(c)
+	r := bufio.NewReader(c)
+	rw := bufio.NewReadWriter(r, w)
+	return rw
 }
