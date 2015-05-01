@@ -86,13 +86,14 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 	return pport, pip, nil
 }
 
-func StartRpc(n, laddr string, eChan chan error, api interface{}) error {
+func StartRpc(n, laddr string, eChan chan error, api interface{}) {
 	server := rpc.NewServer()
 	server.Register(api)
 	l, e := net.Listen(n, laddr)
 	if e != nil {
 		glog.Errorf("Failed to listen: %v", e)
 		eChan <- e
+		return
 	}
 	glog.Infof("Controller started, listening on: %s", laddr)
 	for {
@@ -108,6 +109,9 @@ func StartRpc(n, laddr string, eChan chan error, api interface{}) error {
 }
 
 func CloseStdFiles(c bool) {
+	if !c {
+		return
+	}
 	glog.Info("Closing standard file descripters")
 	defer glog.Flush()
 	err := os.Stdin.Close()

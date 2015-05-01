@@ -39,6 +39,7 @@ var TypeMap map[string]Creator
 func init() {
 	TypeMap = make(map[string]Creator, 10)
 	TypeMap["Stats"] = createStats
+	TypeMap["Ping"] = createPing
 }
 
 const (
@@ -73,16 +74,6 @@ type ServiceArg struct {
 	Service ServiceT
 }
 
-type PingArg struct {
-	ServiceArg
-	Dst   string
-	Host  string
-	Spoof bool
-	RR    bool
-	TS    bool
-	SAddr string
-}
-
 type Ping struct {
 }
 
@@ -113,6 +104,10 @@ type StatsArg struct {
 
 func createStats() interface{} {
 	return new(Stats)
+}
+
+func createPing() interface{} {
+	return new(Ping)
 }
 
 func (m MRequestError) Error() string {

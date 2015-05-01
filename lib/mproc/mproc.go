@@ -88,6 +88,7 @@ func (mp *mProc) KillAll() {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	for _, v := range mp.managedProcs {
+		v.endKeepAlive()
 		v.mu.Lock()
 		v.p.Kill()
 		v.mu.Unlock()
@@ -160,6 +161,12 @@ func (mp *mProc) keepAlive(id uint32) {
 
 	}()
 }
+func (mp *managedP) endKeepAlive() {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	mp.keepAlive = false
+	mp.remRetry = 0
+}
 
 func (mp *mProc) EndKeepAlive(id uint32) error {
 	p := mp.getMp(id)
@@ -172,11 +179,7 @@ func (mp *mProc) EndKeepAlive(id uint32) error {
 	if glog.V(2) {
 		glog.Infof("Ending keep alive on PID: %d", pid)
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	mp.mu.Lock()
-	p.keepAlive = false
-
+	p.endKeepAlive()
 	return nil
 }
 

@@ -95,10 +95,20 @@ func (c *plControllerT) getStats() dm.Stats {
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	ret := dm.Ping{}
-	_, err := c.getSocket(pa.Host)
+	soc, err := c.getSocket(pa.Host)
 	if err != nil {
 		return ret, err
 	}
+	com, err := scamper.NewCmd(pa)
+	if err != nil {
+		return ret, err
+	}
+	cl := scamper.NewClient(soc, com)
+	err = cl.IssueCmd()
+	if err != nil {
+		return ret, err
+	}
+	cl.GetResponse()
 	return ret, nil
 }
 

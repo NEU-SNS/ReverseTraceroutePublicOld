@@ -53,10 +53,9 @@ func main() {
 	defer conn.Close()
 
 	c := jsonrpc.NewClient(conn)
-	args := dm.MArg{Service: dm.PLANET_LAB}
-	var ret dm.StatsReturn
-	err = c.Call(GETSTATS, args, &ret)
-	fmt.Printf("Got response with status: %v\n", ret.Stats)
+	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8"}
+	var ret dm.PingReturn
+	err = c.Call(PING, args, &ret)
 	fmt.Printf("Response took: %s", ret.Dur.String())
 
 	if err != nil {

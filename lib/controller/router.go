@@ -27,6 +27,7 @@
 package controller
 
 import (
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
 	"net/rpc/jsonrpc"
@@ -98,7 +99,12 @@ func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
 		defer c.Close()
 		ret := new(dm.MReturn)
 		api := s.Api[req.Type]
-		sret := dm.TypeMap[api.Type]()
+		sretf, ok := dm.TypeMap[api.Type]
+		if !ok {
+			glog.Errorf("Could not find func for apiType: %s", api.Type)
+			return nil, req, fmt.Errorf("Failed to find Return type")
+		}
+		sret := sretf()
 		err = c.Call(api.Url, req.Args, sret)
 		glog.Info("%v", sret)
 		req.Dur = time.Since(req.Stime)

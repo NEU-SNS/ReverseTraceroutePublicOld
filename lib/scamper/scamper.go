@@ -32,7 +32,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
-	"net"
 	"os"
 	"path"
 	"strconv"
@@ -74,29 +73,6 @@ func (s Socket) Port() string {
 	return s.port
 }
 
-func (s Socket) connect() (net.Conn, error) {
-	return net.Dial("unix", s.fname)
-}
-
-func (s Socket) sendCmd() {
-}
-
-func (s Socket) Do(c Cmd) ([]byte, error) {
-	conn, err := s.connect()
-	if err != nil {
-		return nil, err
-	}
-	rw := util.ConnToRW(conn)
-	_, err = rw.WriteString(c.String())
-	rw.Flush()
-	if err != nil {
-		glog.Errorf("Error sending request: %s, with error: %v", c, err)
-		return nil, err
-	}
-
-	return nil, nil
-}
-
 func NewSocket(fname string) Socket {
 	trim := path.Base(fname)
 	return Socket{fname: trim}
@@ -107,10 +83,6 @@ type ScamperConfig struct {
 	Path   string
 	ScPath string
 	Url    string
-}
-
-type scamperTool struct {
-	sockDir string
 }
 
 func ParseScamperConfig(sc ScamperConfig) error {
