@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,42 +24,67 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package main
+package util
 
 import (
-	"flag"
-	"fmt"
-	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"net"
-	"net/rpc/jsonrpc"
-	"runtime"
+	"bytes"
+	"errors"
 )
 
-const (
-	PING       = "ControllerApi.Ping"
-	TRACEROUTE = "ControllerApi.Traceroute"
-	GETSTATS   = "ControllerApi.GetStats"
-	REGISTER   = "ControllerApi.Register"
+var (
+	UUDecDone          = errors.New("Decoding Done")
+	ErrorInvalidByte   = errors.New("InvalidByte")
+	ErrorBadOKResponse = errors.New("Invalid OK Response")
+	ErrorBadResponse   = errors.New("Bad Scamper Response")
 )
 
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	flag.Parse()
-	conn, err := net.Dial("tcp", "localhost:35000")
+func UUDecode(e []byte) ([]byte, error) {
 
-	if err != nil {
-		panic(err)
+	sep := []byte{'\n'}
+	result := make([]byte, 0, len(e))
+	lines := bytes.Split(e, sep)
+	for _, line := range lines {
+		if len(line) == 0 || line[0] > 96 || line[0] < 32 {
+			break
+		}
+		ue, err := uudecodeLine(line)
+		if err != nil && err != UUDecDone {
+			return nil, err
+		}
+		result = append(result, ue...)
 	}
-	defer conn.Close()
+	return result, nil
+}
 
-	c := jsonrpc.NewClient(conn)
-	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
-	var ret dm.PingReturn
-	err = c.Call(PING, args, &ret)
-	fmt.Printf("Response took: %s", ret.Dur.String())
-
-	if err != nil {
-		panic(err)
+func uudecodeLine(e []byte) ([]byte, error) {
+	if len(e) == 1 && e[0] == '`' {
+		return nil, UUDecDone
 	}
+	lenB := uint(e[0] - 32)
+	e = e[1:]
+	result := make([]byte, 0, lenB)
+	for i := 0; i < len(e); i += 4 {
+		s, err := uudecodeBytes(e[i : i+4])
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, s...)
+	}
+	//log.Printf("Line Data Len: %d len of iteration: %d", lenB, len(e))
+	return result[:lenB], nil
+}
+
+func uudecodeBytes(by []byte) ([]byte, error) {
+	bytes := make([]byte, 3)
+	if (by[0] > 96 || by[0] < 32) ||
+		(by[1] > 96 || by[1] < 32) ||
+		(by[2] > 96 || by[2] < 32) ||
+		(by[3] > 96 || by[3] < 32) {
+		return bytes, ErrorInvalidByte
+	}
+	bytes[0] = (((by[0] - 32) & 0x3F) << 2 & 0xFC) | (((by[1] - 32) & 0x3F) >> 4 & 0x3)
+	bytes[1] = (((by[1] - 32) & 0x3F) << 4 & 0xF0) | (((by[2] - 32) & 0x3F) >> 2 & 0xF)
+	bytes[2] = (((by[2] - 32) & 0x3F) << 6 & 0xC0) | ((by[3] - 32) & 0x3f)
+
+	return bytes, nil
 }

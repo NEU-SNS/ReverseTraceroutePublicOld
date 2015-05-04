@@ -51,6 +51,7 @@ func (c plControllerT) handlEvents(ec chan error) {
 }
 
 func (c plControllerT) watchDir(dir string, ec chan error) {
+	glog.Infof("Starting to watch dir: %s", dir)
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Infof("Failed to create watcher: %v", err)

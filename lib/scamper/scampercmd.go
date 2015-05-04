@@ -27,8 +27,10 @@
 package scamper
 
 import (
+	"bytes"
 	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/golang/glog"
 	"reflect"
 )
 
@@ -39,19 +41,19 @@ const (
 var optionMap = map[CmdT]map[string]option{
 	"ping": map[string]option{
 		"Dst": option{
-			format: "%s ",
+			format: "%s",
 			opt:    stringOpt,
 		},
 		"Spoof": option{
-			format: "-O spoof ",
+			format: "-O spoof",
 			opt:    boolOpt,
 		},
 		"SAddr": option{
-			format: "-S %s ",
+			format: "-S %s",
 			opt:    stringOpt,
 		},
 		"RR": option{
-			format: "-RR ",
+			format: "-RR",
 			opt:    boolOpt,
 		},
 	},
@@ -63,14 +65,21 @@ type option struct {
 }
 
 func boolOpt(f string, arg interface{}) (string, error) {
-	if barg, ok := arg.(bool); ok && barg {
-		return f, nil
+	if barg, ok := arg.(bool); ok {
+		if barg {
+			return f, nil
+		} else {
+			return "", nil
+		}
 	}
 	return "", fmt.Errorf("Invalid arg type in boolOpt: %v", arg)
 }
 
 func stringOpt(f string, arg interface{}) (string, error) {
 	if sarg, ok := arg.(string); ok {
+		if sarg == "" {
+			return sarg, nil
+		}
 		return fmt.Sprintf(f, sarg), nil
 	}
 	return "", fmt.Errorf("Invalid arg type in stringOpt: %v", arg)
@@ -86,7 +95,17 @@ type Cmd struct {
 }
 
 func (c Cmd) String() string {
-	return fmt.Sprintf("TODO")
+	var buf bytes.Buffer
+	buf.WriteString(string(c.ct))
+	buf.WriteString(" ")
+	for _, arg := range c.options {
+		buf.WriteString(arg)
+		buf.WriteString(" ")
+	}
+	buf.WriteString("\n")
+	cmd := buf.String()
+	glog.Infof("Cmd as string: %s", cmd)
+	return cmd
 }
 
 func NewCmd(arg interface{}) (Cmd, error) {
@@ -100,8 +119,8 @@ func NewCmd(arg interface{}) (Cmd, error) {
 func createCmd(arg interface{}, t CmdT) (Cmd, error) {
 	//This far from handles all possible cases
 	opts := optionMap[t]
-	ty := reflect.TypeOf(opts)
-	v := reflect.ValueOf(opts)
+	ty := reflect.TypeOf(arg)
+	v := reflect.ValueOf(arg)
 	n := v.NumField()
 	fopts := make([]string, n)
 	for i := 0; i < n; i++ {
@@ -109,6 +128,7 @@ func createCmd(arg interface{}, t CmdT) (Cmd, error) {
 		if o, ok := opts[f.Name]; ok {
 			str, err := o.opt(o.format, v.FieldByName(f.Name).Interface())
 			if err != nil {
+				glog.Errorf("Failed on option: %s", f.Name)
 				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
 			}
 			fopts = append(fopts, str)

@@ -59,7 +59,7 @@ type Socket struct {
 
 func (s Socket) IP() string {
 	if s.ip == "" {
-		s.ip = strings.Split(s.fname, ":")[util.IP]
+		s.ip = strings.Split(path.Base(s.fname), ":")[util.IP]
 		return s.ip
 	}
 	return s.ip
@@ -67,15 +67,14 @@ func (s Socket) IP() string {
 
 func (s Socket) Port() string {
 	if s.port == "" {
-		s.port = strings.Split(s.fname, ":")[util.PORT]
+		s.port = strings.Split(path.Base(s.fname), ":")[util.PORT]
 		return s.port
 	}
 	return s.port
 }
 
 func NewSocket(fname string) Socket {
-	trim := path.Base(fname)
-	return Socket{fname: trim}
+	return Socket{fname: fname}
 }
 
 type ScamperConfig struct {

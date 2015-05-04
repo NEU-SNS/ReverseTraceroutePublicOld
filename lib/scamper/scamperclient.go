@@ -55,23 +55,40 @@ var (
 
 type Response struct {
 	rType SResponseT
-	data  *[]byte
+	data  []byte
 	ds    int
 }
 
 type Client struct {
-	rw   *bufio.ReadWriter
-	s    Socket
-	cmd  Cmd
-	resp Response
+	rw    *bufio.ReadWriter
+	s     Socket
+	cmd   Cmd
+	resps []Response
+}
+
+func (r Response) WriteTo(w io.Writer) error {
+	//Num of bytes that need to be written
+	l := len(r.data)
+	//Start of where to write from
+	s := 0
+	for l > 0 {
+		//Write bytes
+		c, err := w.Write(r.data[s:])
+		if err != nil && err != io.ErrShortWrite {
+			return err
+		}
+		l -= c
+		s += c
+	}
+	return nil
 }
 
 func NewClient(s Socket, c Cmd) Client {
-	return Client{s: s, cmd: c}
+	return Client{s: s, cmd: c, resps: make([]Response, 1)}
 }
 
-func (c *Client) GetResponse() Response {
-	return c.resp
+func (c *Client) GetResponses() []Response {
+	return c.resps
 }
 
 func (c *Client) checkConn() error {
@@ -91,25 +108,29 @@ func (c *Client) IssueCmd() error {
 	if err != nil {
 		return err
 	}
-	for {
+	c.rw.Flush()
+	i := 0
+	for i < 3 {
 		line, err := c.rw.ReadString('\n')
 		if err != nil {
 			return err
 		}
 		r, err := parseResponse(line, c.rw)
 		if err != nil {
+			glog.Errorf("Error parsing response: %v", err)
 			return err
 		}
 		switch {
 		case r.rType == OK:
-			continue
 		case r.rType == DATA:
-			c.resp = r
-			return nil
+			glog.Infof("Parsed data response")
+			c.resps = append(c.resps, r)
+			i += 1
+			glog.Infof("Count of data received: %d", i)
 		case r.rType == ERR:
+			glog.Errorf("Parsed scamper ERR return")
 			return fmt.Errorf("Error with scamper request: %s", c.cmd.String())
 		case r.rType == MORE:
-			continue
 		}
 
 	}
@@ -132,12 +153,14 @@ func (c *Client) connected() bool {
 
 func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	resp := Response{}
+	resp.data = make([]byte, 10)
 	glog.Infof("Parsing Response")
 	switch {
 	case strings.Contains(r, string(OK)):
 		resp.rType = OK
 		return resp, nil
 	case strings.Contains(r, string(ERR)):
+		glog.Error("Parsed error response")
 		resp.rType = ERR
 		return resp, nil
 	case strings.Contains(r, string(DATA)):
@@ -156,7 +179,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		if err != nil {
 			return resp, err
 		}
-		resp.data = &buff
+		resp.data = buff
 		return resp, nil
 	case strings.Contains(r, string(MORE)):
 		resp.rType = MORE

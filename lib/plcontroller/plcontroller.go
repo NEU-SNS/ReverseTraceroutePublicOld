@@ -27,6 +27,7 @@
 package plcontroller
 
 import (
+	"bytes"
 	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
@@ -94,6 +95,7 @@ func (c *plControllerT) getStats() dm.Stats {
 }
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
+	glog.Infof("Running ping for: %v", pa)
 	ret := dm.Ping{}
 	soc, err := c.getSocket(pa.Host)
 	if err != nil {
@@ -108,18 +110,31 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	if err != nil {
 		return ret, err
 	}
-	cl.GetResponse()
+	resps := cl.GetResponses()
+	of, err := os.OpenFile("temp.warts", os.O_CREATE|os.O_RDWR, 0666)
+	for _, r := range resps {
+		var tempb bytes.Buffer
+		err = r.WriteTo(tempb.)
+		if err != nil {
+			return ret, err
+		}
+		db, err := util.UUDecode(tempb.Bytes())
+	}
+	of.Close()
 	return ret, nil
 }
 
 func (c *plControllerT) addSocket(sock scamper.Socket) {
+	glog.Infof("Added socket: %v", sock)
 	c.rw.Lock()
 	c.socks[sock.IP()] = sock
 	c.rw.Unlock()
 }
 
 func (c *plControllerT) getSocket(n string) (scamper.Socket, error) {
+	glog.Infof("Getting socket for %s", n)
 	c.rw.RLock()
+	defer c.rw.RUnlock()
 	if sock, ok := c.socks[n]; ok {
 		return sock, nil
 	}
@@ -134,6 +149,7 @@ func (c *plControllerT) removeSocket(sock scamper.Socket) {
 
 func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 	errChan := make(chan error, 2)
+	plController.socks = make(map[string]scamper.Socket, 10)
 	port, ip, err := util.ParseAddrArg(laddr)
 
 	if err != nil {
@@ -156,7 +172,7 @@ func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
 	//best to call it after startScamperProc otherwise you'll send an error
 	//and trigger any error logic in whatever code is using this
-	plController.watchDir(sc.ScPath, errChan)
+	plController.watchDir(sc.Path, errChan)
 	go util.StartRpc(n, laddr, errChan, new(PlControllerApi))
 	return errChan
 }
