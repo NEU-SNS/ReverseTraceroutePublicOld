@@ -57,7 +57,7 @@ func main() {
 		Host: "127.0.0.1"}
 	var ret dm.PingReturn
 	err = c.Call(PING, args, &ret)
-	fmt.Printf("Response took: %s", ret.Dur.String())
+	fmt.Printf("Response took: %s\n", ret.Dur.String())
 
 	if err != nil {
 		panic(err)

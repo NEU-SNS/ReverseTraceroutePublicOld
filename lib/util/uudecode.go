@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -29,6 +29,7 @@ package util
 import (
 	"bytes"
 	"errors"
+	"github.com/golang/glog"
 )
 
 var (
@@ -38,12 +39,34 @@ var (
 	ErrorBadResponse   = errors.New("Bad Scamper Response")
 )
 
+type UUDecodingWriter struct {
+	b bytes.Buffer
+}
+
+func (w *UUDecodingWriter) Write(p []byte) (n int, err error) {
+	res, err := UUDecode(p)
+	if err != nil {
+		return 0, err
+	}
+	return w.b.Write(res)
+}
+
+func (w *UUDecodingWriter) Bytes() []byte {
+	return w.b.Bytes()
+}
+
 func UUDecode(e []byte) ([]byte, error) {
 
 	sep := []byte{'\n'}
 	result := make([]byte, 0, len(e))
 	lines := bytes.Split(e, sep)
+	if glog.V(5) {
+		glog.Infof("%s lines to decode", lines)
+	}
 	for _, line := range lines {
+		if glog.V(5) {
+			glog.Infof("Decoding line: %s", line)
+		}
 		if len(line) == 0 || line[0] > 96 || line[0] < 32 {
 			break
 		}
@@ -70,11 +93,16 @@ func uudecodeLine(e []byte) ([]byte, error) {
 		}
 		result = append(result, s...)
 	}
-	//log.Printf("Line Data Len: %d len of iteration: %d", lenB, len(e))
+	if glog.V(5) {
+		glog.Infof("Line Data Len: %d len of iteration: %d", lenB, len(e))
+	}
 	return result[:lenB], nil
 }
 
 func uudecodeBytes(by []byte) ([]byte, error) {
+	if glog.V(5) {
+		glog.Infof("Decoding bytes: %v", by)
+	}
 	bytes := make([]byte, 3)
 	if (by[0] > 96 || by[0] < 32) ||
 		(by[1] > 96 || by[1] < 32) ||

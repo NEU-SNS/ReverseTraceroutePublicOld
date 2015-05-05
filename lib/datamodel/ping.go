@@ -26,67 +26,62 @@
 */
 package datamodel
 
-import (
-	"fmt"
-	"time"
-)
-
-//http://stackoverflow.com/questions/10210188/instance-new-type-golang
-type Creator func() interface{}
-
-var TypeMap map[string]Creator
-
-func init() {
-	TypeMap = make(map[string]Creator, 10)
-	TypeMap["Stats"] = createStats
-	TypeMap["Ping"] = createPing
+type PingArg struct {
+	ServiceArg
+	Dst   string
+	Host  string
+	Spoof bool
+	RR    bool
+	TS    bool
+	SAddr string
 }
 
-const (
-	GenRequest     MRequestState  = "generating request"
-	RequestRoute   MRequestState  = "routing request"
-	ExecuteRequest MRequestState  = "executing request"
-	SUCCESS        MRequestStatus = "SUCCESS"
-	ERROR          MRequestStatus = "ERROR"
-	PING           MType          = "PING"
-	STATS          MType          = "STATS"
-	TRACEROUTE     MType          = "TRACEROUTE"
-	PLANET_LAB     ServiceT       = "PLANET_LAB"
-)
-
-type MRequestStatus string
-type MRequestState string
-
-type MArg struct {
-	Service ServiceT
-	SArg    interface{}
+type PingReturn struct {
+	ReturnT
+	Ping Ping
 }
 
-type ServiceArg struct {
-	Service ServiceT
+type PingStats struct {
+	Replies int     `json:"replies"`
+	Loss    int     `json:"loss"`
+	Min     float64 `json:"min"`
+	Max     float64 `json:"max"`
+	Avg     float64 `json:"avg"`
+	Stddev  float64 `json:"stddev"`
 }
 
-type Time struct {
-	Sec  int64 `json:"sec"`
-	USec int64 `json:"usec"`
+type PingResponse struct {
+	From       string  `json:"from"`
+	Seq        int     `json:"seq"`
+	ReplySize  int     `json:"reply_size"`
+	ReplyTtl   int     `json:"reply_ttl"`
+	ReplyProto string  `json:"reply_proto"`
+	Tx         Time    `json:"tx"`
+	Rx         Time    `json:"rx"`
+	Rtt        float64 `json:"rtt"`
+	ProbeIpId  int     `json:"probe_ipid"`
+	ReplyIpId  int     `json:"reply_ipid"`
+	IcmpType   int     `json:"icmp_type"`
+	IcmpCode   int     `json:"icmp_code"`
 }
 
-type MReturn struct {
-	Status MRequestStatus
-	Dur    time.Duration
-	SRet   interface{}
+type Ping struct {
+	Version    string         `json:"version"`
+	Type       string         `json:"type"`
+	Method     string         `json:"method"`
+	Src        string         `json:"src"`
+	Dst        string         `json:"dst"`
+	Start      Time           `json:"start"`
+	PingSent   int            `json:"ping_sent"`
+	ProbeSize  int            `json:"probe_size"`
+	UserId     int            `json:"userid"`
+	Ttl        int            `json:"ttl"`
+	Wait       int            `json:"wait"`
+	Timeout    int            `json:"timeout"`
+	Responses  []PingResponse `json:"responses"`
+	Statistics PingStats      `json:"statistics"`
 }
 
-type ReturnT struct {
-	Status MRequestStatus
-	Dur    time.Duration
-}
-
-func (m MRequestError) Error() string {
-	return fmt.Sprintf("Error occured while %s caused by: %v", m.Cause, m.CauseErr)
-}
-
-type MRequestError struct {
-	Cause    MRequestState
-	CauseErr error
+func createPing() interface{} {
+	return new(Ping)
 }

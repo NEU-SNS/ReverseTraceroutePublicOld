@@ -61,6 +61,8 @@ func init() {
 
 	flag.StringVar(&flags.ScPath, "B", "/usr/local/bin/sc_remoted",
 		"Path to the scamper binary")
+	flag.StringVar(&flags.ScParserPath, "X", "/usr/local/bin/sc_warts2json",
+		"Path for warts parser")
 }
 
 func sigHandle() {
@@ -83,6 +85,7 @@ func main() {
 	sa.Port = flags.SPort
 	sa.Path = flags.SockPath
 	sa.ScPath = flags.ScPath
+	sa.ScParserPath = flags.ScParserPath
 	err := <-plcontroller.Start(flags.PType, ipstr, sa)
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)

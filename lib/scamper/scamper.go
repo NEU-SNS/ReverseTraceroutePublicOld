@@ -78,10 +78,11 @@ func NewSocket(fname string) Socket {
 }
 
 type ScamperConfig struct {
-	Port   string
-	Path   string
-	ScPath string
-	Url    string
+	Port         string
+	Path         string
+	ScPath       string
+	Url          string
+	ScParserPath string
 }
 
 func ParseScamperConfig(sc ScamperConfig) error {

@@ -66,25 +66,33 @@ type Client struct {
 	resps []Response
 }
 
+func (r Response) Bytes() []byte {
+	return r.data
+}
+
 func (r Response) WriteTo(w io.Writer) error {
+	glog.Infof("Writing data %v", r.data)
 	//Num of bytes that need to be written
-	l := len(r.data)
+	//	l := len(r.data)
 	//Start of where to write from
-	s := 0
-	for l > 0 {
-		//Write bytes
-		c, err := w.Write(r.data[s:])
-		if err != nil && err != io.ErrShortWrite {
-			return err
-		}
-		l -= c
-		s += c
-	}
+	//	s := 0
+	//glog.Infof("WriteTo writing: %s, len: %d", r.data, l)
+	//	for l > 0 {
+	//Write bytes
+	w.Write(r.data)
+	//		if err != nil && err != io.ErrShortWrite {
+	//			glog.Errorf("Failed to write with err: %v", err)
+	//			return err
+	//		}
+	//		l -= c
+	//		s += c
+	//	}
+	//glog.Infof("Wrote %d bytes", s)
 	return nil
 }
 
 func NewClient(s Socket, c Cmd) Client {
-	return Client{s: s, cmd: c, resps: make([]Response, 1)}
+	return Client{s: s, cmd: c, resps: make([]Response, 0)}
 }
 
 func (c *Client) GetResponses() []Response {
@@ -153,7 +161,6 @@ func (c *Client) connected() bool {
 
 func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	resp := Response{}
-	resp.data = make([]byte, 10)
 	glog.Infof("Parsing Response")
 	switch {
 	case strings.Contains(r, string(OK)):
@@ -180,6 +187,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 			return resp, err
 		}
 		resp.data = buff
+		glog.Infof("Parsed data response, len: %d, data: %s", n, buff)
 		return resp, nil
 	case strings.Contains(r, string(MORE)):
 		resp.rType = MORE

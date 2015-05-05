@@ -27,11 +27,12 @@
 package plcontroller
 
 type Flags struct {
-	PType      string
-	Port       string
-	Ip         string
-	SPort      string
-	SockPath   string
-	ScPath     string
-	CloseSocks bool
+	PType        string
+	Port         string
+	Ip           string
+	SPort        string
+	SockPath     string
+	ScPath       string
+	CloseSocks   bool
+	ScParserPath string
 }

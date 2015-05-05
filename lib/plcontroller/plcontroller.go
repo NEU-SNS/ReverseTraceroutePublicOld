@@ -28,6 +28,7 @@ package plcontroller
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
@@ -37,6 +38,7 @@ import (
 	"github.com/golang/glog"
 	"net"
 	"os"
+	"os/exec"
 	"sync"
 	"time"
 )
@@ -111,17 +113,63 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 		return ret, err
 	}
 	resps := cl.GetResponses()
-	of, err := os.OpenFile("temp.warts", os.O_CREATE|os.O_RDWR, 0666)
+	var dw util.UUDecodingWriter
 	for _, r := range resps {
-		var tempb bytes.Buffer
-		err = r.WriteTo(tempb.)
+		glog.Infof("Decoding and writing: %s", r.Bytes())
+		err := r.WriteTo(&dw)
 		if err != nil {
 			return ret, err
 		}
-		db, err := util.UUDecode(tempb.Bytes())
 	}
-	of.Close()
+	res, err := c.convertWarts(dw.Bytes())
+	if err != nil {
+		glog.Errorf("Error converting warts: %v", err)
+		return ret, err
+	}
+	resr := bytes.NewReader(res)
+	err = json.NewDecoder(resr).Decode(&ret)
+	if err != nil {
+		glog.Errorf("Failed to decode ping with err: %v", err)
+		return ret, err
+	}
+	glog.Infof("Ping decoded: %v", ret)
 	return ret, nil
+}
+
+func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {
+	glog.Info("Converting Warts")
+	cmd := exec.Command(c.sc.ScParserPath)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return []byte{}, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return []byte{}, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return []byte{}, err
+	}
+	_, err = stdin.Write(b)
+	if err != nil {
+		return []byte{}, err
+	}
+	err = stdin.Close()
+	if err != nil {
+		return []byte{}, err
+	}
+	res := make([]byte, 1024*2)
+	_, err = stdout.Read(res)
+	if err != nil {
+		return res, err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return []byte{}, err
+	}
+	glog.Infof("Results of converting: %s", res)
+	return res, err
 }
 
 func (c *plControllerT) addSocket(sock scamper.Socket) {

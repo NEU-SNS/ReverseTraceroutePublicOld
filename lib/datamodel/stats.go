@@ -26,12 +26,27 @@
 */
 package datamodel
 
-type PingArg struct {
+import (
+	"time"
+)
+
+type Stats struct {
+	StartTime  time.Time
+	UpTime     time.Duration
+	Requests   int64
+	AvgReqTime time.Duration
+	TotReqTime time.Duration
+}
+
+type StatsReturn struct {
+	ReturnT
+	Stats Stats
+}
+
+type StatsArg struct {
 	ServiceArg
-	Dst   string
-	Host  string
-	Spoof bool
-	RR    bool
-	TS    bool
-	SAddr string
+}
+
+func createStats() interface{} {
+	return new(Stats)
 }
