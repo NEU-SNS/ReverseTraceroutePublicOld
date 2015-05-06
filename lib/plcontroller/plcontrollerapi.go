@@ -34,12 +34,22 @@ import (
 type PlControllerApi struct{}
 
 func (c PlControllerApi) Ping(arg dm.PingArg, ret *dm.Ping) error {
-	glog.Infof("Ping Called")
+	glog.Info("Ping Called")
 	ping, err := plController.runPing(arg)
 	if err != nil {
 		return err
 	}
 	*ret = ping
+	return nil
+}
+
+func (c PlControllerApi) Traceroute(arg dm.TracerouteArg, ret *dm.Traceroute) error {
+	glog.Info("Traceroute Called")
+	tr, err := plController.runTraceroute(arg)
+	if err != nil {
+		return err
+	}
+	*ret = tr
 	return nil
 }
 

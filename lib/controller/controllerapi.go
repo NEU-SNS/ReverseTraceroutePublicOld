@@ -48,9 +48,15 @@ func (c ControllerApi) Ping(arg dm.PingArg, ret *dm.PingReturn) error {
 	return err
 }
 
-func (c ControllerApi) Traceroute(arg dm.MArg, ret *dm.MReturn) error {
-	mr, err := controller.handleMeasurement(&arg, dm.TRACEROUTE)
-	*ret = *mr
+func (c ControllerApi) Traceroute(arg dm.TracerouteArg, ret *dm.TracerouteReturn) error {
+	glog.Info("Handling Traceroute Request")
+	marg := dm.MArg{Service: arg.Service, SArg: arg}
+	mr, err := controller.handleMeasurement(&marg, dm.TRACEROUTE)
+	ret.Status = mr.Status
+	ret.Dur = mr.Dur
+	if trace, ok := mr.SRet.(*dm.Traceroute); ok {
+		ret.Traceroute = *trace
+	}
 	return err
 }
 

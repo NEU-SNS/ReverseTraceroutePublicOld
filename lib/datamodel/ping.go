@@ -28,12 +28,27 @@ package datamodel
 
 type PingArg struct {
 	ServiceArg
-	Dst   string
-	Host  string
-	Spoof bool
-	RR    bool
-	TS    bool
-	SAddr string
+	Dst        string
+	Host       string
+	Spoof      bool
+	RR         bool
+	TS         bool
+	SAddr      string
+	Payload    string
+	Count      string
+	IcmpSum    string
+	DPort      string
+	SPort      string
+	Wait       string
+	Ttl        string
+	Mtu        string
+	ReplyCount string
+	Pattern    string
+	Method     string
+	Size       string
+	UserId     string
+	Tos        string
+	TimeStamp  string
 }
 
 type PingReturn struct {
@@ -44,10 +59,10 @@ type PingReturn struct {
 type PingStats struct {
 	Replies int     `json:"replies"`
 	Loss    int     `json:"loss"`
-	Min     float64 `json:"min"`
-	Max     float64 `json:"max"`
-	Avg     float64 `json:"avg"`
-	Stddev  float64 `json:"stddev"`
+	Min     float32 `json:"min"`
+	Max     float32 `json:"max"`
+	Avg     float32 `json:"avg"`
+	Stddev  float32 `json:"stddev"`
 }
 
 type PingResponse struct {
@@ -58,7 +73,7 @@ type PingResponse struct {
 	ReplyProto string  `json:"reply_proto"`
 	Tx         Time    `json:"tx"`
 	Rx         Time    `json:"rx"`
-	Rtt        float64 `json:"rtt"`
+	Rtt        float32 `json:"rtt"`
 	ProbeIpId  int     `json:"probe_ipid"`
 	ReplyIpId  int     `json:"reply_ipid"`
 	IcmpType   int     `json:"icmp_type"`

@@ -71,12 +71,12 @@ func (r Response) Bytes() []byte {
 }
 
 func (r Response) WriteTo(w io.Writer) error {
-	glog.Infof("Writing data %v", r.data)
+	//	glog.Infof("Writing data %v", r.data)
 	//Num of bytes that need to be written
 	//	l := len(r.data)
 	//Start of where to write from
 	//	s := 0
-	//glog.Infof("WriteTo writing: %s, len: %d", r.data, l)
+	//	glog.Infof("WriteTo writing: %s, len: %d", r.data, l)
 	//	for l > 0 {
 	//Write bytes
 	w.Write(r.data)
@@ -87,7 +87,7 @@ func (r Response) WriteTo(w io.Writer) error {
 	//		l -= c
 	//		s += c
 	//	}
-	//glog.Infof("Wrote %d bytes", s)
+	//	glog.Infof("Wrote %d bytes", s)
 	return nil
 }
 

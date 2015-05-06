@@ -100,7 +100,8 @@ func (c *controllerT) getStats() dm.Stats {
 	if t == 0 {
 		tt = 0
 	} else {
-		tt = time.Duration(req / int64(t))
+		avg := int64(t) / int64(req)
+		tt = time.Duration(avg)
 	}
 	s := dm.Stats{StartTime: c.startTime,
 		UpTime: utime, Requests: req,

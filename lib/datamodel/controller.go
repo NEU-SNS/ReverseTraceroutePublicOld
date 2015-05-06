@@ -40,6 +40,7 @@ func init() {
 	TypeMap = make(map[string]Creator, 10)
 	TypeMap["Stats"] = createStats
 	TypeMap["Ping"] = createPing
+	TypeMap["Traceroute"] = createTraceroute
 }
 
 const (

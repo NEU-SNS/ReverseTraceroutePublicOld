@@ -38,7 +38,6 @@ import (
 	"github.com/golang/glog"
 	"net"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 )
@@ -88,7 +87,8 @@ func (c *plControllerT) getStats() dm.Stats {
 	if t == 0 {
 		tt = 0
 	} else {
-		tt = time.Duration(req / int64(t))
+		avg := int64(t) / int64(req)
+		tt = time.Duration(avg)
 	}
 	s := dm.Stats{StartTime: c.startTime,
 		UpTime: utime, Requests: req,
@@ -98,6 +98,7 @@ func (c *plControllerT) getStats() dm.Stats {
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
+	sTime := time.Now()
 	ret := dm.Ping{}
 	soc, err := c.getSocket(pa.Host)
 	if err != nil {
@@ -126,46 +127,70 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 		glog.Errorf("Error converting warts: %v", err)
 		return ret, err
 	}
-	resr := bytes.NewReader(res)
-	err = json.NewDecoder(resr).Decode(&ret)
+	err = decodeResponse(&res, &ret)
 	if err != nil {
 		glog.Errorf("Failed to decode ping with err: %v", err)
 		return ret, err
 	}
-	glog.Infof("Ping decoded: %v", ret)
+	c.increaseStats(sTime)
+	glog.Infof("Ping done: %v", ret)
 	return ret, nil
+}
+
+func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error) {
+	glog.Infof("Running traceroute for: %v", ta)
+	sTime := time.Now()
+	ret := dm.Traceroute{}
+	soc, err := c.getSocket(ta.Host)
+	if err != nil {
+		return ret, err
+	}
+	com, err := scamper.NewCmd(ta)
+	cl := scamper.NewClient(soc, com)
+	err = cl.IssueCmd()
+	if err != nil {
+		return ret, err
+	}
+	resps := cl.GetResponses()
+	var dw util.UUDecodingWriter
+	for _, r := range resps {
+		glog.Infof("Decoding and writing: %s", r.Bytes())
+		err := r.WriteTo(&dw)
+		if err != nil {
+			return ret, err
+		}
+	}
+	res, err := c.convertWarts(dw.Bytes())
+	if err != nil {
+		glog.Errorf("failed to decode ping with err: %v", err)
+		return ret, err
+	}
+	err = decodeResponse(&res, &ret)
+	if err != nil {
+		glog.Exitf("Failed to decode traceroute with err: %v", err)
+		return ret, err
+	}
+	c.increaseStats(sTime)
+	glog.Infof("Traceroute done: %v", ret)
+	return ret, nil
+}
+
+func (c *plControllerT) increaseStats(t time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.requests += 1
+	c.time += time.Since(t)
+}
+
+func decodeResponse(res *[]byte, ret interface{}) error {
+	return json.NewDecoder(bytes.NewReader(*res)).Decode(ret)
 }
 
 func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {
 	glog.Info("Converting Warts")
-	cmd := exec.Command(c.sc.ScParserPath)
-	stdin, err := cmd.StdinPipe()
+	res, err := util.ConvertBytes(c.sc.ScParserPath, b)
 	if err != nil {
-		return []byte{}, err
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return []byte{}, err
-	}
-	err = cmd.Start()
-	if err != nil {
-		return []byte{}, err
-	}
-	_, err = stdin.Write(b)
-	if err != nil {
-		return []byte{}, err
-	}
-	err = stdin.Close()
-	if err != nil {
-		return []byte{}, err
-	}
-	res := make([]byte, 1024*2)
-	_, err = stdout.Read(res)
-	if err != nil {
-		return res, err
-	}
-	err = cmd.Wait()
-	if err != nil {
+		glog.Errorf("Failed to converte bytes: %v", err)
 		return []byte{}, err
 	}
 	glog.Infof("Results of converting: %s", res)

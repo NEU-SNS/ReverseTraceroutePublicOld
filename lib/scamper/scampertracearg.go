@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,56 +24,99 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package main
+package scamper
 
-import (
-	"flag"
-	"fmt"
-	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"net"
-	"net/rpc/jsonrpc"
-	"runtime"
-)
-
-const (
-	PING       = "ControllerApi.Ping"
-	TRACEROUTE = "ControllerApi.Traceroute"
-	GETSTATS   = "ControllerApi.GetStats"
-	REGISTER   = "ControllerApi.Register"
-)
-
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	flag.Parse()
-	conn, err := net.Dial("tcp", "localhost:35000")
-
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	c := jsonrpc.NewClient(conn)
-	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
-	var ret dm.PingReturn
-	err = c.Call(PING, args, &ret)
-	if err != nil {
-		fmt.Printf("Ping failed with err: %v\n", err)
-	}
-	fmt.Printf("Response took: %s\n", ret.Dur.String())
-	a := dm.TracerouteArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
-	var r dm.TracerouteReturn
-	err = c.Call(TRACEROUTE, a, &r)
-	if err != nil {
-		fmt.Printf("Traceroute failed with err: %v\n", err)
-	}
-	fmt.Printf("Response took: %s\n", ret.Dur.String())
-	arg := dm.StatsArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}}
-	var rr dm.StatsReturn
-	err = c.Call(GETSTATS, arg, &rr)
-	if err != nil {
-		fmt.Printf("Stats failed with err: %v\n", err)
-	}
-	fmt.Printf("Got back: %v\n", rr)
+var traceArg = map[string]option{
+	"Dst": option{
+		format: "%s",
+		opt:    stringOpt,
+	},
+	"Confidence": option{
+		format: "-c %s",
+		opt:    stringOpt,
+	},
+	"DPort": option{
+		format: "-d %s",
+		opt:    stringOpt,
+	},
+	"FirstHop": option{
+		format: "-f %s",
+		opt:    stringOpt,
+	},
+	"GapLimit": option{
+		format: "-g %s",
+		opt:    stringOpt,
+	},
+	"GapAction": option{
+		format: "-G %s",
+		opt:    stringOpt,
+	},
+	"MaxTtl": option{
+		format: "-m %s",
+		opt:    stringOpt,
+	},
+	"PathDiscov": option{
+		format: "-M",
+		opt:    boolOpt,
+	},
+	"Loops": option{
+		format: "-l %s",
+		opt:    stringOpt,
+	},
+	"LoopAction": option{
+		format: "-L %s",
+		opt:    stringOpt,
+	},
+	"Payload": option{
+		format: "-p %s",
+		opt:    stringOpt,
+	},
+	"Method": option{
+		format: "-P %s",
+		opt:    stringOpt,
+	},
+	"Attempts": option{
+		format: "-q %s",
+		opt:    stringOpt,
+	},
+	"SendAll": option{
+		format: "-Q",
+		opt:    boolOpt,
+	},
+	"SPort": option{
+		format: "-s %s",
+		opt:    stringOpt,
+	},
+	"SAddr": option{
+		format: "-S %s",
+		opt:    stringOpt,
+	},
+	"Tos": option{
+		format: "-t %s",
+		opt:    stringOpt,
+	},
+	"TimeExceeded": option{
+		format: "-T",
+		opt:    boolOpt,
+	},
+	"UserId": option{
+		format: "-U %s",
+		opt:    stringOpt,
+	},
+	"Wait": option{
+		format: "-w %s",
+		opt:    stringOpt,
+	},
+	"WaitProbe": option{
+		format: "-W %s",
+		opt:    stringOpt,
+	},
+	"GssEntry": option{
+		format: "-z %s",
+		opt:    stringOpt,
+	},
+	"LssName": option{
+		format: "-Z %s",
+		opt:    stringOpt,
+	},
 }

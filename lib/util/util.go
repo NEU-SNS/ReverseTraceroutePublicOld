@@ -34,6 +34,7 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -137,4 +138,38 @@ func ConnToRW(c net.Conn) *bufio.ReadWriter {
 	r := bufio.NewReader(c)
 	rw := bufio.NewReadWriter(r, w)
 	return rw
+}
+
+func ConvertBytes(path string, b []byte) ([]byte, error) {
+	cmd := exec.Command(path)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return []byte{}, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return []byte{}, err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return []byte{}, err
+	}
+	_, err = stdin.Write(b)
+	if err != nil {
+		return []byte{}, err
+	}
+	err = stdin.Close()
+	if err != nil {
+		return []byte{}, err
+	}
+	res := make([]byte, 1024*5)
+	_, err = stdout.Read(res)
+	if err != nil {
+		return res, err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return []byte{}, err
+	}
+	return res, err
 }

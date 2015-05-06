@@ -35,33 +35,25 @@ import (
 )
 
 const (
-	PING CmdT = "ping"
+	PING       CmdT = "ping"
+	TRACEROUTE CmdT = "trace"
 )
 
 var optionMap = map[CmdT]map[string]option{
-	"ping": map[string]option{
-		"Dst": option{
-			format: "%s",
-			opt:    stringOpt,
-		},
-		"Spoof": option{
-			format: "-O spoof",
-			opt:    boolOpt,
-		},
-		"SAddr": option{
-			format: "-S %s",
-			opt:    stringOpt,
-		},
-		"RR": option{
-			format: "-RR",
-			opt:    boolOpt,
-		},
-	},
+	"ping":  pingArg,
+	"trace": traceArg,
 }
 
 type option struct {
 	format string
 	opt    OptGetter
+}
+
+func intOpt(f string, arg interface{}) (string, error) {
+	if sarg, ok := arg.(int); ok {
+		return fmt.Sprintf(f, sarg), nil
+	}
+	return "", fmt.Errorf("Invalid arg type in intOpt: %v", arg)
 }
 
 func boolOpt(f string, arg interface{}) (string, error) {
@@ -112,6 +104,8 @@ func NewCmd(arg interface{}) (Cmd, error) {
 	switch arg.(type) {
 	case dm.PingArg:
 		return createCmd(arg, PING)
+	case dm.TracerouteArg:
+		return createCmd(arg, TRACEROUTE)
 	}
 	return Cmd{}, fmt.Errorf("Failed to create Cmd, type not found")
 }
