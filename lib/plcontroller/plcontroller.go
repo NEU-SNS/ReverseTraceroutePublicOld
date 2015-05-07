@@ -198,23 +198,27 @@ func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {
 }
 
 func (c *plControllerT) addSocket(sock scamper.Socket) {
-	glog.Infof("Added socket: %v", sock)
+	glog.Infof("Adding socket: %v, len: %d", sock, len(sock.IP()))
 	c.rw.Lock()
 	c.socks[sock.IP()] = sock
+	glog.Infof("Sockets: %v", c.socks)
 	c.rw.Unlock()
 }
 
 func (c *plControllerT) getSocket(n string) (scamper.Socket, error) {
-	glog.Infof("Getting socket for %s", n)
+	glog.Infof("Getting socket for %s, len: %d", n, len(n))
+	glog.Infof("Sockets: %v", c.socks)
 	c.rw.RLock()
 	defer c.rw.RUnlock()
 	if sock, ok := c.socks[n]; ok {
 		return sock, nil
 	}
+	glog.Errorf("Did not find socket for %s", n)
 	return scamper.Socket{}, fmt.Errorf("Could not find socket: %s", n)
 }
 
 func (c *plControllerT) removeSocket(sock scamper.Socket) {
+	glog.Infof("Removing socket: %v", sock)
 	c.rw.Lock()
 	delete(c.socks, sock.IP())
 	c.rw.Unlock()

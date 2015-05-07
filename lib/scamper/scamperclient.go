@@ -64,6 +64,7 @@ type Client struct {
 	s     Socket
 	cmd   Cmd
 	resps []Response
+	conn  *net.Conn
 }
 
 func (r Response) Bytes() []byte {
@@ -71,6 +72,7 @@ func (r Response) Bytes() []byte {
 }
 
 func (r Response) WriteTo(w io.Writer) error {
+	//TODO Make this work
 	//	glog.Infof("Writing data %v", r.data)
 	//Num of bytes that need to be written
 	//	l := len(r.data)
@@ -112,6 +114,7 @@ func (c *Client) IssueCmd() error {
 	if err != nil {
 		return err
 	}
+	defer c.closeConnection()
 	_, err = c.rw.WriteString(c.cmd.String())
 	if err != nil {
 		return err
@@ -151,7 +154,16 @@ func (c *Client) connect() error {
 	if err != nil {
 		return err
 	}
+	c.conn = conn
 	c.rw = util.ConnToRW(conn)
+	return nil
+}
+
+func (c *Client) closeConnection() error {
+	glog.Infof("Closing connection to: %s", c.s.fname)
+	if c.connected() {
+		return c.conn.Close()
+	}
 	return nil
 }
 

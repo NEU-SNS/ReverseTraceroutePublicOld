@@ -53,8 +53,8 @@ func main() {
 	defer conn.Close()
 
 	c := jsonrpc.NewClient(conn)
-	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
+	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "129.10.113.204",
+		Host: "129.10.113.143", RR: false, TimeStamp: "tsandaddr"}
 	var ret dm.PingReturn
 	err = c.Call(PING, args, &ret)
 	if err != nil {
@@ -62,13 +62,13 @@ func main() {
 	}
 	fmt.Printf("Response took: %s\n", ret.Dur.String())
 	a := dm.TracerouteArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
+		Host: "129.10.113.143"}
 	var r dm.TracerouteReturn
 	err = c.Call(TRACEROUTE, a, &r)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)
 	}
-	fmt.Printf("Response took: %s\n", ret.Dur.String())
+	fmt.Printf("Response took: %s\n", r.Dur.String())
 	arg := dm.StatsArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}}
 	var rr dm.StatsReturn
 	err = c.Call(GETSTATS, arg, &rr)

@@ -88,11 +88,10 @@ type Cmd struct {
 
 func (c Cmd) String() string {
 	var buf bytes.Buffer
-	buf.WriteString(string(c.ct))
-	buf.WriteString(" ")
+	glog.Infof("CMD: %s, %s", c.ct, len(string(c.ct)))
+	buf.WriteString(string(c.ct) + " ")
 	for _, arg := range c.options {
-		buf.WriteString(arg)
-		buf.WriteString(" ")
+		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
 	cmd := buf.String()
@@ -117,6 +116,7 @@ func createCmd(arg interface{}, t CmdT) (Cmd, error) {
 	v := reflect.ValueOf(arg)
 	n := v.NumField()
 	fopts := make([]string, n)
+	var targ string
 	for i := 0; i < n; i++ {
 		f := ty.Field(i)
 		if o, ok := opts[f.Name]; ok {
@@ -125,8 +125,13 @@ func createCmd(arg interface{}, t CmdT) (Cmd, error) {
 				glog.Errorf("Failed on option: %s", f.Name)
 				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
 			}
+			if f.Name == "Dst" {
+				targ = str
+				continue
+			}
 			fopts = append(fopts, str)
 		}
 	}
+	fopts = append(fopts, targ)
 	return Cmd{ct: t, options: fopts}, nil
 }

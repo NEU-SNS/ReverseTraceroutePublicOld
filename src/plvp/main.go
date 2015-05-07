@@ -65,7 +65,7 @@ func init() {
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
 		plvp.HandleSig(sig)
 		os.Exit(1)

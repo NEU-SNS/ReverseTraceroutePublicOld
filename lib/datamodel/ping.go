@@ -32,7 +32,6 @@ type PingArg struct {
 	Host       string
 	Spoof      bool
 	RR         bool
-	TS         bool
 	SAddr      string
 	Payload    string
 	Count      string
@@ -66,18 +65,26 @@ type PingStats struct {
 }
 
 type PingResponse struct {
-	From       string  `json:"from"`
-	Seq        int     `json:"seq"`
-	ReplySize  int     `json:"reply_size"`
-	ReplyTtl   int     `json:"reply_ttl"`
-	ReplyProto string  `json:"reply_proto"`
-	Tx         Time    `json:"tx"`
-	Rx         Time    `json:"rx"`
-	Rtt        float32 `json:"rtt"`
-	ProbeIpId  int     `json:"probe_ipid"`
-	ReplyIpId  int     `json:"reply_ipid"`
-	IcmpType   int     `json:"icmp_type"`
-	IcmpCode   int     `json:"icmp_code"`
+	From       string      `json:"from"`
+	Seq        int         `json:"seq"`
+	ReplySize  int         `json:"reply_size"`
+	ReplyTtl   int         `json:"reply_ttl"`
+	ReplyProto string      `json:"reply_proto"`
+	Tx         Time        `json:"tx"`
+	Rx         Time        `json:"rx"`
+	Rtt        float32     `json:"rtt"`
+	ProbeIpId  int         `json:"probe_ipid"`
+	ReplyIpId  int         `json:"reply_ipid"`
+	IcmpType   int         `json:"icmp_type"`
+	IcmpCode   int         `json:"icmp_code"`
+	RR         []string    `json:"RR"`
+	TsOnly     []int64     `json:"tsonly"`
+	TsAndAddr  []TsAndAddr `json:"tsandaddr"`
+}
+
+type TsAndAddr struct {
+	Ip string `json:"ip"`
+	Ts int64  `json:"ts"`
 }
 
 type Ping struct {
@@ -93,6 +100,7 @@ type Ping struct {
 	Ttl        int            `json:"ttl"`
 	Wait       int            `json:"wait"`
 	Timeout    int            `json:"timeout"`
+	Flags      []string       `json:"flags"`
 	Responses  []PingResponse `json:"responses"`
 	Statistics PingStats      `json:"statistics"`
 }
