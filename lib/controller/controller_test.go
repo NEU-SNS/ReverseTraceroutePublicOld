@@ -33,12 +33,15 @@ import (
 	"time"
 )
 
+var conf = Config{Local: LocalConfig{Addr: "localhost:45000",
+	Proto: "tcp"}}
+
 func TestStart(t *testing.T) {
-	eChan := Start("tcp", "localhost:45000", da.New())
+	eChan := Start(conf, da.New())
 
 	select {
 	case e := <-eChan:
-		t.Errorf("TestStart failed %v", e)
+		t.Fatalf("TestStart failed %v", e)
 	case <-time.After(time.Second * 2):
 
 	}
@@ -46,51 +49,93 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartNoDB(t *testing.T) {
-	eChan := Start("tcp", "localhost:45000", nil)
+	eChan := Start(conf, nil)
 
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
-		t.Error("Controller started with nil DB")
+		t.Fatal("Controller started with nil DB")
 	}
 
 }
 
 func TestStartInvalidIP(t *testing.T) {
-	eChan := Start("tcp", "-1:45000", da.New())
+	var c = Config{Local: LocalConfig{Addr: "-1:45000",
+		Proto: "tcp"}}
+	eChan := Start(c, da.New())
 
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
-		t.Errorf("TestStartInvalidIP no error thrown with invalid ip")
+		t.Fatalf("TestStartInvalidIP no error thrown with invalid ip")
 	}
 
 }
 
 func TestStartInvalidPort(t *testing.T) {
-	eChan := Start("tcp", "localhost:PORT", da.New())
+	var c = Config{Local: LocalConfig{Addr: "127.0.0.1:PORT",
+		Proto: "tcp"}}
+	eChan := Start(c, da.New())
 
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
-		t.Errorf("TestStartInvalidPort no error thrown with invalid port")
+		t.Fatalf("TestStartInvalidPort no error thrown with invalid port")
 	}
 
 }
 
 func TestStartPortOutOfRange(t *testing.T) {
-	eChan := Start("tcp", "localhost:70000", da.New())
+	var c = Config{Local: LocalConfig{Addr: "127.0.0.1:70000",
+		Proto: "tcp"}}
+	eChan := Start(c, da.New())
 
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
-		t.Errorf("TestStartPortOutOfRange no error thrown with port 70000")
+		t.Fatalf("TestStartPortOutOfRange no error thrown with port 70000")
 	}
 }
 
 func TestGenerateRequest(t *testing.T) {
 	_, err := generateRequest(&dm.MArg{Service: "TEST"}, dm.PING)
 	if err != nil {
-		t.Errorf("TestGenerateRequest failed error: %v", err)
+		t.Fatalf("TestGenerateRequest failed error: %v", err)
+	}
+}
+
+func TestGetRequests(t *testing.T) {
+	r := controller.getRequests()
+	if r < 0 {
+		t.Fatalf("Invalid requests num returned: %d", r)
+	}
+}
+
+func TestAddRequest(t *testing.T) {
+	s := controller.getRequests()
+	controller.addRequest()
+	f := controller.getRequests()
+	if f != s+1 {
+		t.Fatalf("Add request failed, got %d expected %d", f, s+1)
+	}
+}
+
+func TestAddTime(t *testing.T) {
+	s := controller.getTime()
+	controller.addTime(2 * time.Second)
+	f := controller.getTime()
+	if f != s+(2*time.Second) {
+		t.Fatalf("Add time failed, got %d expected %d", f, s+2*time.Second)
+	}
+}
+
+func TestAddReqStats(t *testing.T) {
+	stat := controller.getStats()
+	req := Request{Dur: 2 * time.Second}
+	controller.addReqStats(req)
+	fstat := controller.getStats()
+	if fstat.Requests != stat.Requests+1 ||
+		fstat.TotReqTime != stat.TotReqTime+2*time.Second {
+		t.Fatalf("Add req Stats failed, got %v expected %v", fstat, stat)
 	}
 }

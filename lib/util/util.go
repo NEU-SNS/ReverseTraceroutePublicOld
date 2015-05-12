@@ -29,14 +29,15 @@ package util
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"net"
+	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -62,14 +63,14 @@ func MakeDir(path string, mode os.FileMode) error {
 }
 
 func ParseAddrArg(addr string) (int, net.IP, error) {
-	parts := strings.Split(addr, ":")
-	ip := parts[IP]
-
+	ip, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, nil, err
+	}
 	//shortcut, maybe resolve?
 	if ip == "localhost" {
 		ip = "127.0.0.1"
 	}
-	port := parts[PORT]
 	pport, err := strconv.Atoi(port)
 	if err != nil {
 		glog.Errorf("Failed to parse port")
@@ -79,8 +80,15 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 		glog.Errorf("Invalid port passed to Start: %d", pport)
 		return 0, nil, ErrorInvalidPort
 	}
-	pip := net.ParseIP(ip)
-	if pip == nil {
+	var pip net.IP
+	var cont bool
+	if ip == "" {
+		pip = nil
+		cont = true
+	} else {
+		pip = net.ParseIP(ip)
+	}
+	if pip == nil && !cont {
 		glog.Errorf("Invalid IP passed to Start: %s", ip)
 		return 0, nil, ErrorInvalidIP
 	}
@@ -172,4 +180,10 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 		return []byte{}, err
 	}
 	return res, err
+}
+
+func StartPProf(port string) {
+	go func() {
+		http.ListenAndServe(fmt.Sprintf("localhost:%s", port), nil)
+	}()
 }

@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,55 +24,27 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package main
+package config
 
 import (
-	"flag"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/controller"
-	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
-	"github.com/golang/glog"
-	_ "net/http/pprof"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"os"
 )
 
-var f controller.Flags
-
-func init() {
-	flag.StringVar(&f.Local.Addr, "a", ":35000",
-		"The address that the controller will bind to.")
-
-	flag.StringVar(&f.Local.Proto, "p", "tcp",
-		"Type protocol type the coltroller will use.")
-
-	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
-		"Determines if the sandard file descriptors are closed")
-
-	flag.StringVar(&f.ConfigPath, "c", "",
-		"Path to the config file.")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
-		"The port for pprof")
-}
-
-func main() {
-	flag.Parse()
-	defer glog.Flush()
-	var conf controller.Config
-	if f.ConfigPath != "" {
-		err := config.ParseConfig(f.ConfigPath, &conf)
-		if err != nil {
-			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			os.Exit(1)
-		}
-	} else {
-		conf.Local = f.Local
-	}
-	util.CloseStdFiles(f.Local.CloseStdDesc)
-	util.StartPProf(conf.Local.PProfAddr)
-	err := <-controller.Start(conf, da.New())
+func ParseConfig(path string, out interface{}) error {
+	f, err := os.Open(path)
 	if err != nil {
-		glog.Errorf("Controller Start returned with error: %v", err)
-		os.Exit(1)
+		return err
 	}
+	defer f.Close()
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	err = yaml.Unmarshal(data, out)
+	if err != nil {
+		return err
+	}
+	return nil
 }

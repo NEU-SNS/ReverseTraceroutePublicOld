@@ -27,12 +27,26 @@
 package plcontroller
 
 type Flags struct {
-	PType        string
-	Port         string
-	Ip           string
-	SPort        string
-	SockPath     string
-	ScPath       string
-	CloseSocks   bool
-	ScParserPath string
+	Local      LocalConfig
+	Scamper    ScamperConfig
+	ConfigPath string
+}
+
+type Config struct {
+	Local   LocalConfig
+	Scamper ScamperConfig
+}
+
+type LocalConfig struct {
+	Addr         string
+	Proto        string
+	CloseStdDesc bool
+	PProfAddr    string
+}
+
+type ScamperConfig struct {
+	Port          string
+	SockDir       string
+	BinPath       string
+	ConverterPath string
 }

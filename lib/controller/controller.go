@@ -39,7 +39,8 @@ import (
 )
 
 type controllerT struct {
-	port      int
+	port int
+	//ip is only not nil when an ip is specified
 	ip        net.IP
 	ptype     string
 	db        da.DataAccess
@@ -109,7 +110,7 @@ func (c *controllerT) getStats() dm.Stats {
 	return s
 }
 
-func Start(n, laddr string, db da.DataAccess) chan error {
+func Start(c Config, db da.DataAccess) chan error {
 	errChan := make(chan error, 1)
 	if db == nil {
 		glog.Errorf("Nil db in Controller Start")
@@ -117,20 +118,21 @@ func Start(n, laddr string, db da.DataAccess) chan error {
 		return errChan
 	}
 	controller.startTime = time.Now()
-	controller.ptype = n
+	controller.ptype = c.Local.Proto
 	controller.db = db
 	controller.router = createRouter()
 	controller.router.RegisterServices(
 		db.GetServices(controller.ip.String())...)
-	port, ip, err := util.ParseAddrArg(laddr)
+	port, ip, err := util.ParseAddrArg(c.Local.Addr)
 	if err != nil {
 		glog.Errorf("Failed to start Controller")
 		errChan <- err
 		return errChan
 	}
+
 	controller.ip = ip
 	controller.port = port
-	go util.StartRpc(n, laddr, errChan, new(ControllerApi))
+	go util.StartRpc(c.Local.Proto, c.Local.Addr, errChan, new(ControllerApi))
 	return errChan
 }
 

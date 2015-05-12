@@ -48,7 +48,7 @@ type plControllerT struct {
 	ptype     string
 	startTime time.Time
 	spid      int
-	sc        scamper.ScamperConfig
+	sc        scamper.Config
 	mp        mproc.MProc
 	w         *fsnotify.Watcher
 	mu        sync.Mutex
@@ -117,7 +117,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	var dw util.UUDecodingWriter
 	for _, r := range resps {
 		glog.Infof("Decoding and writing: %s", r.Bytes())
-		err := r.WriteTo(&dw)
+		_, err := r.WriteTo(&dw)
 		if err != nil {
 			return ret, err
 		}
@@ -155,7 +155,7 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	var dw util.UUDecodingWriter
 	for _, r := range resps {
 		glog.Infof("Decoding and writing: %s", r.Bytes())
-		err := r.WriteTo(&dw)
+		_, err := r.WriteTo(&dw)
 		if err != nil {
 			return ret, err
 		}
@@ -224,17 +224,22 @@ func (c *plControllerT) removeSocket(sock scamper.Socket) {
 	c.rw.Unlock()
 }
 
-func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
+func Start(c Config, noScamp bool) chan error {
+	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
 	plController.socks = make(map[string]scamper.Socket, 10)
-	port, ip, err := util.ParseAddrArg(laddr)
-
+	port, ip, err := util.ParseAddrArg(c.Local.Addr)
 	if err != nil {
 		glog.Error("Failed to parse addr string")
 		errChan <- err
 		return errChan
 	}
-	err = scamper.ParseScamperConfig(sc)
+	var sc scamper.Config
+	sc.Port = c.Scamper.Port
+	sc.Path = c.Scamper.SockDir
+	sc.ScPath = c.Scamper.BinPath
+	sc.ScParserPath = c.Scamper.ConverterPath
+	err = scamper.ParseConfig(sc)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
 		errChan <- err
@@ -245,12 +250,14 @@ func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
 	plController.port = port
 	plController.mp = mproc.New()
 	plController.sc = sc
-	plController.startScamperProc()
+	if !noScamp {
+		plController.startScamperProc()
+	}
 	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
 	//best to call it after startScamperProc otherwise you'll send an error
 	//and trigger any error logic in whatever code is using this
 	plController.watchDir(sc.Path, errChan)
-	go util.StartRpc(n, laddr, errChan, new(PlControllerApi))
+	go util.StartRpc(c.Local.Proto, c.Local.Addr, errChan, new(PlControllerApi))
 	return errChan
 }
 

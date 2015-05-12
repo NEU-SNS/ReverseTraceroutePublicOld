@@ -53,6 +53,12 @@ var (
 	ErrorBadResponse     = errors.New("Bad Response")
 )
 
+//TODO: A possible optimization to make is to open a single connection,
+// resuse it until it fails, and using the -U option to assign an id to
+// each measurement and then return them to the proper caller. This
+// would also involve blocking on a conn waiting for data at any time
+// measurements are out.
+
 type Response struct {
 	rType SResponseT
 	data  []byte
@@ -71,26 +77,11 @@ func (r Response) Bytes() []byte {
 	return r.data
 }
 
-func (r Response) WriteTo(w io.Writer) error {
-	//TODO Make this work
-	//	glog.Infof("Writing data %v", r.data)
-	//Num of bytes that need to be written
-	//	l := len(r.data)
-	//Start of where to write from
-	//	s := 0
-	//	glog.Infof("WriteTo writing: %s, len: %d", r.data, l)
-	//	for l > 0 {
-	//Write bytes
-	w.Write(r.data)
-	//		if err != nil && err != io.ErrShortWrite {
-	//			glog.Errorf("Failed to write with err: %v", err)
-	//			return err
-	//		}
-	//		l -= c
-	//		s += c
-	//	}
-	//	glog.Infof("Wrote %d bytes", s)
-	return nil
+func (r Response) WriteTo(w io.Writer) (n int, err error) {
+	glog.Infof("Writing data %v", r.data)
+	n, err = w.Write(r.data)
+	glog.Infof("Wrote %d bytes", n)
+	return
 }
 
 func NewClient(s Socket, c Cmd) Client {
@@ -154,7 +145,7 @@ func (c *Client) connect() error {
 	if err != nil {
 		return err
 	}
-	c.conn = conn
+	c.conn = &conn
 	c.rw = util.ConnToRW(conn)
 	return nil
 }
@@ -162,7 +153,11 @@ func (c *Client) connect() error {
 func (c *Client) closeConnection() error {
 	glog.Infof("Closing connection to: %s", c.s.fname)
 	if c.connected() {
-		return c.conn.Close()
+		err := (*c.conn).Close()
+		if err != nil {
+			return err
+		}
+		c.conn = nil
 	}
 	return nil
 }

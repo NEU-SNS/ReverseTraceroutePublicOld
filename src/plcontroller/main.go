@@ -28,41 +28,42 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/plcontroller"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-var flags plcontroller.Flags
+var f plcontroller.Flags
 
 func init() {
-	flag.StringVar(&flags.Port, "p", "45000",
-		"The port that the controller will bind to.")
+	flag.StringVar(&f.Local.Addr, "a", ":45000",
+		"The address that the controller will bind to.")
 
-	flag.StringVar(&flags.Ip, "i", "127.0.0.1",
-		"The IP that the controller will bind to.")
-
-	flag.StringVar(&flags.PType, "t", "tcp",
+	flag.StringVar(&f.Local.Proto, "t", "tcp",
 		"Type protocol type the coltroller will use.")
 
-	flag.BoolVar(&flags.CloseSocks, "D", false,
+	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed.")
 
-	flag.StringVar(&flags.SPort, "P", "55000",
+	flag.StringVar(&f.Scamper.Port, "P", "55000",
 		"Port that Scamper will use.")
 
-	flag.StringVar(&flags.SockPath, "S", "/tmp/scamper_sockets",
+	flag.StringVar(&f.Scamper.SockDir, "S", "/tmp/scamper_sockets",
 		"Directory that scamper will use for its sockets")
 
-	flag.StringVar(&flags.ScPath, "B", "/usr/local/bin/sc_remoted",
+	flag.StringVar(&f.Scamper.BinPath, "B", "/usr/local/bin/sc_remoted",
 		"Path to the scamper binary")
-	flag.StringVar(&flags.ScParserPath, "X", "/usr/local/bin/sc_warts2json",
+	flag.StringVar(&f.Scamper.ConverterPath, "X", "/usr/local/bin/sc_warts2json",
 		"Path for warts parser")
+	flag.StringVar(&f.ConfigPath, "c", "",
+		"Path to the config file")
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
+		"The port for pprof")
 }
 
 func sigHandle() {
@@ -78,15 +79,21 @@ func main() {
 	go sigHandle()
 	flag.Parse()
 	defer glog.Flush()
-	util.CloseStdFiles(flags.CloseSocks)
+	var conf plcontroller.Config
 
-	ipstr := fmt.Sprintf("%s:%s", flags.Ip, flags.Port)
-	var sa scamper.ScamperConfig
-	sa.Port = flags.SPort
-	sa.Path = flags.SockPath
-	sa.ScPath = flags.ScPath
-	sa.ScParserPath = flags.ScParserPath
-	err := <-plcontroller.Start(flags.PType, ipstr, sa)
+	if f.ConfigPath != "" {
+		err := config.ParseConfig(f.ConfigPath, &conf)
+		if err != nil {
+			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
+			os.Exit(1)
+		}
+	} else {
+		conf.Local = f.Local
+		conf.Scamper = f.Scamper
+	}
+	util.CloseStdFiles(f.Local.CloseStdDesc)
+	util.StartPProf(conf.Local.PProfAddr)
+	err := <-plcontroller.Start(conf, false)
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
 		os.Exit(1)

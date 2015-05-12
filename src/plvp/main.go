@@ -28,11 +28,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/plvp"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,26 +41,23 @@ import (
 var f plvp.Flags
 
 func init() {
-	flag.StringVar(&f.Port, "p", "55000",
-		"The port the vp will bind to.")
+	flag.StringVar(&f.Local.Addr, "a", ":55000",
+		"The address to run the local service on")
+	flag.StringVar(&f.Local.Proto, "p", "tcp",
+		"The protocol to use for the local service")
+	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
+		"Close std file descripters")
+	flag.StringVar(&f.Local.PProfAddr, "P", ":55500",
+		"The address to use for pperf")
 
-	flag.StringVar(&f.Ip, "i", "127.0.0.1",
-		"The IP that the vp will bind to.")
-
-	flag.StringVar(&f.PType, "t", "tcp",
-		"The protocol type the vp will use")
-
-	flag.BoolVar(&f.CloseSocks, "D", false,
-		"Determines if the standard file descriptors are closed.")
-
-	flag.StringVar(&f.Url, "u", "localhost",
-		"The url of the sc_remoted process")
-
-	flag.StringVar(&f.ScPort, "P", "55000",
-		"The destination port for scamper")
-
-	flag.StringVar(&f.ScPath, "B", "/usr/local/bin/scamper",
-		"Path to the scamper binary")
+	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",
+		"Address that scamper will connect to")
+	flag.StringVar(&f.Scamper.BinPath, "b", "/usr/local/bin/scamper",
+		"The path to the scamper binary")
+	flag.StringVar(&f.ConfigPath, "c", "",
+		"Path to the config file")
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
+		"The port for pprof")
 }
 
 func sigHandle() {
@@ -76,14 +73,25 @@ func main() {
 	go sigHandle()
 	flag.Parse()
 	defer glog.Flush()
-	util.CloseStdFiles(f.CloseSocks)
+	var conf plvp.Config
+	if f.ConfigPath != "" {
 
-	ipstr := fmt.Sprintf("%s:%s", f.Ip, f.Port)
-	var sc scamper.ScamperConfig
-	sc.Port = f.ScPort
-	sc.ScPath = f.ScPath
-	sc.Url = f.Url
-	err := <-plvp.Start(f.PType, ipstr, sc)
+		err := config.ParseConfig(f.ConfigPath, &conf)
+
+		if err != nil {
+			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
+			os.Exit(1)
+		}
+	} else {
+		conf.Local = f.Local
+		conf.Scamper = f.Scamper
+		conf.Scamper.Addrs = append(conf.Scamper.Addrs,
+			conf.Scamper.Addr)
+	}
+
+	util.CloseStdFiles(f.Local.CloseStdDesc)
+	util.StartPProf(conf.Local.PProfAddr)
+	err := <-plvp.Start(conf)
 	if err != nil {
 		glog.Errorf("PLVP Start returned with error: %v", err)
 		os.Exit(1)

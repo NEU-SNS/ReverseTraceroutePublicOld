@@ -33,13 +33,14 @@ import (
 	"github.com/golang/glog"
 	"net"
 	"os"
+	"strings"
 )
 
 type plVantagepointT struct {
 	ip       net.IP
 	port     int
 	hostname string
-	sc       scamper.ScamperConfig
+	sc       []scamper.Config
 	dest     string
 	mp       mproc.MProc
 }
@@ -63,34 +64,46 @@ func HandleSig(s os.Signal) {
 	plVantagepoint.handleSig(s)
 }
 
-func Start(n, laddr string, sc scamper.ScamperConfig) chan error {
+func Start(c Config) chan error {
 	glog.Info("Starting plvp")
 	defer glog.Flush()
 	errChan := make(chan error, 1)
-	port, ip, err := util.ParseAddrArg(laddr)
 
+	port, ip, err := util.ParseAddrArg(c.Local.Addr)
 	if err != nil {
 		glog.Error("Failed to parse addr string")
 		errChan <- err
 		return errChan
 	}
 
-	err = scamper.ParseScamperConfig(sc)
-	if err != nil {
-		glog.Errorf("Invalid scamper args: %v", err)
-		errChan <- err
-		return errChan
+	plVantagepoint.sc = make([]scamper.Config, len(c.Scamper.Addrs))
+
+	for i, addr := range c.Scamper.Addrs {
+		con := new(scamper.Config)
+		split := strings.Split(addr, ":")
+		con.Url = split[util.IP]
+		con.Port = split[util.PORT]
+		con.ScPath = c.Scamper.BinPath
+		err = scamper.ParseConfig(*con)
+		if err != nil {
+			glog.Errorf("Invalid scamper args: %v", err)
+			errChan <- err
+			return errChan
+		}
+		plVantagepoint.sc[i] = *con
 	}
-	plVantagepoint.sc = sc
 	plVantagepoint.port = port
 	plVantagepoint.ip = ip
 	plVantagepoint.mp = mproc.New()
-	plVantagepoint.startScamperProc()
+	plVantagepoint.startScamperProcs()
 	return errChan
 }
 
-func (c *plVantagepointT) startScamperProc() {
-	glog.Info("Starting scamper proc")
-	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.Url, c.sc.Port)
-	c.mp.ManageProcess(sp, true, 10, handleScamperStop)
+func (c *plVantagepointT) startScamperProcs() {
+	glog.Info("Starting scamper procs")
+	for _, sc := range c.sc {
+
+		sp := scamper.GetVPProc(sc.ScPath, sc.Url, sc.Port)
+		c.mp.ManageProcess(sp, true, 10, handleScamperStop)
+	}
 }

@@ -50,8 +50,17 @@ type Request struct {
 }
 
 type Flags struct {
-	PType      string
-	Ip         string
-	Port       string
-	CloseSocks bool
+	Local      LocalConfig
+	ConfigPath string
+}
+
+type Config struct {
+	Local LocalConfig
+}
+
+type LocalConfig struct {
+	Addr         string
+	Proto        string
+	CloseStdDesc bool
+	PProfAddr    string
 }

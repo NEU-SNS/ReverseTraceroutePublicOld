@@ -27,11 +27,25 @@
 package plvp
 
 type Flags struct {
-	Url        string
-	ScPath     string
-	CloseSocks bool
-	ScPort     string
-	PType      string
-	Ip         string
-	Port       string
+	Local      LocalConfig
+	Scamper    ScamperConfig
+	ConfigPath string
+}
+
+type Config struct {
+	Local   LocalConfig
+	Scamper ScamperConfig
+}
+
+type LocalConfig struct {
+	Addr         string
+	Proto        string
+	CloseStdDesc bool
+	PProfAddr    string
+}
+
+type ScamperConfig struct {
+	Addrs   []string
+	BinPath string
+	Addr    string
 }

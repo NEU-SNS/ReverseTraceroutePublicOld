@@ -88,7 +88,7 @@ type Cmd struct {
 
 func (c Cmd) String() string {
 	var buf bytes.Buffer
-	glog.Infof("CMD: %s, %s", c.ct, len(string(c.ct)))
+	glog.Infof("CMD: %s, %d", c.ct, len(string(c.ct)))
 	buf.WriteString(string(c.ct) + " ")
 	for _, arg := range c.options {
 		buf.WriteString(arg + " ")

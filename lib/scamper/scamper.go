@@ -27,7 +27,6 @@
 package scamper
 
 import (
-	"errors"
 	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
@@ -36,10 +35,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-)
-
-var (
-	ErrorScamperBin = errors.New("scamper file is not an executable")
 )
 
 const (
@@ -77,7 +72,7 @@ func NewSocket(fname string) Socket {
 	return Socket{fname: fname}
 }
 
-type ScamperConfig struct {
+type Config struct {
 	Port         string
 	Path         string
 	ScPath       string
@@ -85,7 +80,7 @@ type ScamperConfig struct {
 	ScParserPath string
 }
 
-func ParseScamperConfig(sc ScamperConfig) error {
+func ParseConfig(sc Config) error {
 	val, err := strconv.Atoi(sc.Port)
 	if err != nil {
 		return err
@@ -100,20 +95,21 @@ func ParseScamperConfig(sc ScamperConfig) error {
 		}
 	}
 
-	return checkScamperBinPath(sc.ScPath)
+	return checkBinPath(sc.ScPath)
 
 }
 
-func checkScamperBinPath(binPath string) error {
+func checkBinPath(binPath string) error {
 	fi, err := os.Stat(binPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ErrorScamperBin
+
+			return fmt.Errorf("scamper path does not exist: %s", binPath)
 		}
 		return err
 	}
 	if fi.IsDir() {
-		return ErrorScamperBin
+		return fmt.Errorf("scamper path is not an executable: %s", binPath)
 	}
 	return nil
 }
@@ -145,7 +141,7 @@ func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 		glog.Errorf("Error with scamper socket directory: %v", err)
 		return nil
 	}
-	return proc.New(SUDO, nil, scamperPath,
+	return proc.New(scamperPath, nil,
 		IPv4, PORT, scampPort, SOCKET_DIR, sockDir)
 }
 
