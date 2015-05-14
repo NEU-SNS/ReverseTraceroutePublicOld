@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
+	"log"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -184,6 +185,6 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 
 func StartPProf(port string) {
 	go func() {
-		http.ListenAndServe(fmt.Sprintf("localhost:%s", port), nil)
+		log.Println(http.ListenAndServe(fmt.Sprintf("localhost:%s", port), nil))
 	}()
 }

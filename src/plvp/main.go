@@ -47,7 +47,7 @@ func init() {
 		"The protocol to use for the local service")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
-	flag.StringVar(&f.Local.PProfAddr, "P", ":55500",
+	flag.StringVar(&f.Local.PProfAddr, "P", "55555",
 		"The address to use for pperf")
 
 	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",
@@ -56,14 +56,13 @@ func init() {
 		"The path to the scamper binary")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
-		"The port for pprof")
 }
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
+		glog.Infof("Got signal: %v", sig)
 		plvp.HandleSig(sig)
 		os.Exit(1)
 	}
@@ -89,7 +88,7 @@ func main() {
 			conf.Scamper.Addr)
 	}
 
-	util.CloseStdFiles(f.Local.CloseStdDesc)
+	util.CloseStdFiles(conf.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
 	err := <-plvp.Start(conf)
 	if err != nil {

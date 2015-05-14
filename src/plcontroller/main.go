@@ -62,7 +62,7 @@ func init() {
 		"Path for warts parser")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "55556",
 		"The port for pprof")
 }
 
@@ -70,6 +70,7 @@ func sigHandle() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
+		glog.Infof("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)
 		os.Exit(1)
 	}
@@ -91,7 +92,7 @@ func main() {
 		conf.Local = f.Local
 		conf.Scamper = f.Scamper
 	}
-	util.CloseStdFiles(f.Local.CloseStdDesc)
+	util.CloseStdFiles(conf.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
 	err := <-plcontroller.Start(conf, false)
 	if err != nil {

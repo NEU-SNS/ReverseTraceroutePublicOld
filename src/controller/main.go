@@ -51,7 +51,7 @@ func init() {
 
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file.")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "55555",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "55557",
 		"The port for pprof")
 }
 
