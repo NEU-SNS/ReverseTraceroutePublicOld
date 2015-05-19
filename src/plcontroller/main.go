@@ -62,7 +62,7 @@ func init() {
 		"Path for warts parser")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", ":55556",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55556",
 		"The port for pprof")
 }
 
@@ -72,7 +72,7 @@ func sigHandle() {
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -86,7 +86,7 @@ func main() {
 		err := config.ParseConfig(f.ConfigPath, &conf)
 		if err != nil {
 			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			os.Exit(1)
+			exit(1)
 		}
 	} else {
 		conf.Local = f.Local
@@ -97,6 +97,11 @@ func main() {
 	err := <-plcontroller.Start(conf, false)
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
-		os.Exit(1)
+		exit(1)
 	}
+}
+
+func exit(status int) {
+	glog.Flush()
+	os.Exit(status)
 }

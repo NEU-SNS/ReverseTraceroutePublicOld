@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,45 +24,13 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package controller
+package datamodel
 
-import (
-	"code.google.com/p/go-uuid/uuid"
-	"errors"
-	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"time"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type RoutedRequest func() (*dm.MReturn, Request, error)
-
-type Request struct {
-	Id    uuid.UUID
-	Stime time.Time
-	Dur   time.Duration
-	Args  interface{}
-	Key   dm.ServiceT
-	Type  dm.MType
-}
-
-type Flags struct {
-	Local      LocalConfig
-	ConfigPath string
-	Db         dm.DbConfig
-}
-
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         string
-	Proto        string
-	CloseStdDesc bool
-	PProfAddr    string
+type DbConfig struct {
+	ServiceSpace    string
+	ServiceAttr     string
+	TracerouteSpace string
+	TracerouteAttr  string
+	Host            string
+	Port            int
 }

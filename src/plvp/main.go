@@ -47,7 +47,7 @@ func init() {
 		"The protocol to use for the local service")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
-	flag.StringVar(&f.Local.PProfAddr, "P", ":55555",
+	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55555",
 		"The address to use for pperf")
 
 	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",
@@ -64,7 +64,7 @@ func sigHandle() {
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		plvp.HandleSig(sig)
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -79,7 +79,7 @@ func main() {
 
 		if err != nil {
 			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			os.Exit(1)
+			exit(1)
 		}
 	} else {
 		conf.Local = f.Local
@@ -93,6 +93,11 @@ func main() {
 	err := <-plvp.Start(conf)
 	if err != nil {
 		glog.Errorf("PLVP Start returned with error: %v", err)
-		os.Exit(1)
+		exit(1)
 	}
+}
+
+func exit(status int) {
+	glog.Flush()
+	os.Exit(status)
 }

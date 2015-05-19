@@ -29,7 +29,6 @@ package util
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"github.com/golang/glog"
 	"log"
 	"net"
@@ -159,8 +158,8 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	return res, err
 }
 
-func StartPProf(port string) {
+func StartPProf(addr string) {
 	go func() {
-		log.Println(http.ListenAndServe(fmt.Sprintf("%s", port), nil))
+		log.Println(http.ListenAndServe(addr, nil))
 	}()
 }

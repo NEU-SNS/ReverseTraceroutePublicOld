@@ -27,14 +27,23 @@
 package dataaccess
 
 import (
+	"encoding/json"
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/golang/glog"
+	"github.com/rescrv/HyperDex/bindings/go/client"
 )
 
 type DataAccess interface {
-	GetServices(ip string) []*dm.Service
+	GetServices() ([]*dm.Service, error)
+	StoreTraceroute(t *dm.Traceroute) error
+	GetTraceroute(src, dst string) (*dm.Traceroute, error)
+	Destroy()
 }
 
 type dataAccess struct {
+	c    *client.Client
+	conf dm.DbConfig
 }
 
 func (d *dataAccess) GetServices(ip string) []*dm.Service {
@@ -44,6 +53,77 @@ func (d *dataAccess) GetServices(ip string) []*dm.Service {
 	}}
 }
 
-func New() DataAccess {
-	return &dataAccess{}
+func (d *dataAccess) StoreTraceroute(t *dm.Traceroute) error {
+	b, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("%s:%s", t.Src, t.Dst)
+	err = d.c.Put(d.conf.TracerouteSpace, key,
+		client.Attributes{d.conf.TracerouteAttr: client.Document{string(b)}})
+
+	return err
+}
+
+func (d *dataAccess) GetTraceroute(src, dst string) (*dm.Traceroute, error) {
+	key := fmt.Sprintf("%s:%s", src, dst)
+	res, err := d.c.Get(d.conf.TracerouteSpace, key)
+	if err != nil {
+		return nil, err
+	}
+	var tr *dm.Traceroute
+	obj := res[d.conf.TracerouteAttr]
+	if doc, ok := obj.(client.Document); ok {
+		err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], tr)
+		if err != nil {
+			glog.Errorf("GetTraceroute failed to unmarshal json: %s with err: %v",
+				doc.Doc, err)
+			return nil, err
+		}
+		return tr, nil
+	}
+	return nil, fmt.Errorf("Found no traceroute for %s:%s", src, dst)
+}
+
+func (d *dataAccess) GetServices() ([]*dm.Service, error) {
+	rchan, errChan := d.c.Search(d.conf.ServiceSpace, nil)
+	servs := make([]*dm.Service, 0)
+	for res := range rchan {
+		var serv dm.Service
+		obj := res[d.conf.ServiceAttr]
+		if doc, ok := obj.(client.Document); ok {
+			err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], &serv)
+			if err != nil {
+				glog.Errorf("GetServices failed to unmarshal json: %s with err: %v",
+					doc.Doc, err)
+				return nil, err
+			}
+			servs = append(servs, &serv)
+		}
+		return servs, nil
+	}
+
+	for e := range errChan {
+		return nil, e
+	}
+	panic("should never get here GetServices")
+	return nil, nil
+}
+
+func (d *dataAccess) Destroy() {
+	d.c.Destroy()
+}
+
+func New(conf dm.DbConfig) (DataAccess, error) {
+	glog.Infof("Connecting to database: %v", conf)
+	c, e, err := client.NewClient(conf.Host, conf.Port)
+	if e != nil {
+		return nil, e
+	}
+	go func() {
+		for e := range err {
+			fmt.Println("error: ", e)
+		}
+	}()
+	return &dataAccess{conf: conf, c: c}, nil
 }

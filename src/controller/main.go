@@ -35,9 +35,21 @@ import (
 	"github.com/golang/glog"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 var f controller.Flags
+
+func sigHandle() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+	for sig := range c {
+		glog.Infof("Got signal: %v", sig)
+		controller.HandleSig(sig)
+		exit(1)
+	}
+}
 
 func init() {
 	flag.StringVar(&f.Local.Addr, "a", ":35000",
@@ -51,11 +63,12 @@ func init() {
 
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file.")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", ":55557",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55557",
 		"The port for pprof")
 }
 
 func main() {
+	go sigHandle()
 	flag.Parse()
 	defer glog.Flush()
 	var conf controller.Config
@@ -63,16 +76,27 @@ func main() {
 		err := config.ParseConfig(f.ConfigPath, &conf)
 		if err != nil {
 			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			os.Exit(1)
+			exit(1)
 		}
 	} else {
 		conf.Local = f.Local
 	}
 	util.CloseStdFiles(f.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
-	err := <-controller.Start(conf, da.New())
+	db, err := da.New(conf.Db)
+	if err != nil {
+		glog.Errorf("Failed to create db: %v", err)
+		exit(1)
+	}
+	glog.Infof("Starting controller with config: %v", conf)
+	err = <-controller.Start(conf, db)
 	if err != nil {
 		glog.Errorf("Controller Start returned with error: %v", err)
-		os.Exit(1)
+		exit(1)
 	}
+}
+
+func exit(status int) {
+	glog.Flush()
+	os.Exit(status)
 }

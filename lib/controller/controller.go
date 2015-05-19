@@ -29,6 +29,7 @@ package controller
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"errors"
+	"fmt"
 	capi "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
@@ -100,6 +101,14 @@ func (c *controllerT) getStatsInfo() (t time.Duration, req int64) {
 	t, req = c.time, c.requests
 	c.mu.Unlock()
 	return
+}
+
+func HandleSig(sig os.Signal) {
+	controller.handleSig(sig)
+}
+
+func (c *controllerT) handleSig(sig os.Signal) {
+	c.db.Destroy()
 }
 
 func (c *controllerT) getStats() dm.Stats {
@@ -245,4 +254,51 @@ func Start(c Config, db da.DataAccess) chan error {
 	capi.RegisterControllerServer(controller.server, &controller)
 	go controller.startRpc(errChan)
 	return errChan
+}
+
+func (c *controllerT) makeRemoteReq(req Request, s *dm.Service) (interface{}, error) {
+	glog.Infof("Connecting to %s, %s", s.Proto, s.GetIp())
+	conn, err := jsonrpc.Dial(s.Proto, s.GetIp())
+	if err != nil {
+		glog.Errorf("Failed to connect: %v, %v, with err: %v", req, s, err)
+		return nil, err
+	}
+	defer conn.Close()
+	api := s.Api[req.Type]
+	sretf, ok := dm.TypeMap[api.Type]
+	if !ok {
+		glog.Errorf("Could not find func for apiType: %s", api.Type)
+		return nil, fmt.Errorf("Failed to find Return type")
+	}
+	sret := sretf()
+	err = conn.Call(api.Url, req.Args, sret)
+	glog.Info("%v", sret)
+	return sret, nil
+
+}
+
+var (
+	ErrorUnknownReqType     = fmt.Errorf("Request of Unknown type")
+	ErrorReqArgTypeMismatch = fmt.Errorf("ReqType ReqArg type mismatch")
+	ErrorTracerouteNotFound = fmt.Errorf("Traceroute not found")
+)
+
+func (c *controllerT) checkCachedReq(req Request, ret interface{}) (interface{}, error) {
+	switch req.Type {
+	case dm.TRACEROUTE:
+		if targ, ok := req.Args.(dm.TracerouteArg); ok {
+			tr, err := c.db.GetTraceroute(targ.Host, targ.Dst)
+			if err != nil {
+				return nil, err
+			}
+			if tr == nil {
+				return tr, ErrorTracerouteNotFound
+			}
+			return targ, err
+		}
+		return nil, ErrorReqArgTypeMismatch
+	default:
+		return nil, ErrorUnknownReqType
+	}
+	return nil, nil
 }
