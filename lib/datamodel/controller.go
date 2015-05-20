@@ -28,6 +28,7 @@ package datamodel
 
 import (
 	"fmt"
+	"net/rpc"
 	"time"
 )
 
@@ -57,7 +58,8 @@ type MArg struct {
 }
 
 type ServiceArg struct {
-	Service ServiceT
+	Service   ServiceT
+	Staleness time.Duration
 }
 
 type MReturn struct {
@@ -74,3 +76,5 @@ type MRequestError struct {
 	Cause    MRequestState
 	CauseErr error
 }
+
+type DialFunc func(n, addr string) (*rpc.Client, error)

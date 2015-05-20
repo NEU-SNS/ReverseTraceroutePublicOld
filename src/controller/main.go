@@ -34,6 +34,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	_ "net/http/pprof"
+	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,7 +44,8 @@ var f controller.Flags
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT,
+		syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		controller.HandleSig(sig)
@@ -88,8 +90,9 @@ func main() {
 		glog.Errorf("Failed to create db: %v", err)
 		exit(1)
 	}
+
 	glog.Infof("Starting controller with config: %v", conf)
-	err = <-controller.Start(conf, db)
+	err = <-controller.Start(conf, db, jsonrpc.Dial)
 	if err != nil {
 		glog.Errorf("Controller Start returned with error: %v", err)
 		exit(1)

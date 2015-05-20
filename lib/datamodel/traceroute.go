@@ -44,7 +44,7 @@ func (t *TTime) UnmarshalJSON(data []byte) (err error) {
 func (t TTime) MarshalJSON() ([]byte, error) {
 	tt := time.Time(t)
 	if y := tt.Year(); y < 0 || y >= 10000 {
-		return nil, errors.New("Time.MarshalJSON: year outside of range [0,9999]")
+		return nil, errors.New("TTime.MarshalJSON: year outside of range [0,9999]")
 	}
 	return []byte(tt.Format(`"` + TRACETIME + `"`)), nil
 }

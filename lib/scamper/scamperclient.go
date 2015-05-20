@@ -51,6 +51,7 @@ var (
 	ErrorBadDataResponse = errors.New("Bad DATA Response")
 	ErrorBadOKResponse   = errors.New("Bad OK Response")
 	ErrorBadResponse     = errors.New("Bad Response")
+	ErrorTimeout         = errors.New("Timeout")
 )
 
 //TODO: A possible optimization to make is to open a single connection,
@@ -99,28 +100,33 @@ func (c *Client) checkConn() error {
 	return nil
 }
 
-func (c *Client) IssueCmd() error {
+func (c *Client) IssueCmd() chan error {
 	glog.Infof("Issuing command: %s", c.cmd.String())
+	eChan := make(chan error, 1)
 	err := c.checkConn()
 	if err != nil {
-		return err
+		eChan <- err
+		return eChan
 	}
 	defer c.closeConnection()
 	_, err = c.rw.WriteString(c.cmd.String())
 	if err != nil {
-		return err
+		eChan <- err
+		return eChan
 	}
 	c.rw.Flush()
 	i := 0
 	for i < 3 {
 		line, err := c.rw.ReadString('\n')
 		if err != nil {
-			return err
+			eChan <- err
+			return eChan
 		}
 		r, err := parseResponse(line, c.rw)
 		if err != nil {
 			glog.Errorf("Error parsing response: %v", err)
-			return err
+			eChan <- err
+			return eChan
 		}
 		switch {
 		case r.rType == OK:
@@ -131,12 +137,13 @@ func (c *Client) IssueCmd() error {
 			glog.Infof("Count of data received: %d", i)
 		case r.rType == ERR:
 			glog.Errorf("Parsed scamper ERR return")
-			return fmt.Errorf("Error with scamper request: %s", c.cmd.String())
+			eChan <- fmt.Errorf("Error with scamper request: %s", c.cmd.String())
+			return eChan
 		case r.rType == MORE:
 		}
 
 	}
-	return nil
+	return eChan
 }
 
 func (c *Client) connect() error {

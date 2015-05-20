@@ -59,6 +59,7 @@ type controllerT struct {
 	//the mutex protects the following
 	requests int64
 	time     time.Duration
+	rpc      dm.DialFunc
 }
 
 var controller controllerT
@@ -207,7 +208,6 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 		tr.Ret = makeErrorReturn(st)
 		return
 	}
-
 	tr.Traceroute, err = mt.Traceroute(nctx, ta)
 	if err != nil {
 		tr.Ret = makeErrorReturn(st)
@@ -258,12 +258,12 @@ func Start(c Config, db da.DataAccess) chan error {
 
 func (c *controllerT) makeRemoteReq(req Request, s *dm.Service) (interface{}, error) {
 	glog.Infof("Connecting to %s, %s", s.Proto, s.GetIp())
-	conn, err := jsonrpc.Dial(s.Proto, s.GetIp())
+	cl, err := c.rpc(s.Proto, s.GetIp())
 	if err != nil {
 		glog.Errorf("Failed to connect: %v, %v, with err: %v", req, s, err)
 		return nil, err
 	}
-	defer conn.Close()
+	defer cl.Close()
 	api := s.Api[req.Type]
 	sretf, ok := dm.TypeMap[api.Type]
 	if !ok {
@@ -271,8 +271,14 @@ func (c *controllerT) makeRemoteReq(req Request, s *dm.Service) (interface{}, er
 		return nil, fmt.Errorf("Failed to find Return type")
 	}
 	sret := sretf()
-	err = conn.Call(api.Url, req.Args, sret)
-	glog.Info("%v", sret)
+	err = cl.Call(api.Url, req.Args, sret)
+	if err != nil {
+		return nil, err
+	}
+	err = c.cacheResult(sret, req.Type)
+	if err != nil {
+		glog.Errorf("Caching Failed: %v", err)
+	}
 	return sret, nil
 
 }
@@ -280,25 +286,50 @@ func (c *controllerT) makeRemoteReq(req Request, s *dm.Service) (interface{}, er
 var (
 	ErrorUnknownReqType     = fmt.Errorf("Request of Unknown type")
 	ErrorReqArgTypeMismatch = fmt.Errorf("ReqType ReqArg type mismatch")
-	ErrorTracerouteNotFound = fmt.Errorf("Traceroute not found")
+	ErrorUnknownType        = fmt.Errorf("Unknown MType")
 )
 
-func (c *controllerT) checkCachedReq(req Request, ret interface{}) (interface{}, error) {
+func (c *controllerT) cacheResult(res interface{}, t dm.MType) (err error) {
+	glog.Infof("Caching Results: %v", res)
+	switch t {
+	case dm.TRACEROUTE:
+		if tr, ok := res.(*dm.Traceroute); ok {
+			err = c.db.StoreTraceroute(tr)
+		}
+	case dm.PING:
+		if ping, ok := res.(*dm.Ping); ok {
+			err = c.db.StorePing(ping)
+		}
+	case dm.STATS:
+		return nil
+	default:
+		err = ErrorUnknownType
+	}
+	return
+}
+
+func (c *controllerT) checkCachedReq(req Request) (r interface{}, err error) {
 	switch req.Type {
 	case dm.TRACEROUTE:
 		if targ, ok := req.Args.(dm.TracerouteArg); ok {
-			tr, err := c.db.GetTraceroute(targ.Host, targ.Dst)
-			if err != nil {
-				return nil, err
-			}
-			if tr == nil {
-				return tr, ErrorTracerouteNotFound
-			}
-			return targ, err
+			ret, e := c.db.GetTraceroute(targ.Host, targ.Dst, targ.ServiceArg.Staleness)
+			err = e
+			r = ret
+		} else {
+			err = ErrorReqArgTypeMismatch
 		}
-		return nil, ErrorReqArgTypeMismatch
+	case dm.PING:
+		if targ, ok := req.Args.(dm.PingArg); ok {
+			ret, e := c.db.GetPing(targ.Host, targ.Dst, targ.ServiceArg.Staleness)
+			err = e
+			r = ret
+		} else {
+			err = ErrorReqArgTypeMismatch
+		}
+	case dm.STATS:
+		err = da.ErrorCacheValueNotFound
 	default:
-		return nil, ErrorUnknownReqType
+		err = ErrorUnknownReqType
 	}
-	return nil, nil
+	return
 }

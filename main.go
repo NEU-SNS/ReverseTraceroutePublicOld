@@ -63,6 +63,7 @@ func main() {
 	fmt.Printf("Response took: %s\n", time.Duration(r.GetRet().Dur))
 	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB}
 	rr, err := cl.Stats(con.Background(), &arg)
+
 	if err != nil {
 		fmt.Printf("Stats failed with err: %v\n", err)
 	}

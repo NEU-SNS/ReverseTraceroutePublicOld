@@ -110,9 +110,11 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 		return ret, err
 	}
 	cl := scamper.NewClient(soc, com)
-	err = cl.IssueCmd()
-	if err != nil {
+	select {
+	case err := <-cl.IssueCmd():
 		return ret, err
+	case <-time.After(time.Second * 60):
+		return ret, fmt.Errorf("Ping timed out")
 	}
 	resps := cl.GetResponses()
 	var dw util.UUDecodingWriter
@@ -148,9 +150,11 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	}
 	com, err := scamper.NewCmd(ta)
 	cl := scamper.NewClient(soc, com)
-	err = cl.IssueCmd()
-	if err != nil {
+	select {
+	case err := <-cl.IssueCmd():
 		return ret, err
+	case <-time.After(time.Second * 60):
+		return ret, fmt.Errorf("Ping timed out")
 	}
 	resps := cl.GetResponses()
 	var dw util.UUDecodingWriter

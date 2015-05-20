@@ -32,18 +32,66 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
 	"github.com/rescrv/HyperDex/bindings/go/client"
+	"time"
+)
+
+var (
+	ErrorCacheValueNotFound = fmt.Errorf("Cached value not found")
 )
 
 type DataAccess interface {
 	GetServices() ([]*dm.Service, error)
 	StoreTraceroute(t *dm.Traceroute) error
-	GetTraceroute(src, dst string) (*dm.Traceroute, error)
+	GetTraceroute(src, dst string, s time.Duration) (*dm.Traceroute, error)
+	GetPing(src, dst string, s time.Duration) (*dm.Ping, error)
+	StorePing(*dm.Ping) error
 	Destroy()
 }
 
 type dataAccess struct {
 	c    *client.Client
 	conf dm.DbConfig
+	ec   chan client.Error
+}
+
+func (d *dataAccess) GetPing(src, dst string, s time.Duration) (*dm.Ping, error) {
+	key := fmt.Sprintf("%s:%s", src, dst)
+	glog.Infof("Trying to get ping for: %s", key)
+	res, err := d.c.Get(d.conf.PingSpace, key)
+	if err != nil {
+		return nil, convertErr(err)
+	}
+	ping := new(dm.Ping)
+	obj := res[d.conf.PingAttr]
+	if doc, ok := obj.(client.Document); ok {
+		err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], ping)
+		if err != nil {
+			glog.Errorf("GetPing failed to unmarshal json: %s with err: %v",
+				doc.Doc, err)
+			return nil, err
+		}
+		start := time.Unix(ping.Start.Sec, ping.Start.USec)
+		d := time.Since(start)
+
+		if d > s {
+			ping = nil
+		}
+		return ping, nil
+	}
+	return nil, nil
+}
+
+func (d *dataAccess) StorePing(p *dm.Ping) error {
+	p.Prestore()
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("%s:%s", p.Src, p.Dst)
+	glog.Infof("Storing ping: %s %s", key, b)
+	err = d.c.Put(d.conf.PingSpace, key,
+		client.Attributes{d.conf.PingAttr: client.Document{string(b)}})
+	return err
 }
 
 func (d *dataAccess) GetServices(ip string) []*dm.Service {
@@ -54,24 +102,37 @@ func (d *dataAccess) GetServices(ip string) []*dm.Service {
 }
 
 func (d *dataAccess) StoreTraceroute(t *dm.Traceroute) error {
+	t.Prestore()
 	b, err := json.Marshal(t)
 	if err != nil {
 		return err
 	}
 	key := fmt.Sprintf("%s:%s", t.Src, t.Dst)
+	glog.Infof("Storing traceroute: %s %s", key, b)
 	err = d.c.Put(d.conf.TracerouteSpace, key,
 		client.Attributes{d.conf.TracerouteAttr: client.Document{string(b)}})
 
 	return err
 }
 
-func (d *dataAccess) GetTraceroute(src, dst string) (*dm.Traceroute, error) {
+func convertErr(err *client.Error) (e error) {
+	switch err.Status {
+	case client.NOTFOUND:
+		e = ErrorCacheValueNotFound
+	default:
+		e = err
+	}
+	return
+}
+
+func (d *dataAccess) GetTraceroute(src, dst string, s time.Duration) (*dm.Traceroute, error) {
 	key := fmt.Sprintf("%s:%s", src, dst)
+	glog.Infof("Trying to get ping for: %s", key)
 	res, err := d.c.Get(d.conf.TracerouteSpace, key)
 	if err != nil {
-		return nil, err
+		return nil, convertErr(err)
 	}
-	var tr *dm.Traceroute
+	tr := new(dm.Traceroute)
 	obj := res[d.conf.TracerouteAttr]
 	if doc, ok := obj.(client.Document); ok {
 		err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], tr)
@@ -80,9 +141,15 @@ func (d *dataAccess) GetTraceroute(src, dst string) (*dm.Traceroute, error) {
 				doc.Doc, err)
 			return nil, err
 		}
+		start := time.Unix(tr.Start.Sec, tr.Start.USec)
+		d := time.Since(start)
+
+		if d > s {
+			tr = nil
+		}
 		return tr, nil
 	}
-	return nil, fmt.Errorf("Found no traceroute for %s:%s", src, dst)
+	return nil, nil
 }
 
 func (d *dataAccess) GetServices() ([]*dm.Service, error) {
@@ -114,16 +181,21 @@ func (d *dataAccess) Destroy() {
 	d.c.Destroy()
 }
 
+func (d *dataAccess) handleErrors() {
+	go func() {
+		for e := range d.ec {
+			glog.Errorf("DB Client issue: %v", e)
+		}
+	}()
+}
+
 func New(conf dm.DbConfig) (DataAccess, error) {
 	glog.Infof("Connecting to database: %v", conf)
 	c, e, err := client.NewClient(conf.Host, conf.Port)
 	if e != nil {
 		return nil, e
 	}
-	go func() {
-		for e := range err {
-			fmt.Println("error: ", e)
-		}
-	}()
-	return &dataAccess{conf: conf, c: c}, nil
+	da := &dataAccess{conf: conf, c: c, ec: err}
+	da.handleErrors()
+	return da, nil
 }
