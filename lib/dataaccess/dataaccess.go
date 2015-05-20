@@ -54,6 +54,11 @@ type dataAccess struct {
 	ec   chan client.Error
 }
 
+func uToNSec(u int64) int64 {
+	//1000 nsec to a nsec
+	return u * 1000
+}
+
 func (d *dataAccess) GetPing(src, dst string, s time.Duration) (*dm.Ping, error) {
 	key := fmt.Sprintf("%s:%s", src, dst)
 	glog.Infof("Trying to get ping for: %s", key)
@@ -70,7 +75,7 @@ func (d *dataAccess) GetPing(src, dst string, s time.Duration) (*dm.Ping, error)
 				doc.Doc, err)
 			return nil, err
 		}
-		start := time.Unix(ping.Start.Sec, ping.Start.USec*1000)
+		start := time.Unix(ping.Start.Sec, uToNSec(ping.Start.USec))
 		d := time.Since(start)
 
 		if d > s {
