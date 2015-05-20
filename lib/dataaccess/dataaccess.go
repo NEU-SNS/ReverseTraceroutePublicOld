@@ -70,7 +70,7 @@ func (d *dataAccess) GetPing(src, dst string, s time.Duration) (*dm.Ping, error)
 				doc.Doc, err)
 			return nil, err
 		}
-		start := time.Unix(ping.Start.Sec, ping.Start.USec)
+		start := time.Unix(ping.Start.Sec, ping.Start.USec*1000)
 		d := time.Since(start)
 
 		if d > s {
@@ -141,7 +141,7 @@ func (d *dataAccess) GetTraceroute(src, dst string, s time.Duration) (*dm.Tracer
 				doc.Doc, err)
 			return nil, err
 		}
-		start := time.Unix(tr.Start.Sec, tr.Start.USec)
+		start := time.Unix(tr.Start.Sec, tr.Start.USec*1000)
 		d := time.Since(start)
 
 		if d > s {
