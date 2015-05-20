@@ -53,6 +53,7 @@ type plControllerT struct {
 	mp        mproc.MProc
 	w         *fsnotify.Watcher
 	mu        sync.Mutex
+	conf      Config
 	//the mutex protects the following
 	requests int64
 	time     time.Duration
@@ -99,6 +100,10 @@ func (c *plControllerT) getStats() dm.Stats {
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
+	timeout := pa.ServiceArg.Timeout
+	if timeout == 0 {
+		timeout = c.conf.Local.Timeout
+	}
 	sTime := time.Now()
 	ret := dm.Ping{}
 	soc, err := c.getSocket(pa.Host)
@@ -142,6 +147,10 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 
 func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
+	timeout := ta.ServiceArg.Timeout
+	if timeout == 0 {
+		timeout = c.conf.Local.Timeout
+	}
 	sTime := time.Now()
 	ret := dm.Traceroute{}
 	soc, err := c.getSocket(ta.Host)
@@ -248,6 +257,7 @@ func Start(c Config, noScamp bool) chan error {
 	plController.startTime = time.Now()
 	plController.mp = mproc.New()
 	plController.sc = sc
+	plController.conf = c
 	if !noScamp {
 		plController.startScamperProc()
 	}

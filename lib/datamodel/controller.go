@@ -60,6 +60,7 @@ type MArg struct {
 type ServiceArg struct {
 	Service   ServiceT
 	Staleness time.Duration
+	Timeout   int
 }
 
 type MReturn struct {

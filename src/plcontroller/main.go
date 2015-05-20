@@ -41,6 +41,8 @@ import (
 var f plcontroller.Flags
 
 func init() {
+	flag.IntVar(&f.Local.Timeout, "t", 60,
+		"The default timeout used for measurement requests.")
 	flag.StringVar(&f.Local.Addr, "a", ":45000",
 		"The address that the controller will bind to.")
 
