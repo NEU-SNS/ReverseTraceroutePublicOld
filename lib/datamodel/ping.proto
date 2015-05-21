@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/time.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+message PingArg {
+    string service = 1;
+    string dst = 2;
+    string host = 3;
+    bool spoof = 4;
+    bool r_r = 5;
+    string s_addr = 6;
+    string payload = 7;
+    string count = 8;
+    string icmp_sum = 9;
+    string dport = 10;
+    string sport = 11;
+    string wait = 12;
+    string ttl = 13;
+    string mut = 14;
+    string reply_count = 15;
+    string pattern = 16;
+    string method = 17;
+    string size = 18;
+    string user_id = 19;
+    string tos = 20;
+    string time_stamp = 21;
+}
+
+message PingStats {
+    int32 replies = 1;
+    int32 loss = 2;
+    float min = 3;
+    float max = 4;
+    float avg = 5;
+    float stddev = 6;
+}
+
+message PingResponse {
+    string from = 1;
+    int32 seq = 2;
+    int32 reply_size = 3;
+    int32 reply_ttl = 4;
+    string reply_proto = 5;
+    Time tx = 6;
+    Time rx = 7;
+    float rtt = 8;
+    int32 probe_ip_id = 9;
+    int32 reply_ip_id = 10;
+    int32 icmp_type = 11;
+    int32 icmp_code = 12;
+    repeated string r_r = 13;
+    repeated int64 tsonly = 14;
+    repeated TsAndAddr tsandaddr = 15;
+    
+}
+
+message TsAndAddr {
+    string ip = 1;
+    int64 ts = 2;
+}
+
+message Ping {
+	string version   =  1; 
+    string type      =  2;
+	string method    =  3;
+	string src       =  4; 
+	string dst       =  5; 
+	Time start       =  6; 
+	string ping_sent =  7;
+	int32 probe_size =  8; 
+	int32 userid     =  9; 
+	int32 ttl        = 10; 
+	int32 wait       = 11;
+	int32 timeout    = 12;
+	repeated string flags                = 13;
+	repeated PingResponse ping_responses = 14;
+	PingStats Statistics                 = 15;
+}
+
+message PingReturn {
+    ReturnT ret = 1;
+    Ping ping = 2;
+}

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+message Stats {
+    string start_time = 1;
+    string up_time = 2;
+    int64 requests = 3;
+    string avg_req_time = 4;
+    string tot_req_time = 5;
+}
+
+message StatsArg {
+    string service = 1;
+}
+
+message StatsReturn {
+    ReturnT ret = 1;
+    Stats stats = 2;
+}
+

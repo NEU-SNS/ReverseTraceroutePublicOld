@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+enum MRequestStatus {
+    SUCCESS = 0;
+    ERROR   = 1;
+}
+
+message ReturnT {
+    MRequestStatus Status = 1;
+    string Dur = 2; 
+}

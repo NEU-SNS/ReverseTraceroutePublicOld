@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -25,27 +25,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package datamodel
-
-import (
-	"time"
-)
-
-type Stats struct {
-	StartTime  time.Time
-	UpTime     time.Duration
-	Requests   int64
-	AvgReqTime time.Duration
-	TotReqTime time.Duration
-}
-
-type StatsReturn struct {
-	ReturnT
-	Stats Stats
-}
-
-type StatsArg struct {
-	ServiceArg
-}
 
 func createStats() interface{} {
 	return new(Stats)

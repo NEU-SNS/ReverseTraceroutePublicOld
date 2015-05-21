@@ -31,74 +31,6 @@ import (
 	"time"
 )
 
-type TracerouteArg struct {
-	ServiceArg
-	Host         string
-	Dst          string
-	Confidence   string
-	DPort        string
-	FirstHop     string
-	GapLimit     string
-	GapAction    string
-	MaxTtl       string
-	PathDiscov   bool
-	Loops        string
-	LoopAction   string
-	Payload      string
-	Method       string
-	Attempts     string
-	SendAll      bool
-	SPort        string
-	SAddr        string
-	Tos          string
-	TimeExceeded bool
-	UserId       string
-	Wait         string
-	WaitProbe    string
-	GssEntry     string
-	LssName      string
-}
-
-type Traceroute struct {
-	Version    string          `json:"version"`
-	Type       string          `json:"type"`
-	UserId     int             `json:"userid"`
-	Method     string          `json:"method"`
-	Src        string          `json:"src"`
-	Dst        string          `json:"dst"`
-	SPort      int             `json:"sport"`
-	DPort      int             `json:"dport"`
-	StopReason string          `json:"stop_reason"`
-	StopData   int             `json:"stop_data"`
-	Start      TracerouteTime  `json:"start"`
-	HopCount   int             `json:"hop_count"`
-	Attempts   int             `json:"attempts"`
-	HopLimit   int             `json:"hoplimit"`
-	FirstHop   int             `json:"firsthop"`
-	Wait       int             `json:"wait"`
-	WaitProbe  int             `json:"wait_probe"`
-	Tos        int             `json:"tos"`
-	ProbeSize  int             `json:"probe_size"`
-	Hops       []TracerouteHop `json:"hops"`
-}
-
-type TracerouteHop struct {
-	Addr      string  `json:"addr"`
-	ProbeTtl  int     `json:"probe_ttl"`
-	ProbeId   int     `json:"probe_id"`
-	ProbeSize int     `json:"probe_size"`
-	Rtt       float32 `json:"rtt"`
-	ReplyTtl  int     `json:"reply_ttl"`
-	ReplyTos  int     `json:"reply_tos"`
-	ReplySize int     `json:"reply_size"`
-	ReplyIpId int     `json:"reply_ipid"`
-	IcmpType  int     `json:"icmp_type"`
-	IcmpCode  int     `json:"icmp_code"`
-	IcmpQTtl  int     `json:"icmp_q_ttl"`
-	IcmpqIpl  int     `json:"icmp_q_ipl"`
-	IcmpQTos  int     `json:"icmp_q_tos"`
-}
-
 type TTime time.Time
 
 const TRACETIME = "2006-01-_2 15:04:05"
@@ -120,17 +52,6 @@ func (t TTime) MarshalJSON() ([]byte, error) {
 func (t TTime) String() string {
 	tt := time.Time(t)
 	return tt.String()
-}
-
-type TracerouteTime struct {
-	Sec   int64 `json:"sec"`
-	USec  int64 `json:"usec"`
-	Ftime TTime `json:"ftime"`
-}
-
-type TracerouteReturn struct {
-	ReturnT
-	Traceroute Traceroute
 }
 
 func createTraceroute() interface{} {

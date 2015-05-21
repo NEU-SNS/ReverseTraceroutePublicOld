@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+
+option go_package = "controller";
+
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/ping.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/traceroute.proto";
+
+service Controller {
+
+    rpc Ping(datamodel.PingArg) returns (datamodel.PingReturn) {}
+    rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.TracerouteReturn) {}
+    rpc Stats(datamodel.StatsArg) returns (datamodel.StatsReturn) {}
+
+}
