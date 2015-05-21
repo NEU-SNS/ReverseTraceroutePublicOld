@@ -55,7 +55,7 @@ type dataAccess struct {
 }
 
 func uToNSec(u int64) int64 {
-	//1000 nsec to a nsec
+	//1000 nsec to a usec
 	return u * 1000
 }
 
@@ -130,6 +130,15 @@ func convertErr(err *client.Error) (e error) {
 	return
 }
 
+func umarshal(data []byte, obj interface{}) error {
+	err := json.Unmarshal(data, obj)
+	if err != nil {
+		glog.Errorf("Failed to unmarshal data: %s with error: %v", data, err)
+		return err
+	}
+	return nil
+}
+
 func (d *dataAccess) GetTraceroute(src, dst string, s time.Duration) (*dm.Traceroute, error) {
 	key := fmt.Sprintf("%s:%s", src, dst)
 	glog.Infof("Trying to get ping for: %s", key)
@@ -140,15 +149,11 @@ func (d *dataAccess) GetTraceroute(src, dst string, s time.Duration) (*dm.Tracer
 	tr := new(dm.Traceroute)
 	obj := res[d.conf.TracerouteAttr]
 	if doc, ok := obj.(client.Document); ok {
-		err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], tr)
-		if err != nil {
-			glog.Errorf("GetTraceroute failed to unmarshal json: %s with err: %v",
-				doc.Doc, err)
+		if err := unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], tr); err != nil {
 			return nil, err
 		}
-		start := time.Unix(tr.Start.Sec, tr.Start.USec*1000)
+		start := time.Unix(tr.Start.Sec, uToNSec(tr.Start.USec))
 		d := time.Since(start)
-
 		if d > s {
 			tr = nil
 		}
@@ -161,16 +166,13 @@ func (d *dataAccess) GetServices() ([]*dm.Service, error) {
 	rchan, errChan := d.c.Search(d.conf.ServiceSpace, nil)
 	servs := make([]*dm.Service, 0)
 	for res := range rchan {
-		var serv dm.Service
+		serv := new(dm.Service)
 		obj := res[d.conf.ServiceAttr]
 		if doc, ok := obj.(client.Document); ok {
-			err := json.Unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], &serv)
-			if err != nil {
-				glog.Errorf("GetServices failed to unmarshal json: %s with err: %v",
-					doc.Doc, err)
+			if err := unmarshal([]byte(doc.Doc)[:len(doc.Doc)-1], serv); err != nil {
 				return nil, err
 			}
-			servs = append(servs, &serv)
+			servs = append(servs, serv)
 		}
 		return servs, nil
 	}
