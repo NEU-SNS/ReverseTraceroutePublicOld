@@ -37,7 +37,6 @@ var (
 	ErrorServiceNotFound = errors.New("service not found")
 )
 
-type ControllerApi struct{}
 type RoutedRequest func() (*dm.MReturn, Request, error)
 
 type Request struct {

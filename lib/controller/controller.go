@@ -33,6 +33,7 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	"net"
 	"sync"
 	"time"
@@ -104,9 +105,9 @@ func (c *controllerT) getStats() dm.Stats {
 		avg := int64(t) / int64(req)
 		tt = time.Duration(avg)
 	}
-	s := dm.Stats{StartTime: c.startTime,
-		UpTime: utime, Requests: req,
-		TotReqTime: t, AvgReqTime: tt}
+	s := dm.Stats{StartTime: c.startTime.String(),
+		UpTime: utime.Nanoseconds(), Requests: req,
+		TotReqTime: t.Nanoseconds(), AvgReqTime: tt.Nanoseconds()}
 	return s
 }
 
@@ -137,7 +138,8 @@ func Start(c Config, db da.DataAccess) chan error {
 }
 
 func makeErrorReturn(cause dm.MRequestState, err error) (*dm.MReturn, error) {
-	return &dm.MReturn{Status: dm.ERROR}, dm.MRequestError{Cause: cause, CauseErr: err}
+	return &dm.MReturn{Status: dm.MRequestStatus_ERROR},
+		dm.MRequestError{Cause: cause, CauseErr: err}
 }
 
 func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn, error) {
@@ -160,7 +162,7 @@ func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn,
 		return makeErrorReturn(dm.ExecuteRequest, err)
 	}
 	glog.Infof("Finished Measurement: %v", req)
-	result.Status = dm.SUCCESS
+	result.Status = dm.MRequestStatus_SUCCESS
 	return result, nil
 }
 

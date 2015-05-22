@@ -47,10 +47,6 @@ const (
 	GenRequest     MRequestState = "generating request"
 	RequestRoute   MRequestState = "routing request"
 	ExecuteRequest MRequestState = "executing request"
-	PING           MType         = "PING"
-	STATS          MType         = "STATS"
-	TRACEROUTE     MType         = "TRACEROUTE"
-	PLANET_LAB     ServiceT      = "PLANET_LAB"
 )
 
 type MRequestState string

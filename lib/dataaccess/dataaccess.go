@@ -39,9 +39,9 @@ type dataAccess struct {
 
 func (d *dataAccess) GetServices(ip string) []*dm.Service {
 	api := make(map[dm.MType]dm.Api, 1)
-	api[dm.STATS] = dm.Api{Url: "PlControllerApi.GetStats", Type: "Stats"}
-	api[dm.PING] = dm.Api{Url: "PlControllerApi.Ping", Type: "Ping"}
-	api[dm.TRACEROUTE] = dm.Api{Url: "PlControllerApi.Traceroute", Type: "Traceroute"}
+	api[dm.MType_STATS] = dm.Api{Url: "PlControllerApi.GetStats", Type: "Stats"}
+	api[dm.MType_PING] = dm.Api{Url: "PlControllerApi.Ping", Type: "Ping"}
+	api[dm.MType_TRACEROUTE] = dm.Api{Url: "PlControllerApi.Traceroute", Type: "Traceroute"}
 	return []*dm.Service{&dm.Service{Port: 45000,
 		IPAddr: "127.0.0.1",
 		Key:    "PLANET_LAB",

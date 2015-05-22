@@ -8,10 +8,10 @@ package datamodel;
 
 message Stats {
     string start_time = 1;
-    string up_time = 2;
+    int64 up_time = 2;
     int64 requests = 3;
-    string avg_req_time = 4;
-    string tot_req_time = 5;
+    int64 avg_req_time = 4;
+    int64 tot_req_time = 5;
 }
 
 message StatsArg {

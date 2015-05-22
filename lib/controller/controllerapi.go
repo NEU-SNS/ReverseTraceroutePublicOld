@@ -29,45 +29,24 @@ package controller
 import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
+	con "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
-func (c ControllerApi) Register(arg int, reply *int) error {
-	*reply = 5
-	return nil
-}
-
-func (c ControllerApi) Ping(arg dm.PingArg, ret *dm.PingReturn) error {
+func (c *controllerT) Ping(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
 	glog.Info("Handling Ping Request")
-	marg := dm.MArg{Service: arg.Service, SArg: arg}
-	mr, err := controller.handleMeasurement(&marg, dm.PING)
-	ret.Status = mr.Status
-	ret.Dur = mr.Dur
-	if ping, ok := mr.SRet.(*dm.Ping); ok {
-		ret.Ping = *ping
-	}
-	return err
+	return nil, nil
 }
 
-func (c ControllerApi) Traceroute(arg dm.TracerouteArg, ret *dm.TracerouteReturn) error {
-	glog.Info("Handling Traceroute Request")
-	marg := dm.MArg{Service: arg.Service, SArg: arg}
-	mr, err := controller.handleMeasurement(&marg, dm.TRACEROUTE)
-	ret.Status = mr.Status
-	ret.Dur = mr.Dur
-	if trace, ok := mr.SRet.(*dm.Traceroute); ok {
-		ret.Traceroute = *trace
-	}
-	return err
-}
-
-func (c ControllerApi) GetStats(arg dm.StatsArg, ret *dm.StatsReturn) error {
+func (c *controllerT) GetStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
 	glog.Info("Handling Stats Request")
-	marg := dm.MArg{Service: arg.Service, SArg: arg}
+	marg := dm.MArg{Service: sa.Service, SArg: sa}
+	sr = new(dm.StatsReturn)
 	mr, err := controller.handleMeasurement(&marg, dm.STATS)
-	ret.Status = mr.Status
-	ret.Dur = mr.Dur
+	sr.Status = mr.Status
+	sr.Dur = mr.Dur
 	if stats, ok := mr.SRet.(*dm.Stats); ok {
 		ret.Stats = *stats
 	}
-	return err
+	return
 }
