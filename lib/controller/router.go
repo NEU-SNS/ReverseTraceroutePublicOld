@@ -27,22 +27,27 @@
 package controller
 
 import (
-	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
-	"net/rpc/jsonrpc"
 	"sync"
-	"time"
 )
 
 type router struct {
-	rw       sync.RWMutex
-	services map[dm.ServiceT]*dm.Service
+	rw          sync.RWMutex
+	services    map[dm.ServiceT]*dm.Service
+	servClients map[dm.ServiceT]MeasurementTool
 }
 
 func createRouter() Router {
 	s := make(map[dm.ServiceT]*dm.Service)
-	return &router{services: s}
+	sc := make(map[dm.ServiceT]MeasurementTool)
+	r := &router{services: s, servClients: sc}
+	r.registerClients()
+	return r
+}
+
+func (r *router) registerClients() {
+	r.servClients[dm.ServiceT_PLANET_LAB] = &plClient{}
 }
 
 func NewRouter() Router {
@@ -51,7 +56,7 @@ func NewRouter() Router {
 
 type Router interface {
 	RegisterServices(services ...*dm.Service)
-	RouteRequest(req Request) (RoutedRequest, error)
+	GetService(dm.ServiceT) (*dm.Service, MeasurementTool, error)
 	GetServices() []*dm.Service
 }
 
@@ -69,52 +74,22 @@ func (r *router) RegisterServices(services ...*dm.Service) {
 	r.rw.Lock()
 	for _, service := range services {
 		r.services[service.Key] = service
-		glog.Infof("Registered service: %v, with api: %v", service, service.Api)
+		glog.Infof("Registered service: %v", service)
 	}
 	r.rw.Unlock()
 }
 
-func (r *router) RouteRequest(req Request) (RoutedRequest, error) {
+func (r *router) GetService(s dm.ServiceT) (*dm.Service, MeasurementTool, error) {
 	r.rw.RLock()
-	glog.Infof("Trying to get API for %s", req.Key)
-	s := r.services[req.Key]
-	if s == nil {
-		return nil, ErrorServiceNotFound
+	glog.Infof("Trying to get API for %s", s)
+	serv := r.services[s]
+	if serv == nil {
+		return nil, nil, ErrorServiceNotFound
+	}
+	mt := r.servClients[s]
+	if mt == nil {
+		return nil, nil, ErrorServiceNotFound
 	}
 	r.rw.RUnlock()
-	return wrapRequest(req, s)
-}
-
-func wrapRequest(req Request, s *dm.Service) (RoutedRequest, error) {
-	glog.Infof("Wrapping request: %v", req)
-	return func() (*dm.MReturn, Request, error) {
-		req.Stime = time.Now()
-		glog.Infof("Executing request: %v", req)
-		glog.Infof("Connecting to %s, %s", s.Proto, s.FormatIp())
-		c, err := jsonrpc.Dial(s.Proto, s.FormatIp())
-		if err != nil {
-			glog.Errorf("Failed to connect: %v, %v, with err: %v", req, s, err)
-			return nil, req, err
-		}
-		defer c.Close()
-		ret := new(dm.MReturn)
-		api := s.Api[req.Type]
-		sretf, ok := dm.TypeMap[api.Type]
-		if !ok {
-			glog.Errorf("Could not find func for apiType: %s", api.Type)
-			return nil, req, fmt.Errorf("Failed to find Return type")
-		}
-		sret := sretf()
-		err = c.Call(api.Url, req.Args, sret)
-		glog.Info("%v", sret)
-		req.Dur = time.Since(req.Stime)
-		ret.Dur = req.Dur
-		ret.SRet = sret
-		glog.Infof("Finished Request: %v", req)
-		if err != nil {
-			return nil, req, err
-		}
-		return ret, req, nil
-	}, nil
-
+	return serv, mt, nil
 }

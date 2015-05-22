@@ -29,49 +29,40 @@ package main
 import (
 	"flag"
 	"fmt"
+	c "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"net"
-	"net/rpc/jsonrpc"
+	con "golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"runtime"
-)
-
-const (
-	PING       = "ControllerApi.Ping"
-	TRACEROUTE = "ControllerApi.Traceroute"
-	GETSTATS   = "ControllerApi.GetStats"
-	REGISTER   = "ControllerApi.Register"
+	"time"
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
-	conn, err := net.Dial("tcp", "localhost:35000")
 
+	conn, err := grpc.Dial("127.0.0.1:35000")
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
-
-	c := jsonrpc.NewClient(conn)
-	args := dm.PingArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "129.10.113.204",
+	cl := c.NewControllerClient(conn)
+	args := dm.PingArg{Service: dm.ServiceT_PLANET_LAB, Dst: "129.10.113.204",
 		Host: "127.0.0.1", RR: false}
-	var ret dm.PingReturn
-	err = c.Call(PING, args, &ret)
+	ret, err := cl.Ping(con.Background(), &args)
 	if err != nil {
 		fmt.Printf("Ping failed with err: %v\n", err)
 	}
-	fmt.Printf("Response took: %s\n", ret.Dur.String())
-	a := dm.TracerouteArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}, Dst: "8.8.8.8",
+	fmt.Printf("Response took: %s\n", time.Unix(0, ret.GetRet().Dur).String())
+	a := dm.TracerouteArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
 		Host: "127.0.0.1"}
-	var r dm.TracerouteReturn
-	err = c.Call(TRACEROUTE, a, &r)
+	r, err := cl.Traceroute(con.Background(), &a)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)
 	}
-	fmt.Printf("Response took: %s\n", r.Dur.String())
-	arg := dm.StatsArg{ServiceArg: dm.ServiceArg{dm.PLANET_LAB}}
-	var rr dm.StatsReturn
-	err = c.Call(GETSTATS, arg, &rr)
+	fmt.Printf("Response took: %s\n", time.Unix(0, r.GetRet().Dur).String())
+	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB}
+	rr, err := cl.Stats(con.Background(), &arg)
 	if err != nil {
 		fmt.Printf("Stats failed with err: %v\n", err)
 	}

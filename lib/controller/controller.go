@@ -29,24 +29,31 @@ package controller
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"errors"
+	capi "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
+	con "golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"net"
 	"sync"
 	"time"
 )
 
+const (
+	ID = "ID"
+)
+
+func getUUID() string {
+	return uuid.NewUUID().String()
+}
+
 type controllerT struct {
-	port int
-	//ip is only not nil when an ip is specified
-	ip        net.IP
-	ptype     string
+	config    Config
 	db        da.DataAccess
 	router    Router
 	startTime time.Time
+	server    *grpc.Server
 	mu        sync.Mutex
 	//the mutex protects the following
 	requests int64
@@ -105,10 +112,118 @@ func (c *controllerT) getStats() dm.Stats {
 		avg := int64(t) / int64(req)
 		tt = time.Duration(avg)
 	}
-	s := dm.Stats{StartTime: c.startTime.String(),
+	s := dm.Stats{StartTime: c.startTime.UnixNano(),
 		UpTime: utime.Nanoseconds(), Requests: req,
 		TotReqTime: t.Nanoseconds(), AvgReqTime: tt.Nanoseconds()}
 	return s
+}
+
+func (c *controllerT) startRpc(eChan chan error) {
+	l, e := net.Listen(c.config.Local.Proto, c.config.Local.Addr)
+	if e != nil {
+		glog.Errorf("Failed to listen: %v", e)
+		eChan <- e
+		return
+	}
+	glog.Infof("Controller started, listening on: %s", c.config.Local.Addr)
+	err := c.server.Serve(l)
+	eChan <- err
+}
+
+func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
+	st := time.Now()
+	uuid := getUUID()
+	glog.Infof("%s: Ping starting")
+	nctx := con.WithValue(ctx, ID, uuid)
+	sr = new(dm.StatsReturn)
+	s, mt, err := c.getService(sa.Service)
+	if err != nil {
+		sr.Ret = makeErrorReturn(st)
+		return
+	}
+	err = mt.Connect(s.GetIp())
+	if err != nil {
+		sr.Ret = makeErrorReturn(st)
+		return
+	}
+
+	sr.Stats, err = mt.Stats(nctx, sa)
+	if err != nil {
+		sr.Ret = makeErrorReturn(st)
+		return
+	}
+	sr.Ret = makeSuccessReturn(st)
+	return
+}
+
+func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
+	st := time.Now()
+	uuid := getUUID()
+	glog.Infof("%s: Ping starting", uuid)
+	nctx := con.WithValue(ctx, ID, uuid)
+	pr = new(dm.PingReturn)
+	s, mt, err := c.getService(pa.Service)
+	if err != nil {
+		pr.Ret = makeErrorReturn(st)
+		return
+	}
+	err = mt.Connect(s.GetIp())
+	if err != nil {
+		pr.Ret = makeErrorReturn(st)
+		return
+	}
+
+	pr.Ping, err = mt.Ping(nctx, pa)
+	if err != nil {
+		pr.Ret = makeErrorReturn(st)
+		return
+	}
+	pr.Ret = makeSuccessReturn(st)
+	return
+}
+
+func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
+	st := time.Now()
+	uuid := getUUID()
+	glog.Infof("%s: Ping starting")
+	nctx := con.WithValue(ctx, ID, uuid)
+	tr = new(dm.TracerouteReturn)
+	s, mt, err := c.getService(ta.Service)
+	if err != nil {
+		tr.Ret = makeErrorReturn(st)
+		return
+	}
+	err = mt.Connect(s.GetIp())
+	if err != nil {
+		tr.Ret = makeErrorReturn(st)
+		return
+	}
+
+	tr.Traceroute, err = mt.Traceroute(nctx, ta)
+	if err != nil {
+		tr.Ret = makeErrorReturn(st)
+		return
+	}
+	tr.Ret = makeSuccessReturn(st)
+	return
+}
+
+func makeSuccessReturn(t time.Time) *dm.ReturnT {
+	mr := new(dm.ReturnT)
+	mr.Dur = time.Since(t).Nanoseconds()
+	mr.Status = dm.MRequestStatus_SUCCESS
+	return mr
+}
+
+func makeErrorReturn(t time.Time) *dm.ReturnT {
+	mr := new(dm.ReturnT)
+	mr.Dur = time.Since(t).Nanoseconds()
+	mr.Status = dm.MRequestStatus_ERROR
+	return mr
+}
+
+func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, error) {
+	return c.router.GetService(s)
 }
 
 func Start(c Config, db da.DataAccess) chan error {
@@ -118,70 +233,16 @@ func Start(c Config, db da.DataAccess) chan error {
 		errChan <- errors.New("Controller Start, nil DB")
 		return errChan
 	}
+	controller.config = c
 	controller.startTime = time.Now()
-	controller.ptype = c.Local.Proto
 	controller.db = db
 	controller.router = createRouter()
 	controller.router.RegisterServices(
-		db.GetServices(controller.ip.String())...)
-	port, ip, err := util.ParseAddrArg(c.Local.Addr)
-	if err != nil {
-		glog.Errorf("Failed to start Controller")
-		errChan <- err
-		return errChan
-	}
+		db.GetServices("")...)
 
-	controller.ip = ip
-	controller.port = port
-	go util.StartRpc(c.Local.Proto, c.Local.Addr, errChan, new(ControllerApi))
+	var opts []grpc.ServerOption
+	controller.server = grpc.NewServer(opts...)
+	capi.RegisterControllerServer(controller.server, &controller)
+	go controller.startRpc(errChan)
 	return errChan
-}
-
-func makeErrorReturn(cause dm.MRequestState, err error) (*dm.MReturn, error) {
-	return &dm.MReturn{Status: dm.MRequestStatus_ERROR},
-		dm.MRequestError{Cause: cause, CauseErr: err}
-}
-
-func (c *controllerT) handleMeasurement(arg *dm.MArg, mt dm.MType) (*dm.MReturn, error) {
-	glog.Infof("Handling measurement: %v, type: %v", arg, mt)
-	r, err := generateRequest(arg, mt)
-	if err != nil {
-		glog.Errorf("Error generating request: %v", err)
-		return makeErrorReturn(dm.GenRequest, err)
-	}
-	rr, err := controller.routeRequest(r)
-	glog.Infof("%s: request routed: %v", r.Id, r)
-	if err != nil {
-		glog.Errorf("%s: Failed to route request: %v, with error: %v", r.Id, r, err)
-		return makeErrorReturn(dm.RequestRoute, err)
-	}
-	result, req, err := rr()
-	c.addReqStats(req)
-	if err != nil {
-		glog.Errorf("%s: Failed to execute request: %v, with error: %v", r.Id, rr, err)
-		return makeErrorReturn(dm.ExecuteRequest, err)
-	}
-	glog.Infof("Finished Measurement: %v", req)
-	result.Status = dm.MRequestStatus_SUCCESS
-	return result, nil
-}
-
-func (c *controllerT) routeRequest(r Request) (RoutedRequest, error) {
-	rr, err := c.router.RouteRequest(r)
-	if err != nil {
-		return nil, err
-	}
-	return rr, err
-}
-
-func generateRequest(marg *dm.MArg, mt dm.MType) (Request, error) {
-	id := uuid.NewRandom()
-	glog.Infof("%s: Generating Request: %v", id, marg)
-	r := Request{
-		Id:   id,
-		Args: marg.SArg,
-		Key:  marg.Service,
-		Type: mt}
-	glog.Infof("%s: Generated Request: %v", id, r)
-	return r, nil
 }

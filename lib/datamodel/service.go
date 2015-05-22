@@ -27,33 +27,17 @@
 package datamodel
 
 import (
-	"fmt"
-	"net"
+	"math/rand"
 )
 
-type ServiceT string
-
 type Service struct {
-	Port   int
-	IPAddr string
+	IPAddr []string
 	Key    ServiceT
-	ip     net.IP
-	Proto  string
-	Api    map[MType]Api
 }
 
-type Api struct {
-	Url  string
-	Type string
-}
-
-func (s *Service) FormatIp() string {
-	return fmt.Sprintf("%s:%d", s.IP().String(), s.Port)
-}
-
-func (s *Service) IP() net.IP {
-	if s.ip == nil {
-		s.ip = net.ParseIP(s.IPAddr)
+func (s *Service) GetIp() string {
+	if len(s.IPAddr) == 0 {
+		return ""
 	}
-	return s.ip
+	return s.IPAddr[rand.Intn(len(s.IPAddr))]
 }

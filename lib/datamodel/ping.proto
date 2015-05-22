@@ -2,13 +2,14 @@ syntax = "proto3";
 
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/time.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/service.proto";
 
 option go_package = "datamodel";
 
 package datamodel;
 
 message PingArg {
-    string service = 1;
+    ServiceT service = 1;
     string dst = 2;
     string host = 3;
     bool spoof = 4;

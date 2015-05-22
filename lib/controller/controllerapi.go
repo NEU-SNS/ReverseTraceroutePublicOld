@@ -30,23 +30,25 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
 	con "golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 func (c *controllerT) Ping(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
 	glog.Info("Handling Ping Request")
-	return nil, nil
+	pr = new(dm.PingReturn)
+	pr, err = c.doPing(ctx, pa)
+	return
 }
 
-func (c *controllerT) GetStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
+func (c *controllerT) Stats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
 	glog.Info("Handling Stats Request")
-	marg := dm.MArg{Service: sa.Service, SArg: sa}
 	sr = new(dm.StatsReturn)
-	mr, err := controller.handleMeasurement(&marg, dm.STATS)
-	sr.Status = mr.Status
-	sr.Dur = mr.Dur
-	if stats, ok := mr.SRet.(*dm.Stats); ok {
-		ret.Stats = *stats
-	}
+	sr, err = c.doStats(ctx, sa)
+	return
+}
+
+func (c *controllerT) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
+	glog.Info("Handling Traceroute Request")
+	tr = new(dm.TracerouteReturn)
+	tr, err = c.doTraceroute(ctx, ta)
 	return
 }

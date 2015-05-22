@@ -47,7 +47,7 @@ func init() {
 		"The protocol to use for the local service")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
-	flag.StringVar(&f.Local.PProfAddr, "P", "55555",
+	flag.StringVar(&f.Local.PProfAddr, "P", ":55555",
 		"The address to use for pperf")
 
 	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",

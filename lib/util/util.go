@@ -34,8 +34,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 	"os"
 	"os/exec"
 	"strconv"
@@ -94,28 +92,6 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 		return 0, nil, ErrorInvalidIP
 	}
 	return pport, pip, nil
-}
-
-func StartRpc(n, laddr string, eChan chan error, api interface{}) {
-	server := rpc.NewServer()
-	server.Register(api)
-	l, e := net.Listen(n, laddr)
-	if e != nil {
-		glog.Errorf("Failed to listen: %v", e)
-		eChan <- e
-		return
-	}
-	glog.Infof("Controller started, listening on: %s", laddr)
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			glog.Errorf("Accept failed: %v", err)
-			eChan <- err
-			continue
-		}
-		glog.Info("Serving reqeust")
-		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-	}
 }
 
 func CloseStdFiles(c bool) {
@@ -185,6 +161,6 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 
 func StartPProf(port string) {
 	go func() {
-		log.Println(http.ListenAndServe(fmt.Sprintf("localhost:%s", port), nil))
+		log.Println(http.ListenAndServe(fmt.Sprintf("%s", port), nil))
 	}()
 }

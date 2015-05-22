@@ -62,7 +62,7 @@ func init() {
 		"Path for warts parser")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "55556",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", ":55556",
 		"The port for pprof")
 }
 

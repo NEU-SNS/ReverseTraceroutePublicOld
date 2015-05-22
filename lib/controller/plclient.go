@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,28 +24,78 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package plcontroller
+package controller
 
 import (
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
 	"github.com/golang/glog"
 	con "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
-func (c *plControllerT) Ping(ctx con.Context, arg *dm.PingArg) (pr *dm.Ping, err error) {
-	glog.Info("Ping Called")
-	*pr, err = plController.runPing(*arg)
-	return
+type MeasurementTool interface {
+	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
+	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
+	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
+	Connect(addr string) error
+	Disconnect() error
 }
 
-func (c *plControllerT) Traceroute(ctx con.Context, arg *dm.TracerouteArg) (tr *dm.Traceroute, err error) {
-	glog.Info("Traceroute Called")
-	*tr, err = plController.runTraceroute(*arg)
-	return
+type plClient struct {
+	cc       *grpc.ClientConn
+	connOpen bool
+	client   plc.PLControllerClient
+	addr     string
 }
 
-func (c *plControllerT) Stats(ctx con.Context, arg *dm.StatsArg) (sr *dm.Stats, err error) {
-	glog.Infof("GetStats Called")
-	*sr = plController.getStats()
-	return
+func (c *plClient) Disconnect() error {
+	if c.cc != nil {
+		return c.cc.Close()
+	}
+	return fmt.Errorf("Called disconnect on unconnected plClient")
+}
+
+func (c *plClient) Connect(addr string) error {
+	glog.Infof("Trying to connect to: %s", addr)
+	if c.connOpen && addr == c.addr {
+		return nil
+	}
+	if c.connOpen && addr != c.addr {
+		err := c.cc.Close()
+		if err != nil {
+			return err
+		}
+	}
+	cc, err := grpc.Dial(addr)
+	if err != nil {
+		glog.Errorf("PlClient Failed to connect: %v", err)
+		return err
+	}
+	c.cc = cc
+	c.client = plc.NewPLControllerClient(cc)
+	c.connOpen = true
+	return nil
+}
+
+func (c *plClient) Ping(ctx con.Context, pa *dm.PingArg) (*dm.Ping, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.Ping(ctx, pa)
+}
+
+func (c *plClient) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (*dm.Traceroute, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.Traceroute(ctx, ta)
+}
+
+func (c *plClient) Stats(ctx con.Context, s *dm.StatsArg) (*dm.Stats, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.Stats(ctx, s)
 }

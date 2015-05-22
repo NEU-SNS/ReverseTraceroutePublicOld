@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 
-option go_package = "controller";
+option go_package = "controllerapi";
 
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/ping.proto";

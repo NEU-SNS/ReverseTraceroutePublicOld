@@ -32,10 +32,12 @@ import (
 	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
+	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/go-fsnotify/fsnotify"
 	"github.com/golang/glog"
+	"google.golang.org/grpc"
 	"net"
 	"os"
 	"sync"
@@ -43,11 +45,10 @@ import (
 )
 
 type plControllerT struct {
-	port      int
-	ip        net.IP
-	ptype     string
 	startTime time.Time
 	spid      int
+	server    *grpc.Server
+	config    Config
 	sc        scamper.Config
 	mp        mproc.MProc
 	w         *fsnotify.Watcher
@@ -90,9 +91,9 @@ func (c *plControllerT) getStats() dm.Stats {
 		avg := int64(t) / int64(req)
 		tt = time.Duration(avg)
 	}
-	s := dm.Stats{StartTime: c.startTime,
-		UpTime: utime, Requests: req,
-		TotReqTime: t, AvgReqTime: tt}
+	s := dm.Stats{StartTime: c.startTime.UnixNano(),
+		UpTime: utime.Nanoseconds(), Requests: req,
+		TotReqTime: t.Nanoseconds(), AvgReqTime: tt.Nanoseconds()}
 	return s
 }
 
@@ -228,26 +229,19 @@ func Start(c Config, noScamp bool) chan error {
 	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
 	plController.socks = make(map[string]scamper.Socket, 10)
-	port, ip, err := util.ParseAddrArg(c.Local.Addr)
-	if err != nil {
-		glog.Error("Failed to parse addr string")
-		errChan <- err
-		return errChan
-	}
 	var sc scamper.Config
 	sc.Port = c.Scamper.Port
 	sc.Path = c.Scamper.SockDir
 	sc.ScPath = c.Scamper.BinPath
 	sc.ScParserPath = c.Scamper.ConverterPath
-	err = scamper.ParseConfig(sc)
+	err := scamper.ParseConfig(sc)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
 		errChan <- err
 		return errChan
 	}
+	plController.config = c
 	plController.startTime = time.Now()
-	plController.ip = ip
-	plController.port = port
 	plController.mp = mproc.New()
 	plController.sc = sc
 	if !noScamp {
@@ -257,8 +251,23 @@ func Start(c Config, noScamp bool) chan error {
 	//best to call it after startScamperProc otherwise you'll send an error
 	//and trigger any error logic in whatever code is using this
 	plController.watchDir(sc.Path, errChan)
-	go util.StartRpc(c.Local.Proto, c.Local.Addr, errChan, new(PlControllerApi))
+	var opts []grpc.ServerOption
+	plController.server = grpc.NewServer(opts...)
+	plc.RegisterPLControllerServer(plController.server, &plController)
+	go plController.startRpc(errChan)
 	return errChan
+}
+
+func (c *plControllerT) startRpc(eChan chan error) {
+	l, e := net.Listen(c.config.Local.Proto, c.config.Local.Addr)
+	if e != nil {
+		glog.Errorf("Failed to listen: %v", e)
+		eChan <- e
+		return
+	}
+	glog.Infof("PLController started, listening on: %s", c.config.Local.Addr)
+	err := c.server.Serve(l)
+	eChan <- err
 }
 
 func (c *plControllerT) startScamperProc() {

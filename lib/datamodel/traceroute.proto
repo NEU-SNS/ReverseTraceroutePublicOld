@@ -1,13 +1,14 @@
 syntax = "proto3";
 
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/service.proto";
 
 option go_package = "datamodel";
 
 package datamodel;
 
 message TracerouteArg {
-    string service      =  1;
+    ServiceT service      =  1;
 	string host         =  2;
 	string dst          =  3;
 	string confidence   =  4;

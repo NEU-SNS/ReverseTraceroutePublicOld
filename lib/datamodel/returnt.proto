@@ -11,5 +11,5 @@ enum MRequestStatus {
 
 message ReturnT {
     MRequestStatus Status = 1;
-    string Dur = 2; 
+    int64 Dur = 2; 
 }

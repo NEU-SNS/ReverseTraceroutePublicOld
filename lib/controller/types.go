@@ -34,7 +34,8 @@ import (
 )
 
 var (
-	ErrorServiceNotFound = errors.New("service not found")
+	ErrorServiceNotFound         = errors.New("service not found")
+	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
 )
 
 type RoutedRequest func() (*dm.MReturn, Request, error)
