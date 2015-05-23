@@ -53,14 +53,14 @@ func main() {
 	if err != nil {
 		fmt.Printf("Ping failed with err: %v\n", err)
 	}
-	fmt.Printf("Response took: %s\n", time.Unix(0, ret.GetRet().Dur).String())
+	fmt.Printf("Response took: %s\n", time.Duration(ret.GetRet().Dur))
 	a := dm.TracerouteArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
 		Host: "127.0.0.1"}
 	r, err := cl.Traceroute(con.Background(), &a)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)
 	}
-	fmt.Printf("Response took: %s\n", time.Unix(0, r.GetRet().Dur).String())
+	fmt.Printf("Response took: %s\n", time.Duration(r.GetRet().Dur))
 	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB}
 	rr, err := cl.Stats(con.Background(), &arg)
 	if err != nil {

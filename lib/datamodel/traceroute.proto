@@ -28,7 +28,7 @@ message TracerouteArg {
 	string saddr        = 18;
 	string tos          = 19;
 	  bool time_exceeded = 20;
-	string user_id       = 21;
+	string userid       = 21;
 	string wait         = 22;
 	string wait_probe    = 23;
 	string gss_entry     = 24;
@@ -44,7 +44,7 @@ message TracerouteHop {
 	int32 reply_ttl  =  6;
 	int32 reply_tos  =  7;
 	int32 reply_size =  8;
-	int32 reply_ip_id =  9;
+	int32 reply_ipid =  9;
 	int32 icmp_type  = 10;
 	int32 icmp_code  = 11;
 	int32 icmp_q_ttl  = 12;
@@ -66,8 +66,8 @@ message Traceroute {
 	TracerouteTime start              = 11;
 	 int32 hop_count           = 12;          
 	 int32 attempts           = 13;          
-	 int32 hop_limit           = 14;          
-	 int32 first_hop           = 15;         
+	 int32 hoplimit           = 14;          
+	 int32 firsthop           = 15;         
 	 int32 wait               = 16;        
 	 int32 wait_probe          = 17;         
 	 int32 tos                = 18;      

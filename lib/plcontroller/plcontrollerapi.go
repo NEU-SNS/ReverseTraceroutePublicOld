@@ -34,18 +34,21 @@ import (
 
 func (c *plControllerT) Ping(ctx con.Context, arg *dm.PingArg) (pr *dm.Ping, err error) {
 	glog.Info("Ping Called")
+	pr = new(dm.Ping)
 	*pr, err = plController.runPing(*arg)
 	return
 }
 
 func (c *plControllerT) Traceroute(ctx con.Context, arg *dm.TracerouteArg) (tr *dm.Traceroute, err error) {
 	glog.Info("Traceroute Called")
+	tr = new(dm.Traceroute)
 	*tr, err = plController.runTraceroute(*arg)
 	return
 }
 
 func (c *plControllerT) Stats(ctx con.Context, arg *dm.StatsArg) (sr *dm.Stats, err error) {
 	glog.Infof("GetStats Called")
+	sr = new(dm.Stats)
 	*sr = plController.getStats()
 	return
 }
