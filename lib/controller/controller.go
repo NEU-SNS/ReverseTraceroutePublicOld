@@ -185,7 +185,7 @@ func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn
 func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
 	st := time.Now()
 	uuid := getUUID()
-	glog.Infof("%s: Ping starting")
+	glog.Infof("%s: Traceroute starting", uuid)
 	nctx := con.WithValue(ctx, ID, uuid)
 	tr = new(dm.TracerouteReturn)
 	s, mt, err := c.getService(ta.Service)

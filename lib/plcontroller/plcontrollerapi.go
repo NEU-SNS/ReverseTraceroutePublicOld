@@ -32,22 +32,27 @@ import (
 	con "golang.org/x/net/context"
 )
 
+const ID = "ID"
+
 func (c *plControllerT) Ping(ctx con.Context, arg *dm.PingArg) (pr *dm.Ping, err error) {
-	glog.Info("Ping Called")
+	val := ctx.Value(ID)
+	glog.Info("Ping Called for req: %s", val)
 	pr = new(dm.Ping)
 	*pr, err = plController.runPing(*arg)
 	return
 }
 
 func (c *plControllerT) Traceroute(ctx con.Context, arg *dm.TracerouteArg) (tr *dm.Traceroute, err error) {
-	glog.Info("Traceroute Called")
+	val := ctx.Value(ID)
+	glog.Info("Traceroute Called for req: %s", val)
 	tr = new(dm.Traceroute)
 	*tr, err = plController.runTraceroute(*arg)
 	return
 }
 
 func (c *plControllerT) Stats(ctx con.Context, arg *dm.StatsArg) (sr *dm.Stats, err error) {
-	glog.Infof("GetStats Called")
+	val := ctx.Value(ID)
+	glog.Infof("GetStats Called for req: %s", val)
 	sr = new(dm.Stats)
 	*sr = plController.getStats()
 	return
