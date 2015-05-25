@@ -291,7 +291,9 @@ func (c *plControllerT) startRpc(eChan chan error) {
 	}
 	glog.Infof("PLController started, listening on: %s", c.config.Local.Addr)
 	err := c.server.Serve(l)
-	eChan <- err
+	if err != nil {
+		eChan <- err
+	}
 }
 
 func (c *plControllerT) startScamperProc() {

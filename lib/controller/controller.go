@@ -136,7 +136,9 @@ func (c *controllerT) startRpc(eChan chan error) {
 	}
 	glog.Infof("Controller started, listening on: %s", c.config.Local.Addr)
 	err := c.server.Serve(l)
-	eChan <- err
+	if err != nil {
+		eChan <- err
+	}
 }
 
 func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
