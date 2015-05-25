@@ -43,13 +43,12 @@ var f plvp.Flags
 func init() {
 	flag.StringVar(&f.Local.Addr, "a", ":55000",
 		"The address to run the local service on")
-	flag.StringVar(&f.Local.Proto, "p", "tcp",
-		"The protocol to use for the local service")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
 	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55555",
 		"The address to use for pperf")
-
+	flag.StringVar(&f.Local.Proto, "p", "tcp",
+		"The protocol that the controller will use.")
 	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",
 		"Address that scamper will connect to")
 	flag.StringVar(&f.Scamper.BinPath, "b", "/usr/local/bin/scamper",

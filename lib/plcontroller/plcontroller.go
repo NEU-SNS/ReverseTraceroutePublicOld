@@ -100,7 +100,7 @@ func (c *plControllerT) getStats() dm.Stats {
 
 func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
-	timeout := pa.ServiceArg.Timeout
+	timeout := pa.Timeout
 	if timeout == 0 {
 		timeout = c.conf.Local.Timeout
 	}
@@ -115,11 +115,16 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 		return ret, err
 	}
 	cl := scamper.NewClient(soc, com)
+	ec := make(chan error, 1)
+	dc := make(chan struct{}, 1)
+	go cl.IssueCmd(ec, dc)
 	select {
-	case err := <-cl.IssueCmd():
+	case err := <-ec:
 		return ret, err
 	case <-time.After(time.Second * 60):
 		return ret, fmt.Errorf("Ping timed out")
+	case <-dc:
+		break
 	}
 	resps := cl.GetResponses()
 	var dw util.UUDecodingWriter
@@ -147,7 +152,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 
 func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
-	timeout := ta.ServiceArg.Timeout
+	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = c.conf.Local.Timeout
 	}
@@ -159,11 +164,16 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	}
 	com, err := scamper.NewCmd(ta)
 	cl := scamper.NewClient(soc, com)
+	ec := make(chan error, 1)
+	dc := make(chan struct{}, 1)
+	go cl.IssueCmd(ec, dc)
 	select {
-	case err := <-cl.IssueCmd():
+	case err := <-ec:
 		return ret, err
 	case <-time.After(time.Second * 60):
 		return ret, fmt.Errorf("Ping timed out")
+	case <-dc:
+		break
 	}
 	resps := cl.GetResponses()
 	var dw util.UUDecodingWriter

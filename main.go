@@ -47,11 +47,12 @@ func main() {
 	}
 	defer conn.Close()
 	cl := c.NewControllerClient(conn)
-	args := dm.PingArg{Service: dm.ServiceT_PLANET_LAB, Dst: "129.10.113.204",
+	args := dm.PingArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
 		Host: "127.0.0.1", RR: false}
 	ret, err := cl.Ping(con.Background(), &args)
 	if err != nil {
 		fmt.Printf("Ping failed with err: %v\n", err)
+		return
 	}
 	fmt.Printf("Response took: %s\n", time.Duration(ret.GetRet().Dur))
 	a := dm.TracerouteArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
@@ -59,9 +60,10 @@ func main() {
 	r, err := cl.Traceroute(con.Background(), &a)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)
+		return
 	}
 	fmt.Printf("Response took: %s\n", time.Duration(r.GetRet().Dur))
-	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB}
+	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB, Ip: "127.0.0.1"}
 	rr, err := cl.Stats(con.Background(), &arg)
 
 	if err != nil {

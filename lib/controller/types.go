@@ -30,6 +30,7 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"errors"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	con "golang.org/x/net/context"
 	"time"
 )
 
@@ -37,6 +38,13 @@ var (
 	ErrorServiceNotFound         = errors.New("service not found")
 	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
 )
+
+type MeasurementTool interface {
+	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
+	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
+	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
+	Connect(string) error
+}
 
 type RoutedRequest func() (*dm.MReturn, Request, error)
 
@@ -62,7 +70,7 @@ type Config struct {
 
 type LocalConfig struct {
 	Addr         string
-	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string
+	Proto        string
 }

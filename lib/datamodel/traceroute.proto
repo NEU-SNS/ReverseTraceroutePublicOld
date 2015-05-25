@@ -32,7 +32,8 @@ message TracerouteArg {
 	string wait         = 22;
 	string wait_probe    = 23;
 	string gss_entry     = 24;
-	string lss_name      = 25;
+	string lss_name      = 25; 
+    int64 timeout = 26;
 }
 
 message TracerouteHop {

@@ -35,6 +35,7 @@ type TracerouteArg struct {
 	WaitProbe    string   `protobuf:"bytes,23,opt,name=wait_probe" json:"wait_probe,omitempty"`
 	GssEntry     string   `protobuf:"bytes,24,opt,name=gss_entry" json:"gss_entry,omitempty"`
 	LssName      string   `protobuf:"bytes,25,opt,name=lss_name" json:"lss_name,omitempty"`
+	Timeout      int64    `protobuf:"varint,26,opt,name=timeout" json:"timeout,omitempty"`
 }
 
 func (m *TracerouteArg) Reset()         { *m = TracerouteArg{} }

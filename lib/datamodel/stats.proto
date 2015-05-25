@@ -17,6 +17,7 @@ message Stats {
 
 message StatsArg {
     ServiceT service = 1;
+    string ip = 2;
 }
 
 message StatsReturn {

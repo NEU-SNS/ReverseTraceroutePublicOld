@@ -29,7 +29,6 @@ package controller
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"errors"
-	"fmt"
 	capi "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
@@ -37,6 +36,7 @@ import (
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"net"
+	"os"
 	"sync"
 	"time"
 )
@@ -51,7 +51,7 @@ func getUUID() string {
 
 type controllerT struct {
 	config    Config
-	db        da.DataAccess
+	db        da.DataProvider
 	router    Router
 	startTime time.Time
 	server    *grpc.Server
@@ -109,7 +109,6 @@ func HandleSig(sig os.Signal) {
 }
 
 func (c *controllerT) handleSig(sig os.Signal) {
-	c.db.Destroy()
 }
 
 func (c *controllerT) getStats() dm.Stats {
@@ -146,17 +145,16 @@ func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsRet
 	glog.Infof("%s: Ping starting")
 	nctx := con.WithValue(ctx, ID, uuid)
 	sr = new(dm.StatsReturn)
-	s, mt, err := c.getService(sa.Service)
+	_, mt, err := c.getService(sa.Service)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return
 	}
-	err = mt.Connect(s.GetIp())
+	err = mt.Connect(sa.Ip)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return
 	}
-
 	sr.Stats, err = mt.Stats(nctx, sa)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
@@ -182,7 +180,6 @@ func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn
 		pr.Ret = makeErrorReturn(st)
 		return
 	}
-
 	pr.Ping, err = mt.Ping(nctx, pa)
 	if err != nil {
 		pr.Ret = makeErrorReturn(st)
@@ -235,7 +232,7 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
-func Start(c Config, db da.DataAccess) chan error {
+func Start(c Config, db da.DataProvider) chan error {
 	errChan := make(chan error, 1)
 	if db == nil {
 		glog.Errorf("Nil db in Controller Start")
@@ -246,90 +243,17 @@ func Start(c Config, db da.DataAccess) chan error {
 	controller.startTime = time.Now()
 	controller.db = db
 	controller.router = createRouter()
+	servs, err := db.GetServices()
+	if err != nil {
+		errChan <- err
+		return errChan
+	}
 	controller.router.RegisterServices(
-		db.GetServices("")...)
+		servs...)
 
 	var opts []grpc.ServerOption
 	controller.server = grpc.NewServer(opts...)
 	capi.RegisterControllerServer(controller.server, &controller)
 	go controller.startRpc(errChan)
 	return errChan
-}
-
-func (c *controllerT) makeRemoteReq(req Request, s *dm.Service) (interface{}, error) {
-	glog.Infof("Connecting to %s, %s", s.Proto, s.GetIp())
-	cl, err := c.rpc(s.Proto, s.GetIp())
-	if err != nil {
-		glog.Errorf("Failed to connect: %v, %v, with err: %v", req, s, err)
-		return nil, err
-	}
-	defer cl.Close()
-	api := s.Api[req.Type]
-	sretf, ok := dm.TypeMap[api.Type]
-	if !ok {
-		glog.Errorf("Could not find func for apiType: %s", api.Type)
-		return nil, fmt.Errorf("Failed to find Return type")
-	}
-	sret := sretf()
-	err = cl.Call(api.Url, req.Args, sret)
-	if err != nil {
-		return nil, err
-	}
-	err = c.cacheResult(sret, req.Type)
-	if err != nil {
-		glog.Errorf("Caching Failed: %v", err)
-	}
-	return sret, nil
-
-}
-
-var (
-	ErrorUnknownReqType     = fmt.Errorf("Request of Unknown type")
-	ErrorReqArgTypeMismatch = fmt.Errorf("ReqType ReqArg type mismatch")
-	ErrorUnknownType        = fmt.Errorf("Unknown MType")
-)
-
-func (c *controllerT) cacheResult(res interface{}, t dm.MType) (err error) {
-	glog.Infof("Caching Results: %v", res)
-	switch t {
-	case dm.TRACEROUTE:
-		if tr, ok := res.(*dm.Traceroute); ok {
-			err = c.db.StoreTraceroute(tr)
-		}
-	case dm.PING:
-		if ping, ok := res.(*dm.Ping); ok {
-			err = c.db.StorePing(ping)
-		}
-	case dm.STATS:
-		return nil
-	default:
-		err = ErrorUnknownType
-	}
-	return
-}
-
-func (c *controllerT) checkCachedReq(req Request) (r interface{}, err error) {
-	switch req.Type {
-	case dm.TRACEROUTE:
-		if targ, ok := req.Args.(dm.TracerouteArg); ok {
-			ret, e := c.db.GetTraceroute(targ.Host, targ.Dst, targ.ServiceArg.Staleness)
-			err = e
-			r = ret
-		} else {
-			err = ErrorReqArgTypeMismatch
-		}
-	case dm.PING:
-		if targ, ok := req.Args.(dm.PingArg); ok {
-			ret, e := c.db.GetPing(targ.Host, targ.Dst, targ.ServiceArg.Staleness)
-			err = e
-			r = ret
-		} else {
-			err = ErrorReqArgTypeMismatch
-		}
-	case dm.STATS:
-		err = da.ErrorCacheValueNotFound
-	default:
-		err = ErrorUnknownReqType
-	}
-	return
 }

@@ -42,7 +42,7 @@ type LocalConfig struct {
 	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string
-	Timeout      int
+	Timeout      int64
 }
 
 type ScamperConfig struct {

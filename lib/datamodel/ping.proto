@@ -30,6 +30,7 @@ message PingArg {
     string user_id = 19;
     string tos = 20;
     string time_stamp = 21;
+    int64 timeout = 22;
 }
 
 message PingStats {

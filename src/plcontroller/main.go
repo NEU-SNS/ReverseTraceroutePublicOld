@@ -41,14 +41,12 @@ import (
 var f plcontroller.Flags
 
 func init() {
-	flag.IntVar(&f.Local.Timeout, "t", 60,
+	flag.Int64Var(&f.Local.Timeout, "t", 60,
 		"The default timeout used for measurement requests.")
 	flag.StringVar(&f.Local.Addr, "a", ":45000",
 		"The address that the controller will bind to.")
-
-	flag.StringVar(&f.Local.Proto, "t", "tcp",
-		"Type protocol type the coltroller will use.")
-
+	flag.StringVar(&f.Local.Proto, "p", "tcp",
+		"The protocol that the controller will use.")
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed.")
 

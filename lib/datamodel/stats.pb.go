@@ -23,6 +23,7 @@ func (*Stats) ProtoMessage()    {}
 
 type StatsArg struct {
 	Service ServiceT `protobuf:"varint,1,opt,name=service,enum=datamodel.ServiceT" json:"service,omitempty"`
+	Ip      string   `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
 }
 
 func (m *StatsArg) Reset()         { *m = StatsArg{} }

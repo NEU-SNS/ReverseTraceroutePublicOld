@@ -100,50 +100,50 @@ func (c *Client) checkConn() error {
 	return nil
 }
 
-func (c *Client) IssueCmd() chan error {
+func (c *Client) IssueCmd(ec chan error, dc chan struct{}) {
 	glog.Infof("Issuing command: %s", c.cmd.String())
-	eChan := make(chan error, 1)
 	err := c.checkConn()
 	if err != nil {
-		eChan <- err
-		return eChan
+		ec <- err
+		return
 	}
 	defer c.closeConnection()
 	_, err = c.rw.WriteString(c.cmd.String())
 	if err != nil {
-		eChan <- err
-		return eChan
+		ec <- err
+		return
 	}
 	c.rw.Flush()
 	i := 0
 	for i < 3 {
 		line, err := c.rw.ReadString('\n')
 		if err != nil {
-			eChan <- err
-			return eChan
+			ec <- err
+			return
 		}
 		r, err := parseResponse(line, c.rw)
 		if err != nil {
 			glog.Errorf("Error parsing response: %v", err)
-			eChan <- err
-			return eChan
+			ec <- err
+			return
 		}
-		switch {
-		case r.rType == OK:
-		case r.rType == DATA:
+		switch r.rType {
+		case OK:
+		case DATA:
 			glog.Infof("Parsed data response")
 			c.resps = append(c.resps, r)
 			i += 1
 			glog.Infof("Count of data received: %d", i)
-		case r.rType == ERR:
+		case ERR:
 			glog.Errorf("Parsed scamper ERR return")
-			eChan <- fmt.Errorf("Error with scamper request: %s", c.cmd.String())
-			return eChan
-		case r.rType == MORE:
+			ec <- fmt.Errorf("Error with scamper request: %s", c.cmd.String())
+			return
+		case MORE:
 		}
 
 	}
-	return eChan
+	close(dc)
+	return
 }
 
 func (c *Client) connect() error {

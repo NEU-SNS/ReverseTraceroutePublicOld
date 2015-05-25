@@ -34,7 +34,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	_ "net/http/pprof"
-	"net/rpc/jsonrpc"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,10 +55,8 @@ func sigHandle() {
 func init() {
 	flag.StringVar(&f.Local.Addr, "a", ":35000",
 		"The address that the controller will bind to.")
-
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
-		"Type protocol type the coltroller will use.")
-
+		"The protocol that the controller will use.")
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed")
 
@@ -92,7 +89,7 @@ func main() {
 	}
 
 	glog.Infof("Starting controller with config: %v", conf)
-	err = <-controller.Start(conf, db, jsonrpc.Dial)
+	err = <-controller.Start(conf, db)
 	if err != nil {
 		glog.Errorf("Controller Start returned with error: %v", err)
 		exit(1)
