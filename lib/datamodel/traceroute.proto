@@ -34,6 +34,8 @@ message TracerouteArg {
 	string gss_entry     = 24;
 	string lss_name      = 25; 
     int64 timeout = 26;
+    bool check_cache = 27;
+    int64 staleness = 28;
 }
 
 message TracerouteHop {

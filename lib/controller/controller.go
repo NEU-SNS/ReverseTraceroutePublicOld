@@ -29,6 +29,8 @@ package controller
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"errors"
+	"fmt"
+	ca "github.com/NEU-SNS/ReverseTraceroute/lib/cache"
 	capi "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
@@ -52,6 +54,7 @@ func getUUID() string {
 type controllerT struct {
 	config    Config
 	db        da.DataProvider
+	cache     ca.Cache
 	router    Router
 	startTime time.Time
 	server    *grpc.Server
@@ -166,18 +169,26 @@ func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsRet
 	return
 }
 
+func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, error) {
+	s, mt, err := c.getService(serv)
+	if err != nil {
+		return nil, err
+	}
+	err = mt.Connect(s.GetIp())
+	if err != nil {
+		return nil, err
+	}
+	return mt, nil
+}
+
 func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
 	st := time.Now()
 	uuid := getUUID()
 	glog.Infof("%s: Ping starting", uuid)
 	nctx := con.WithValue(ctx, ID, uuid)
 	pr = new(dm.PingReturn)
-	s, mt, err := c.getService(pa.Service)
-	if err != nil {
-		pr.Ret = makeErrorReturn(st)
-		return
-	}
-	err = mt.Connect(s.GetIp())
+
+	mt, err := c.getMeasurementTool(pa.Service)
 	if err != nil {
 		pr.Ret = makeErrorReturn(st)
 		return
@@ -197,22 +208,38 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 	glog.Infof("%s: Traceroute starting", uuid)
 	nctx := con.WithValue(ctx, ID, uuid)
 	tr = new(dm.TracerouteReturn)
-	s, mt, err := c.getService(ta.Service)
-	if err != nil {
-		tr.Ret = makeErrorReturn(st)
+	makeRequest := !ta.CheckCache
+	if ta.CheckCache {
+		trace, e := c.db.GetTRBySrcDstWithStaleness(ta.Host, ta.Dst, da.Staleness(ta.Staleness))
+		if e != nil {
+			tr.Traceroute = trace
+			tr.Ret = makeSuccessReturn(st)
+			return
+		}
+		makeRequest = true
+	}
+
+	if makeRequest {
+		mt, e := c.getMeasurementTool(ta.Service)
+		if e != nil {
+			tr.Ret = makeErrorReturn(st)
+			return
+		}
+		tr.Traceroute, e = mt.Traceroute(nctx, ta)
+		if e != nil {
+			tr.Ret = makeErrorReturn(st)
+			return
+		}
+		e = c.db.StoreTraceroute(tr.Traceroute)
+		if e != nil {
+			glog.Errorf("Failed to store traceroute")
+		}
+		tr.Ret = makeSuccessReturn(st)
 		return
 	}
-	err = mt.Connect(s.GetIp())
-	if err != nil {
-		tr.Ret = makeErrorReturn(st)
-		return
-	}
-	tr.Traceroute, err = mt.Traceroute(nctx, ta)
-	if err != nil {
-		tr.Ret = makeErrorReturn(st)
-		return
-	}
-	tr.Ret = makeSuccessReturn(st)
+
+	tr.Ret = makeErrorReturn(st)
+	err = fmt.Errorf("doTraceroute failed to find in cache or remote")
 	return
 }
 
@@ -234,16 +261,22 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
-func Start(c Config, db da.DataProvider) chan error {
+func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	errChan := make(chan error, 1)
 	if db == nil {
 		glog.Errorf("Nil db in Controller Start")
 		errChan <- errors.New("Controller Start, nil DB")
 		return errChan
 	}
+	if cache == nil {
+		glog.Errorf("Nil cache in Controller start")
+		errChan <- errors.New("Controller Start, nil Cache")
+		return errChan
+	}
 	controller.config = c
 	controller.startTime = time.Now()
 	controller.db = db
+	controller.cache = cache
 	controller.router = createRouter()
 	servs, err := db.GetServices()
 	if err != nil {

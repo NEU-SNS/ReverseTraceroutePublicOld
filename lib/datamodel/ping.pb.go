@@ -32,6 +32,7 @@ type PingArg struct {
 	Tos        string   `protobuf:"bytes,20,opt,name=tos" json:"tos,omitempty"`
 	TimeStamp  string   `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
 	Timeout    int64    `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
+	CheckCache bool     `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
 }
 
 func (m *PingArg) Reset()         { *m = PingArg{} }

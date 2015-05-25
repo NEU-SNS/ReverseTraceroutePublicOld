@@ -36,6 +36,8 @@ type TracerouteArg struct {
 	GssEntry     string   `protobuf:"bytes,24,opt,name=gss_entry" json:"gss_entry,omitempty"`
 	LssName      string   `protobuf:"bytes,25,opt,name=lss_name" json:"lss_name,omitempty"`
 	Timeout      int64    `protobuf:"varint,26,opt,name=timeout" json:"timeout,omitempty"`
+	CheckCache   bool     `protobuf:"varint,27,opt,name=check_cache" json:"check_cache,omitempty"`
+	Staleness    int64    `protobuf:"varint,28,opt,name=staleness" json:"staleness,omitempty"`
 }
 
 func (m *TracerouteArg) Reset()         { *m = TracerouteArg{} }
