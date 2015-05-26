@@ -39,6 +39,7 @@ func (c *plControllerT) Ping(ctx con.Context, arg *dm.PingArg) (pr *dm.Ping, err
 	glog.Info("Ping Called for req: %s", val)
 	pr = new(dm.Ping)
 	*pr, err = plController.runPing(*arg)
+	glog.Info("Ping done for req: %s, got: %v", val, pr)
 	return
 }
 

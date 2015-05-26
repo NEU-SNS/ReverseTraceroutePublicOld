@@ -9,6 +9,7 @@ type DataProvider interface {
 	ServiceProvider
 	TracerouteProvider
 	PingProvider
+	Close() error
 }
 
 type ServiceProvider interface {

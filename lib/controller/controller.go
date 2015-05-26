@@ -150,12 +150,12 @@ func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsRet
 	glog.Infof("%s: Ping starting")
 	nctx := con.WithValue(ctx, ID, uuid)
 	sr = new(dm.StatsReturn)
-	_, mt, err := c.getService(sa.Service)
+	s, mt, err := c.getService(sa.Service)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return
 	}
-	err = mt.Connect(sa.Ip)
+	err = mt.Connect(s.GetIp())
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return

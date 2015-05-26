@@ -66,6 +66,10 @@ func (d *dataAccess) StorePing(p *dm.Ping) error {
 	return nil
 }
 
+func (d *dataAccess) Close() error {
+	return nil
+}
+
 func New(c dm.DbConfig) (DataProvider, error) {
 	return &dataAccess{conf: c}, nil
 }

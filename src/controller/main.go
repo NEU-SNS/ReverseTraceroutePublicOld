@@ -28,6 +28,7 @@ package main
 
 import (
 	"flag"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/controller"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
@@ -89,7 +90,7 @@ func main() {
 	}
 
 	glog.Infof("Starting controller with config: %v", conf)
-	err = <-controller.Start(conf, db)
+	err = <-controller.Start(conf, db, cache.New())
 	if err != nil {
 		glog.Errorf("Controller Start returned with error: %v", err)
 		exit(1)

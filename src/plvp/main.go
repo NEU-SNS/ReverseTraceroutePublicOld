@@ -45,7 +45,7 @@ func init() {
 		"The address to run the local service on")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
-	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55555",
+	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55557",
 		"The address to use for pperf")
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
 		"The protocol that the controller will use.")
