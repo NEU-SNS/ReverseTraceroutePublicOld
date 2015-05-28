@@ -29,6 +29,7 @@ package util
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"log"
 	"net"
@@ -162,4 +163,18 @@ func StartPProf(addr string) {
 	go func() {
 		log.Println(http.ListenAndServe(addr, nil))
 	}()
+}
+
+func IpStringToInt64(ips string) (int64, error) {
+	ip := net.ParseIP(ips)
+	if ip == nil {
+		return 0, fmt.Errorf("Nil ip in IpToInt64")
+	}
+	ip = ip.To4()
+	var res int64
+	res |= int64(ip[0]) << 24
+	res |= int64(ip[1]) << 16
+	res |= int64(ip[2]) << 8
+	res |= int64(ip[3])
+	return res, nil
 }
