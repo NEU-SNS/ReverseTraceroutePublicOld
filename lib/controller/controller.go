@@ -34,6 +34,7 @@ import (
 	capi "github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -147,7 +148,7 @@ func (c *controllerT) startRpc(eChan chan error) {
 func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
 	st := time.Now()
 	uuid := getUUID()
-	glog.Infof("%s: Ping starting")
+	glog.Infof("%s: Ping starting", uuid)
 	nctx := con.WithValue(ctx, ID, uuid)
 	sr = new(dm.StatsReturn)
 	s, mt, err := c.getService(sa.Service)
@@ -202,6 +203,28 @@ func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn
 	return
 }
 
+func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
+	mt := new(dm.MTraceroute)
+	mt.Service = s
+	mt.Date = time.Unix(t.Start.Sec, util.MicroToNanoSec(t.Start.Usec)).Unix()
+	mt.Src = t.Src
+	mt.Dst = t.Dst
+	hops := t.GetHops()
+	if hops == nil {
+		return nil
+	}
+	lhops := make([]int64, len(hops))
+	for i, hop := range hops {
+		ip, err := util.IpStringToInt64(hop.Addr)
+		if err != nil {
+			return nil
+		}
+		lhops[i] = ip
+	}
+	mt.Hops = lhops
+	return mt
+}
+
 func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
 	st := time.Now()
 	uuid := getUUID()
@@ -211,11 +234,13 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 	makeRequest := !ta.CheckCache
 	if ta.CheckCache {
 		trace, e := c.db.GetTRBySrcDstWithStaleness(ta.Host, ta.Dst, da.Staleness(ta.Staleness))
-		if e != nil {
+		if e == nil {
+			glog.Infof("Got traceroute from db: %v", trace)
 			tr.Traceroute = trace
 			tr.Ret = makeSuccessReturn(st)
 			return
 		}
+		glog.Errorf("Failed to get traceroute from db: %v", e)
 		makeRequest = true
 	}
 
@@ -225,15 +250,23 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 			tr.Ret = makeErrorReturn(st)
 			return
 		}
-		tr.Traceroute, e = mt.Traceroute(nctx, ta)
+		trace, e := mt.Traceroute(nctx, ta)
 		if e != nil {
 			tr.Ret = makeErrorReturn(st)
 			return
 		}
-		e = c.db.StoreTraceroute(tr.Traceroute)
-		if e != nil {
-			glog.Errorf("Failed to store traceroute")
+		tr.Traceroute = makeMTraceroute(trace, ta.Service)
+		if tr.Traceroute == nil {
+			tr.Ret = makeErrorReturn(st)
+			err = fmt.Errorf("Invalid traceroute received")
+			return
 		}
+		go func() {
+			e = c.db.StoreTraceroute(trace, ta.Service)
+			if e != nil {
+				glog.Errorf("Failed to store traceroute: %v", e)
+			}
+		}()
 		tr.Ret = makeSuccessReturn(st)
 		return
 	}

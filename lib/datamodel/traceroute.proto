@@ -84,7 +84,18 @@ message TracerouteTime {
     string ftime = 3; 
 }
 
+message MTraceroute {
+    int64 date = 1;
+    string src = 2;
+    string dst = 3;
+    repeated int64 hops = 4 [packed=true];
+    ServiceT service = 5;
+    string hop = 6;
+    
+}
+
 message TracerouteReturn {
     ReturnT ret = 1;
-    Traceroute traceroute = 2;
+    
+    MTraceroute traceroute = 2;
 }

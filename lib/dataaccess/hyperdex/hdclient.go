@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+var (
+	ErrorWrongType = fmt.Errorf("The data stored is of the wrong type")
+	ErrorTooOld    = fmt.Errorf("The stored object is too old")
+)
+
 type hdClient struct {
 	c      *client.Client
 	config dm.DbConfig
@@ -39,19 +44,16 @@ func New(con dm.DbConfig) (da.DataProvider, error) {
 	return &hdClient{c: c, config: con, eChan: echan}, nil
 }
 
-func microToNanoSec(usec int64) int64 {
-	return usec * 1000
-}
-
 var ErrorInvalidIP = fmt.Errorf("Invalid IP in traceroute")
 
-func (c *hdClient) StoreTraceroute(tr *dm.Traceroute) error {
+func (c *hdClient) StoreTraceroute(tr *dm.Traceroute, s dm.ServiceT) error {
+	glog.Infof("Storing traceroute: %v", *tr)
 	t := tr.GetStart()
 	var st time.Time
 	if t == nil {
 		st = time.Now()
 	} else {
-		st = time.Unix(t.Sec, microToNanoSec(t.Usec))
+		st = time.Unix(t.Sec, util.MicroToNanoSec(t.Usec))
 	}
 	hops := tr.GetHops()
 	if hops == nil || len(hops) == 0 {
@@ -75,16 +77,143 @@ func (c *hdClient) StoreTraceroute(tr *dm.Traceroute) error {
 	}
 	key := fmt.Sprintf("%d:%d", src, dst)
 
-	e := c.c.Put(c.config.TracerouteSpace, key, client.Attributes{"src": src, "dst": dst, "date": st.Unix(), "hops": hlist})
+	e := c.c.Put(c.config.TracerouteSpace,
+		key,
+		client.Attributes{"src": src,
+			"dst":     dst,
+			"service": s,
+			"date":    st.Unix(),
+			"route":   client.ListInt(hlist)})
+
 	if e != nil {
 		return e
 	}
+	glog.Infof("Traceroute stored")
 	for i, hop := range hlist {
 		key := fmt.Sprintf("%d:%d", hop, dst)
-		e = c.c.Put(c.config.TraceHopSpace, key, client.Attributes{"hop": hop, "dst": dst, "date": st.Unix(), "hops": hlist[i:]})
+		e = c.c.Put(c.config.TraceHopSpace,
+			key,
+			client.Attributes{"src": src,
+				"hop":     hop,
+				"dst":     dst,
+				"service": s,
+				"date":    st.Unix(),
+				"route":   client.ListInt(hlist[i:])})
+
 		if e != nil {
 			return e
 		}
 	}
+	glog.Infof("Traceroute hop stored")
+	return nil
+}
+
+func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
+	tr := new(dm.MTraceroute)
+	hl := (*a)["route"]
+	if d, ok := (*a)["date"].(int64); ok {
+		tr.Date = d
+	}
+
+	src := (*a)["src"]
+	dst := (*a)["dst"]
+
+	if ssrc, ok := src.(int64); ok {
+		s, err := util.Int64ToIpString(ssrc)
+		if err != nil {
+			return nil, ErrorWrongType
+		}
+		tr.Src = s
+	}
+
+	if sdst, ok := dst.(int64); ok {
+		s, err := util.Int64ToIpString(sdst)
+		if err != nil {
+			return nil, ErrorWrongType
+		}
+		tr.Dst = s
+	}
+
+	if hop, ok := (*a)["hop"]; ok {
+		if h, ok := hop.(int64); ok {
+			hi, err := util.Int64ToIpString(h)
+			if err != nil {
+				return nil, ErrorWrongType
+			}
+			tr.Hop = hi
+		}
+	}
+
+	if serv, ok := (*a)["service"].(dm.ServiceT); ok {
+		tr.Service = serv
+	} else {
+		return nil, ErrorWrongType
+	}
+	if h, ok := hl.([]int64); ok {
+		tr.Hops = h
+		return tr, nil
+	}
+	return nil, ErrorWrongType
+}
+
+func (c *hdClient) GetTRBySrcDst(src, dst string) (*dm.MTraceroute, error) {
+	return c.GetTRBySrcDstWithStaleness(src, dst, -1)
+}
+
+func (c *hdClient) GetTRBySrcDstWithStaleness(src, dst string, s da.Staleness) (*dm.MTraceroute, error) {
+	nsrc, err := util.IpStringToInt64(src)
+	if err != nil {
+		return nil, ErrorInvalidIP
+	}
+	ndst, err := util.IpStringToInt64(dst)
+	if err != nil {
+		return nil, ErrorInvalidIP
+	}
+	key := fmt.Sprintf("%d:%d", nsrc, ndst)
+	attrs, e := c.c.Get(c.config.TracerouteSpace, key)
+	if e != nil {
+		return nil, e
+	}
+	tr, err := makeMTraceroute(&attrs)
+	if err != nil {
+		return nil, err
+	}
+	sasi := int64(s)
+	if sasi > 0 && time.Now().Unix() > tr.Date+sasi {
+		return nil, ErrorTooOld
+	}
+	return tr, nil
+}
+
+func (c *hdClient) GetIntersectingTraceroute(hop, dst string, s da.Staleness) (*dm.MTraceroute, error) {
+	nhop, err := util.IpStringToInt64(hop)
+	if err != nil {
+		return nil, ErrorInvalidIP
+	}
+	ndst, err := util.IpStringToInt64(dst)
+	if err != nil {
+		return nil, ErrorInvalidIP
+	}
+	key := fmt.Sprintf("%d:%d", nhop, ndst)
+	attrs, e := c.c.Get(c.config.TraceHopSpace, key)
+	if e != nil {
+		return nil, e
+	}
+	tr, err := makeMTraceroute(&attrs)
+	if err != nil {
+		return nil, err
+	}
+	return tr, nil
+}
+
+func (c *hdClient) GetPingBySrcDst(src, dst string) (*dm.Ping, error) {
+	return nil, nil
+}
+
+func (c *hdClient) StorePing(p *dm.Ping) error {
+	return nil
+}
+
+func (c *hdClient) Close() error {
 	return nil
 }

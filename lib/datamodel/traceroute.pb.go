@@ -116,9 +116,22 @@ func (m *TracerouteTime) Reset()         { *m = TracerouteTime{} }
 func (m *TracerouteTime) String() string { return proto.CompactTextString(m) }
 func (*TracerouteTime) ProtoMessage()    {}
 
+type MTraceroute struct {
+	Date    int64    `protobuf:"varint,1,opt,name=date" json:"date,omitempty"`
+	Src     string   `protobuf:"bytes,2,opt,name=src" json:"src,omitempty"`
+	Dst     string   `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
+	Hops    []int64  `protobuf:"varint,4,rep,packed,name=hops" json:"hops,omitempty"`
+	Service ServiceT `protobuf:"varint,5,opt,name=service,enum=datamodel.ServiceT" json:"service,omitempty"`
+	Hop     string   `protobuf:"bytes,6,opt,name=hop" json:"hop,omitempty"`
+}
+
+func (m *MTraceroute) Reset()         { *m = MTraceroute{} }
+func (m *MTraceroute) String() string { return proto.CompactTextString(m) }
+func (*MTraceroute) ProtoMessage()    {}
+
 type TracerouteReturn struct {
-	Ret        *ReturnT    `protobuf:"bytes,1,opt,name=ret" json:"ret,omitempty"`
-	Traceroute *Traceroute `protobuf:"bytes,2,opt,name=traceroute" json:"traceroute,omitempty"`
+	Ret        *ReturnT     `protobuf:"bytes,1,opt,name=ret" json:"ret,omitempty"`
+	Traceroute *MTraceroute `protobuf:"bytes,2,opt,name=traceroute" json:"traceroute,omitempty"`
 }
 
 func (m *TracerouteReturn) Reset()         { *m = TracerouteReturn{} }
@@ -132,7 +145,7 @@ func (m *TracerouteReturn) GetRet() *ReturnT {
 	return nil
 }
 
-func (m *TracerouteReturn) GetTraceroute() *Traceroute {
+func (m *TracerouteReturn) GetTraceroute() *MTraceroute {
 	if m != nil {
 		return m.Traceroute
 	}

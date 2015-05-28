@@ -178,3 +178,20 @@ func IpStringToInt64(ips string) (int64, error) {
 	res |= int64(ip[3])
 	return res, nil
 }
+
+func Int64ToIpString(ip int64) (string, error) {
+	var a, b, c, d byte
+	d = byte(ip & 0x70000000000000ff)
+	c = byte(ip & 0x700000000000ff00 >> 8)
+	b = byte(ip & 0x7000000000ff0000 >> 16)
+	a = byte(ip & 0x70000000ff000000 >> 24)
+	nip := net.IPv4(a, b, c, d)
+	if nip == nil {
+		return "", fmt.Errorf("Invalid IP")
+	}
+	return nip.String(), nil
+}
+
+func MicroToNanoSec(usec int64) int64 {
+	return usec * 1000
+}

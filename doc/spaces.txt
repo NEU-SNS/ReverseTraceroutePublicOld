@@ -1,0 +1,11 @@
+space traceroutes
+key tr
+attributes int src, int dst, int service
+list(int) route, int date
+subspace src, dst, date
+
+space hops
+key h
+attributes int src, int hop, int dst,
+list(int) route, int date, int service
+subspace src, hop, date

@@ -31,7 +31,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/lib/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/controller"
-	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
+	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/hyperdex"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	_ "net/http/pprof"
@@ -63,7 +63,7 @@ func init() {
 
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file.")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55557",
+	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55555",
 		"The port for pprof")
 }
 

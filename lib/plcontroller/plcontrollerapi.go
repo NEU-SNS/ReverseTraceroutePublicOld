@@ -48,6 +48,7 @@ func (c *plControllerT) Traceroute(ctx con.Context, arg *dm.TracerouteArg) (tr *
 	glog.Info("Traceroute Called for req: %s", val)
 	tr = new(dm.Traceroute)
 	*tr, err = plController.runTraceroute(*arg)
+	glog.Info("Traceroute done for req: %s, got: %v", val, tr)
 	return
 }
 

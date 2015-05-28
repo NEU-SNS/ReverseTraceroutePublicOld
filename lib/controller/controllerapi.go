@@ -50,5 +50,6 @@ func (c *controllerT) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.
 	glog.Info("Handling Traceroute Request")
 	tr = new(dm.TracerouteReturn)
 	tr, err = c.doTraceroute(ctx, ta)
+	glog.Infof("Returning traceroute: %v", tr)
 	return
 }

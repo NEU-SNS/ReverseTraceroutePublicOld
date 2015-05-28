@@ -46,15 +46,15 @@ func (d *dataAccess) GetServices() ([]*dm.Service, error) {
 	}}, nil
 }
 
-func (d *dataAccess) StoreTraceroute(t *dm.Traceroute) error {
+func (d *dataAccess) StoreTraceroute(t *dm.Traceroute, s dm.ServiceT) error {
 	return nil
 }
 
-func (d *dataAccess) GetTRBySrcDst(src, dst string) (*dm.Traceroute, error) {
+func (d *dataAccess) GetTRBySrcDst(src, dst string) (*dm.MTraceroute, error) {
 	return nil, nil
 }
 
-func (d *dataAccess) GetTRBySrcDstWithStaleness(src, dst string, s Staleness) (*dm.Traceroute, error) {
+func (d *dataAccess) GetTRBySrcDstWithStaleness(src, dst string, s Staleness) (*dm.MTraceroute, error) {
 	return nil, nil
 }
 
@@ -70,6 +70,8 @@ func (d *dataAccess) Close() error {
 	return nil
 }
 
+/*
 func New(c dm.DbConfig) (DataProvider, error) {
 	return &dataAccess{conf: c}, nil
 }
+*/

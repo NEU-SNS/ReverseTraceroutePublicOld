@@ -56,12 +56,13 @@ func main() {
 	}
 	fmt.Printf("Response took: %s\n", time.Duration(ret.GetRet().Dur))
 	a := dm.TracerouteArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
-		Host: "127.0.0.1"}
+		Host: "127.0.0.1", CheckCache: true}
 	r, err := cl.Traceroute(con.Background(), &a)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)
 		return
 	}
+	fmt.Printf("Got traceroute: %v\n", r.GetTraceroute())
 	fmt.Printf("Response took: %s\n", time.Duration(r.GetRet().Dur))
 	arg := dm.StatsArg{Service: dm.ServiceT_PLANET_LAB, Ip: "127.0.0.1"}
 	rr, err := cl.Stats(con.Background(), &arg)

@@ -19,9 +19,10 @@ type ServiceProvider interface {
 type Staleness time.Duration
 
 type TracerouteProvider interface {
-	StoreTraceroute(*dm.Traceroute) error
-	GetTRBySrcDst(string, string) (*dm.Traceroute, error)
-	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.Traceroute, error)
+	StoreTraceroute(*dm.Traceroute, dm.ServiceT) error
+	GetTRBySrcDst(string, string) (*dm.MTraceroute, error)
+	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.MTraceroute, error)
+	GetIntersectingTraceroute(string, string, Staleness) (*dm.MTraceroute, error)
 }
 
 type PingProvider interface {
