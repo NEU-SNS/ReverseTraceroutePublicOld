@@ -60,11 +60,16 @@ func init() {
 		"The protocol that the controller will use.")
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed")
-
+	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
+		"Autoconnect to the eth0 IP, will use port 35000")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file.")
 	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55555",
 		"The port for pprof")
+	flag.StringVar(&f.Local.CertFile, "cert-file", "cert.pem",
+		"The path the the cert file for the the server")
+	flag.StringVar(&f.Local.KeyFile, "key-file", "key.pem",
+		"The path to the private key for the file")
 }
 
 func main() {

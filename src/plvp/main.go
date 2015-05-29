@@ -41,10 +41,12 @@ import (
 var f plvp.Flags
 
 func init() {
-	flag.StringVar(&f.Local.Addr, "a", ":55000",
+	flag.StringVar(&f.Local.Addr, "a", ":65000",
 		"The address to run the local service on")
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
+	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
+		"Autoconnect to the eth0 IP, will use port 55000")
 	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55557",
 		"The address to use for pperf")
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
@@ -59,7 +61,8 @@ func init() {
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
+		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		plvp.HandleSig(sig)

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+message VantagePoint {
+    string hostname = 1;
+    string ip = 2;
+    bool sshable = 3;
+    bool timestamp = 4;
+    bool record_route = 5;
+    bool active = 6;
+    int64 last_updated = 7;
+}
+
+message VantagePointReturn {
+    ReturnT ret = 1;
+    repeated VantagePoint vps = 2;
+}

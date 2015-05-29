@@ -121,7 +121,8 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	select {
 	case err := <-ec:
 		return ret, err
-	case <-time.After(time.Second * 60):
+	case <-time.After(time.Second * c.conf.Local.Timeout):
+		cl.CancelCmd()
 		return ret, fmt.Errorf("Ping timed out")
 	case <-dc:
 		break
@@ -170,7 +171,8 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	select {
 	case err := <-ec:
 		return ret, err
-	case <-time.After(time.Second * 60):
+	case <-time.After(time.Second * c.conf.Local.Timeout):
+		cl.CancelCmd()
 		return ret, fmt.Errorf("Ping timed out")
 	case <-dc:
 		break
@@ -283,13 +285,25 @@ func Start(c Config, noScamp bool) chan error {
 }
 
 func (c *plControllerT) startRpc(eChan chan error) {
-	l, e := net.Listen(c.config.Local.Proto, c.config.Local.Addr)
+	var addr string
+	if c.config.Local.AutoConnect {
+		saddr, err := util.GetBindAddr()
+		if err != nil {
+			eChan <- err
+			return
+		}
+		addr = fmt.Sprintf("%s:%d", saddr, 45000)
+	} else {
+		addr = c.config.Local.Addr
+	}
+	glog.Infof("Conecting to: %s", addr)
+	l, e := net.Listen(c.config.Local.Proto, addr)
 	if e != nil {
 		glog.Errorf("Failed to listen: %v", e)
 		eChan <- e
 		return
 	}
-	glog.Infof("PLController started, listening on: %s", c.config.Local.Addr)
+	glog.Infof("PLController started, listening on: %s", addr)
 	err := c.server.Serve(l)
 	if err != nil {
 		eChan <- err
@@ -306,6 +320,7 @@ func HandleSig(s os.Signal) {
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
+	glog.Infof("Got signale %v", s)
 	if c.mp != nil {
 		c.mp.KillAll()
 	}

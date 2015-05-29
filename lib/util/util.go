@@ -37,6 +37,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -194,4 +195,26 @@ func Int64ToIpString(ip int64) (string, error) {
 
 func MicroToNanoSec(usec int64) int64 {
 	return usec * 1000
+}
+
+func GetBindAddr() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		if strings.Contains(iface.Name, "eth0") && uint(iface.Flags)&uint(net.FlagUp) > 0 {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return "", err
+			}
+			addr := addrs[0]
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				return "", err
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("Didn't find eth0 interface")
 }

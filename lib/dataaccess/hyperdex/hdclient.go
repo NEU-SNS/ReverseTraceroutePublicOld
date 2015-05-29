@@ -23,7 +23,7 @@ type hdClient struct {
 
 func (c *hdClient) GetServices() ([]*dm.Service, error) {
 	return []*dm.Service{&dm.Service{
-		IPAddr: []string{"127.0.0.1:45000"},
+		IPAddr: []string{"129.10.113.205:45000"},
 		Key:    dm.ServiceT_PLANET_LAB,
 	}}, nil
 }
@@ -109,6 +109,7 @@ func (c *hdClient) StoreTraceroute(tr *dm.Traceroute, s dm.ServiceT) error {
 }
 
 func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
+	glog.Infof("Making traceroute from: %v", a)
 	tr := new(dm.MTraceroute)
 	hl := (*a)["route"]
 	if d, ok := (*a)["date"].(int64); ok {
@@ -121,6 +122,7 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 	if ssrc, ok := src.(int64); ok {
 		s, err := util.Int64ToIpString(ssrc)
 		if err != nil {
+			glog.Errorf("Failed to parse src string from: %d", ssrc)
 			return nil, ErrorWrongType
 		}
 		tr.Src = s
@@ -129,6 +131,7 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 	if sdst, ok := dst.(int64); ok {
 		s, err := util.Int64ToIpString(sdst)
 		if err != nil {
+			glog.Errorf("Failed to parse dst string from: %d", dst)
 			return nil, ErrorWrongType
 		}
 		tr.Dst = s
@@ -138,21 +141,28 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 		if h, ok := hop.(int64); ok {
 			hi, err := util.Int64ToIpString(h)
 			if err != nil {
+				glog.Errorf("Failed to parse hop string from: %d", h)
 				return nil, ErrorWrongType
 			}
 			tr.Hop = hi
 		}
 	}
 
-	if serv, ok := (*a)["service"].(dm.ServiceT); ok {
-		tr.Service = serv
+	if serv, ok := (*a)["service"].(int64); ok {
+		if serv < 0 {
+			glog.Errorf("Failed to parse service: %d", serv)
+			return nil, ErrorWrongType
+		}
+		tr.Service = dm.ServiceT(serv)
 	} else {
+		glog.Errorf("Failed to parse service: %d", serv)
 		return nil, ErrorWrongType
 	}
-	if h, ok := hl.([]int64); ok {
-		tr.Hops = h
+	if h, ok := hl.(client.ListInt); ok {
+		tr.Hops = []int64(h)
 		return tr, nil
 	}
+	glog.Errorf("Failed to parse hop list")
 	return nil, ErrorWrongType
 }
 
@@ -182,6 +192,7 @@ func (c *hdClient) GetTRBySrcDstWithStaleness(src, dst string, s da.Staleness) (
 	if sasi > 0 && time.Now().Unix() > tr.Date+sasi {
 		return nil, ErrorTooOld
 	}
+	glog.Infof("Got traceroute from db: %v", tr)
 	return tr, nil
 }
 

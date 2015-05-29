@@ -42,6 +42,7 @@ type LocalConfig struct {
 	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string
+	AutoConnect  bool
 }
 
 type ScamperConfig struct {

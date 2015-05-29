@@ -73,4 +73,7 @@ type LocalConfig struct {
 	CloseStdDesc bool
 	PProfAddr    string
 	Proto        string
+	AutoConnect  bool
+	CertFile     string
+	KeyFile      string
 }

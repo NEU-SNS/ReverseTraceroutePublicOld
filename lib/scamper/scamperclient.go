@@ -41,10 +41,11 @@ import (
 type SResponseT string
 
 const (
-	OK   SResponseT = "OK"
-	MORE SResponseT = "MORE"
-	DATA SResponseT = "DATA"
-	ERR  SResponseT = "ERR"
+	OK        SResponseT = "OK"
+	MORE      SResponseT = "MORE"
+	DATA      SResponseT = "DATA"
+	ERR       SResponseT = "ERR"
+	cancelCmd            = "halt %d"
 )
 
 var (
@@ -64,6 +65,7 @@ type Response struct {
 	rType SResponseT
 	data  []byte
 	ds    int
+	id    int
 }
 
 type Client struct {
@@ -72,6 +74,7 @@ type Client struct {
 	cmd   Cmd
 	resps []Response
 	conn  *net.Conn
+	id    int
 }
 
 func (r Response) Bytes() []byte {
@@ -98,6 +101,21 @@ func (c *Client) checkConn() error {
 		return c.connect()
 	}
 	return nil
+}
+
+func (c *Client) CancelCmd() error {
+	glog.Info("Canceling command: %d", c.id)
+	err := c.checkConn()
+	if err != nil {
+		return err
+	}
+	defer c.closeConnection()
+	cstring := fmt.Sprintf(cancelCmd, c.id)
+	_, err = c.rw.WriteString(cstring)
+	if err != nil {
+		return err
+	}
+	return c.rw.Flush()
 }
 
 func (c *Client) IssueCmd(ec chan error, dc chan struct{}) {
@@ -129,6 +147,7 @@ func (c *Client) IssueCmd(ec chan error, dc chan struct{}) {
 		}
 		switch r.rType {
 		case OK:
+			c.id = r.id
 		case DATA:
 			glog.Infof("Parsed data response")
 			c.resps = append(c.resps, r)
@@ -179,6 +198,12 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	switch {
 	case strings.Contains(r, string(OK)):
 		resp.rType = OK
+		split := strings.Split(r, " ")
+		id, err := strconv.Atoi(split[1])
+		if err != nil {
+			return resp, ErrorBadResponse
+		}
+		resp.id = id
 		return resp, nil
 	case strings.Contains(r, string(ERR)):
 		glog.Error("Parsed error response")

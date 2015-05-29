@@ -45,17 +45,16 @@ func init() {
 		"The default timeout used for measurement requests.")
 	flag.StringVar(&f.Local.Addr, "a", ":45000",
 		"The address that the controller will bind to.")
+	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
+		"Autoconnect to the eth0 IP, will use port 45000")
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
 		"The protocol that the controller will use.")
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed.")
-
 	flag.StringVar(&f.Scamper.Port, "P", "55000",
 		"Port that Scamper will use.")
-
 	flag.StringVar(&f.Scamper.SockDir, "S", "/tmp/scamper_sockets",
 		"Directory that scamper will use for its sockets")
-
 	flag.StringVar(&f.Scamper.BinPath, "B", "/usr/local/bin/sc_remoted",
 		"Path to the scamper binary")
 	flag.StringVar(&f.Scamper.ConverterPath, "X", "/usr/local/bin/sc_warts2json",
@@ -64,11 +63,16 @@ func init() {
 		"Path to the config file")
 	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55556",
 		"The port for pprof")
+	flag.StringVar(&f.Local.CertFile, "cert-file", "cert.pem",
+		"The path the the cert file for the the server")
+	flag.StringVar(&f.Local.KeyFile, "key-file", "key.pem",
+		"The path to the private key for the file")
 }
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
+		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)

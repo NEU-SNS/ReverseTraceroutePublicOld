@@ -43,6 +43,9 @@ type LocalConfig struct {
 	CloseStdDesc bool
 	PProfAddr    string
 	Timeout      int64
+	AutoConnect  bool
+	CertFile     string
+	KeyFile      string
 }
 
 type ScamperConfig struct {

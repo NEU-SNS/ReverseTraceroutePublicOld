@@ -41,14 +41,14 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
-	conn, err := grpc.Dial("127.0.0.1:35000")
+	conn, err := grpc.Dial("129.10.113.205:35000")
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
 	cl := c.NewControllerClient(conn)
 	args := dm.PingArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
-		Host: "127.0.0.1", RR: false}
+		Host: "129.10.113.205", RR: false}
 	ret, err := cl.Ping(con.Background(), &args)
 	if err != nil {
 		fmt.Printf("Ping failed with err: %v\n", err)
@@ -56,7 +56,7 @@ func main() {
 	}
 	fmt.Printf("Response took: %s\n", time.Duration(ret.GetRet().Dur))
 	a := dm.TracerouteArg{Service: dm.ServiceT_PLANET_LAB, Dst: "8.8.8.8",
-		Host: "127.0.0.1", CheckCache: true}
+		Host: "129.10.113.205", CheckCache: true}
 	r, err := cl.Traceroute(con.Background(), &a)
 	if err != nil {
 		fmt.Printf("Traceroute failed with err: %v\n", err)

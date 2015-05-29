@@ -132,13 +132,25 @@ func (c *controllerT) getStats() dm.Stats {
 }
 
 func (c *controllerT) startRpc(eChan chan error) {
-	l, e := net.Listen(c.config.Local.Proto, c.config.Local.Addr)
+	var addr string
+	if c.config.Local.AutoConnect {
+		saddr, err := util.GetBindAddr()
+		if err != nil {
+			eChan <- err
+			return
+		}
+		addr = fmt.Sprintf("%s:%d", saddr, 35000)
+	} else {
+		addr = c.config.Local.Addr
+	}
+	glog.Infof("Conecting to: %s", addr)
+	l, e := net.Listen(c.config.Local.Proto, addr)
 	if e != nil {
 		glog.Errorf("Failed to listen: %v", e)
 		eChan <- e
 		return
 	}
-	glog.Infof("Controller started, listening on: %s", c.config.Local.Addr)
+	glog.Infof("Controller started, listening on: %s", addr)
 	err := c.server.Serve(l)
 	if err != nil {
 		eChan <- err
@@ -240,7 +252,7 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 			tr.Ret = makeSuccessReturn(st)
 			return
 		}
-		glog.Errorf("Failed to get traceroute from db: %v", e)
+		glog.Errorf("Failed to get traceroute from db: %v, got: %v", e, trace)
 		makeRequest = true
 	}
 
@@ -294,8 +306,25 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
+//Periodically reload services so live updates can occur
+func (c *controllerT) loadServices(errChan chan error) {
+	for {
+		select {
+		case <-time.After(time.Second * 60):
+			servs, err := c.db.GetServices()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			controller.router.RegisterServices(
+				servs...)
+		}
+
+	}
+}
+
 func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	if db == nil {
 		glog.Errorf("Nil db in Controller Start")
 		errChan <- errors.New("Controller Start, nil DB")
@@ -311,14 +340,7 @@ func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	controller.db = db
 	controller.cache = cache
 	controller.router = createRouter()
-	servs, err := db.GetServices()
-	if err != nil {
-		errChan <- err
-		return errChan
-	}
-	controller.router.RegisterServices(
-		servs...)
-
+	go controller.loadServices(errChan)
 	var opts []grpc.ServerOption
 	controller.server = grpc.NewServer(opts...)
 	capi.RegisterControllerServer(controller.server, &controller)
