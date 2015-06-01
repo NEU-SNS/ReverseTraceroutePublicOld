@@ -13,6 +13,7 @@ subspace src, hop, date
 space vps
 key vp
 attributes string hostname, int ip, int sshable,
-int sudo_problem, int record_route, int ts,
-int active, int controller, int spoof, int last_updated
+int sudo_problem, int record_route, int ts, string site
+int active, int controller, int spoof, int last_updated, 
+int rec_spoof, int scamper_up
 subspace ip, active, record_route, last_updated

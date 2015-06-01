@@ -39,5 +39,7 @@ type VantagePointProvider interface {
 	GetSpoofers() ([]*dm.VantagePoint, error)
 	GetTimeStamps() ([]*dm.VantagePoint, error)
 	GetRecordRoute() ([]*dm.VantagePoint, error)
+	GetRecSpoof() ([]*dm.VantagePoint, error)
 	GetActive() ([]*dm.VantagePoint, error)
+	Close() error
 }

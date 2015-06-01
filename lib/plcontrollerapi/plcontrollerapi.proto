@@ -11,5 +11,5 @@ service PLController {
     rpc Ping(datamodel.PingArg) returns (datamodel.Ping) {}
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.Traceroute) {}
     rpc Stats(datamodel.StatsArg) returns (datamodel.Stats) {}
-
+    
 }

@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto";
-
 option go_package = "datamodel";
 
 package datamodel;
@@ -17,9 +15,6 @@ message VantagePoint {
     bool sudo_problem = 8;
     bool spoof = 9;
     string controller = 10;
-}
-
-message VantagePointReturn {
-    ReturnT ret = 1;
-    repeated VantagePoint vps = 2;
+    bool rec_spoof = 11;
+    bool scamper_up = 12;
 }

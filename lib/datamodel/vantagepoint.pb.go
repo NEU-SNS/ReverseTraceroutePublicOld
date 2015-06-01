@@ -20,34 +20,12 @@ type VantagePoint struct {
 	SudoProblem bool   `protobuf:"varint,8,opt,name=sudo_problem" json:"sudo_problem,omitempty"`
 	Spoof       bool   `protobuf:"varint,9,opt,name=spoof" json:"spoof,omitempty"`
 	Controller  string `protobuf:"bytes,10,opt,name=controller" json:"controller,omitempty"`
+	RecSpoof    bool   `protobuf:"varint,11,opt,name=rec_spoof" json:"rec_spoof,omitempty"`
 }
 
 func (m *VantagePoint) Reset()         { *m = VantagePoint{} }
 func (m *VantagePoint) String() string { return proto.CompactTextString(m) }
 func (*VantagePoint) ProtoMessage()    {}
-
-type VantagePointReturn struct {
-	Ret *ReturnT        `protobuf:"bytes,1,opt,name=ret" json:"ret,omitempty"`
-	Vps []*VantagePoint `protobuf:"bytes,2,rep,name=vps" json:"vps,omitempty"`
-}
-
-func (m *VantagePointReturn) Reset()         { *m = VantagePointReturn{} }
-func (m *VantagePointReturn) String() string { return proto.CompactTextString(m) }
-func (*VantagePointReturn) ProtoMessage()    {}
-
-func (m *VantagePointReturn) GetRet() *ReturnT {
-	if m != nil {
-		return m.Ret
-	}
-	return nil
-}
-
-func (m *VantagePointReturn) GetVps() []*VantagePoint {
-	if m != nil {
-		return m.Vps
-	}
-	return nil
-}
 
 func init() {
 }

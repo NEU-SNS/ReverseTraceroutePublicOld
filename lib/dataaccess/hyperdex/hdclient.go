@@ -44,6 +44,22 @@ func New(con dm.DbConfig) (da.DataProvider, error) {
 	return &hdClient{c: c, config: con, eChan: echan}, nil
 }
 
+func NewVP(con dm.DbConfig) (da.VantagePointProvider, error) {
+	c, e, echan := client.NewClient(con.Host, con.Port)
+	if e != nil {
+		return nil, e
+	}
+	go func() {
+		for {
+			select {
+			case e := <-echan:
+				glog.Exitf("Hyperdex Client error: %v", e)
+			}
+		}
+	}()
+	return &hdClient{c: c, config: con, eChan: echan}, nil
+}
+
 var ErrorInvalidIP = fmt.Errorf("Invalid IP in traceroute")
 
 func (c *hdClient) StoreTraceroute(tr *dm.Traceroute, s dm.ServiceT) error {
@@ -265,7 +281,7 @@ func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
 	var sshable, sudoProblem,
 		ip, recordRoute,
 		lastUpdate, spoof,
-		ts, active int64
+		ts, active, rec_spoof int64
 
 	if vp.Sshable {
 		sshable = 1
@@ -285,6 +301,9 @@ func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
 	if vp.Active {
 		active = 1
 	}
+	if vp.RecSpoof {
+		rec_spoof = 1
+	}
 	ip, err := util.IpStringToInt64(vp.Ip)
 	if err != nil {
 		return client.Attributes{}, err
@@ -299,6 +318,7 @@ func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
 		"ts":           ts,
 		"active":       active,
 		"last_update":  lastUpdate,
+		"rec_spoof":    rec_spoof,
 	}
 	return attr, nil
 }
@@ -312,7 +332,9 @@ var keys = []string{"hostname",
 	"active",
 	"controller",
 	"spoof",
-	"last_updated"}
+	"last_updated",
+	"hostname",
+	"rec_spoof"}
 
 func attrToVp(attr client.Attributes) (*dm.VantagePoint, error) {
 	vp := new(dm.VantagePoint)
@@ -374,6 +396,16 @@ func attrToVp(attr client.Attributes) (*dm.VantagePoint, error) {
 			case "last_updated":
 				if lu, ok := val.(int64); ok {
 					vp.LastUpdated = lu
+				}
+			case "hostname":
+				if hn, ok := val.(string); ok {
+					vp.Hostname = hn
+				}
+			case "rec_spoof":
+				if rs, ok := val.(int64); ok {
+					if rs > 0 {
+						vp.RecSpoof = true
+					}
 				}
 			}
 		}
@@ -449,6 +481,13 @@ func (c *hdClient) GetRecordRoute() ([]*dm.VantagePoint, error) {
 func (c *hdClient) GetActive() ([]*dm.VantagePoint, error) {
 	attrs, errs := c.c.Search(c.config.VantagePointSpace,
 		[]client.Predicate{client.Predicate{"active", 0, client.GREATER_THAN}})
+
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) GetRecSpoof() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"rec_spoof", 0, client.GREATER_THAN}})
 
 	return vpsFromChannels(attrs, errs)
 }

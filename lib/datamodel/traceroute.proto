@@ -96,6 +96,5 @@ message MTraceroute {
 
 message TracerouteReturn {
     ReturnT ret = 1;
-    
     MTraceroute traceroute = 2;
 }

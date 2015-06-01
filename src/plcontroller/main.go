@@ -29,6 +29,7 @@ package main
 import (
 	"flag"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/config"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/hyperdex"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/plcontroller"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
@@ -98,7 +99,12 @@ func main() {
 	}
 	util.CloseStdFiles(conf.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
-	err := <-plcontroller.Start(conf, false)
+	db, err := hdclient.NewVP(conf.Db)
+	if err != nil {
+		glog.Errorf("Failed to created db: %v", err)
+		exit(1)
+	}
+	err = <-plcontroller.Start(conf, false, db)
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
 		exit(1)

@@ -113,6 +113,7 @@ func HandleSig(sig os.Signal) {
 }
 
 func (c *controllerT) handleSig(sig os.Signal) {
+	c.db.Close()
 }
 
 func (c *controllerT) getStats() dm.Stats {

@@ -319,7 +319,7 @@ func (c *plControllerT) startRpc(eChan chan error) {
 
 func (c *plControllerT) startScamperProc() {
 	sp := scamper.GetProc(c.sc.Path, c.sc.Port, c.sc.ScPath)
-	plController.mp.ManageProcess(sp, true, 10, handleScamperStop)
+	plController.mp.ManageProcess(sp, true, 1000, handleScamperStop)
 }
 
 func HandleSig(s os.Signal) {
@@ -335,4 +335,5 @@ func (c *plControllerT) handleSig(s os.Signal) {
 		c.w.Close()
 	}
 	c.removeAllVps()
+	c.db.Close()
 }
