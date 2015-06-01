@@ -29,3 +29,15 @@ type PingProvider interface {
 	GetPingBySrcDst(string, string) (*dm.Ping, error)
 	StorePing(*dm.Ping) error
 }
+
+type VantagePointProvider interface {
+	SetController(string, string) error
+	RemoveController(string, string) error
+	UpdateVp(*dm.VantagePoint) error
+	GetVpByIp(string) (*dm.VantagePoint, error)
+	GetByController(string) ([]*dm.VantagePoint, error)
+	GetSpoofers() ([]*dm.VantagePoint, error)
+	GetTimeStamps() ([]*dm.VantagePoint, error)
+	GetRecordRoute() ([]*dm.VantagePoint, error)
+	GetActive() ([]*dm.VantagePoint, error)
+}

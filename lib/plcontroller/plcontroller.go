@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
@@ -51,6 +52,7 @@ type plControllerT struct {
 	config    Config
 	sc        scamper.Config
 	mp        mproc.MProc
+	db        da.VantagePointProvider
 	w         *fsnotify.Watcher
 	mu        sync.Mutex
 	conf      Config
@@ -121,7 +123,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	select {
 	case err := <-ec:
 		return ret, err
-	case <-time.After(time.Second * c.conf.Local.Timeout):
+	case <-time.After(time.Second * time.Duration(c.conf.Local.Timeout)):
 		cl.CancelCmd()
 		return ret, fmt.Errorf("Ping timed out")
 	case <-dc:
@@ -171,7 +173,7 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	select {
 	case err := <-ec:
 		return ret, err
-	case <-time.After(time.Second * c.conf.Local.Timeout):
+	case <-time.After(time.Second * time.Duration(c.conf.Local.Timeout)):
 		cl.CancelCmd()
 		return ret, fmt.Errorf("Ping timed out")
 	case <-dc:
@@ -250,9 +252,14 @@ func (c *plControllerT) removeSocket(sock scamper.Socket) {
 	c.rw.Unlock()
 }
 
-func Start(c Config, noScamp bool) chan error {
+func Start(c Config, noScamp bool, db da.VantagePointProvider) chan error {
 	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
+	if db == nil {
+		errChan <- fmt.Errorf("Nill db in plController")
+		return errChan
+	}
+	plController.db = db
 	plController.socks = make(map[string]scamper.Socket, 10)
 	var sc scamper.Config
 	sc.Port = c.Scamper.Port
@@ -327,4 +334,5 @@ func (c *plControllerT) handleSig(s os.Signal) {
 	if c.w != nil {
 		c.w.Close()
 	}
+	c.removeAllVps()
 }

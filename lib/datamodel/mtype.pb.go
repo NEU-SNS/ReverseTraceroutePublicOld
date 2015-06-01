@@ -13,6 +13,7 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/time.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/traceroute.proto
+	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/vantagepoint.proto
 
 It has these top-level messages:
 */

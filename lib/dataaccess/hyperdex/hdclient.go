@@ -226,5 +226,229 @@ func (c *hdClient) StorePing(p *dm.Ping) error {
 }
 
 func (c *hdClient) Close() error {
+	c.c.Destroy()
 	return nil
+}
+
+func (c *hdClient) SetController(ip, myip string) error {
+	nip, err := util.IpStringToInt64(ip)
+	if err != nil {
+		return err
+	}
+	ts := time.Now().Unix()
+	e := c.c.Put(c.config.VantagePointSpace, myip,
+		client.Attributes{"controller": nip, "last_updated": ts})
+	return e
+}
+
+func (c *hdClient) RemoveController(ip, myip string) error {
+	nip, err := util.IpStringToInt64(ip)
+	if err != nil {
+		return err
+	}
+	nmyip, err := util.IpStringToInt64(myip)
+	if err != nil {
+		return err
+	}
+	ts := time.Now().Unix()
+	e := c.c.CondPut(c.config.VantagePointSpace, ip,
+		[]client.Predicate{
+			client.Predicate{"ip", nip, client.EQUALS},
+			client.Predicate{"controller", nmyip, client.EQUALS},
+		},
+		client.Attributes{"controller": int64(-1),
+			"last_updated": ts})
+	return e
+}
+
+func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
+	var sshable, sudoProblem,
+		ip, recordRoute,
+		lastUpdate, spoof,
+		ts, active int64
+
+	if vp.Sshable {
+		sshable = 1
+	}
+	if vp.SudoProblem {
+		sudoProblem = 1
+	}
+	if vp.RecordRoute {
+		recordRoute = 1
+	}
+	if vp.Spoof {
+		spoof = 1
+	}
+	if vp.Ts {
+		ts = 1
+	}
+	if vp.Active {
+		active = 1
+	}
+	ip, err := util.IpStringToInt64(vp.Ip)
+	if err != nil {
+		return client.Attributes{}, err
+	}
+	lastUpdate = time.Now().Unix()
+	attr := client.Attributes{
+		"sshable":      sshable,
+		"ip":           ip,
+		"sudo_problem": sudoProblem,
+		"record_route": recordRoute,
+		"spoof":        spoof,
+		"ts":           ts,
+		"active":       active,
+		"last_update":  lastUpdate,
+	}
+	return attr, nil
+}
+
+var keys = []string{"hostname",
+	"ip",
+	"sshable",
+	"sudo_problem",
+	"record_route",
+	"ts",
+	"active",
+	"controller",
+	"spoof",
+	"last_updated"}
+
+func attrToVp(attr client.Attributes) (*dm.VantagePoint, error) {
+	vp := new(dm.VantagePoint)
+	for _, key := range keys {
+		if val, ok := attr[key]; ok {
+			switch key {
+			case "ip":
+				if ip, ok := val.(int64); ok {
+					sip, err := util.Int64ToIpString(ip)
+					if err != nil {
+						return nil, err
+					}
+					vp.Ip = sip
+				}
+			case "sshable":
+				if sshable, ok := val.(int64); ok {
+					if sshable > 0 {
+						vp.Sshable = true
+					}
+				}
+			case "sudo_problem":
+				if sp, ok := val.(int64); ok {
+					if sp > 0 {
+						vp.SudoProblem = true
+					}
+				}
+			case "record_route":
+				if rr, ok := val.(int64); ok {
+					if rr > 0 {
+						vp.RecordRoute = true
+					}
+				}
+			case "ts":
+				if ts, ok := val.(int64); ok {
+					if ts > 0 {
+						vp.Ts = true
+					}
+				}
+			case "active":
+				if active, ok := val.(int64); ok {
+					if active > 0 {
+						vp.Active = true
+					}
+				}
+			case "controller":
+				if cont, ok := val.(int64); ok {
+					c, err := util.Int64ToIpString(cont)
+					if err != nil {
+						return nil, err
+					}
+					vp.Controller = c
+				}
+			case "spoof":
+				if spoof, ok := val.(int64); ok {
+					if spoof > 0 {
+						vp.Spoof = true
+					}
+				}
+			case "last_updated":
+				if lu, ok := val.(int64); ok {
+					vp.LastUpdated = lu
+				}
+			}
+		}
+	}
+	return vp, nil
+}
+
+func (c *hdClient) UpdateVp(vp *dm.VantagePoint) error {
+	attr, err := makeVpAttributes(vp)
+	if err != nil {
+		return err
+	}
+	e := c.c.Put(c.config.VantagePointSpace, vp.Ip, attr)
+	return e
+}
+
+func (c *hdClient) GetVpByIp(ip string) (*dm.VantagePoint, error) {
+	attr, e := c.c.Get(c.config.VantagePointSpace, ip)
+	if e.Status == client.NOTFOUND {
+		return nil, e
+	}
+	return attrToVp(attr)
+}
+
+func vpsFromChannels(ac chan client.Attributes, ec chan client.Error) ([]*dm.VantagePoint, error) {
+	vps := make([]*dm.VantagePoint, 0)
+	for attr := range ac {
+		a, err := attrToVp(attr)
+		if err != nil {
+			return nil, err
+		}
+		vps = append(vps, a)
+	}
+
+	for e := range ec {
+		return nil, e
+	}
+	return vps, nil
+}
+
+func (c *hdClient) GetByController(cont string) ([]*dm.VantagePoint, error) {
+	nc, err := util.IpStringToInt64(cont)
+	if err != nil {
+		return nil, err
+	}
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"controller", nc, client.EQUALS}})
+
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) GetSpoofers() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"spoof", 0, client.GREATER_THAN}})
+
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) GetTimeStamps() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"ts", 0, client.GREATER_THAN}})
+
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) GetRecordRoute() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"record_route", 0, client.GREATER_THAN}})
+
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) GetActive() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"active", 0, client.GREATER_THAN}})
+
+	return vpsFromChannels(attrs, errs)
 }

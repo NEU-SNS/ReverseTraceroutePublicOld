@@ -26,6 +26,10 @@
 */
 package plcontroller
 
+import (
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+)
+
 type Flags struct {
 	Local      LocalConfig
 	Scamper    ScamperConfig
@@ -35,6 +39,7 @@ type Flags struct {
 type Config struct {
 	Local   LocalConfig
 	Scamper ScamperConfig
+	Db      dm.DbConfig
 }
 
 type LocalConfig struct {

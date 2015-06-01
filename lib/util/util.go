@@ -182,6 +182,9 @@ func IpStringToInt64(ips string) (int64, error) {
 
 func Int64ToIpString(ip int64) (string, error) {
 	var a, b, c, d byte
+	if ip < 0 || ip > 4294967295 {
+		return "", fmt.Errorf("Ip out of range")
+	}
 	d = byte(ip & 0x70000000000000ff)
 	c = byte(ip & 0x700000000000ff00 >> 8)
 	b = byte(ip & 0x7000000000ff0000 >> 16)

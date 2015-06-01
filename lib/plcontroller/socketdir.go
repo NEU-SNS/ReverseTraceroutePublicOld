@@ -32,25 +32,38 @@ import (
 	"github.com/golang/glog"
 )
 
-func (c plControllerT) handlEvents(ec chan error) {
+func (c *plControllerT) handlEvents(ec chan error) {
 	glog.Info("Started event handling loop")
 	for {
 		select {
 		case e := <-c.w.Events:
 			glog.Infof("Received fs event: %v", e)
 			if e.Op&fsnotify.Create == fsnotify.Create {
-				c.addSocket(scamper.NewSocket(e.Name))
+				s := scamper.NewSocket(e.Name)
+				c.addSocket(s)
+				c.db.SetController(c.conf.Local.Addr, s.IP())
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				c.removeSocket(scamper.NewSocket(e.Name))
+				s := scamper.NewSocket(e.Name)
+				c.removeSocket(s)
+				c.db.RemoveController(c.conf.Local.Addr, s.IP())
 				break
 			}
 		}
 	}
 }
 
-func (c plControllerT) watchDir(dir string, ec chan error) {
+//This is only for use when a server is going down
+func (c *plControllerT) removeAllVps() {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	for key := range c.socks {
+		c.db.RemoveController(c.conf.Local.Addr, key)
+	}
+}
+
+func (c *plControllerT) watchDir(dir string, ec chan error) {
 	glog.Infof("Starting to watch dir: %s", dir)
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -68,6 +81,11 @@ func (c plControllerT) watchDir(dir string, ec chan error) {
 	}
 }
 
-func (c plControllerT) closeWatcher() {
+func (c *plControllerT) closeWatcher() {
 	c.w.Close()
+}
+
+func (c *plControllerT) updateVp() error {
+
+	return nil
 }

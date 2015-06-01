@@ -10,10 +10,13 @@ message VantagePoint {
     string hostname = 1;
     string ip = 2;
     bool sshable = 3;
-    bool timestamp = 4;
+    bool ts = 4;
     bool record_route = 5;
     bool active = 6;
     int64 last_updated = 7;
+    bool sudo_problem = 8;
+    bool spoof = 9;
+    string controller = 10;
 }
 
 message VantagePointReturn {
