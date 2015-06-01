@@ -5,11 +5,13 @@ option go_package = "plcontrollerapi";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/ping.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/traceroute.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/vantagepoint.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/register.proto";
 
 service PLController {
 
     rpc Ping(datamodel.PingArg) returns (datamodel.Ping) {}
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.Traceroute) {}
     rpc Stats(datamodel.StatsArg) returns (datamodel.Stats) {}
-    
+    rpc Register(datamodel.VantagePoint) returns (datamodel.RegisterResponse) {}
 }

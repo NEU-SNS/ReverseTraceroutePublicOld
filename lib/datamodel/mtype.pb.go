@@ -8,6 +8,7 @@ Package datamodel is a generated protocol buffer package.
 It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/mtype.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/ping.proto
+	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/register.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/returnt.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/service.proto
 	github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto

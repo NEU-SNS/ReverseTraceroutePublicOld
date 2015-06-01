@@ -16,6 +16,8 @@ import proto "github.com/golang/protobuf/proto"
 import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+import datamodel6 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+import datamodel7 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -38,6 +40,7 @@ type PLControllerClient interface {
 	Ping(ctx context.Context, in *datamodel4.PingArg, opts ...grpc.CallOption) (*datamodel4.Ping, error)
 	Traceroute(ctx context.Context, in *datamodel5.TracerouteArg, opts ...grpc.CallOption) (*datamodel5.Traceroute, error)
 	Stats(ctx context.Context, in *datamodel2.StatsArg, opts ...grpc.CallOption) (*datamodel2.Stats, error)
+	Register(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel7.RegisterResponse, error)
 }
 
 type pLControllerClient struct {
@@ -75,12 +78,22 @@ func (c *pLControllerClient) Stats(ctx context.Context, in *datamodel2.StatsArg,
 	return out, nil
 }
 
+func (c *pLControllerClient) Register(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel7.RegisterResponse, error) {
+	out := new(datamodel7.RegisterResponse)
+	err := grpc.Invoke(ctx, "/.PLController/Register", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for PLController service
 
 type PLControllerServer interface {
 	Ping(context.Context, *datamodel4.PingArg) (*datamodel4.Ping, error)
 	Traceroute(context.Context, *datamodel5.TracerouteArg) (*datamodel5.Traceroute, error)
 	Stats(context.Context, *datamodel2.StatsArg) (*datamodel2.Stats, error)
+	Register(context.Context, *datamodel6.VantagePoint) (*datamodel7.RegisterResponse, error)
 }
 
 func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
@@ -123,6 +136,18 @@ func _PLController_Stats_Handler(srv interface{}, ctx context.Context, codec grp
 	return out, nil
 }
 
+func _PLController_Register_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+	in := new(datamodel6.VantagePoint)
+	if err := codec.Unmarshal(buf, in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PLControllerServer).Register(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 var _PLController_serviceDesc = grpc.ServiceDesc{
 	ServiceName: ".PLController",
 	HandlerType: (*PLControllerServer)(nil),
@@ -138,6 +163,10 @@ var _PLController_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Stats",
 			Handler:    _PLController_Stats_Handler,
+		},
+		{
+			MethodName: "Register",
+			Handler:    _PLController_Register_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{},

@@ -21,6 +21,7 @@ type VantagePoint struct {
 	Spoof       bool   `protobuf:"varint,9,opt,name=spoof" json:"spoof,omitempty"`
 	Controller  string `protobuf:"bytes,10,opt,name=controller" json:"controller,omitempty"`
 	RecSpoof    bool   `protobuf:"varint,11,opt,name=rec_spoof" json:"rec_spoof,omitempty"`
+	ScamperUp   bool   `protobuf:"varint,12,opt,name=scamper_up" json:"scamper_up,omitempty"`
 }
 
 func (m *VantagePoint) Reset()         { *m = VantagePoint{} }
