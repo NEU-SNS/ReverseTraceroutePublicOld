@@ -1,3 +1,29 @@
+/*
+ Copyright (c) 2015, Northeastern University
+ All rights reserved.
+ 
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the Northeastern University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 package hdclient
 
 import (
@@ -422,12 +448,29 @@ func (c *hdClient) UpdateVp(vp *dm.VantagePoint) error {
 	return e
 }
 
-func (c *hdClient) GetVpByIp(ip string) (*dm.VantagePoint, error) {
-	attr, e := c.c.Get(c.config.VantagePointSpace, ip)
+func (c *hdClient) GetVpByIp(ip int64) (*dm.VantagePoint, error) {
+	ips, err := util.Int64ToIpString(ip)
+	if err != nil {
+		return nil, err
+	}
+	attr, e := c.c.Get(c.config.VantagePointSpace, ips)
 	if e.Status == client.NOTFOUND {
 		return nil, e
 	}
 	return attrToVp(attr)
+}
+
+func (c *hdClient) GetVpByHostname(hn string) (*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{client.Predicate{"hostname", hn, client.EQUALS}})
+	vps, err := vpsFromChannels(attrs, errs)
+	if err != nil {
+		return nil, err
+	}
+	if len(vps) != 1 {
+		return nil, fmt.Errorf("Non-unique hostname")
+	}
+	return vps[0], nil
 }
 
 func vpsFromChannels(ac chan client.Attributes, ec chan client.Error) ([]*dm.VantagePoint, error) {
@@ -489,5 +532,24 @@ func (c *hdClient) GetRecSpoof() ([]*dm.VantagePoint, error) {
 	attrs, errs := c.c.Search(c.config.VantagePointSpace,
 		[]client.Predicate{client.Predicate{"rec_spoof", 0, client.GREATER_THAN}})
 
+	return vpsFromChannels(attrs, errs)
+}
+
+func (c *hdClient) UpdateCanSpoof(ip int64) error {
+	ips, err := util.Int64ToIpString(ip)
+	if err != nil {
+		return err
+	}
+	e := c.c.Put(c.config.VantagePointSpace, ips,
+		client.Attributes{"spoof": 1})
+	if e != nil {
+		return e
+	}
+	return nil
+}
+
+func (c *hdClient) GetAll() ([]*dm.VantagePoint, error) {
+	attrs, errs := c.c.Search(c.config.VantagePointSpace,
+		[]client.Predicate{})
 	return vpsFromChannels(attrs, errs)
 }

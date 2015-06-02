@@ -91,3 +91,45 @@ func (c *plClient) Stats(ctx con.Context, s *dm.StatsArg) (*dm.Stats, error) {
 	}
 	return c.client.Stats(ctx, s)
 }
+
+func (c *plClient) GetVP(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetVP(ctx, arg)
+}
+
+func (c *plClient) GetAllVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetAllVPs(ctx, arg)
+}
+
+func (c *plClient) GetActiveVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetActiveVPs(ctx, arg)
+}
+
+func (c *plClient) GetRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetRecordRouteVPs(ctx, arg)
+}
+
+func (c *plClient) GetTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetTimeStampVPs(ctx, arg)
+}
+
+func (c *plClient) GetSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	if !c.connOpen {
+		return nil, fmt.Errorf("PLClient not connected")
+	}
+	return c.client.GetSpoofingVPs(ctx, arg)
+}

@@ -27,6 +27,7 @@
 package controller
 
 import (
+	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
 	"sync"
@@ -35,12 +36,12 @@ import (
 type router struct {
 	rw          sync.RWMutex
 	services    map[dm.ServiceT]*dm.Service
-	servClients map[dm.ServiceT]MeasurementTool
+	servClients map[dm.ServiceT]interface{}
 }
 
 func createRouter() Router {
 	s := make(map[dm.ServiceT]*dm.Service)
-	sc := make(map[dm.ServiceT]MeasurementTool)
+	sc := make(map[dm.ServiceT]interface{})
 	r := &router{services: s, servClients: sc}
 	r.registerClients()
 	return r
@@ -54,10 +55,17 @@ func NewRouter() Router {
 	return createRouter()
 }
 
+func (r *router) GetClient(s dm.ServiceT) (interface{}, *dm.Service, error) {
+	r.rw.RLock()
+	defer r.rw.RUnlock()
+	return r.servClients[s], r.services[s], nil
+}
+
 type Router interface {
 	RegisterServices(services ...*dm.Service)
 	GetService(dm.ServiceT) (*dm.Service, MeasurementTool, error)
 	GetServices() []*dm.Service
+	GetClient(dm.ServiceT) (interface{}, *dm.Service, error)
 }
 
 func (r *router) GetServices() []*dm.Service {
@@ -86,10 +94,13 @@ func (r *router) GetService(s dm.ServiceT) (*dm.Service, MeasurementTool, error)
 	if serv == nil {
 		return nil, nil, ErrorServiceNotFound
 	}
-	mt := r.servClients[s]
-	if mt == nil {
+	mi := r.servClients[s]
+	if mi == nil {
 		return nil, nil, ErrorServiceNotFound
 	}
 	r.rw.RUnlock()
-	return serv, mt, nil
+	if mt, ok := mi.(MeasurementTool); ok {
+		return serv, mt, nil
+	}
+	return nil, nil, fmt.Errorf("Could not get measurement tool for service: %v", s)
 }

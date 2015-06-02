@@ -18,3 +18,12 @@ message VantagePoint {
     bool rec_spoof = 11;
     bool scamper_up = 12;
 }
+
+message VPRequest {
+    string hostname = 1;
+    int64 ip = 2;
+}
+
+message VPReturn {
+    repeated VantagePoint vps = 1;
+}

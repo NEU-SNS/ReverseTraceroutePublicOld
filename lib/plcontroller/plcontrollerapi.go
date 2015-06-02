@@ -59,3 +59,72 @@ func (c *plControllerT) Stats(ctx con.Context, arg *dm.StatsArg) (sr *dm.Stats, 
 	*sr = plController.getStats()
 	return
 }
+
+func (c *plControllerT) NotifyRecSpoof(ctx con.Context, arg *dm.NotifyRecSpoof) (nr *dm.NotifyRecSpoofResponse, err error) {
+	glog.Infof("Recieving notification for a recieved spoof")
+	nr = new(dm.NotifyRecSpoofResponse)
+	err = c.updateCanSpoof(arg.Ip)
+	return
+}
+
+func (c *plControllerT) Register(ctx con.Context, arg *dm.VantagePoint) (rr *dm.RegisterResponse, err error) {
+	glog.Infof("VP Registering: %v", arg)
+	rr = new(dm.RegisterResponse)
+	err = c.register(arg)
+	return
+}
+
+func (c *plControllerT) UpdateVp(ctx con.Context, arg *dm.VantagePoint) (ur *dm.UpdateResponse, err error) {
+	glog.Infof("Updateing VP: %v", arg)
+	ur = new(dm.UpdateResponse)
+	err = c.updateVp(arg)
+	return
+}
+
+func (c *plControllerT) GetActiveVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Info("Getting active VPs")
+	ret = new(dm.VPReturn)
+	vps, err := c.getActiveVPs()
+	ret.Vps = vps
+	return
+}
+
+func (c *plControllerT) GetAllVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Info("Getting All VPs")
+	ret = new(dm.VPReturn)
+	vps, err := c.getAllVPs()
+	ret.Vps = vps
+	return
+}
+
+func (c *plControllerT) GetRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Info("Getting RecordRoute VPs")
+	ret = new(dm.VPReturn)
+	vps, err := c.getRecordRouteVPs()
+	ret.Vps = vps
+	return
+}
+
+func (c *plControllerT) GetSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Info("Getting Spoofing VPs")
+	ret = new(dm.VPReturn)
+	vps, err := c.getSpoofingVPs()
+	ret.Vps = vps
+	return
+}
+
+func (c *plControllerT) GetTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Info("Getting Timestamp VPs")
+	ret = new(dm.VPReturn)
+	vps, err := c.getTimeStampVPs()
+	ret.Vps = vps
+	return
+}
+
+func (c *plControllerT) GetVP(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+	glog.Infof("Getting VP: %v", arg)
+	ret = new(dm.VPReturn)
+	vp, err := c.getVP(arg)
+	ret.Vps = vp
+	return
+}

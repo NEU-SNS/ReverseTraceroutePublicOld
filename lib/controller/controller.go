@@ -289,6 +289,99 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 	return
 }
 
+// VPs only apply to planet-lab currently, so the get VP type calls
+// will be hardcoded to look for planet-lab vps
+func (c *controllerT) getVP(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetVP(ctx, arg)
+
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
+func (c *controllerT) getAllVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetAllVPs(ctx, arg)
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
+func (c *controllerT) getSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetSpoofingVPs(ctx, arg)
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
+func (c *controllerT) getTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetTimeStampVPs(ctx, arg)
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
+func (c *controllerT) getRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetRecordRouteVPs(ctx, arg)
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
+func (c *controllerT) getActiveVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
+	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
+	if err != nil {
+		return nil, err
+	}
+	if plcl, ok := plc.(plClient); ok {
+		err = plcl.Connect(s.GetIp())
+		if err != nil {
+			return nil, err
+		}
+		return plcl.GetActiveVPs(ctx, arg)
+	}
+	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+}
+
 func makeSuccessReturn(t time.Time) *dm.ReturnT {
 	mr := new(dm.ReturnT)
 	mr.Dur = time.Since(t).Nanoseconds()

@@ -84,8 +84,3 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 func (c *plControllerT) closeWatcher() {
 	c.w.Close()
 }
-
-func (c *plControllerT) updateVp() error {
-
-	return nil
-}

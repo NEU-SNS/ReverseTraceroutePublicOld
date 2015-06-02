@@ -43,6 +43,7 @@ type MeasurementTool interface {
 	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
 	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
 	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
+	GetVP(string) (*dm.VantagePoint, error)
 	Connect(string) error
 }
 
@@ -74,6 +75,7 @@ type LocalConfig struct {
 	PProfAddr    string
 	Proto        string
 	AutoConnect  bool
+	SecureConn   bool
 	CertFile     string
 	KeyFile      string
 }

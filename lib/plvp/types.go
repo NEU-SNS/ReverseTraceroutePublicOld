@@ -43,6 +43,9 @@ type LocalConfig struct {
 	CloseStdDesc bool
 	PProfAddr    string
 	AutoConnect  bool
+	SecureConn   bool
+	CertPath     string
+	KeyPath      string
 }
 
 type ScamperConfig struct {

@@ -233,6 +233,48 @@ func (c *plControllerT) addSocket(sock scamper.Socket) {
 	c.rw.Unlock()
 }
 
+func (c *plControllerT) updateCanSpoof(ip int64) error {
+	return c.db.UpdateCanSpoof(ip)
+}
+
+func (c *plControllerT) register(vp *dm.VantagePoint) error {
+	return c.db.UpdateVp(vp)
+}
+
+func (c *plControllerT) updateVp(vp *dm.VantagePoint) error {
+	return c.db.UpdateVp(vp)
+}
+
+func (c *plControllerT) getActiveVPs() ([]*dm.VantagePoint, error) {
+	return c.db.GetActive()
+}
+
+func (c *plControllerT) getAllVPs() ([]*dm.VantagePoint, error) {
+	return c.db.GetAll()
+}
+
+func (c *plControllerT) getRecordRouteVPs() ([]*dm.VantagePoint, error) {
+	return c.db.GetRecordRoute()
+}
+
+func (c *plControllerT) getSpoofingVPs() ([]*dm.VantagePoint, error) {
+	return c.db.GetSpoofers()
+}
+
+func (c *plControllerT) getTimeStampVPs() ([]*dm.VantagePoint, error) {
+	return c.db.GetTimeStamps()
+}
+
+func (c *plControllerT) getVP(arg *dm.VPRequest) ([]*dm.VantagePoint, error) {
+	hn := arg.Hostname
+	if hn == "" {
+		vp, err := c.db.GetVpByIp(arg.Ip)
+		return []*dm.VantagePoint{vp}, err
+	}
+	vp, err := c.db.GetVpByHostname(hn)
+	return []*dm.VantagePoint{vp}, err
+}
+
 func (c *plControllerT) getSocket(n string) (scamper.Socket, error) {
 	glog.Infof("Getting socket for %s, len: %d", n, len(n))
 	glog.Infof("Sockets: %v", c.socks)
