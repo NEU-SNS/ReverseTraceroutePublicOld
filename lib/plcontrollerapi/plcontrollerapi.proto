@@ -14,4 +14,5 @@ service PLController {
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.Traceroute) {}
     rpc Stats(datamodel.StatsArg) returns (datamodel.Stats) {}
     rpc Register(datamodel.VantagePoint) returns (datamodel.RegisterResponse) {}
+    rpc UpdateVp(datamodel.VantagePoint) returns (datamodel.UpdateResponse) {}
 }
