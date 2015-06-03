@@ -33,6 +33,7 @@ import (
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
@@ -65,7 +66,7 @@ type plControllerT struct {
 	socks map[string]scamper.Socket
 }
 
-func handleScamperStop(err error, ps *os.ProcessState) bool {
+func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 	switch err.(type) {
 	default:
 		return false

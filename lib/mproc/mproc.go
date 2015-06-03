@@ -40,9 +40,9 @@ const (
 	DELAY = 2
 )
 
-type FailFunc func(err error, ps *os.ProcessState) bool
+type FailFunc func(err error, ps *os.ProcessState, p *proc.Process) bool
 
-func noop(err error, ps *os.ProcessState) bool {
+func noop(err error, ps *os.ProcessState, p *proc.Process) bool {
 	return false
 }
 
@@ -122,7 +122,7 @@ func (mp *mProc) keepAlive(id uint32) {
 	go func() {
 		p := mp.getMp(id)
 		err := <-p.p.Wait()
-		exit := p.f(err, p.p.GetWaitStatus())
+		exit := p.f(err, p.p.GetWaitStatus(), p.p)
 		if exit {
 			p.keepAlive = false
 			p.remRetry = 0
@@ -145,7 +145,7 @@ func (mp *mProc) keepAlive(id uint32) {
 				<-time.After(DELAY * time.Second)
 				pid, err := p.p.Start()
 				if err != nil {
-					exit := p.f(err, p.p.GetWaitStatus())
+					exit := p.f(err, p.p.GetWaitStatus(), p.p)
 					glog.Error("Failed to restart process in keepAlive")
 					if exit {
 						return

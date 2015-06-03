@@ -27,27 +27,37 @@
 package plvp
 
 import (
+	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
+	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
+	"math/rand"
 	"net"
 	"os"
-	"strings"
+	"time"
 )
 
 type plVantagepointT struct {
-	ip       net.IP
-	port     int
 	hostname string
-	sc       []scamper.Config
+	sc       scamper.Config
 	dest     string
 	mp       mproc.MProc
+	conf     Config
 }
 
 var plVantagepoint plVantagepointT
 
-func handleScamperStop(err error, ps *os.ProcessState) bool {
+func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
+	sip, e := pickIp(c.conf.Local.Host)
+	if e != nil {
+		glog.Errorf("Couldn't resolve host on restart")
+		return true
+	}
+	c.sc.Ip = sip
+	arg := fmt.Sprintf("%s:%s", sip, c.sc.Port)
+	p.SetArg(scamper.ADDRINDEX, arg)
 	switch err.(type) {
 	default:
 		return false
@@ -69,41 +79,43 @@ func Start(c Config) chan error {
 	defer glog.Flush()
 	errChan := make(chan error, 1)
 
-	port, ip, err := util.ParseAddrArg(c.Local.Addr)
+	plVantagepoint.conf = c
+
+	con := new(scamper.Config)
+	con.ScPath = c.Scamper.BinPath
+	sip, err := pickIp(c.Local.Host)
 	if err != nil {
-		glog.Error("Failed to parse addr string")
+		glog.Errorf("Could not resolve url: %s, with err: %v", c.Local.Host, err)
 		errChan <- err
 		return errChan
 	}
-
-	plVantagepoint.sc = make([]scamper.Config, len(c.Scamper.Addrs))
-
-	for i, addr := range c.Scamper.Addrs {
-		con := new(scamper.Config)
-		split := strings.Split(addr, ":")
-		con.Url = split[util.IP]
-		con.Port = split[util.PORT]
-		con.ScPath = c.Scamper.BinPath
-		err = scamper.ParseConfig(*con)
-		if err != nil {
-			glog.Errorf("Invalid scamper args: %v", err)
-			errChan <- err
-			return errChan
-		}
-		plVantagepoint.sc[i] = *con
+	con.Ip = sip
+	err = scamper.ParseConfig(*con)
+	if err != nil {
+		glog.Errorf("Invalid scamper args: %v", err)
+		errChan <- err
+		return errChan
 	}
-	plVantagepoint.port = port
-	plVantagepoint.ip = ip
+	plVantagepoint.sc = *con
 	plVantagepoint.mp = mproc.New()
-	plVantagepoint.startScamperProcs()
+	if c.Local.StartScamp {
+		plVantagepoint.startScamperProcs()
+	}
+
 	return errChan
+}
+
+func pickIp(url string) (string, error) {
+	addrs, err := net.LookupHost(url)
+	if err != nil {
+		return "", err
+	}
+	rand.Seed(time.Now().UnixNano())
+	return addrs[rand.Intn(len(addrs))], nil
 }
 
 func (c *plVantagepointT) startScamperProcs() {
 	glog.Info("Starting scamper procs")
-	for _, sc := range c.sc {
-
-		sp := scamper.GetVPProc(sc.ScPath, sc.Url, sc.Port)
-		c.mp.ManageProcess(sp, true, 10, handleScamperStop)
-	}
+	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.Ip, c.sc.Port)
+	c.mp.ManageProcess(sp, true, 10000, c.handleScamperStop)
 }

@@ -49,12 +49,14 @@ func init() {
 		"Autoconnect to the eth0 IP, will use port 55000")
 	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55557",
 		"The address to use for pperf")
+	flag.StringVar(&f.Local.Host, "url", "fakepl",
+		"The url for the plcontroller service")
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
 		"The protocol that the controller will use.")
-	flag.StringVar(&f.Scamper.Addr, "s", "127.0.0.1:55000",
-		"Address that scamper will connect to")
 	flag.StringVar(&f.Scamper.BinPath, "b", "/usr/local/bin/scamper",
 		"The path to the scamper binary")
+	flag.IntVar(&f.Scamper.Port, "scamper-port", 55000,
+		"The port scamper will try to connect to.")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
 }
@@ -86,8 +88,6 @@ func main() {
 	} else {
 		conf.Local = f.Local
 		conf.Scamper = f.Scamper
-		conf.Scamper.Addrs = append(conf.Scamper.Addrs,
-			conf.Scamper.Addr)
 	}
 
 	util.CloseStdFiles(conf.Local.CloseStdDesc)

@@ -48,6 +48,14 @@ func New(p string, pA *os.ProcAttr, argv ...string) *Process {
 	return &Process{prog: p, procAttr: pA, argv: argv}
 }
 
+func (p *Process) SetArg(i int, arg string) error {
+	if i > len(p.argv)-1 || i < 0 {
+		return fmt.Errorf("Arg index out of range")
+	}
+	p.argv[i] = arg
+	return nil
+}
+
 func (p *Process) String() string {
 	s := fmt.Sprintf("Starting prog: %s with args %v", p.prog, p.argv)
 	return s

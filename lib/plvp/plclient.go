@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -26,32 +26,43 @@
 */
 package plvp
 
-type Flags struct {
-	Local      LocalConfig
-	Scamper    ScamperConfig
-	ConfigPath string
+import (
+	"fmt"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
+	"github.com/golang/glog"
+	"google.golang.org/grpc"
+	"time"
+)
+
+type plClient struct {
+	cc     *grpc.ClientConn
+	client plc.PLControllerClient
 }
 
-type Config struct {
-	Local   LocalConfig
-	Scamper ScamperConfig
+func (c *plClient) disconnect() error {
+	if c.cc != nil {
+		cl := c.cc
+		c.cc = nil
+		return cl.Close()
+	}
+	return fmt.Errorf("Called disconnect on unconnected plClient")
 }
 
-type LocalConfig struct {
-	Addr         string
-	Proto        string
-	CloseStdDesc bool
-	PProfAddr    string
-	AutoConnect  bool
-	SecureConn   bool
-	CertPath     string
-	KeyPath      string
-	StartScamp   bool
-	Host         string
+func (c *plClient) connect(addr string, timeout time.Duration) error {
+	glog.Infof("Trying to connect to: %s", addr)
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(timeout))
+	if err != nil {
+		glog.Errorf("PlClient Failed to connect: %v", err)
+		return err
+	}
+	c.cc = cc
+	c.client = plc.NewPLControllerClient(cc)
+	return nil
 }
 
-type ScamperConfig struct {
-	BinPath string
-	Addr    string
-	Port    int
+func (c *plClient) Register(addr string,
+	to time.Duration,
+	vp *dm.VantagePoint) error {
+	c.connect(addr, to
 }

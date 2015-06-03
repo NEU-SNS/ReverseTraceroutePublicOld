@@ -44,6 +44,7 @@ const (
 	SOCKET_DIR = "-U"
 	REMOTE     = "-R"
 	SUDO       = "/usr/bin/sudo"
+	ADDRINDEX  = 2
 )
 
 type Socket struct {
@@ -76,7 +77,7 @@ type Config struct {
 	Port         string
 	Path         string
 	ScPath       string
-	Url          string
+	Ip           string
 	ScParserPath string
 }
 
