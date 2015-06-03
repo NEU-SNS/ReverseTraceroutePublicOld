@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"time"
 )
 
 type plClient struct {
@@ -49,7 +50,7 @@ func (c *plClient) disconnect() error {
 	return fmt.Errorf("Called disconnect on unconnected plClient")
 }
 
-func (c *plClient) Connect(addr string) error {
+func (c *plClient) Connect(addr string, timeout time.Duration) error {
 	glog.Infof("Trying to connect to: %s", addr)
 	if c.connOpen && addr == c.addr {
 		return nil
@@ -60,7 +61,7 @@ func (c *plClient) Connect(addr string) error {
 			return err
 		}
 	}
-	cc, err := grpc.Dial(addr)
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(timeout))
 	if err != nil {
 		glog.Errorf("PlClient Failed to connect: %v", err)
 		return err

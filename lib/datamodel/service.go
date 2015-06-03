@@ -27,17 +27,57 @@
 package datamodel
 
 import (
+	"fmt"
+	"github.com/golang/glog"
 	"math/rand"
+	"net"
+	"sync"
+	"time"
 )
 
 type Service struct {
-	IPAddr []string
-	Key    ServiceT
+	Url  string
+	Key  ServiceT
+	Port int
+	//Protects Ips and last load times
+
+	mu          sync.Mutex
+	lastUpdated time.Time
+	ips         []string
 }
 
-func (s *Service) GetIp() string {
-	if len(s.IPAddr) == 0 {
-		return ""
+func (s *Service) GetIp() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.ips) == 0 || time.Since(s.lastUpdated) > time.Minute*5 {
+		glog.Infof("Resolving url: %s", s.Url)
+		ips, err := net.LookupHost(s.Url)
+		if err != nil {
+			return "", err
+		}
+		glog.Infof("Got IPs: %v", ips)
+		s.lastUpdated = time.Now()
+		s.ips = ips
 	}
-	return s.IPAddr[rand.Intn(len(s.IPAddr))]
+	rand.Seed(time.Now().UnixNano())
+	ip := s.ips[rand.Intn(len(s.ips))]
+	return fmt.Sprintf("%s:%d", ip, s.Port), nil
+}
+
+func (s *ServiceT) UnmarshalYAML(unm func(interface{}) error) error {
+	var text string
+	err := unm(&text)
+	if err != nil {
+		return nil
+	}
+	if val, ok := ServiceT_value[text]; ok {
+		*s = ServiceT(val)
+		return nil
+	}
+	return fmt.Errorf("Invalid Value for ServiceT")
+}
+
+func (s *ServiceT) MarshalYAML() (interface{}, error) {
+	text := ServiceT_name[int32(*s)]
+	return &text, nil
 }

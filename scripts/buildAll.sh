@@ -4,7 +4,7 @@ ROOT=`pwd`
 
 CONT=src/controller
 PLCONT=src/plcontroller
-PLVP=.src/plvp
+PLVP=src/plvp
 BUILD="go build"
 INSTALL="go install"
 CLEAN="go clean"

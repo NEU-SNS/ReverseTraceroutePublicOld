@@ -169,7 +169,11 @@ func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsRet
 		sr.Ret = makeErrorReturn(st)
 		return
 	}
-	err = mt.Connect(s.GetIp())
+	ip, err := s.GetIp()
+	if err != nil {
+		return nil, err
+	}
+	err = mt.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return
@@ -188,7 +192,11 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 	if err != nil {
 		return nil, err
 	}
-	err = mt.Connect(s.GetIp())
+	ip, err := s.GetIp()
+	if err != nil {
+		return nil, err
+	}
+	err = mt.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +305,11 @@ func (c *controllerT) getVP(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, e
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -313,7 +325,11 @@ func (c *controllerT) getAllVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPRetur
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +344,11 @@ func (c *controllerT) getSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VP
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +363,11 @@ func (c *controllerT) getTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (*dm.V
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +382,11 @@ func (c *controllerT) getRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (*dm
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -373,7 +401,11 @@ func (c *controllerT) getActiveVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPRe
 		return nil, err
 	}
 	if plcl, ok := plc.(plClient); ok {
-		err = plcl.Connect(s.GetIp())
+		ip, err := s.GetIp()
+		if err != nil {
+			return nil, err
+		}
+		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -400,23 +432,6 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
-//Periodically reload services so live updates can occur
-func (c *controllerT) loadServices(errChan chan error) {
-	for {
-		select {
-		case <-time.After(time.Second * 60):
-			servs, err := c.db.GetServices()
-			if err != nil {
-				errChan <- err
-				return
-			}
-			controller.router.RegisterServices(
-				servs...)
-		}
-
-	}
-}
-
 func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	errChan := make(chan error, 2)
 	if db == nil {
@@ -434,7 +449,7 @@ func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	controller.db = db
 	controller.cache = cache
 	controller.router = createRouter()
-	go controller.loadServices(errChan)
+	controller.router.RegisterServices(c.Local.Services...)
 	var opts []grpc.ServerOption
 	controller.server = grpc.NewServer(opts...)
 	capi.RegisterControllerServer(controller.server, &controller)

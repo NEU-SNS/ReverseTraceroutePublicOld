@@ -39,13 +39,6 @@ func uToNSec(u int64) int64 {
 	return u * 1000
 }
 
-func (d *dataAccess) GetServices() ([]*dm.Service, error) {
-	return []*dm.Service{&dm.Service{
-		IPAddr: []string{"127.0.0.1:45000"},
-		Key:    dm.ServiceT_PLANET_LAB,
-	}}, nil
-}
-
 func (d *dataAccess) StoreTraceroute(t *dm.Traceroute, s dm.ServiceT) error {
 	return nil
 }

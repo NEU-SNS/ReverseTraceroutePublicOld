@@ -177,7 +177,6 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 		cl.CancelCmd()
 		return ret, fmt.Errorf("Ping timed out")
 	case <-dc:
-		break
 	}
 	resps := cl.GetResponses()
 	var dw util.UUDecodingWriter

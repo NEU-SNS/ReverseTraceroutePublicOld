@@ -43,8 +43,8 @@ type MeasurementTool interface {
 	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
 	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
 	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(string) (*dm.VantagePoint, error)
-	Connect(string) error
+	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
+	Connect(string, time.Duration) error
 }
 
 type RoutedRequest func() (*dm.MReturn, Request, error)
@@ -78,4 +78,6 @@ type LocalConfig struct {
 	SecureConn   bool
 	CertFile     string
 	KeyFile      string
+	ConnTimeout  int64
+	Services     []*dm.Service
 }

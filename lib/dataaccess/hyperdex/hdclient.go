@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -47,30 +47,7 @@ type hdClient struct {
 	eChan  chan client.Error
 }
 
-func (c *hdClient) GetServices() ([]*dm.Service, error) {
-	return []*dm.Service{&dm.Service{
-		IPAddr: []string{"129.10.113.205:45000"},
-		Key:    dm.ServiceT_PLANET_LAB,
-	}}, nil
-}
-
-func New(con dm.DbConfig) (da.DataProvider, error) {
-	c, e, echan := client.NewClient(con.Host, con.Port)
-	if e != nil {
-		return nil, e
-	}
-	go func() {
-		for {
-			select {
-			case e := <-echan:
-				glog.Exitf("Hyperdex Client error: %v", e)
-			}
-		}
-	}()
-	return &hdClient{c: c, config: con, eChan: echan}, nil
-}
-
-func NewVP(con dm.DbConfig) (da.VantagePointProvider, error) {
+func New(con dm.DbConfig) (*hdClient, error) {
 	c, e, echan := client.NewClient(con.Host, con.Port)
 	if e != nil {
 		return nil, e

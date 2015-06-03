@@ -99,7 +99,7 @@ func main() {
 	}
 	util.CloseStdFiles(conf.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
-	db, err := hdclient.NewVP(conf.Db)
+	db, err := hdclient.New(conf.Db)
 	if err != nil {
 		glog.Errorf("Failed to created db: %v", err)
 		exit(1)
