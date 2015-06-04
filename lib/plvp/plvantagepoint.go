@@ -30,27 +30,31 @@ import (
 	"fmt"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
-	plc "github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"math/rand"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
 
 type plVantagepointT struct {
-	hostname string
 	sc       scamper.Config
+	spoofmon *SpoofPingMonitor
 	dest     string
 	mp       mproc.MProc
-	conf     Config
+	config   Config
+	mu       sync.Mutex
+	lu       time.Time
+	ips      []string
 }
 
 var plVantagepoint plVantagepointT
 
 func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	sip, e := pickIp(c.conf.Local.Host)
+	sip, e := pickIp(c.config.Local.Host)
 	if e != nil {
 		glog.Errorf("Couldn't resolve host on restart")
 		return true
@@ -75,21 +79,22 @@ func HandleSig(s os.Signal) {
 }
 
 func Start(c Config) chan error {
-	glog.Info("Starting plvp")
+	glog.Info("Starting plvp with config: %v", c)
 	defer glog.Flush()
 	errChan := make(chan error, 1)
 
-	plVantagepoint.conf = c
+	plVantagepoint.config = c
 
 	con := new(scamper.Config)
 	con.ScPath = c.Scamper.BinPath
-	sip, err := pickIp(c.Local.Host)
+	sip, err := pickIp(c.Scamper.Host)
 	if err != nil {
 		glog.Errorf("Could not resolve url: %s, with err: %v", c.Local.Host, err)
 		errChan <- err
 		return errChan
 	}
 	con.Ip = sip
+	con.Port = c.Scamper.Port
 	err = scamper.ParseConfig(*con)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
@@ -98,20 +103,50 @@ func Start(c Config) chan error {
 	}
 	plVantagepoint.sc = *con
 	plVantagepoint.mp = mproc.New()
+	plVantagepoint.spoofmon = &SpoofPingMonitor{}
+	monaddr, err := util.GetBindAddr()
+	if err != nil {
+		glog.Errorf("Could not get bind addr: %v", err)
+		errChan <- err
+		return errChan
+	}
+	monec := make(chan error, 1)
+	monip := make(chan int64, 1)
+	go plVantagepoint.spoofmon.Start(monaddr, monip, monec)
 	if c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
 	}
 
+	go func() {
+		for {
+			select {
+			case ip := <-monip:
+				glog.Infof("Got IP from spoof monitor: %d", int32(ip))
+			case err := <-monec:
+				glog.Errorf("Recieved error from spoof monitor: %v", err)
+			}
+		}
+	}()
 	return errChan
 }
 
-func pickIp(url string) (string, error) {
-	addrs, err := net.LookupHost(url)
-	if err != nil {
-		return "", err
+func pickIp(host string) (string, error) {
+	plVantagepoint.mu.Lock()
+	defer plVantagepoint.mu.Unlock()
+
+	if len(plVantagepoint.ips) == 0 || time.Since(plVantagepoint.lu) > time.Minute*5 {
+		glog.Infof("Looking up addresses for %s", host)
+		addrs, err := net.LookupHost(host)
+		if err != nil {
+			return "", err
+		}
+
+		glog.Infof("Got IPs: %v", addrs)
+		plVantagepoint.ips = addrs
+		plVantagepoint.lu = time.Now()
 	}
 	rand.Seed(time.Now().UnixNano())
-	return addrs[rand.Intn(len(addrs))], nil
+	return plVantagepoint.ips[rand.Intn(len(plVantagepoint.ips))], nil
 }
 
 func (c *plVantagepointT) startScamperProcs() {

@@ -63,7 +63,6 @@ type controllerT struct {
 	//the mutex protects the following
 	requests int64
 	time     time.Duration
-	rpc      dm.DialFunc
 }
 
 var controller controllerT

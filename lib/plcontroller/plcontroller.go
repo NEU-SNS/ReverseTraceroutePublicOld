@@ -55,8 +55,8 @@ type plControllerT struct {
 	mp        mproc.MProc
 	db        da.VantagePointProvider
 	w         *fsnotify.Watcher
-	mu        sync.Mutex
 	conf      Config
+	mu        sync.Mutex
 	//the mutex protects the following
 	requests int64
 	time     time.Duration

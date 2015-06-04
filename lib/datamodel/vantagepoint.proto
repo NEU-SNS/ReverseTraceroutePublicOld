@@ -17,6 +17,7 @@ message VantagePoint {
     string controller = 10;
     bool rec_spoof = 11;
     bool scamper_up = 12;
+    int64 last_active = 13;
 }
 
 message VPRequest {

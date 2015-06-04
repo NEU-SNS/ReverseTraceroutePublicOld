@@ -38,7 +38,6 @@ type Config struct {
 }
 
 type LocalConfig struct {
-	Addr         string
 	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string
@@ -48,10 +47,11 @@ type LocalConfig struct {
 	KeyPath      string
 	StartScamp   bool
 	Host         string
+	Addr         string
 }
 
 type ScamperConfig struct {
 	BinPath string
-	Addr    string
-	Port    int
+	Host    string
+	Port    string
 }

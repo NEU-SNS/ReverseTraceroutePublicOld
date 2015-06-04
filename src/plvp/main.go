@@ -55,7 +55,7 @@ func init() {
 		"The protocol that the controller will use.")
 	flag.StringVar(&f.Scamper.BinPath, "b", "/usr/local/bin/scamper",
 		"The path to the scamper binary")
-	flag.IntVar(&f.Scamper.Port, "scamper-port", 55000,
+	flag.StringVar(&f.Scamper.Port, "scamper-port", "55000",
 		"The port scamper will try to connect to.")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file")
