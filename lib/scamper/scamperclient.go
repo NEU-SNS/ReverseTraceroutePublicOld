@@ -197,6 +197,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	glog.Infof("Parsing Response")
 	switch {
 	case strings.Contains(r, string(OK)):
+		glog.Info("Parsed OK response")
 		resp.rType = OK
 		split := strings.Split(r, " ")
 		id, err := strconv.Atoi(split[1])
@@ -210,6 +211,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		resp.rType = ERR
 		return resp, nil
 	case strings.Contains(r, string(DATA)):
+		glog.Info("Parsed DATA response")
 		resp.rType = DATA
 		split := strings.Split(r, " ")
 		if len(split) != 2 {
@@ -229,6 +231,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		glog.Infof("Parsed data response, len: %d, data: %s", n, buff)
 		return resp, nil
 	case strings.Contains(r, string(MORE)):
+		glog.Info("Parsed MORE response")
 		resp.rType = MORE
 		return resp, nil
 	}

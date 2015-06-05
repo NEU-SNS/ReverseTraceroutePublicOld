@@ -38,6 +38,7 @@ type Config struct {
 }
 
 type LocalConfig struct {
+	Addr         string
 	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string

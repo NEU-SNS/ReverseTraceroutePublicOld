@@ -34,7 +34,10 @@ import (
 	"net"
 )
 
-const ()
+const (
+	ID  = 0xf0f1
+	SEQ = 0xf2f3
+)
 
 type SpoofPingMonitor struct {
 	conn *icmp.PacketConn
@@ -64,7 +67,7 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 			continue
 		}
 		if echo, ok := mess.Body.(*icmp.Echo); ok {
-			if echo.ID == 0xf0f1 && echo.Seq == 0xf2f3 {
+			if echo.ID == ID && echo.Seq == SEQ {
 				if len(echo.Data) < 4 {
 					glog.Infof("Not enough data in echo %v", echo.Data)
 					continue

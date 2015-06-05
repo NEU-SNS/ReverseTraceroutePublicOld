@@ -56,6 +56,7 @@ type plControllerT struct {
 	db        da.VantagePointProvider
 	w         *fsnotify.Watcher
 	conf      Config
+	reqCount  *ReqCount
 	mu        sync.Mutex
 	//the mutex protects the following
 	requests int64
@@ -64,6 +65,23 @@ type plControllerT struct {
 	rw sync.RWMutex
 	//rwmutex protext the socks
 	socks map[string]scamper.Socket
+}
+
+type ReqCount struct {
+	val uint32
+	mu  sync.Mutex
+}
+
+func (r *ReqCount) inc() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.val += 1
+}
+
+func (r *ReqCount) dec() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.val -= 1
 }
 
 func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
@@ -302,6 +320,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider) chan error {
 		return errChan
 	}
 	plController.db = db
+	plController.reqCount = new(ReqCount)
 	plController.socks = make(map[string]scamper.Socket, 10)
 	var sc scamper.Config
 	sc.Port = c.Scamper.Port
