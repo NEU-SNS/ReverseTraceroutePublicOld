@@ -172,6 +172,7 @@ func IpStringToInt64(ips string) (int64, error) {
 		return 0, fmt.Errorf("Nil ip in IpToInt64")
 	}
 	ip = ip.To4()
+	glog.Infof("Converting IP: %s, to int64", ip.String())
 	var res int64
 	res |= int64(ip[0]) << 24
 	res |= int64(ip[1]) << 16

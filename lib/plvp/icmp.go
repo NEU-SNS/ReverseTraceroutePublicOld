@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -28,7 +28,6 @@ package plvp
 
 import (
 	"fmt"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
 	"github.com/golang/glog"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/internal/iana"
@@ -41,7 +40,7 @@ type SpoofPingMonitor struct {
 	conn *icmp.PacketConn
 }
 
-func (sm *SpoofPingMonitor) Start(addr string, ips chan int64, ec chan error) {
+func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
 	pc, err := icmp.ListenPacket("ip4:icmp", addr)
 	if err != nil {
@@ -66,27 +65,27 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan int64, ec chan error) {
 		}
 		if echo, ok := mess.Body.(*icmp.Echo); ok {
 			if echo.ID == 0xf0f1 && echo.Seq == 0xf2f3 {
-				glog.Info("Received echo reply with magic numbers")
-				ipb := echo.Data[:3]
-				ip := net.IPv4(ipb[0], ipb[1], ipb[2], ipb[3])
+				if len(echo.Data) < 4 {
+					glog.Infof("Not enough data in echo %v", echo.Data)
+					continue
+				}
+				ip := net.IPv4(echo.Data[0],
+					echo.Data[1],
+					echo.Data[2],
+					echo.Data[3])
 				if ip == nil {
 					ec <- fmt.Errorf("Could not create IP from echo reply body")
 					continue
 				}
-				ipn, err := util.IpStringToInt64(ip.String())
-				if err != nil {
-					ec <- fmt.Errorf("Could not create ip from parsed echo body")
-					continue
-				}
 				glog.Infof("Got spoofed echo-reply from: %s", ip)
-				ips <- ipn
+				ips <- ip
 				continue
 
 			}
 			glog.Info("Got non-spoofed echo-reply")
 			continue
 		}
-		glog.Info("Received non-echo icmpi")
+		glog.Info("Received non-echo icmp packet")
 	}
 }
 

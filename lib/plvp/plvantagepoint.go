@@ -111,7 +111,7 @@ func Start(c Config) chan error {
 		return errChan
 	}
 	monec := make(chan error, 1)
-	monip := make(chan int64, 1)
+	monip := make(chan net.IP, 1)
 	go plVantagepoint.spoofmon.Start(monaddr, monip, monec)
 	if c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
@@ -121,7 +121,7 @@ func Start(c Config) chan error {
 		for {
 			select {
 			case ip := <-monip:
-				glog.Infof("Got IP from spoof monitor: %d", int32(ip))
+				glog.Infof("Got IP from spoof monitor: %d", ip)
 			case err := <-monec:
 				glog.Errorf("Recieved error from spoof monitor: %v", err)
 			}
