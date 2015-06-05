@@ -47,7 +47,6 @@ type LocalConfig struct {
 	KeyPath      string
 	StartScamp   bool
 	Host         string
-	Addr         string
 }
 
 type ScamperConfig struct {

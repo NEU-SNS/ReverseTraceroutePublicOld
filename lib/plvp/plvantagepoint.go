@@ -28,6 +28,7 @@ package plvp
 
 import (
 	"fmt"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc/proc"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/scamper"
@@ -48,6 +49,7 @@ type plVantagepointT struct {
 	config   Config
 	mu       sync.Mutex
 	lu       time.Time
+	plc      *plClient
 	ips      []string
 }
 
@@ -104,6 +106,7 @@ func Start(c Config) chan error {
 	plVantagepoint.sc = *con
 	plVantagepoint.mp = mproc.New()
 	plVantagepoint.spoofmon = &SpoofPingMonitor{}
+	plVantagepoint.plc = &plClient{}
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Could not get bind addr: %v", err)
@@ -113,40 +116,57 @@ func Start(c Config) chan error {
 	monec := make(chan error, 1)
 	monip := make(chan net.IP, 1)
 	go plVantagepoint.spoofmon.Start(monaddr, monip, monec)
+	go plVantagepoint.monitorSpoofedPings(monip, monec)
 	if c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
 	}
+	return errChan
+}
 
+func (c *plVantagepointT) monitorSpoofedPings(ips chan net.IP, ec chan error) {
 	go func() {
 		for {
 			select {
-			case ip := <-monip:
+			case ip := <-ips:
 				glog.Infof("Got IP from spoof monitor: %d", ip)
-			case err := <-monec:
+				err := c.sendRecSpoofIp(ip)
+				if err != nil {
+					glog.Errorf("Failed to notify recspoof: %v", err)
+				}
+			case err := <-ec:
 				glog.Errorf("Recieved error from spoof monitor: %v", err)
 			}
 		}
 	}()
-	return errChan
+}
+
+func (c *plVantagepointT) sendRecSpoofIp(ip net.IP) error {
+	connip, err := pickIp(c.config.Local.Host)
+	if err != nil {
+		return err
+	}
+	arg := new(dm.NotifyRecSpoof)
+	arg.Ip, err = util.IpStringToInt64(ip.String())
+	if err != nil {
+		return err
+	}
+	err = c.plc.NotifyRecSpoof(connip, time.Second*10, arg)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func pickIp(host string) (string, error) {
-	plVantagepoint.mu.Lock()
-	defer plVantagepoint.mu.Unlock()
 
-	if len(plVantagepoint.ips) == 0 || time.Since(plVantagepoint.lu) > time.Minute*5 {
-		glog.Infof("Looking up addresses for %s", host)
-		addrs, err := net.LookupHost(host)
-		if err != nil {
-			return "", err
-		}
-
-		glog.Infof("Got IPs: %v", addrs)
-		plVantagepoint.ips = addrs
-		plVantagepoint.lu = time.Now()
+	glog.Infof("Looking up addresses for %s", host)
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return "", err
 	}
-	rand.Seed(time.Now().UnixNano())
-	return plVantagepoint.ips[rand.Intn(len(plVantagepoint.ips))], nil
+
+	glog.Infof("Got IPs: %v", addrs)
+	return addrs[rand.Intn(len(addrs))], nil
 }
 
 func (c *plVantagepointT) startScamperProcs() {
