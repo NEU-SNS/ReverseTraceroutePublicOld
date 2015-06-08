@@ -115,6 +115,7 @@ func (c *Client) CancelCmd() error {
 	if err != nil {
 		return err
 	}
+	glog.Flush()
 	return c.rw.Flush()
 }
 
@@ -199,9 +200,13 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	case strings.Contains(r, string(OK)):
 		glog.Info("Parsed OK response")
 		resp.rType = OK
+		r = strings.TrimSpace(r)
 		split := strings.Split(r, " ")
-		id, err := strconv.Atoi(split[1])
+		idsp := strings.Split(split[1], "-")
+		glog.Infof("Got id info: %v", idsp)
+		id, err := strconv.Atoi(idsp[1])
 		if err != nil {
+			glog.Errorf("Failed to parse response: %v", r)
 			return resp, ErrorBadResponse
 		}
 		resp.id = id
@@ -215,6 +220,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		resp.rType = DATA
 		split := strings.Split(r, " ")
 		if len(split) != 2 {
+			glog.Errorf("Failed to parse response: %v", r)
 			return resp, ErrorBadDataResponse
 		}
 		n, err := strconv.Atoi(split[1][:len(split[1])-1])
@@ -225,6 +231,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		buff := make([]byte, n)
 		_, err = io.ReadFull(rw, buff)
 		if err != nil {
+
 			return resp, err
 		}
 		resp.data = buff
@@ -235,5 +242,6 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		resp.rType = MORE
 		return resp, nil
 	}
+	glog.Errorf("Failed to parse response: %v", r)
 	return resp, ErrorBadResponse
 }
