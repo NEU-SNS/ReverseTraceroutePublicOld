@@ -36,7 +36,7 @@ import proto "github.com/golang/protobuf/proto"
 var _ = proto.Marshal
 
 type NotifyRecSpoof struct {
-	Ip int64 `protobuf:"varint,1,opt,name=ip" json:"ip,omitempty"`
+	Ip uint32 `protobuf:"varint,1,opt,name=ip" json:"ip,omitempty"`
 }
 
 func (m *NotifyRecSpoof) Reset()         { *m = NotifyRecSpoof{} }

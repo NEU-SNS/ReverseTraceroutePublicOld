@@ -130,23 +130,23 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	cmd := exec.Command(path)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	err = cmd.Start()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	_, err = stdin.Write(b)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	err = stdin.Close()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	res := make([]byte, 1024*5)
 	_, err = stdout.Read(res)
@@ -155,7 +155,7 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	}
 	err = cmd.Wait()
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	return res, err
 }
@@ -166,35 +166,35 @@ func StartPProf(addr string) {
 	}()
 }
 
-func IpStringToInt64(ips string) (int64, error) {
+func Int32ToIpString(ip uint32) (string, error) {
+	var a, b, c, d byte
+	if ip < 0 || ip > 4294967295 {
+		return "", fmt.Errorf("Ip out of range")
+	}
+	d = byte(ip & 0x000000ff)
+	c = byte(ip & 0x0000ff00 >> 8)
+	b = byte(ip & 0x00ff0000 >> 16)
+	a = byte(ip & 0xff000000 >> 24)
+	nip := net.IPv4(a, b, c, d)
+	if nip == nil {
+		return "", fmt.Errorf("Invalid IP")
+	}
+	return nip.String(), nil
+}
+
+func IpStringToInt32(ips string) (uint32, error) {
 	ip := net.ParseIP(ips)
 	if ip == nil {
 		return 0, fmt.Errorf("Nil ip in IpToInt64")
 	}
 	ip = ip.To4()
 	glog.Infof("Converting IP: %s, to int64", ip.String())
-	var res int64
-	res |= int64(ip[0]) << 24
-	res |= int64(ip[1]) << 16
-	res |= int64(ip[2]) << 8
-	res |= int64(ip[3])
+	var res uint32
+	res |= uint32(ip[0]) << 24
+	res |= uint32(ip[1]) << 16
+	res |= uint32(ip[2]) << 8
+	res |= uint32(ip[3])
 	return res, nil
-}
-
-func Int64ToIpString(ip int64) (string, error) {
-	var a, b, c, d byte
-	if ip < 0 || ip > 4294967295 {
-		return "", fmt.Errorf("Ip out of range")
-	}
-	d = byte(ip & 0x70000000000000ff)
-	c = byte(ip & 0x700000000000ff00 >> 8)
-	b = byte(ip & 0x7000000000ff0000 >> 16)
-	a = byte(ip & 0x70000000ff000000 >> 24)
-	nip := net.IPv4(a, b, c, d)
-	if nip == nil {
-		return "", fmt.Errorf("Invalid IP")
-	}
-	return nip.String(), nil
 }
 
 func MicroToNanoSec(usec int64) int64 {

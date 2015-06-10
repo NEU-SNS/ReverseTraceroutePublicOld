@@ -233,9 +233,9 @@ func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
 	if hops == nil {
 		return nil
 	}
-	lhops := make([]int64, len(hops))
+	lhops := make([]uint32, len(hops))
 	for i, hop := range hops {
-		ip, err := util.IpStringToInt64(hop.Addr)
+		ip, err := util.IpStringToInt32(hop.Addr)
 		if err != nil {
 			return nil
 		}

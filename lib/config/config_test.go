@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,30 +27,40 @@
 package config
 
 import (
-	"github.com/NEU-SNS/ReverseTraceroute/lib/plvp"
 	"os"
 	"testing"
 )
 
+type SubConfig struct {
+	Name string
+	Age  int
+}
+
+type Config struct {
+	Name   string
+	Num    int
+	Array  []int
+	SubCon SubConfig
+}
+
 const config = `
-local:
-    addr: 127.0.0.1:55000
-    proto: tcp
-    closestddesc: true
-    pprofaddr: 127.0.0.1:55550
-scamper:
-    addrs: ['10.0.0.1:80', '10.0.0.2:80']
-    binpath: /path/to/bin
-    addr: 192.168.1.2:56
+name: Rob
+num: 65
+array: [1, 2, 3]
+subcon:
+    name: Rob
+    age: 25
 `
 
-var testConfig = plvp.Config{Local: plvp.LocalConfig{
-	Addr:         "127.0.0.1:55000",
-	Proto:        "tcp",
-	CloseStdDesc: true,
-	PProfAddr:    "127.0.0.1:55550",
-}, Scamper: plvp.ScamperConfig{Addrs: []string{"10.0.0.1:80", "10.0.0.2:80"},
-	BinPath: "/path/to/bin", Addr: "192.168.1.2:56"}}
+var testConfig = Config{
+	Name:  "Rob",
+	Num:   65,
+	Array: []int{1, 2, 3},
+	SubCon: SubConfig{
+		Name: "Rob",
+		Age:  25,
+	},
+}
 
 func TestParseConfig(t *testing.T) {
 	f, err := os.Create("testparse.config")
@@ -58,7 +68,7 @@ func TestParseConfig(t *testing.T) {
 		t.Fatalf("Error creating file: %v", err)
 	}
 	defer os.Remove("testparse.config")
-	var conf plvp.Config
+	var conf Config
 	f.Write([]byte(config))
 	err = ParseConfig("testparse.config", &conf)
 	t.Logf("%v", conf)
@@ -67,44 +77,28 @@ func TestParseConfig(t *testing.T) {
 		t.Fatalf("Failed parse config: %v", err)
 	}
 
-	if testConfig.Local.Addr != conf.Local.Addr {
-		t.Fatalf("Local.Addr not equal %s != %s",
-			testConfig.Local.Addr, conf.Local.Addr)
+	if testConfig.Name != conf.Name {
+		t.Fatalf("Failed to parse Config.Name")
 	}
-	if testConfig.Local.Proto != conf.Local.Proto {
-		t.Fatalf("Local.Proto not equal %s != %s",
-			testConfig.Local.Proto, conf.Local.Proto)
+	if testConfig.Num != conf.Num {
+		t.Fatalf("Failed to parse Config.Num")
 	}
-	if testConfig.Local.CloseStdDesc != conf.Local.CloseStdDesc {
-		t.Fatalf("Local.CloseStdDesc not equal %s != %s",
-			testConfig.Local.CloseStdDesc, conf.Local.CloseStdDesc)
+	if testConfig.SubCon != conf.SubCon {
+		t.Fatalf("Failed to parse Config.SubCon")
 	}
-	if testConfig.Local.PProfAddr != conf.Local.PProfAddr {
-		t.Fatalf("Local.Addr not equal %s != %s",
-			testConfig.Local.PProfAddr, conf.Local.PProfAddr)
+	if len(testConfig.Array) != len(conf.Array) {
+		t.Fatalf("Failed to parse Config.Array")
 	}
-	if testConfig.Scamper.BinPath != conf.Scamper.BinPath {
-		t.Fatalf("Scamper.BinPath not equal %s != %s",
-			testConfig.Scamper.BinPath, conf.Scamper.BinPath)
-	}
-	if testConfig.Scamper.Addr != conf.Scamper.Addr {
-		t.Fatalf("Scamper.Addr not equal %s != %s",
-			testConfig.Scamper.Addr, conf.Scamper.Addr)
-	}
-	lenEqual := len(testConfig.Scamper.Addrs) == len(conf.Scamper.Addrs)
-	if !lenEqual {
-		t.Fatalf("Scamper.Addrs not the same length")
-	}
-	for i := 0; i < len(testConfig.Scamper.Addrs); i++ {
-		if testConfig.Scamper.Addrs[i] != conf.Scamper.Addrs[i] {
-			t.Fatalf("Scamper.Addrs[%d] not equal %s != %s", i,
-				testConfig.Scamper.Addrs[i], conf.Scamper.Addrs[i])
+
+	for i := 0; i < len(testConfig.Array); i++ {
+		if testConfig.Array[i] != conf.Array[i] {
+			t.Fatalf("Failed to parse Config.Array[%d]", i)
 		}
 	}
 }
 
 func TestParseConfigBadPath(t *testing.T) {
-	var conf plvp.Config
+	var conf Config
 	err := ParseConfig("-", &conf)
 	if err == nil {
 		t.Fatalf("TestParseConfigBadPath: Didnt return error with bad path")

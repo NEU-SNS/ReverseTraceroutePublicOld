@@ -88,7 +88,7 @@ message MTraceroute {
     int64 date = 1;
     string src = 2;
     string dst = 3;
-    repeated int64 hops = 4 [packed=true];
+    repeated uint32 hops = 4 [packed=true];
     ServiceT service = 5;
     string hop = 6;
     

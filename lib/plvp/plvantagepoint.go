@@ -146,7 +146,7 @@ func (c *plVantagepointT) sendRecSpoofIp(ip net.IP) error {
 		return err
 	}
 	arg := new(dm.NotifyRecSpoof)
-	arg.Ip, err = util.IpStringToInt64(ip.String())
+	arg.Ip, err = util.IpStringToInt32(ip.String())
 	if err != nil {
 		return err
 	}

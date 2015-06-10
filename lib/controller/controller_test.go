@@ -27,8 +27,8 @@
 package controller
 
 import (
+	"github.com/NEU-SNS/ReverseTraceroute/lib/cache"
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/testdataaccess"
-	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"testing"
 	"time"
 )
@@ -37,7 +37,7 @@ var conf = Config{Local: LocalConfig{Addr: "localhost:45000",
 	Proto: "tcp"}}
 
 func TestStart(t *testing.T) {
-	eChan := Start(conf, da.New())
+	eChan := Start(conf, da.New(), cache.New())
 
 	select {
 	case e := <-eChan:
@@ -49,7 +49,7 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartNoDB(t *testing.T) {
-	eChan := Start(conf, nil)
+	eChan := Start(conf, nil, cache.New())
 
 	select {
 	case <-eChan:
@@ -62,7 +62,7 @@ func TestStartNoDB(t *testing.T) {
 func TestStartInvalidIP(t *testing.T) {
 	var c = Config{Local: LocalConfig{Addr: "-1:45000",
 		Proto: "tcp"}}
-	eChan := Start(c, da.New())
+	eChan := Start(c, da.New(), cache.New())
 
 	select {
 	case <-eChan:
@@ -75,7 +75,7 @@ func TestStartInvalidIP(t *testing.T) {
 func TestStartInvalidPort(t *testing.T) {
 	var c = Config{Local: LocalConfig{Addr: "127.0.0.1:PORT",
 		Proto: "tcp"}}
-	eChan := Start(c, da.New())
+	eChan := Start(c, da.New(), cache.New())
 
 	select {
 	case <-eChan:
@@ -88,19 +88,12 @@ func TestStartInvalidPort(t *testing.T) {
 func TestStartPortOutOfRange(t *testing.T) {
 	var c = Config{Local: LocalConfig{Addr: "127.0.0.1:70000",
 		Proto: "tcp"}}
-	eChan := Start(c, da.New())
+	eChan := Start(c, da.New(), cache.New())
 
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
 		t.Fatalf("TestStartPortOutOfRange no error thrown with port 70000")
-	}
-}
-
-func TestGenerateRequest(t *testing.T) {
-	_, err := generateRequest(&dm.MArg{Service: "TEST"}, dm.PING)
-	if err != nil {
-		t.Fatalf("TestGenerateRequest failed error: %v", err)
 	}
 }
 
@@ -135,7 +128,7 @@ func TestAddReqStats(t *testing.T) {
 	controller.addReqStats(req)
 	fstat := controller.getStats()
 	if fstat.Requests != stat.Requests+1 ||
-		fstat.TotReqTime != stat.TotReqTime+2*time.Second {
+		time.Duration(fstat.TotReqTime) != time.Duration(stat.TotReqTime)+(2*time.Second) {
 		t.Fatalf("Add req Stats failed, got %v expected %v", fstat, stat)
 	}
 }

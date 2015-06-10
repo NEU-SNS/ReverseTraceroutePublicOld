@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,19 +27,36 @@
 package testdataaccess
 
 import (
+	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 )
 
 type testAccess struct{}
 
-func (da *testAccess) GetServices(ip string) []*dm.Service {
-	return []*dm.Service{&dm.Service{Key: "TEST",
-		IPAddr: "192.168.1.1",
-		Port:   9999,
-		Proto:  "unix",
-		Api:    nil}}
-}
-
 func New() *testAccess {
 	return &testAccess{}
+}
+
+func (t *testAccess) GetPingBySrcDst(string, string) (*dm.Ping, error) {
+	return nil, nil
+}
+func (t *testAccess) StorePing(*dm.Ping) error {
+	return nil
+}
+
+func (t *testAccess) StoreTraceroute(*dm.Traceroute, dm.ServiceT) error {
+	return nil
+}
+func (t *testAccess) GetTRBySrcDst(string, string) (*dm.MTraceroute, error) {
+	return nil, nil
+}
+func (t *testAccess) GetTRBySrcDstWithStaleness(string, string, da.Staleness) (*dm.MTraceroute, error) {
+	return nil, nil
+}
+func (t *testAccess) GetIntersectingTraceroute(string, string, da.Staleness) (*dm.MTraceroute, error) {
+	return nil, nil
+}
+
+func (t *testAccess) Close() error {
+	return nil
 }

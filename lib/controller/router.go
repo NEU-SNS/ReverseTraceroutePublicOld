@@ -87,20 +87,26 @@ func (r *router) RegisterServices(services ...*dm.Service) {
 	r.rw.Unlock()
 }
 
-func (r *router) GetService(s dm.ServiceT) (*dm.Service, MeasurementTool, error) {
+func (r *router) GetService(s dm.ServiceT) (sv *dm.Service, m MeasurementTool, err error) {
 	r.rw.RLock()
+	defer r.rw.RUnlock()
 	glog.Infof("Trying to get API for %s", s)
-	serv := r.services[s]
-	if serv == nil {
-		return nil, nil, ErrorServiceNotFound
+	if serv, ok := r.services[s]; ok {
+		sv = serv
+	} else {
+		err = ErrorServiceNotFound
+		return
 	}
-	mi := r.servClients[s]
-	if mi == nil {
-		return nil, nil, ErrorServiceNotFound
+
+	if mi, ok := r.servClients[s]; ok {
+		if mt, ok := mi.(MeasurementTool); ok {
+			m = mt
+			return
+		}
+	} else {
+		err = ErrorServiceNotFound
+		return
 	}
-	r.rw.RUnlock()
-	if mt, ok := mi.(MeasurementTool); ok {
-		return serv, mt, nil
-	}
-	return nil, nil, fmt.Errorf("Could not get measurement tool for service: %v", s)
+	err = fmt.Errorf("Could not get measurement tool for service: %v", s)
+	return
 }

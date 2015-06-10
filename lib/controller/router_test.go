@@ -27,61 +27,70 @@
 package controller
 
 import (
-	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess/testdataaccess"
+	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"testing"
 )
 
 func TestNewRouter(t *testing.T) {
 	r := NewRouter()
 	if r == nil {
-		t.Errorf("TestNewRouter returned nil router")
+		t.Fatalf("TestNewRouter returned nil router")
 	}
 }
+
+var servs = []*dm.Service{
+	&dm.Service{
+		Url:  "fakepl",
+		Key:  dm.ServiceT_PLANET_LAB,
+		Port: 9999,
+	}}
 
 func TestRegisterServices(t *testing.T) {
 	r := NewRouter()
-	r.RegisterServices(da.New().GetServices("192.168.1.1")...)
-	if len(r.GetServices()) == 0 {
-		t.Errorf("TestRegisterServices failed to add service")
+	if r == nil {
+		t.Fatalf("TestNewRouter returned nil router")
+	}
+
+	r.RegisterServices(servs...)
+}
+
+func setupRouter(t *testing.T) Router {
+	r := NewRouter()
+	if r == nil {
+		t.Fatalf("TestNewRouter returned nil router")
+	}
+	r.RegisterServices(servs...)
+	return r
+}
+
+func TestGetClient(t *testing.T) {
+	r := setupRouter(t)
+	s, mt, err := r.GetClient(dm.ServiceT_PLANET_LAB)
+	if s == nil || mt == nil || err != nil {
+		t.Fatalf("TestGetClient Failed: %v, %v, %v", s, mt, err)
 	}
 }
 
-func TestRouteRequestNoService(t *testing.T) {
-	r := NewRouter()
-	r.RegisterServices(da.New().GetServices("192.168.1.1")...)
-	req := Request{
-		Key: "Fake Key",
-	}
-	_, err := r.RouteRequest(req)
-	if err != ErrorServiceNotFound {
-		t.Error("TestRouteRequestNoService didnt return ErrorServiceNotFound",
-			" with fake service")
+func TestGetClientUnknownService(t *testing.T) {
+	r := setupRouter(t)
+	s, mt, err := r.GetClient(dm.ServiceT(-1))
+	if s != nil || mt != nil || err != nil {
+		t.Fatalf("TestGetClientUnknowService Failed: %v, %v, %v", s, mt, err)
 	}
 }
 
-func TestRouteRequest(t *testing.T) {
-	r := NewRouter()
-	r.RegisterServices(da.New().GetServices("192.168.1.1")...)
-	req := Request{
-		Key: "TEST",
-	}
-
-	rr, err := r.RouteRequest(req)
-	if rr == nil || err != nil {
-		t.Errorf("TestRouteRequest failed: %v, %v", rr, err)
+func TestGetService(t *testing.T) {
+	r := setupRouter(t)
+	cl, mt, err := r.GetService(dm.ServiceT_PLANET_LAB)
+	if cl == nil || mt == nil || err != nil {
+		t.Fatalf("TestGetClient Failed: %v, %v, %v", cl, mt, err)
 	}
 }
 
-func TestRouteRequestRunRequest(t *testing.T) {
-	r := NewRouter()
-	r.RegisterServices(da.New().GetServices("192.168.1.1")...)
-	req := Request{
-		Key: "TEST",
-	}
-
-	rr, err := r.RouteRequest(req)
-	result, _, err := rr()
-	if result == nil && err == nil {
-		t.Errorf("TestRouteRequestRunRequest failed %v, %v", result, err)
+func TestGetServiceUnknownService(t *testing.T) {
+	r := setupRouter(t)
+	cl, mt, err := r.GetClient(dm.ServiceT(-1))
+	if cl != nil || err == nil {
+		t.Fatalf("TestGetClientUnknowService Failed: %v, %v, %v", cl, mt, err)
 	}
 }

@@ -5,7 +5,7 @@ option go_package = "datamodel";
 package datamodel;
 
 message NotifyRecSpoof {
-    int64 ip = 1;
+    uint32 ip = 1;
 }
 
 message NotifyRecSpoofResponse {

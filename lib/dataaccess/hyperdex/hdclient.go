@@ -78,21 +78,21 @@ func (c *hdClient) StoreTraceroute(tr *dm.Traceroute, s dm.ServiceT) error {
 	if hops == nil || len(hops) == 0 {
 		return nil
 	}
-	src, err := util.IpStringToInt64(tr.Src)
+	src, err := util.IpStringToInt32(tr.Src)
 	if err != nil {
 		return ErrorInvalidIP
 	}
-	dst, err := util.IpStringToInt64(tr.Dst)
+	dst, err := util.IpStringToInt32(tr.Dst)
 	if err != nil {
 		return ErrorInvalidIP
 	}
 	hlist := make([]int64, len(hops))
 	for i, hop := range hops {
-		ip, err := util.IpStringToInt64(hop.Addr)
+		ip, err := util.IpStringToInt32(hop.Addr)
 		if err != nil {
 			return fmt.Errorf("Invalid IP address in hop: %v", hop)
 		}
-		hlist[i] = ip
+		hlist[i] = int64(ip)
 	}
 	key := fmt.Sprintf("%d:%d", src, dst)
 
@@ -139,7 +139,7 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 	dst := (*a)["dst"]
 
 	if ssrc, ok := src.(int64); ok {
-		s, err := util.Int64ToIpString(ssrc)
+		s, err := util.Int32ToIpString(uint32(ssrc))
 		if err != nil {
 			glog.Errorf("Failed to parse src string from: %d", ssrc)
 			return nil, ErrorWrongType
@@ -148,7 +148,7 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 	}
 
 	if sdst, ok := dst.(int64); ok {
-		s, err := util.Int64ToIpString(sdst)
+		s, err := util.Int32ToIpString(uint32(sdst))
 		if err != nil {
 			glog.Errorf("Failed to parse dst string from: %d", dst)
 			return nil, ErrorWrongType
@@ -158,7 +158,7 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 
 	if hop, ok := (*a)["hop"]; ok {
 		if h, ok := hop.(int64); ok {
-			hi, err := util.Int64ToIpString(h)
+			hi, err := util.Int32ToIpString(uint32(h))
 			if err != nil {
 				glog.Errorf("Failed to parse hop string from: %d", h)
 				return nil, ErrorWrongType
@@ -178,7 +178,10 @@ func makeMTraceroute(a *client.Attributes) (*dm.MTraceroute, error) {
 		return nil, ErrorWrongType
 	}
 	if h, ok := hl.(client.ListInt); ok {
-		tr.Hops = []int64(h)
+		tr.Hops = make([]uint32, 0)
+		for val := range []int64(h) {
+			tr.Hops = append(tr.Hops, uint32(val))
+		}
 		return tr, nil
 	}
 	glog.Errorf("Failed to parse hop list")
@@ -190,11 +193,11 @@ func (c *hdClient) GetTRBySrcDst(src, dst string) (*dm.MTraceroute, error) {
 }
 
 func (c *hdClient) GetTRBySrcDstWithStaleness(src, dst string, s da.Staleness) (*dm.MTraceroute, error) {
-	nsrc, err := util.IpStringToInt64(src)
+	nsrc, err := util.IpStringToInt32(src)
 	if err != nil {
 		return nil, ErrorInvalidIP
 	}
-	ndst, err := util.IpStringToInt64(dst)
+	ndst, err := util.IpStringToInt32(dst)
 	if err != nil {
 		return nil, ErrorInvalidIP
 	}
@@ -216,11 +219,11 @@ func (c *hdClient) GetTRBySrcDstWithStaleness(src, dst string, s da.Staleness) (
 }
 
 func (c *hdClient) GetIntersectingTraceroute(hop, dst string, s da.Staleness) (*dm.MTraceroute, error) {
-	nhop, err := util.IpStringToInt64(hop)
+	nhop, err := util.IpStringToInt32(hop)
 	if err != nil {
 		return nil, ErrorInvalidIP
 	}
-	ndst, err := util.IpStringToInt64(dst)
+	ndst, err := util.IpStringToInt32(dst)
 	if err != nil {
 		return nil, ErrorInvalidIP
 	}
@@ -250,7 +253,7 @@ func (c *hdClient) Close() error {
 }
 
 func (c *hdClient) SetController(ip, myip string) error {
-	nip, err := util.IpStringToInt64(ip)
+	nip, err := util.IpStringToInt32(ip)
 	if err != nil {
 		return err
 	}
@@ -261,11 +264,11 @@ func (c *hdClient) SetController(ip, myip string) error {
 }
 
 func (c *hdClient) RemoveController(ip, myip string) error {
-	nip, err := util.IpStringToInt64(ip)
+	nip, err := util.IpStringToInt32(ip)
 	if err != nil {
 		return err
 	}
-	nmyip, err := util.IpStringToInt64(myip)
+	nmyip, err := util.IpStringToInt32(myip)
 	if err != nil {
 		return err
 	}
@@ -282,7 +285,7 @@ func (c *hdClient) RemoveController(ip, myip string) error {
 
 func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
 	var sshable, sudoProblem,
-		ip, recordRoute,
+		recordRoute,
 		lastUpdate, spoof,
 		ts, active, rec_spoof int64
 
@@ -307,14 +310,14 @@ func makeVpAttributes(vp *dm.VantagePoint) (client.Attributes, error) {
 	if vp.RecSpoof {
 		rec_spoof = 1
 	}
-	ip, err := util.IpStringToInt64(vp.Ip)
+	ip, err := util.IpStringToInt32(vp.Ip)
 	if err != nil {
 		return client.Attributes{}, err
 	}
 	lastUpdate = time.Now().Unix()
 	attr := client.Attributes{
 		"sshable":      sshable,
-		"ip":           ip,
+		"ip":           int64(ip),
 		"sudo_problem": sudoProblem,
 		"record_route": recordRoute,
 		"spoof":        spoof,
@@ -346,7 +349,7 @@ func attrToVp(attr client.Attributes) (*dm.VantagePoint, error) {
 			switch key {
 			case "ip":
 				if ip, ok := val.(int64); ok {
-					sip, err := util.Int64ToIpString(ip)
+					sip, err := util.Int32ToIpString(uint32(ip))
 					if err != nil {
 						return nil, err
 					}
@@ -384,7 +387,7 @@ func attrToVp(attr client.Attributes) (*dm.VantagePoint, error) {
 				}
 			case "controller":
 				if cont, ok := val.(int64); ok {
-					c, err := util.Int64ToIpString(cont)
+					c, err := util.Int32ToIpString(uint32(cont))
 					if err != nil {
 						return nil, err
 					}
@@ -425,8 +428,8 @@ func (c *hdClient) UpdateVp(vp *dm.VantagePoint) error {
 	return e
 }
 
-func (c *hdClient) GetVpByIp(ip int64) (*dm.VantagePoint, error) {
-	ips, err := util.Int64ToIpString(ip)
+func (c *hdClient) GetVpByIp(ip uint32) (*dm.VantagePoint, error) {
+	ips, err := util.Int32ToIpString(ip)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +470,7 @@ func vpsFromChannels(ac chan client.Attributes, ec chan client.Error) ([]*dm.Van
 }
 
 func (c *hdClient) GetByController(cont string) ([]*dm.VantagePoint, error) {
-	nc, err := util.IpStringToInt64(cont)
+	nc, err := util.IpStringToInt32(cont)
 	if err != nil {
 		return nil, err
 	}
@@ -512,8 +515,8 @@ func (c *hdClient) GetRecSpoof() ([]*dm.VantagePoint, error) {
 	return vpsFromChannels(attrs, errs)
 }
 
-func (c *hdClient) UpdateCanSpoof(ip int64) error {
-	ips, err := util.Int64ToIpString(ip)
+func (c *hdClient) UpdateCanSpoof(ip uint32) error {
+	ips, err := util.Int32ToIpString(ip)
 	if err != nil {
 		return err
 	}
