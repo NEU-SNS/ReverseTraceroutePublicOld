@@ -70,7 +70,7 @@ type Router interface {
 
 func (r *router) GetServices() []*dm.Service {
 	r.rw.RLock()
-	serv := make([]*dm.Service, len(r.services), len(r.services))
+	serv := make([]*dm.Service, 0)
 	for _, service := range r.services {
 		serv = append(serv, service)
 	}
@@ -90,7 +90,6 @@ func (r *router) RegisterServices(services ...*dm.Service) {
 func (r *router) GetService(s dm.ServiceT) (sv *dm.Service, m MeasurementTool, err error) {
 	r.rw.RLock()
 	defer r.rw.RUnlock()
-	glog.Infof("Trying to get API for %s", s)
 	if serv, ok := r.services[s]; ok {
 		sv = serv
 	} else {

@@ -38,12 +38,13 @@ func TestNewRouter(t *testing.T) {
 	}
 }
 
-var servs = []*dm.Service{
-	&dm.Service{
-		Url:  "fakepl",
-		Key:  dm.ServiceT_PLANET_LAB,
-		Port: 9999,
-	}}
+var service = &dm.Service{
+	Url:  "fakepl",
+	Key:  dm.ServiceT_PLANET_LAB,
+	Port: 9999,
+}
+
+var servs = []*dm.Service{service}
 
 func TestRegisterServices(t *testing.T) {
 	r := NewRouter()
@@ -83,14 +84,34 @@ func TestGetService(t *testing.T) {
 	r := setupRouter(t)
 	cl, mt, err := r.GetService(dm.ServiceT_PLANET_LAB)
 	if cl == nil || mt == nil || err != nil {
-		t.Fatalf("TestGetClient Failed: %v, %v, %v", cl, mt, err)
+		t.Fatalf("TestGetService Failed: %v, %v, %v", cl, mt, err)
 	}
 }
 
 func TestGetServiceUnknownService(t *testing.T) {
 	r := setupRouter(t)
-	cl, mt, err := r.GetClient(dm.ServiceT(-1))
+	cl, mt, err := r.GetService(dm.ServiceT(-1))
 	if cl != nil || err == nil {
-		t.Fatalf("TestGetClientUnknowService Failed: %v, %v, %v", cl, mt, err)
+		t.Fatalf("TestGetServiceUnknowService Failed: %v, %v, %v", cl, mt, err)
+	}
+}
+
+func TestGetServiceBadMT(t *testing.T) {
+	r := setupRouter(t)
+	rout := r.(*router)
+	delete((*rout).servClients, dm.ServiceT_PLANET_LAB)
+	cl, mt, err := rout.GetService(dm.ServiceT(-1))
+	if cl != nil || err == nil {
+		t.Fatalf("TestGetServiceUnknowService Failed: %v, %v, %v", cl, mt, err)
+	}
+}
+
+func TestGetServices(t *testing.T) {
+	r := setupRouter(t)
+	services := r.GetServices()
+	if services == nil ||
+		len(services) != 1 ||
+		services[0] != service {
+		t.Fatalf("TestGetServices Failed: services: %v, got: %v", servs, services[0])
 	}
 }
