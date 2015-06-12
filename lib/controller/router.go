@@ -27,7 +27,6 @@
 package controller
 
 import (
-	"fmt"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
 	"sync"
@@ -94,18 +93,13 @@ func (r *router) GetService(s dm.ServiceT) (sv *dm.Service, m MeasurementTool, e
 		sv = serv
 	} else {
 		err = ErrorServiceNotFound
-		return
 	}
-
 	if mi, ok := r.servClients[s]; ok {
 		if mt, ok := mi.(MeasurementTool); ok {
 			m = mt
-			return
 		}
 	} else {
 		err = ErrorServiceNotFound
-		return
 	}
-	err = fmt.Errorf("Could not get measurement tool for service: %v", s)
 	return
 }

@@ -36,8 +36,14 @@ import (
 	"time"
 )
 
+type ClientConn interface {
+	Close() error
+}
+
+type dialFunc func(string, ...interface{}) (ClientConn, error)
+
 type plClient struct {
-	cc       *grpc.ClientConn
+	cc       ClientConn
 	connOpen bool
 	client   plc.PLControllerClient
 	addr     string

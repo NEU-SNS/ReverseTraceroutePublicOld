@@ -100,8 +100,8 @@ func TestGetServiceBadMT(t *testing.T) {
 	r := setupRouter(t)
 	rout := r.(*router)
 	delete((*rout).servClients, dm.ServiceT_PLANET_LAB)
-	cl, mt, err := rout.GetService(dm.ServiceT(-1))
-	if cl != nil || err == nil {
+	cl, mt, err := rout.GetService(dm.ServiceT_PLANET_LAB)
+	if err == nil || err != ErrorServiceNotFound {
 		t.Fatalf("TestGetServiceUnknowService Failed: %v, %v, %v", cl, mt, err)
 	}
 }
