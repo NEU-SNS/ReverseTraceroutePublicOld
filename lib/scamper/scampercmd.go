@@ -29,17 +29,19 @@ package scamper
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"reflect"
+
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/golang/glog"
-	"reflect"
 )
 
 const (
-	PING       CmdT = "ping"
-	TRACEROUTE CmdT = "trace"
+	PING       cmdT = "ping"
+	TRACEROUTE cmdT = "trace"
 )
 
-var optionMap = map[CmdT]map[string]option{
+var optionMap = map[cmdT]map[string]option{
 	"ping":  pingArg,
 	"trace": traceArg,
 }
@@ -79,14 +81,19 @@ func stringOpt(f string, arg interface{}) (string, error) {
 
 type OptGetter func(f string, arg interface{}) (string, error)
 
-type CmdT string
+type cmdT string
 
 type Cmd struct {
-	ct      CmdT
-	options []string
+	ct          cmdT
+	options     []string
+	id          uint32
+	userIDCache uint32
+	resp        Response
+	userID      uint32
+	arg         interface{}
 }
 
-func (c Cmd) String() string {
+func (c Cmd) Marshal() []byte {
 	var buf bytes.Buffer
 	glog.Infof("CMD: %s, %d", c.ct, len(string(c.ct)))
 	buf.WriteString(string(c.ct) + " ")
@@ -94,22 +101,38 @@ func (c Cmd) String() string {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	cmd := buf.String()
 	glog.Infof("Cmd as string: %s", cmd)
-	return cmd
+	return buf.Bytes()
 }
 
-func NewCmd(arg interface{}) (Cmd, error) {
+func (c *Cmd) IssueCommand(w io.Writer) error {
+	cmd := c.Marshal()
+	_, err := w.Write(cmd)
+	return err
+}
+
+func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	switch arg.(type) {
 	case dm.PingArg:
-		return createCmd(arg, PING)
+		oID := arg.(dm.PingArg).UserId
+		arg.(dm.PingArg).UserId = id
+		c, err = createCmd(arg, PING)
+		c.userIDCache = oID
+		c.userID = id
 	case dm.TracerouteArg:
-		return createCmd(arg, TRACEROUTE)
+		oID := arg.(dm.TracerouteArg).Userid
+		arg.(dm.TracerouteArg).Userid = id
+		c, err = createCmd(arg, TRACEROUTE)
+		c.userIDCache = oID
+		c.userID = id
+	default:
+		err = fmt.Errorf("Failed to create Cmd, type not found")
 	}
-	return Cmd{}, fmt.Errorf("Failed to create Cmd, type not found")
+	c.arg = arg
+	return
 }
 
-func createCmd(arg interface{}, t CmdT) (Cmd, error) {
+func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 	//This far from handles all possible cases
 	opts := optionMap[t]
 	ty := reflect.TypeOf(arg)

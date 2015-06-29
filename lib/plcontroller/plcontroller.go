@@ -30,6 +30,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"sync"
+	"time"
+
 	da "github.com/NEU-SNS/ReverseTraceroute/lib/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/lib/mproc"
@@ -40,10 +45,6 @@ import (
 	"github.com/go-fsnotify/fsnotify"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	"net"
-	"os"
-	"sync"
-	"time"
 )
 
 type plControllerT struct {
@@ -228,8 +229,8 @@ func (c *plControllerT) increaseStats(t time.Time) {
 	c.time += time.Since(t)
 }
 
-func decodeResponse(res *[]byte, ret interface{}) error {
-	return json.NewDecoder(bytes.NewReader(*res)).Decode(ret)
+func decodeResponse(res []byte, ret interface{}) error {
+	return json.NewDecoder(bytes.NewReader(res)).Decode(ret)
 }
 
 func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {

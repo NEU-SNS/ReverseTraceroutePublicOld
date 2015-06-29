@@ -24,35 +24,48 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package scamper is a library to work with scamper control sockets
 package scamper
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
-	"github.com/golang/glog"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/NEU-SNS/ReverseTraceroute/lib/util"
+	"github.com/golang/glog"
 )
 
+// SResponseT represents the type of responses scamper can send
 type SResponseT string
 
 const (
-	OK        SResponseT = "OK"
-	MORE      SResponseT = "MORE"
-	DATA      SResponseT = "DATA"
+	// OK is the accept response from scamper
+	OK SResponseT = "OK"
+	// MORE is the response when more commands can be given
+	MORE SResponseT = "MORE"
+	// DATA represensts a data message
+	DATA SResponseT = "DATA"
+	// ERR is the error response from scamper
 	ERR       SResponseT = "ERR"
 	cancelCmd            = "halt %d"
 )
 
 var (
+	// ErrorBadDataResponse is returned when the data received by scamper couldnt
+	// be converted
 	ErrorBadDataResponse = errors.New("Bad DATA Response")
-	ErrorBadOKResponse   = errors.New("Bad OK Response")
-	ErrorBadResponse     = errors.New("Bad Response")
-	ErrorTimeout         = errors.New("Timeout")
+	// ErrorBadOKResponse is returned when an OK response fails to parse
+	ErrorBadOKResponse = errors.New("Bad OK Response")
+	// ErrorBadResponse is the generic error when a response can't be parsed
+	ErrorBadResponse = errors.New("Bad Response")
+	// ErrorTimeout returned when a command times out
+	ErrorTimeout = errors.New("Timeout")
 )
 
 //TODO: A possible optimization to make is to open a single connection,
@@ -61,6 +74,7 @@ var (
 // would also involve blocking on a conn waiting for data at any time
 // measurements are out.
 
+// Response represents a response from scamper
 type Response struct {
 	rType SResponseT
 	data  []byte
@@ -68,6 +82,7 @@ type Response struct {
 	id    int
 }
 
+/*
 type Client struct {
 	rw    *bufio.ReadWriter
 	s     Socket
@@ -76,22 +91,35 @@ type Client struct {
 	conn  *net.Conn
 	id    int
 }
+*/
 
+type socketMap map[string]Socket
+
+// Client is the main object for interacting with scamper
+type Client struct {
+	sockets socketMap
+}
+
+// Bytes get the data as bytes from a scamper response
 func (r Response) Bytes() []byte {
 	return r.data
 }
 
-func (r Response) WriteTo(w io.Writer) (n int, err error) {
+// WriteTo writes the response to the given io.Writer
+func (r Response) WriteTo(w io.Writer) (n int64, err error) {
 	glog.Infof("Writing data %v", r.data)
-	n, err = w.Write(r.data)
+	c, err := w.Write(r.data)
+	n = int64(c)
 	glog.Infof("Wrote %d bytes", n)
 	return
 }
 
-func NewClient(s Socket, c Cmd) Client {
-	return Client{s: s, cmd: c, resps: make([]Response, 0)}
+// NewClient creates a new Client
+func NewClient(s Socket, c Cmd) *Client {
+	return &Client{s: s, cmd: c, resps: make([]Response, 0)}
 }
 
+// GetResponses gets the raw responses from the Client
 func (c *Client) GetResponses() []Response {
 	return c.resps
 }
@@ -103,6 +131,7 @@ func (c *Client) checkConn() error {
 	return nil
 }
 
+// CancelCmd cancels the running scamper command
 func (c *Client) CancelCmd() error {
 	glog.Info("Canceling command: %d", c.id)
 	err := c.checkConn()
@@ -119,6 +148,7 @@ func (c *Client) CancelCmd() error {
 	return c.rw.Flush()
 }
 
+// IssueCmd runs the command on scamper
 func (c *Client) IssueCmd(ec chan error, dc chan struct{}) {
 	glog.Infof("Issuing command: %s", c.cmd.String())
 	err := c.checkConn()
@@ -152,7 +182,7 @@ func (c *Client) IssueCmd(ec chan error, dc chan struct{}) {
 		case DATA:
 			glog.Infof("Parsed data response")
 			c.resps = append(c.resps, r)
-			i += 1
+			i++
 			glog.Infof("Count of data received: %d", i)
 		case ERR:
 			glog.Errorf("Parsed scamper ERR return")
