@@ -3,7 +3,6 @@ syntax = "proto3";
 
 option go_package = "controllerapi";
 
-import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/stats.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/ping.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/traceroute.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/vantagepoint.proto";
@@ -12,11 +11,5 @@ service Controller {
 
     rpc Ping(datamodel.PingArg) returns (datamodel.PingReturn) {}
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.TracerouteReturn) {}
-    rpc Stats(datamodel.StatsArg) returns (datamodel.StatsReturn) {}
-    rpc GetVP(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-    rpc GetAllVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-    rpc GetSpoofingVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-    rpc GetTimeStampVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-    rpc GetRecordRouteVPs(datamodel.VPRequest) returns (datamodel.VPReturn){}
-    rpc GetActiveVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
+    rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
 }

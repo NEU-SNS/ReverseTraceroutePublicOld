@@ -35,13 +35,13 @@ import proto "github.com/golang/protobuf/proto"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
-type NotifyRecSpoof struct {
+type RecSpoof struct {
 	Ip uint32 `protobuf:"varint,1,opt,name=ip" json:"ip,omitempty"`
 }
 
-func (m *NotifyRecSpoof) Reset()         { *m = NotifyRecSpoof{} }
-func (m *NotifyRecSpoof) String() string { return proto.CompactTextString(m) }
-func (*NotifyRecSpoof) ProtoMessage()    {}
+func (m *RecSpoof) Reset()         { *m = RecSpoof{} }
+func (m *RecSpoof) String() string { return proto.CompactTextString(m) }
+func (*RecSpoof) ProtoMessage()    {}
 
 type NotifyRecSpoofResponse struct {
 }

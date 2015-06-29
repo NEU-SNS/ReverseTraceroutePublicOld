@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
-
+ 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
-
+ 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -39,13 +39,10 @@ It has these top-level messages:
 package plcontrollerapi
 
 import proto "github.com/golang/protobuf/proto"
-import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel6 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-import datamodel7 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-import datamodel8 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-import datamodel9 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -65,18 +62,10 @@ func init() {
 // Client API for PLController service
 
 type PLControllerClient interface {
-	Ping(ctx context.Context, in *datamodel4.PingArg, opts ...grpc.CallOption) (*datamodel4.Ping, error)
-	Traceroute(ctx context.Context, in *datamodel5.TracerouteArg, opts ...grpc.CallOption) (*datamodel5.Traceroute, error)
-	Stats(ctx context.Context, in *datamodel2.StatsArg, opts ...grpc.CallOption) (*datamodel2.Stats, error)
-	Register(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel7.RegisterResponse, error)
-	UpdateVp(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel9.UpdateResponse, error)
-	NotifyRecSpoof(ctx context.Context, in *datamodel8.NotifyRecSpoof, opts ...grpc.CallOption) (*datamodel8.NotifyRecSpoofResponse, error)
-	GetVP(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetAllVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetSpoofingVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetTimeStampVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetRecordRouteVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetActiveVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
+	Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.Ping, error)
+	Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (*datamodel4.Traceroute, error)
+	ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (*datamodel6.NotifyRecSpoofResponse, error)
+	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (*datamodel5.VPReturn, error)
 }
 
 type pLControllerClient struct {
@@ -87,8 +76,8 @@ func NewPLControllerClient(cc *grpc.ClientConn) PLControllerClient {
 	return &pLControllerClient{cc}
 }
 
-func (c *pLControllerClient) Ping(ctx context.Context, in *datamodel4.PingArg, opts ...grpc.CallOption) (*datamodel4.Ping, error) {
-	out := new(datamodel4.Ping)
+func (c *pLControllerClient) Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.Ping, error) {
+	out := new(datamodel3.Ping)
 	err := grpc.Invoke(ctx, "/.PLController/Ping", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -96,8 +85,8 @@ func (c *pLControllerClient) Ping(ctx context.Context, in *datamodel4.PingArg, o
 	return out, nil
 }
 
-func (c *pLControllerClient) Traceroute(ctx context.Context, in *datamodel5.TracerouteArg, opts ...grpc.CallOption) (*datamodel5.Traceroute, error) {
-	out := new(datamodel5.Traceroute)
+func (c *pLControllerClient) Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (*datamodel4.Traceroute, error) {
+	out := new(datamodel4.Traceroute)
 	err := grpc.Invoke(ctx, "/.PLController/Traceroute", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -105,90 +94,18 @@ func (c *pLControllerClient) Traceroute(ctx context.Context, in *datamodel5.Trac
 	return out, nil
 }
 
-func (c *pLControllerClient) Stats(ctx context.Context, in *datamodel2.StatsArg, opts ...grpc.CallOption) (*datamodel2.Stats, error) {
-	out := new(datamodel2.Stats)
-	err := grpc.Invoke(ctx, "/.PLController/Stats", in, out, c.cc, opts...)
+func (c *pLControllerClient) ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (*datamodel6.NotifyRecSpoofResponse, error) {
+	out := new(datamodel6.NotifyRecSpoofResponse)
+	err := grpc.Invoke(ctx, "/.PLController/ReceiveSpoof", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *pLControllerClient) Register(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel7.RegisterResponse, error) {
-	out := new(datamodel7.RegisterResponse)
-	err := grpc.Invoke(ctx, "/.PLController/Register", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) UpdateVp(ctx context.Context, in *datamodel6.VantagePoint, opts ...grpc.CallOption) (*datamodel9.UpdateResponse, error) {
-	out := new(datamodel9.UpdateResponse)
-	err := grpc.Invoke(ctx, "/.PLController/UpdateVp", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) NotifyRecSpoof(ctx context.Context, in *datamodel8.NotifyRecSpoof, opts ...grpc.CallOption) (*datamodel8.NotifyRecSpoofResponse, error) {
-	out := new(datamodel8.NotifyRecSpoofResponse)
-	err := grpc.Invoke(ctx, "/.PLController/NotifyRecSpoof", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetVP(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetVP", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetAllVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetAllVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetSpoofingVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetSpoofingVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetTimeStampVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetTimeStampVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetRecordRouteVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetRecordRouteVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *pLControllerClient) GetActiveVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.PLController/GetActiveVPs", in, out, c.cc, opts...)
+func (c *pLControllerClient) GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (*datamodel5.VPReturn, error) {
+	out := new(datamodel5.VPReturn)
+	err := grpc.Invoke(ctx, "/.PLController/GetVPs", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -198,18 +115,10 @@ func (c *pLControllerClient) GetActiveVPs(ctx context.Context, in *datamodel6.VP
 // Server API for PLController service
 
 type PLControllerServer interface {
-	Ping(context.Context, *datamodel4.PingArg) (*datamodel4.Ping, error)
-	Traceroute(context.Context, *datamodel5.TracerouteArg) (*datamodel5.Traceroute, error)
-	Stats(context.Context, *datamodel2.StatsArg) (*datamodel2.Stats, error)
-	Register(context.Context, *datamodel6.VantagePoint) (*datamodel7.RegisterResponse, error)
-	UpdateVp(context.Context, *datamodel6.VantagePoint) (*datamodel9.UpdateResponse, error)
-	NotifyRecSpoof(context.Context, *datamodel8.NotifyRecSpoof) (*datamodel8.NotifyRecSpoofResponse, error)
-	GetVP(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetAllVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetSpoofingVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetTimeStampVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetRecordRouteVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetActiveVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
+	Ping(context.Context, *datamodel3.PingArg) (*datamodel3.Ping, error)
+	Traceroute(context.Context, *datamodel4.TracerouteArg) (*datamodel4.Traceroute, error)
+	ReceiveSpoof(context.Context, *datamodel6.RecSpoof) (*datamodel6.NotifyRecSpoofResponse, error)
+	GetVPs(context.Context, *datamodel5.VPRequest) (*datamodel5.VPReturn, error)
 }
 
 func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
@@ -217,7 +126,7 @@ func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
 }
 
 func _PLController_Ping_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel4.PingArg)
+	in := new(datamodel3.PingArg)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
@@ -229,7 +138,7 @@ func _PLController_Ping_Handler(srv interface{}, ctx context.Context, codec grpc
 }
 
 func _PLController_Traceroute_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel5.TracerouteArg)
+	in := new(datamodel4.TracerouteArg)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
@@ -240,120 +149,24 @@ func _PLController_Traceroute_Handler(srv interface{}, ctx context.Context, code
 	return out, nil
 }
 
-func _PLController_Stats_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel2.StatsArg)
+func _PLController_ReceiveSpoof_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+	in := new(datamodel6.RecSpoof)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(PLControllerServer).Stats(ctx, in)
+	out, err := srv.(PLControllerServer).ReceiveSpoof(ctx, in)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func _PLController_Register_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VantagePoint)
+func _PLController_GetVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+	in := new(datamodel5.VPRequest)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(PLControllerServer).Register(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_UpdateVp_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VantagePoint)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).UpdateVp(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_NotifyRecSpoof_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel8.NotifyRecSpoof)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).NotifyRecSpoof(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetVP_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetVP(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetAllVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetAllVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetSpoofingVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetSpoofingVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetTimeStampVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetTimeStampVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetRecordRouteVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetRecordRouteVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _PLController_GetActiveVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(PLControllerServer).GetActiveVPs(ctx, in)
+	out, err := srv.(PLControllerServer).GetVPs(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -373,44 +186,12 @@ var _PLController_serviceDesc = grpc.ServiceDesc{
 			Handler:    _PLController_Traceroute_Handler,
 		},
 		{
-			MethodName: "Stats",
-			Handler:    _PLController_Stats_Handler,
+			MethodName: "ReceiveSpoof",
+			Handler:    _PLController_ReceiveSpoof_Handler,
 		},
 		{
-			MethodName: "Register",
-			Handler:    _PLController_Register_Handler,
-		},
-		{
-			MethodName: "UpdateVp",
-			Handler:    _PLController_UpdateVp_Handler,
-		},
-		{
-			MethodName: "NotifyRecSpoof",
-			Handler:    _PLController_NotifyRecSpoof_Handler,
-		},
-		{
-			MethodName: "GetVP",
-			Handler:    _PLController_GetVP_Handler,
-		},
-		{
-			MethodName: "GetAllVPs",
-			Handler:    _PLController_GetAllVPs_Handler,
-		},
-		{
-			MethodName: "GetSpoofingVPs",
-			Handler:    _PLController_GetSpoofingVPs_Handler,
-		},
-		{
-			MethodName: "GetTimeStampVPs",
-			Handler:    _PLController_GetTimeStampVPs_Handler,
-		},
-		{
-			MethodName: "GetRecordRouteVPs",
-			Handler:    _PLController_GetRecordRouteVPs_Handler,
-		},
-		{
-			MethodName: "GetActiveVPs",
-			Handler:    _PLController_GetActiveVPs_Handler,
+			MethodName: "GetVPs",
+			Handler:    _PLController_GetVPs_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{},

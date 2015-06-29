@@ -39,10 +39,9 @@ It has these top-level messages:
 package controllerapi
 
 import proto "github.com/golang/protobuf/proto"
-import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
+import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
-import datamodel6 "github.com/NEU-SNS/ReverseTraceroute/lib/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -62,15 +61,9 @@ func init() {
 // Client API for Controller service
 
 type ControllerClient interface {
-	Ping(ctx context.Context, in *datamodel4.PingArg, opts ...grpc.CallOption) (*datamodel4.PingReturn, error)
-	Traceroute(ctx context.Context, in *datamodel5.TracerouteArg, opts ...grpc.CallOption) (*datamodel5.TracerouteReturn, error)
-	Stats(ctx context.Context, in *datamodel2.StatsArg, opts ...grpc.CallOption) (*datamodel2.StatsReturn, error)
-	GetVP(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetAllVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetSpoofingVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetTimeStampVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetRecordRouteVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
-	GetActiveVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error)
+	Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.PingReturn, error)
+	Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (*datamodel4.TracerouteReturn, error)
+	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (*datamodel5.VPReturn, error)
 }
 
 type controllerClient struct {
@@ -81,8 +74,8 @@ func NewControllerClient(cc *grpc.ClientConn) ControllerClient {
 	return &controllerClient{cc}
 }
 
-func (c *controllerClient) Ping(ctx context.Context, in *datamodel4.PingArg, opts ...grpc.CallOption) (*datamodel4.PingReturn, error) {
-	out := new(datamodel4.PingReturn)
+func (c *controllerClient) Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.PingReturn, error) {
+	out := new(datamodel3.PingReturn)
 	err := grpc.Invoke(ctx, "/.Controller/Ping", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -90,8 +83,8 @@ func (c *controllerClient) Ping(ctx context.Context, in *datamodel4.PingArg, opt
 	return out, nil
 }
 
-func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel5.TracerouteArg, opts ...grpc.CallOption) (*datamodel5.TracerouteReturn, error) {
-	out := new(datamodel5.TracerouteReturn)
+func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (*datamodel4.TracerouteReturn, error) {
+	out := new(datamodel4.TracerouteReturn)
 	err := grpc.Invoke(ctx, "/.Controller/Traceroute", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -99,63 +92,9 @@ func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel5.Tracer
 	return out, nil
 }
 
-func (c *controllerClient) Stats(ctx context.Context, in *datamodel2.StatsArg, opts ...grpc.CallOption) (*datamodel2.StatsReturn, error) {
-	out := new(datamodel2.StatsReturn)
-	err := grpc.Invoke(ctx, "/.Controller/Stats", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetVP(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetVP", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetAllVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetAllVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetSpoofingVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetSpoofingVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetTimeStampVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetTimeStampVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetRecordRouteVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetRecordRouteVPs", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *controllerClient) GetActiveVPs(ctx context.Context, in *datamodel6.VPRequest, opts ...grpc.CallOption) (*datamodel6.VPReturn, error) {
-	out := new(datamodel6.VPReturn)
-	err := grpc.Invoke(ctx, "/.Controller/GetActiveVPs", in, out, c.cc, opts...)
+func (c *controllerClient) GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (*datamodel5.VPReturn, error) {
+	out := new(datamodel5.VPReturn)
+	err := grpc.Invoke(ctx, "/.Controller/GetVPs", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,15 +104,9 @@ func (c *controllerClient) GetActiveVPs(ctx context.Context, in *datamodel6.VPRe
 // Server API for Controller service
 
 type ControllerServer interface {
-	Ping(context.Context, *datamodel4.PingArg) (*datamodel4.PingReturn, error)
-	Traceroute(context.Context, *datamodel5.TracerouteArg) (*datamodel5.TracerouteReturn, error)
-	Stats(context.Context, *datamodel2.StatsArg) (*datamodel2.StatsReturn, error)
-	GetVP(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetAllVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetSpoofingVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetTimeStampVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetRecordRouteVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
-	GetActiveVPs(context.Context, *datamodel6.VPRequest) (*datamodel6.VPReturn, error)
+	Ping(context.Context, *datamodel3.PingArg) (*datamodel3.PingReturn, error)
+	Traceroute(context.Context, *datamodel4.TracerouteArg) (*datamodel4.TracerouteReturn, error)
+	GetVPs(context.Context, *datamodel5.VPRequest) (*datamodel5.VPReturn, error)
 }
 
 func RegisterControllerServer(s *grpc.Server, srv ControllerServer) {
@@ -181,7 +114,7 @@ func RegisterControllerServer(s *grpc.Server, srv ControllerServer) {
 }
 
 func _Controller_Ping_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel4.PingArg)
+	in := new(datamodel3.PingArg)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
@@ -193,7 +126,7 @@ func _Controller_Ping_Handler(srv interface{}, ctx context.Context, codec grpc.C
 }
 
 func _Controller_Traceroute_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel5.TracerouteArg)
+	in := new(datamodel4.TracerouteArg)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
@@ -204,84 +137,12 @@ func _Controller_Traceroute_Handler(srv interface{}, ctx context.Context, codec 
 	return out, nil
 }
 
-func _Controller_Stats_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel2.StatsArg)
+func _Controller_GetVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+	in := new(datamodel5.VPRequest)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(ControllerServer).Stats(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetVP_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetVP(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetAllVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetAllVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetSpoofingVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetSpoofingVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetTimeStampVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetTimeStampVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetRecordRouteVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetRecordRouteVPs(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func _Controller_GetActiveVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.VPRequest)
-	if err := codec.Unmarshal(buf, in); err != nil {
-		return nil, err
-	}
-	out, err := srv.(ControllerServer).GetActiveVPs(ctx, in)
+	out, err := srv.(ControllerServer).GetVPs(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -301,32 +162,8 @@ var _Controller_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Controller_Traceroute_Handler,
 		},
 		{
-			MethodName: "Stats",
-			Handler:    _Controller_Stats_Handler,
-		},
-		{
-			MethodName: "GetVP",
-			Handler:    _Controller_GetVP_Handler,
-		},
-		{
-			MethodName: "GetAllVPs",
-			Handler:    _Controller_GetAllVPs_Handler,
-		},
-		{
-			MethodName: "GetSpoofingVPs",
-			Handler:    _Controller_GetSpoofingVPs_Handler,
-		},
-		{
-			MethodName: "GetTimeStampVPs",
-			Handler:    _Controller_GetTimeStampVPs_Handler,
-		},
-		{
-			MethodName: "GetRecordRouteVPs",
-			Handler:    _Controller_GetRecordRouteVPs_Handler,
-		},
-		{
-			MethodName: "GetActiveVPs",
-			Handler:    _Controller_GetActiveVPs_Handler,
+			MethodName: "GetVPs",
+			Handler:    _Controller_GetVPs_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{},
