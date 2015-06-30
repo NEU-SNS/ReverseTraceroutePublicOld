@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package scamper is a library to work with scamper control sockets
 package scamper
 
 import (
@@ -37,7 +39,9 @@ import (
 )
 
 const (
-	PING       cmdT = "ping"
+	// PING represents the ping measurement
+	PING cmdT = "ping"
+	// TRACEROUTE represents the traceroute measurement
 	TRACEROUTE cmdT = "trace"
 )
 
@@ -62,9 +66,8 @@ func boolOpt(f string, arg interface{}) (string, error) {
 	if barg, ok := arg.(bool); ok {
 		if barg {
 			return f, nil
-		} else {
-			return "", nil
 		}
+		return "", nil
 	}
 	return "", fmt.Errorf("Invalid arg type in boolOpt: %v", arg)
 }
@@ -79,21 +82,34 @@ func stringOpt(f string, arg interface{}) (string, error) {
 	return "", fmt.Errorf("Invalid arg type in stringOpt: %v", arg)
 }
 
+// OptGetter is a function for converting an option
+// into a form scamper can understand
 type OptGetter func(f string, arg interface{}) (string, error)
 
 type cmdT string
 
+// Cmd is a command that can run on scamper
 type Cmd struct {
 	ct          cmdT
 	options     []string
 	id          uint32
-	userIDCache uint32
+	userIDCache string
 	resp        Response
 	userID      uint32
 	arg         interface{}
+	Err         error
 }
 
-func (c Cmd) Marshal() []byte {
+var cancelCmd = "halt %d\n"
+
+// CancelCmd cancels a running command
+func (c *Cmd) cancelCmd(w io.Writer) error {
+	cmd := fmt.Sprintf(cancelCmd, c.id)
+	_, err := w.Write([]byte(cmd))
+	return err
+}
+
+func (c *Cmd) marshal() []byte {
 	var buf bytes.Buffer
 	glog.Infof("CMD: %s, %d", c.ct, len(string(c.ct)))
 	buf.WriteString(string(c.ct) + " ")
@@ -101,12 +117,13 @@ func (c Cmd) Marshal() []byte {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	glog.Infof("Cmd as string: %s", cmd)
+	glog.Infof("Cmd as string: %s", buf)
 	return buf.Bytes()
 }
 
-func (c *Cmd) IssueCommand(w io.Writer) error {
-	cmd := c.Marshal()
+// IssueCommand marshals the Cmd and writes it to the provided writer
+func (c *Cmd) issueCommand(w io.Writer) error {
+	cmd := c.marshal()
 	_, err := w.Write(cmd)
 	return err
 }
@@ -115,16 +132,20 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	switch arg.(type) {
 	case dm.PingArg:
 		oID := arg.(dm.PingArg).UserId
-		arg.(dm.PingArg).UserId = id
-		c, err = createCmd(arg, PING)
-		c.userIDCache = oID
-		c.userID = id
+		if pa, ok := arg.(dm.PingArg); ok {
+			pa.UserId = fmt.Sprintf("%d", id)
+			c, err = createCmd(arg, PING)
+			c.userIDCache = oID
+			c.userID = id
+		}
 	case dm.TracerouteArg:
 		oID := arg.(dm.TracerouteArg).Userid
-		arg.(dm.TracerouteArg).Userid = id
-		c, err = createCmd(arg, TRACEROUTE)
-		c.userIDCache = oID
-		c.userID = id
+		if ta, ok := arg.(dm.TracerouteArg); ok {
+			ta.Userid = fmt.Sprintf("%d", id)
+			c, err = createCmd(arg, TRACEROUTE)
+			c.userIDCache = oID
+			c.userID = id
+		}
 	default:
 		err = fmt.Errorf("Failed to create Cmd, type not found")
 	}
