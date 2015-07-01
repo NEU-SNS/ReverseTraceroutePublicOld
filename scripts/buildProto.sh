@@ -2,9 +2,9 @@
 
 GOSRC=$GOPATH/src
 
-protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/lib/datamodel/*.proto \
+protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/datamodel/*.proto \
     --go_out=plugins=grpc:$GOSRC
-protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/lib/controllerapi/*.proto \
+protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/controllerapi/*.proto \
     --go_out=plugins=grpc:$GOSRC
-protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/lib/plcontrollerapi/*.proto \
+protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi/*.proto \
     --go_out=plugins=grpc:$GOSRC

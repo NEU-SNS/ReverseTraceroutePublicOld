@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+enum MType {
+    PING       = 0;
+    STATS      = 1;
+    TRACEROUTE = 2;
+}
