@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+message RecSpoof {
+    uint32 ip = 1;
+}
+
+message NotifyRecSpoofResponse {
+}
