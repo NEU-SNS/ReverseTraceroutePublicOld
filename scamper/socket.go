@@ -108,7 +108,7 @@ func newCmdMap() *cmdMap {
 }
 
 type userID struct {
-	UserID uint32 `json:"user_id"`
+	UserID uint32 `json:"userid"`
 }
 
 type unmarshal func(data []byte, v interface{}) error
@@ -177,7 +177,7 @@ func (s *Socket) monitorResponses() {
 		case resp := <-s.respChan:
 			cmdmap, err := s.cmds.getCmd(resp.UserID)
 			if err != nil {
-				glog.Errorf("Failed to get command for id: %d", resp.UserID)
+				glog.Errorf("Failed to get command for id: %d, err: %s", resp.UserID, err)
 				continue
 			}
 			s.cmds.rmCmd(resp.UserID)
@@ -198,7 +198,6 @@ func (s *Socket) reconnect() error {
 
 func (s *Socket) monitorConn() {
 	rw := bufio.NewReadWriter(bufio.NewReader(s.con), bufio.NewWriter(s.con))
-
 	for {
 		select {
 		case c := <-s.cmdChan:
@@ -232,16 +231,18 @@ func (s *Socket) monitorConn() {
 			if resp.RType != DATA {
 				continue
 			}
-			s.rc++
+
 			if s.rc < 2 {
 				s.wartsHeader[s.rc] = resp
+				s.rc++
 				continue
 			}
 			dec := &util.UUDecodingWriter{}
-			for i := 0; i < 2; i++ {
-				s.wartsHeader[i].WriteTo(dec)
-			}
+			s.wartsHeader[0].WriteTo(dec)
+			s.wartsHeader[1].WriteTo(dec)
+			glog.Infof("Writing: %s", resp.Bytes())
 			resp.WriteTo(dec)
+			glog.Infof("Converting warts: %s", dec.Bytes())
 			cwarts, err := convertWarts(s.converterPath, dec.Bytes())
 			if err != nil {
 				resp.Err = err
@@ -249,13 +250,14 @@ func (s *Socket) monitorConn() {
 				glog.Error("Failed to convert warts")
 				continue
 			}
-
+			resp.Data = cwarts
+			resp.DS = len(cwarts)
 			uid := &userID{}
 			err = s.unmarsh(cwarts, uid)
 			if err != nil {
 				resp.Err = err
 				s.respChan <- resp
-				glog.Error("Could not parse UserId from response")
+				glog.Errorf("Could not parse UserId from response: %s", err)
 				continue
 			}
 			resp.UserID = uid.UserID
@@ -270,7 +272,7 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 	glog.Info("Converting Warts")
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
-		glog.Errorf("Failed to converte bytes: %v", err)
+		glog.Errorf("Failed to converte bytes: %v, %s", err, b)
 		return []byte{}, err
 	}
 	glog.Infof("Results of converting: %s", res)
@@ -333,6 +335,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		resp.RType = ERR
 		return resp, nil
 	case strings.Contains(r, string(DATA)):
+		glog.Infof("Parsing Data response: %s", r)
 		resp.RType = DATA
 		split := strings.Split(r, " ")
 		if len(split) != 2 {

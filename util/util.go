@@ -30,7 +30,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"log"
 	"net"
 	"net/http"
@@ -38,6 +37,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -149,7 +150,7 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 		return nil, err
 	}
 	res := make([]byte, 1024*5)
-	_, err = stdout.Read(res)
+	n, err := stdout.Read(res)
 	if err != nil {
 		return res, err
 	}
@@ -157,7 +158,7 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return res, err
+	return res[:n], err
 }
 
 func StartPProf(addr string) {

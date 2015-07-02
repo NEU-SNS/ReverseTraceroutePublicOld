@@ -93,6 +93,11 @@ func (r Response) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
+var (
+	// ErrorSocketNotFound is used when a socketMap doesn't contain a socket
+	ErrorSocketNotFound = fmt.Errorf("No socket found")
+)
+
 type socketMap struct {
 	sync.Mutex
 	socks map[string]*Socket
@@ -123,7 +128,7 @@ func (sm *socketMap) Get(addr string) (*Socket, error) {
 	if sock, ok := sm.socks[addr]; ok {
 		return sock, nil
 	}
-	return nil, fmt.Errorf("Failed to find socket: %s", addr)
+	return nil, ErrorSocketNotFound
 }
 
 // Client is the main object for interacting with scamper
@@ -144,6 +149,11 @@ func (c *Client) AddSocket(s *Socket) {
 // RemoveSocket removes a socket from the client
 func (c *Client) RemoveSocket(addr string) {
 	c.sockets.Remove(addr)
+}
+
+// GetSocket gets a socket registered in the client
+func (c *Client) GetSocket(addr string) (*Socket, error) {
+	return c.sockets.Get(addr)
 }
 
 // DoMeasurement run the measurement described by arg from the address addr

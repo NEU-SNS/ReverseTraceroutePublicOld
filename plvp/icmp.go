@@ -28,10 +28,11 @@ package plvp
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/golang/glog"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/internal/iana"
-	"net"
 )
 
 const (
