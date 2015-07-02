@@ -83,7 +83,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	}
 	ret := dm.Ping{}
 
-	resp, err := c.client.DoMeasurement(pa.SAddr, pa)
+	resp, err := c.client.DoMeasurement(pa.Src, pa)
 	if err != nil {
 		return ret, err
 	}
@@ -95,7 +95,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 			return ret, fmt.Errorf("Could not decode ping response: %v", err)
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
-		return ret, fmt.Errorf("Ping time out")
+		return ret, fmt.Errorf("Ping timed out")
 	}
 	glog.Infof("Ping done: %v", ret)
 	return ret, nil
@@ -109,14 +109,19 @@ func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error
 	}
 	ret := dm.Traceroute{}
 
-	ec := make(chan error, 1)
-	dc := make(chan struct{}, 1)
-	select {
-	case err := <-ec:
+	resp, err := c.client.DoMeasurement(ta.Src, ta)
+	if err != nil {
 		return ret, err
-	case <-time.After(time.Second * time.Duration(c.conf.Local.Timeout)):
+	}
+
+	select {
+	case r := <-resp:
+		err := decodeResponse(r.Bytes(), &ret)
+		if err != nil {
+			return ret, fmt.Errorf("Could not decode traceroute response: %v", err)
+		}
+	case <-time.After(time.Second * time.Duration(timeout)):
 		return ret, fmt.Errorf("Traceroute timed out")
-	case <-dc:
 	}
 
 	glog.Infof("Traceroute done: %v", ret)
