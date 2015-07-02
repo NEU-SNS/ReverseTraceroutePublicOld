@@ -59,6 +59,7 @@ type PingArg struct {
 	TimeStamp  string   `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
 	Timeout    int64    `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
 	CheckCache bool     `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
+	Src        string   `protobuf:"bytes,24,opt,name=src" json:"src,omitempty"`
 }
 
 func (m *PingArg) Reset()         { *m = PingArg{} }
@@ -139,7 +140,7 @@ type Ping struct {
 	Start      *Time           `protobuf:"bytes,6,opt,name=start" json:"start,omitempty"`
 	PingSent   int32           `protobuf:"varint,7,opt,name=ping_sent" json:"ping_sent,omitempty"`
 	ProbeSize  int32           `protobuf:"varint,8,opt,name=probe_size" json:"probe_size,omitempty"`
-	Userid     int32           `protobuf:"varint,9,opt,name=userid" json:"userid,omitempty"`
+	Userid     uint32          `protobuf:"varint,9,opt,name=userid" json:"userid,omitempty"`
 	Ttl        int32           `protobuf:"varint,10,opt,name=ttl" json:"ttl,omitempty"`
 	Wait       int32           `protobuf:"varint,11,opt,name=wait" json:"wait,omitempty"`
 	Timeout    int32           `protobuf:"varint,12,opt,name=timeout" json:"timeout,omitempty"`

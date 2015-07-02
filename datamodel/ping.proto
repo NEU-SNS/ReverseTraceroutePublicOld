@@ -32,6 +32,7 @@ message PingArg {
     string time_stamp = 21;
     int64 timeout = 22;
     bool check_cache = 23;
+    string src = 24;
 }
 
 message PingStats {
@@ -76,7 +77,7 @@ message Ping {
 	Time start       =  6;
 	int32 ping_sent =  7;
 	int32 probe_size =  8;
-	int32 userid     =  9;
+	uint32 userid     =  9;
 	int32 ttl        = 10;
 	int32 wait       = 11;
 	int32 timeout    = 12;

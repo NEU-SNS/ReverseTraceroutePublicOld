@@ -99,24 +99,14 @@ type Cmd struct {
 	arg         interface{}
 }
 
-var cancelCmd = "halt %d\n"
-
-// CancelCmd cancels a running command
-func (c *Cmd) cancelCmd(w io.Writer) error {
-	cmd := fmt.Sprintf(cancelCmd, c.id)
-	_, err := w.Write([]byte(cmd))
-	return err
-}
-
 func (c *Cmd) marshal() []byte {
 	var buf bytes.Buffer
-	glog.Infof("CMD: %s, %d", c.ct, len(string(c.ct)))
 	buf.WriteString(string(c.ct) + " ")
 	for _, arg := range c.options {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	glog.Infof("Cmd as string: %s", buf)
+	glog.Infof("Cmd as string: %s", buf.String())
 	return buf.Bytes()
 }
 
@@ -138,7 +128,7 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 		oID := arg.(dm.PingArg).UserId
 		if pa, ok := arg.(dm.PingArg); ok {
 			pa.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(arg, PING)
+			c, err = createCmd(pa, PING)
 			c.userIDCache = oID
 			c.userID = id
 		}
@@ -146,7 +136,7 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 		oID := arg.(dm.TracerouteArg).Userid
 		if ta, ok := arg.(dm.TracerouteArg); ok {
 			ta.Userid = fmt.Sprintf("%d", id)
-			c, err = createCmd(arg, TRACEROUTE)
+			c, err = createCmd(ta, TRACEROUTE)
 			c.userIDCache = oID
 			c.userID = id
 		}
@@ -163,7 +153,7 @@ func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 	ty := reflect.TypeOf(arg)
 	v := reflect.ValueOf(arg)
 	n := v.NumField()
-	fopts := make([]string, n)
+	var fopts []string
 	var targ string
 	for i := 0; i < n; i++ {
 		f := ty.Field(i)
@@ -173,6 +163,9 @@ func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 				glog.Errorf("Failed on option: %s", f.Name)
 				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
 			}
+			if len(str) == 0 {
+				continue
+			}
 			if f.Name == "Dst" {
 				targ = str
 				continue
@@ -181,5 +174,6 @@ func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 		}
 	}
 	fopts = append(fopts, targ)
+	glog.Infof("Args: %v, %d", fopts, len(fopts))
 	return Cmd{ct: t, options: fopts}, nil
 }
