@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package controller is the library for creating a central controller
 package controller
 
 import (
@@ -46,6 +48,7 @@ import (
 )
 
 const (
+	// ID is the key for the measurement Id stored in the context argument
 	ID = "ID"
 )
 
@@ -77,7 +80,7 @@ func (c *controllerT) getRequests() int64 {
 
 func (c *controllerT) addRequest() {
 	c.mu.Lock()
-	c.requests += 1
+	c.requests++
 	c.mu.Unlock()
 }
 
@@ -97,7 +100,7 @@ func (c *controllerT) getTime() time.Duration {
 func (c *controllerT) addReqStats(req Request) {
 	c.mu.Lock()
 	c.time += req.Dur
-	c.requests += 1
+	c.requests++
 	c.mu.Unlock()
 }
 
@@ -108,6 +111,7 @@ func (c *controllerT) getStatsInfo() (t time.Duration, req int64) {
 	return
 }
 
+// HandleSig handles and signals received from the OS
 func HandleSig(sig os.Signal) {
 	controller.handleSig(sig)
 }
@@ -132,7 +136,7 @@ func (c *controllerT) getStats() dm.Stats {
 	return s
 }
 
-func (c *controllerT) startRpc(eChan chan error) {
+func (c *controllerT) startRPC(eChan chan error) {
 	var addr string
 	if c.config.Local.AutoConnect {
 		saddr, err := util.GetBindAddr()
@@ -297,121 +301,8 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 	return
 }
 
-// VPs only apply to planet-lab currently, so the get VP type calls
-// will be hardcoded to look for planet-lab vps
-func (c *controllerT) getVP(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetVP(ctx, arg)
-
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
-}
-
-func (c *controllerT) getAllVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetAllVPs(ctx, arg)
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
-}
-
-func (c *controllerT) getSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetSpoofingVPs(ctx, arg)
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
-}
-
-func (c *controllerT) getTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetTimeStampVPs(ctx, arg)
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
-}
-
-func (c *controllerT) getRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetRecordRouteVPs(ctx, arg)
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
-}
-
-func (c *controllerT) getActiveVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	plc, s, err := c.router.GetClient(dm.ServiceT_PLANET_LAB)
-	if err != nil {
-		return nil, err
-	}
-	if plcl, ok := plc.(plClient); ok {
-		ip, err := s.GetIp()
-		if err != nil {
-			return nil, err
-		}
-		err = plcl.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return plcl.GetActiveVPs(ctx, arg)
-	}
-	return nil, fmt.Errorf("Error tried to get vp from incorrect service")
+func (c *controllerT) doGetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
+	return new(dm.VPReturn), nil
 }
 
 func makeSuccessReturn(t time.Time) *dm.ReturnT {
@@ -432,6 +323,7 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
+// Start starts a central controller with the given configuration
 func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	errChan := make(chan error, 2)
 	if db == nil {
@@ -453,6 +345,6 @@ func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
 	var opts []grpc.ServerOption
 	controller.server = grpc.NewServer(opts...)
 	capi.RegisterControllerServer(controller.server, &controller)
-	go controller.startRpc(errChan)
+	go controller.startRPC(errChan)
 	return errChan
 }

@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package plvp is the library for creating a vantage poing on a planet-lab node
 package plvp
 
 import (
@@ -36,14 +38,18 @@ import (
 )
 
 const (
-	ID  = 0xf0f1
+	// ID is the ICMDPID magic number
+	ID = 0xf0f1
+	// SEQ is the ICMP seq number magic number
 	SEQ = 0xf2f3
 )
 
+// SpoofPingMonitor monitors for ICMP echo replies that match the magic numbers
 type SpoofPingMonitor struct {
 	conn *icmp.PacketConn
 }
 
+// Start the SpoofPingMonitor
 func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
 	pc, err := icmp.ListenPacket("ip4:icmp", addr)
@@ -93,6 +99,7 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 	}
 }
 
+// Stop stops the SpoofPingMonitor
 func (sm *SpoofPingMonitor) Stop() error {
 	return sm.conn.Close()
 }

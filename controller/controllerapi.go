@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package controller is the library for creating a central controller
 package controller
 
 import (
@@ -54,47 +56,9 @@ func (c *controllerT) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.
 	return
 }
 
-func (c *controllerT) GetVP(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Infof("Getting VP: %v", arg)
-	r = new(dm.VPReturn)
-	r, err = c.getVP(ctx, arg)
-	glog.Infof("Returning VP: %v", r.GetVps())
-	return
-
-}
-
-func (c *controllerT) GetAllVPs(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Info("Getting all VPs")
-	r = new(dm.VPReturn)
-	r, err = c.getAllVPs(ctx, arg)
-	glog.Infof("Returning VPs: %v", r.GetVps())
-	return
-}
-func (c *controllerT) GetSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Info("Getting spoofing vps")
-	r = new(dm.VPReturn)
-	r, err = c.getSpoofingVPs(ctx, arg)
-	glog.Infof("Returning spoofing VPs: %v", r.GetVps())
-	return
-}
-func (c *controllerT) GetTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Info("Getting timestamp vps")
-	r = new(dm.VPReturn)
-	r, err = c.getSpoofingVPs(ctx, arg)
-	glog.Infof("Returning timestamp VPs: %v", r.GetVps())
-	return
-}
-func (c *controllerT) GetRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Info("Getting record route vps")
-	r = new(dm.VPReturn)
-	r, err = c.getSpoofingVPs(ctx, arg)
-	glog.Infof("Returning record VPs: %v", r.GetVps())
-	return
-}
-func (c *controllerT) GetActiveVPs(ctx con.Context, arg *dm.VPRequest) (r *dm.VPReturn, err error) {
-	glog.Info("Getting active vps")
-	r = new(dm.VPReturn)
-	r, err = c.getActiveVPs(ctx, arg)
-	glog.Infof("Returning active VPs: %v", r.GetVps())
+func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
+	glog.Info("Handling VP Request")
+	vpr = new(dm.VPReturn)
+	vpr, err = c.doGetVPs(ctx, gvp)
 	return
 }

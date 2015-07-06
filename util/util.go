@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package util contains utilities uses throughout the packages
 package util
 
 import (
@@ -42,15 +44,20 @@ import (
 )
 
 const (
-	IP   = 0
+	// IP is the index for the ip in a split of an address string
+	IP = 0
+	// PORT is the index for the port in a split of an address string
 	PORT = 1
 )
 
 var (
-	ErrorInvalidIP   = errors.New("invalid IP address")
+	// ErrorInvalidIP is the error if the IP is invalid
+	ErrorInvalidIP = errors.New("invalid IP address")
+	// ErrorInvalidPort is the error if the Port is invalid
 	ErrorInvalidPort = errors.New("invalid port")
 )
 
+// IsDir checks if what is at path dir is a directory
 func IsDir(dir string) (bool, error) {
 	fi, err := os.Stat(dir)
 	if err != nil {
@@ -59,10 +66,12 @@ func IsDir(dir string) (bool, error) {
 	return fi.IsDir(), nil
 }
 
+// MakeDir create a directory at path path with permissions mode
 func MakeDir(path string, mode os.FileMode) error {
 	return os.Mkdir(path, mode)
 }
 
+// ParseAddrArg checks if the address in ip:port notation is valid
 func ParseAddrArg(addr string) (int, net.IP, error) {
 	ip, port, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -96,6 +105,7 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 	return pport, pip, nil
 }
 
+// CloseStdFiles closes the standard file descriptors
 func CloseStdFiles(c bool) {
 	if !c {
 		return
@@ -120,6 +130,7 @@ func CloseStdFiles(c bool) {
 	}
 }
 
+// ConnToRW converts a net.Conn to a bufio.ReadWriter
 func ConnToRW(c net.Conn) *bufio.ReadWriter {
 	w := bufio.NewWriter(c)
 	r := bufio.NewReader(c)
@@ -127,6 +138,8 @@ func ConnToRW(c net.Conn) *bufio.ReadWriter {
 	return rw
 }
 
+// ConvertBytes converts an input byte slice to an output byte slice using the
+// executable at path
 func ConvertBytes(path string, b []byte) ([]byte, error) {
 	cmd := exec.Command(path)
 	stdin, err := cmd.StdinPipe()
@@ -161,13 +174,15 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	return res[:n], err
 }
 
+// StartPProf starts the pprof http service
 func StartPProf(addr string) {
 	go func() {
 		log.Println(http.ListenAndServe(addr, nil))
 	}()
 }
 
-func Int32ToIpString(ip uint32) (string, error) {
+// Int32ToIPString converts an ip as an uint32 to a string
+func Int32ToIPString(ip uint32) (string, error) {
 	var a, b, c, d byte
 	if ip < 0 || ip > 4294967295 {
 		return "", fmt.Errorf("Ip out of range")
@@ -183,7 +198,8 @@ func Int32ToIpString(ip uint32) (string, error) {
 	return nip.String(), nil
 }
 
-func IpStringToInt32(ips string) (uint32, error) {
+// IPStringToInt32 converts an IP string to a uint32
+func IPStringToInt32(ips string) (uint32, error) {
 	ip := net.ParseIP(ips)
 	if ip == nil {
 		return 0, fmt.Errorf("Nil ip in IpToInt64")
@@ -198,10 +214,23 @@ func IpStringToInt32(ips string) (uint32, error) {
 	return res, nil
 }
 
+// IPtoInt32 converts a net.IP to an uint32
+func IPtoInt32(ip net.IP) (uint32, error) {
+	ip = ip.To4()
+	var res uint32
+	res |= uint32(ip[0]) << 24
+	res |= uint32(ip[1]) << 16
+	res |= uint32(ip[2]) << 8
+	res |= uint32(ip[3])
+	return res, nil
+}
+
+// MicroToNanoSec convers microseconds to nanoseconds
 func MicroToNanoSec(usec int64) int64 {
 	return usec * 1000
 }
 
+// GetBindAddr gets the IP of the eth0 like address
 func GetBindAddr() (string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
