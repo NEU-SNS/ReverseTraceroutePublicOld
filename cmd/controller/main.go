@@ -24,6 +24,7 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package main
 
 import (
@@ -36,7 +37,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess/hyperdex"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 )

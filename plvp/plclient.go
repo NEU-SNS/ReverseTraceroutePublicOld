@@ -24,16 +24,16 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package plvp is the library for creating a vantage poing on a planet-lab node
 package plvp
 
 import (
 	"fmt"
 	"time"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/golang/glog"
-	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -61,46 +61,4 @@ func (c *plClient) connect(addr string, timeout time.Duration) error {
 	c.cc = cc
 	c.client = plc.NewPLControllerClient(cc)
 	return nil
-}
-
-func (c *plClient) Register(addr string,
-	to time.Duration,
-	vp *dm.VantagePoint) error {
-
-	glog.Infof("Registering VP")
-	err := c.connect(addr, to)
-	if err != nil {
-		return err
-	}
-	defer c.disconnect()
-	_, err = c.client.Register(con.Background(), vp)
-	return err
-}
-
-func (c *plClient) NotifyRecSpoof(addr string,
-	to time.Duration,
-	rs *dm.NotifyRecSpoof) error {
-
-	glog.Infof("Notifying rec of spoofed ping from: %v", rs)
-	err := c.connect(addr, to)
-	if err != nil {
-		return err
-	}
-	defer c.disconnect()
-	_, err = c.client.NotifyRecSpoof(con.Background(), rs)
-	return err
-}
-
-func (c *plClient) UpdateVp(addr string,
-	to time.Duration,
-	vp *dm.VantagePoint) error {
-
-	glog.Infof("Updating VP with: %v", vp)
-	err := c.connect(addr, to)
-	if err != nil {
-		return err
-	}
-	defer c.disconnect()
-	_, err = c.client.UpdateVp(con.Background(), vp)
-	return err
 }

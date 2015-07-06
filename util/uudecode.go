@@ -24,21 +24,25 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package util contains utilities uses throughout the packages
 package util
 
 import (
 	"bytes"
 	"errors"
+
 	"github.com/golang/glog"
 )
 
 var (
-	UUDecDone          = errors.New("Decoding Done")
-	ErrorInvalidByte   = errors.New("InvalidByte")
-	ErrorBadOKResponse = errors.New("Invalid OK Response")
-	ErrorBadResponse   = errors.New("Bad Scamper Response")
+	// ErrorUUDecDone is the error for indicating the UUDecoding is done
+	ErrorUUDecDone = errors.New("Decoding Done")
+	// ErrorInvalidByte is the error for an invalid byte in a UUDecoding
+	ErrorInvalidByte = errors.New("InvalidByte")
 )
 
+// UUDecodingWriter decodes uuencoded bytes that are written to it
 type UUDecodingWriter struct {
 	b bytes.Buffer
 }
@@ -51,10 +55,12 @@ func (w *UUDecodingWriter) Write(p []byte) (n int, err error) {
 	return w.b.Write(res)
 }
 
+// Bytes gets the result bytes from a UUDecodingWriter
 func (w *UUDecodingWriter) Bytes() []byte {
 	return w.b.Bytes()
 }
 
+// UUDecode decodes the uuencoded bytes in e
 func UUDecode(e []byte) ([]byte, error) {
 
 	sep := []byte{'\n'}
@@ -71,7 +77,7 @@ func UUDecode(e []byte) ([]byte, error) {
 			break
 		}
 		ue, err := uudecodeLine(line)
-		if err != nil && err != UUDecDone {
+		if err != nil && err != ErrorUUDecDone {
 			return nil, err
 		}
 		result = append(result, ue...)
@@ -81,7 +87,7 @@ func UUDecode(e []byte) ([]byte, error) {
 
 func uudecodeLine(e []byte) ([]byte, error) {
 	if len(e) == 1 && e[0] == '`' {
-		return nil, UUDecDone
+		return nil, ErrorUUDecDone
 	}
 	lenB := uint(e[0] - 32)
 	e = e[1:]

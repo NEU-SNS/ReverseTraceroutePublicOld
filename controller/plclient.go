@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package controller is the library for creating a central controller
 package controller
 
 import (
@@ -37,14 +39,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-type ClientConn interface {
+type clientConn interface {
 	Close() error
 }
 
-type dialFunc func(string, ...interface{}) (ClientConn, error)
+type dialFunc func(string, ...interface{}) (clientConn, error)
 
 type plClient struct {
-	cc       ClientConn
+	cc       clientConn
 	connOpen bool
 	client   plc.PLControllerClient
 	addr     string
@@ -91,53 +93,4 @@ func (c *plClient) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (*dm.Tracer
 		return nil, fmt.Errorf("PLClient not connected")
 	}
 	return c.client.Traceroute(ctx, ta)
-}
-
-func (c *plClient) Stats(ctx con.Context, s *dm.StatsArg) (*dm.Stats, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.Stats(ctx, s)
-}
-
-func (c *plClient) GetVP(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetVP(ctx, arg)
-}
-
-func (c *plClient) GetAllVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetAllVPs(ctx, arg)
-}
-
-func (c *plClient) GetActiveVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetActiveVPs(ctx, arg)
-}
-
-func (c *plClient) GetRecordRouteVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetRecordRouteVPs(ctx, arg)
-}
-
-func (c *plClient) GetTimeStampVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetTimeStampVPs(ctx, arg)
-}
-
-func (c *plClient) GetSpoofingVPs(ctx con.Context, arg *dm.VPRequest) (*dm.VPReturn, error) {
-	if !c.connOpen {
-		return nil, fmt.Errorf("PLClient not connected")
-	}
-	return c.client.GetSpoofingVPs(ctx, arg)
 }

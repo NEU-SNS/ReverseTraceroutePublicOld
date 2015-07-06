@@ -39,7 +39,7 @@ It has these top-level messages:
 package controllerapi
 
 import proto "github.com/golang/protobuf/proto"
-import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 
@@ -61,7 +61,7 @@ func init() {
 // Client API for Controller service
 
 type ControllerClient interface {
-	Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.PingReturn, error)
+	Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (*datamodel2.PingReturn, error)
 	Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (*datamodel4.TracerouteReturn, error)
 	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (*datamodel5.VPReturn, error)
 }
@@ -74,8 +74,8 @@ func NewControllerClient(cc *grpc.ClientConn) ControllerClient {
 	return &controllerClient{cc}
 }
 
-func (c *controllerClient) Ping(ctx context.Context, in *datamodel3.PingArg, opts ...grpc.CallOption) (*datamodel3.PingReturn, error) {
-	out := new(datamodel3.PingReturn)
+func (c *controllerClient) Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (*datamodel2.PingReturn, error) {
+	out := new(datamodel2.PingReturn)
 	err := grpc.Invoke(ctx, "/.Controller/Ping", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (c *controllerClient) GetVPs(ctx context.Context, in *datamodel5.VPRequest,
 // Server API for Controller service
 
 type ControllerServer interface {
-	Ping(context.Context, *datamodel3.PingArg) (*datamodel3.PingReturn, error)
+	Ping(context.Context, *datamodel2.PingArg) (*datamodel2.PingReturn, error)
 	Traceroute(context.Context, *datamodel4.TracerouteArg) (*datamodel4.TracerouteReturn, error)
 	GetVPs(context.Context, *datamodel5.VPRequest) (*datamodel5.VPReturn, error)
 }
@@ -114,7 +114,7 @@ func RegisterControllerServer(s *grpc.Server, srv ControllerServer) {
 }
 
 func _Controller_Ping_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel3.PingArg)
+	in := new(datamodel2.PingArg)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}

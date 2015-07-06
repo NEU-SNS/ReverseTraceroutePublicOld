@@ -35,40 +35,54 @@ import proto "github.com/golang/protobuf/proto"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
+type TracerouteMeasurement struct {
+	Staleness    int64  `protobuf:"varint,1,opt,name=staleness" json:"staleness,omitempty"`
+	Host         string `protobuf:"bytes,2,opt,name=host" json:"host,omitempty"`
+	Dst          string `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
+	Confidence   string `protobuf:"bytes,4,opt,name=confidence" json:"confidence,omitempty"`
+	Dport        string `protobuf:"bytes,5,opt,name=dport" json:"dport,omitempty"`
+	FirstHop     string `protobuf:"bytes,6,opt,name=first_hop" json:"first_hop,omitempty"`
+	GapLimit     string `protobuf:"bytes,7,opt,name=gap_limit" json:"gap_limit,omitempty"`
+	GapAction    string `protobuf:"bytes,8,opt,name=gap_action" json:"gap_action,omitempty"`
+	MaxTtl       string `protobuf:"bytes,9,opt,name=max_ttl" json:"max_ttl,omitempty"`
+	PathDiscov   bool   `protobuf:"varint,10,opt,name=path_discov" json:"path_discov,omitempty"`
+	Loops        string `protobuf:"bytes,11,opt,name=loops" json:"loops,omitempty"`
+	LoopAction   string `protobuf:"bytes,12,opt,name=loop_action" json:"loop_action,omitempty"`
+	Payload      string `protobuf:"bytes,13,opt,name=payload" json:"payload,omitempty"`
+	Method       string `protobuf:"bytes,14,opt,name=method" json:"method,omitempty"`
+	Attempts     string `protobuf:"bytes,15,opt,name=attempts" json:"attempts,omitempty"`
+	SendAll      bool   `protobuf:"varint,16,opt,name=send_all" json:"send_all,omitempty"`
+	Sport        string `protobuf:"bytes,17,opt,name=sport" json:"sport,omitempty"`
+	Src          string `protobuf:"bytes,18,opt,name=src" json:"src,omitempty"`
+	Tos          string `protobuf:"bytes,19,opt,name=tos" json:"tos,omitempty"`
+	TimeExceeded bool   `protobuf:"varint,20,opt,name=time_exceeded" json:"time_exceeded,omitempty"`
+	Userid       string `protobuf:"bytes,21,opt,name=userid" json:"userid,omitempty"`
+	Wait         string `protobuf:"bytes,22,opt,name=wait" json:"wait,omitempty"`
+	WaitProbe    string `protobuf:"bytes,23,opt,name=wait_probe" json:"wait_probe,omitempty"`
+	GssEntry     string `protobuf:"bytes,24,opt,name=gss_entry" json:"gss_entry,omitempty"`
+	LssName      string `protobuf:"bytes,25,opt,name=lss_name" json:"lss_name,omitempty"`
+	Timeout      int64  `protobuf:"varint,26,opt,name=timeout" json:"timeout,omitempty"`
+	CheckCache   bool   `protobuf:"varint,27,opt,name=check_cache" json:"check_cache,omitempty"`
+}
+
+func (m *TracerouteMeasurement) Reset()         { *m = TracerouteMeasurement{} }
+func (m *TracerouteMeasurement) String() string { return proto.CompactTextString(m) }
+func (*TracerouteMeasurement) ProtoMessage()    {}
+
 type TracerouteArg struct {
-	Service      ServiceT `protobuf:"varint,1,opt,name=service,enum=datamodel.ServiceT" json:"service,omitempty"`
-	Host         string   `protobuf:"bytes,2,opt,name=host" json:"host,omitempty"`
-	Dst          string   `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
-	Confidence   string   `protobuf:"bytes,4,opt,name=confidence" json:"confidence,omitempty"`
-	Dport        string   `protobuf:"bytes,5,opt,name=dport" json:"dport,omitempty"`
-	FirstHop     string   `protobuf:"bytes,6,opt,name=first_hop" json:"first_hop,omitempty"`
-	GapLimit     string   `protobuf:"bytes,7,opt,name=gap_limit" json:"gap_limit,omitempty"`
-	GapAction    string   `protobuf:"bytes,8,opt,name=gap_action" json:"gap_action,omitempty"`
-	MaxTtl       string   `protobuf:"bytes,9,opt,name=max_ttl" json:"max_ttl,omitempty"`
-	PathDiscov   bool     `protobuf:"varint,10,opt,name=path_discov" json:"path_discov,omitempty"`
-	Loops        string   `protobuf:"bytes,11,opt,name=loops" json:"loops,omitempty"`
-	LoopAction   string   `protobuf:"bytes,12,opt,name=loop_action" json:"loop_action,omitempty"`
-	Payload      string   `protobuf:"bytes,13,opt,name=payload" json:"payload,omitempty"`
-	Method       string   `protobuf:"bytes,14,opt,name=method" json:"method,omitempty"`
-	Attempts     string   `protobuf:"bytes,15,opt,name=attempts" json:"attempts,omitempty"`
-	SendAll      bool     `protobuf:"varint,16,opt,name=send_all" json:"send_all,omitempty"`
-	Sport        string   `protobuf:"bytes,17,opt,name=sport" json:"sport,omitempty"`
-	Src          string   `protobuf:"bytes,18,opt,name=src" json:"src,omitempty"`
-	Tos          string   `protobuf:"bytes,19,opt,name=tos" json:"tos,omitempty"`
-	TimeExceeded bool     `protobuf:"varint,20,opt,name=time_exceeded" json:"time_exceeded,omitempty"`
-	Userid       string   `protobuf:"bytes,21,opt,name=userid" json:"userid,omitempty"`
-	Wait         string   `protobuf:"bytes,22,opt,name=wait" json:"wait,omitempty"`
-	WaitProbe    string   `protobuf:"bytes,23,opt,name=wait_probe" json:"wait_probe,omitempty"`
-	GssEntry     string   `protobuf:"bytes,24,opt,name=gss_entry" json:"gss_entry,omitempty"`
-	LssName      string   `protobuf:"bytes,25,opt,name=lss_name" json:"lss_name,omitempty"`
-	Timeout      int64    `protobuf:"varint,26,opt,name=timeout" json:"timeout,omitempty"`
-	CheckCache   bool     `protobuf:"varint,27,opt,name=check_cache" json:"check_cache,omitempty"`
-	Staleness    int64    `protobuf:"varint,28,opt,name=staleness" json:"staleness,omitempty"`
+	Traceroutes []*TracerouteMeasurement `protobuf:"bytes,1,rep,name=traceroutes" json:"traceroutes,omitempty"`
 }
 
 func (m *TracerouteArg) Reset()         { *m = TracerouteArg{} }
 func (m *TracerouteArg) String() string { return proto.CompactTextString(m) }
 func (*TracerouteArg) ProtoMessage()    {}
+
+func (m *TracerouteArg) GetTraceroutes() []*TracerouteMeasurement {
+	if m != nil {
+		return m.Traceroutes
+	}
+	return nil
+}
 
 type TracerouteHop struct {
 	Addr      string  `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`

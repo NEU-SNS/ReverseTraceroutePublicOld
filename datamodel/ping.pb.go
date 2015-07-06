@@ -35,36 +35,50 @@ import proto "github.com/golang/protobuf/proto"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
+type PingMeasurement struct {
+	Src        string `protobuf:"bytes,1,opt,name=src" json:"src,omitempty"`
+	Dst        string `protobuf:"bytes,2,opt,name=dst" json:"dst,omitempty"`
+	Host       string `protobuf:"bytes,3,opt,name=host" json:"host,omitempty"`
+	Spoof      bool   `protobuf:"varint,4,opt,name=spoof" json:"spoof,omitempty"`
+	RR         bool   `protobuf:"varint,5,opt" json:"RR,omitempty"`
+	SAddr      string `protobuf:"bytes,6,opt,name=s_addr" json:"s_addr,omitempty"`
+	Payload    string `protobuf:"bytes,7,opt,name=payload" json:"payload,omitempty"`
+	Count      string `protobuf:"bytes,8,opt,name=count" json:"count,omitempty"`
+	IcmpSum    string `protobuf:"bytes,9,opt,name=icmp_sum" json:"icmp_sum,omitempty"`
+	Dport      string `protobuf:"bytes,10,opt,name=dport" json:"dport,omitempty"`
+	Sport      string `protobuf:"bytes,11,opt,name=sport" json:"sport,omitempty"`
+	Wait       string `protobuf:"bytes,12,opt,name=wait" json:"wait,omitempty"`
+	Ttl        string `protobuf:"bytes,13,opt,name=ttl" json:"ttl,omitempty"`
+	Mut        string `protobuf:"bytes,14,opt,name=mut" json:"mut,omitempty"`
+	ReplyCount string `protobuf:"bytes,15,opt,name=reply_count" json:"reply_count,omitempty"`
+	Pattern    string `protobuf:"bytes,16,opt,name=pattern" json:"pattern,omitempty"`
+	Method     string `protobuf:"bytes,17,opt,name=method" json:"method,omitempty"`
+	Size       string `protobuf:"bytes,18,opt,name=size" json:"size,omitempty"`
+	UserId     string `protobuf:"bytes,19,opt,name=user_id" json:"user_id,omitempty"`
+	Tos        string `protobuf:"bytes,20,opt,name=tos" json:"tos,omitempty"`
+	TimeStamp  string `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
+	Timeout    int64  `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
+	CheckCache bool   `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
+}
+
+func (m *PingMeasurement) Reset()         { *m = PingMeasurement{} }
+func (m *PingMeasurement) String() string { return proto.CompactTextString(m) }
+func (*PingMeasurement) ProtoMessage()    {}
+
 type PingArg struct {
-	Service    ServiceT `protobuf:"varint,1,opt,name=service,enum=datamodel.ServiceT" json:"service,omitempty"`
-	Dst        string   `protobuf:"bytes,2,opt,name=dst" json:"dst,omitempty"`
-	Host       string   `protobuf:"bytes,3,opt,name=host" json:"host,omitempty"`
-	Spoof      bool     `protobuf:"varint,4,opt,name=spoof" json:"spoof,omitempty"`
-	RR         bool     `protobuf:"varint,5,opt" json:"RR,omitempty"`
-	SAddr      string   `protobuf:"bytes,6,opt,name=s_addr" json:"s_addr,omitempty"`
-	Payload    string   `protobuf:"bytes,7,opt,name=payload" json:"payload,omitempty"`
-	Count      string   `protobuf:"bytes,8,opt,name=count" json:"count,omitempty"`
-	IcmpSum    string   `protobuf:"bytes,9,opt,name=icmp_sum" json:"icmp_sum,omitempty"`
-	Dport      string   `protobuf:"bytes,10,opt,name=dport" json:"dport,omitempty"`
-	Sport      string   `protobuf:"bytes,11,opt,name=sport" json:"sport,omitempty"`
-	Wait       string   `protobuf:"bytes,12,opt,name=wait" json:"wait,omitempty"`
-	Ttl        string   `protobuf:"bytes,13,opt,name=ttl" json:"ttl,omitempty"`
-	Mut        string   `protobuf:"bytes,14,opt,name=mut" json:"mut,omitempty"`
-	ReplyCount string   `protobuf:"bytes,15,opt,name=reply_count" json:"reply_count,omitempty"`
-	Pattern    string   `protobuf:"bytes,16,opt,name=pattern" json:"pattern,omitempty"`
-	Method     string   `protobuf:"bytes,17,opt,name=method" json:"method,omitempty"`
-	Size       string   `protobuf:"bytes,18,opt,name=size" json:"size,omitempty"`
-	UserId     string   `protobuf:"bytes,19,opt,name=user_id" json:"user_id,omitempty"`
-	Tos        string   `protobuf:"bytes,20,opt,name=tos" json:"tos,omitempty"`
-	TimeStamp  string   `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
-	Timeout    int64    `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
-	CheckCache bool     `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
-	Src        string   `protobuf:"bytes,24,opt,name=src" json:"src,omitempty"`
+	Pings []*PingMeasurement `protobuf:"bytes,1,rep,name=pings" json:"pings,omitempty"`
 }
 
 func (m *PingArg) Reset()         { *m = PingArg{} }
 func (m *PingArg) String() string { return proto.CompactTextString(m) }
 func (*PingArg) ProtoMessage()    {}
+
+func (m *PingArg) GetPings() []*PingMeasurement {
+	if m != nil {
+		return m.Pings
+	}
+	return nil
+}
 
 type PingStats struct {
 	Replies int32   `protobuf:"varint,1,opt,name=replies" json:"replies,omitempty"`
@@ -147,6 +161,7 @@ type Ping struct {
 	Flags      []string        `protobuf:"bytes,13,rep,name=flags" json:"flags,omitempty"`
 	Responses  []*PingResponse `protobuf:"bytes,14,rep,name=responses" json:"responses,omitempty"`
 	Statistics *PingStats      `protobuf:"bytes,15,opt,name=statistics" json:"statistics,omitempty"`
+	Error      string          `protobuf:"bytes,16,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *Ping) Reset()         { *m = Ping{} }

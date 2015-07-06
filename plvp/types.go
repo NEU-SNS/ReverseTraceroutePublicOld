@@ -24,19 +24,24 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package plvp is the library for creating a vantage poing on a planet-lab node
 package plvp
 
+// Flags represents the arguments to the vantage-point
 type Flags struct {
 	Local      LocalConfig
 	Scamper    ScamperConfig
 	ConfigPath string
 }
 
+// Config represents the configuration of the vantage-point
 type Config struct {
 	Local   LocalConfig
 	Scamper ScamperConfig
 }
 
+// LocalConfig represents the configuration of the vantage-point minus Scamper
 type LocalConfig struct {
 	Addr         string
 	Proto        string
@@ -50,6 +55,7 @@ type LocalConfig struct {
 	Host         string
 }
 
+// ScamperConfig represents the scamper configuration options
 type ScamperConfig struct {
 	BinPath string
 	Host    string

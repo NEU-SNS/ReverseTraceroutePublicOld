@@ -124,17 +124,17 @@ func (c *Cmd) issueCommand(w io.Writer) error {
 
 func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	switch arg.(type) {
-	case dm.PingArg:
-		oID := arg.(dm.PingArg).UserId
-		if pa, ok := arg.(dm.PingArg); ok {
+	case dm.PingMeasurement:
+		oID := arg.(dm.PingMeasurement).UserId
+		if pa, ok := arg.(dm.PingMeasurement); ok {
 			pa.UserId = fmt.Sprintf("%d", id)
 			c, err = createCmd(pa, PING)
 			c.userIDCache = oID
 			c.userID = id
 		}
-	case dm.TracerouteArg:
-		oID := arg.(dm.TracerouteArg).Userid
-		if ta, ok := arg.(dm.TracerouteArg); ok {
+	case dm.TracerouteMeasurement:
+		oID := arg.(dm.TracerouteMeasurement).Userid
+		if ta, ok := arg.(dm.TracerouteMeasurement); ok {
 			ta.Userid = fmt.Sprintf("%d", id)
 			c, err = createCmd(ta, TRACEROUTE)
 			c.userIDCache = oID

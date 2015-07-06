@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package plvp is the library for creating a vantage poing on a planet-lab node
 package plvp
 
 import (
@@ -51,18 +53,17 @@ type plVantagepointT struct {
 	mu       sync.Mutex
 	lu       time.Time
 	plc      *plClient
-	ips      []string
 }
 
 var plVantagepoint plVantagepointT
 
 func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	sip, e := pickIp(c.config.Local.Host)
+	sip, e := pickIP(c.config.Local.Host)
 	if e != nil {
 		glog.Errorf("Couldn't resolve host on restart")
 		return true
 	}
-	c.sc.Ip = sip
+	c.sc.IP = sip
 	arg := fmt.Sprintf("%s:%s", sip, c.sc.Port)
 	p.SetArg(scamper.ADDRINDEX, arg)
 	switch err.(type) {
@@ -77,10 +78,12 @@ func (c *plVantagepointT) handleSig(s os.Signal) {
 	c.mp.KillAll()
 }
 
+// HandleSig handles signals
 func HandleSig(s os.Signal) {
 	plVantagepoint.handleSig(s)
 }
 
+// Start a plvp with the given config
 func Start(c Config) chan error {
 	glog.Info("Starting plvp with config: %v", c)
 	defer glog.Flush()
@@ -90,13 +93,13 @@ func Start(c Config) chan error {
 
 	con := new(scamper.Config)
 	con.ScPath = c.Scamper.BinPath
-	sip, err := pickIp(c.Scamper.Host)
+	sip, err := pickIP(c.Scamper.Host)
 	if err != nil {
 		glog.Errorf("Could not resolve url: %s, with err: %v", c.Local.Host, err)
 		errChan <- err
 		return errChan
 	}
-	con.Ip = sip
+	con.IP = sip
 	con.Port = c.Scamper.Port
 	err = scamper.ParseConfig(*con)
 	if err != nil {
@@ -130,7 +133,7 @@ func (c *plVantagepointT) monitorSpoofedPings(ips chan net.IP, ec chan error) {
 			select {
 			case ip := <-ips:
 				glog.Infof("Got IP from spoof monitor: %d", ip)
-				err := c.sendRecSpoofIp(ip)
+				err := c.sendRecSpoofIP(ip)
 				if err != nil {
 					glog.Errorf("Failed to notify recspoof: %v", err)
 				}
@@ -141,24 +144,20 @@ func (c *plVantagepointT) monitorSpoofedPings(ips chan net.IP, ec chan error) {
 	}()
 }
 
-func (c *plVantagepointT) sendRecSpoofIp(ip net.IP) error {
-	connip, err := pickIp(c.config.Local.Host)
+func (c *plVantagepointT) sendRecSpoofIP(ip net.IP) error {
+	_, err := pickIP(c.config.Local.Host)
 	if err != nil {
 		return err
 	}
-	arg := new(dm.NotifyRecSpoof)
-	arg.Ip, err = util.IpStringToInt32(ip.String())
-	if err != nil {
-		return err
-	}
-	err = c.plc.NotifyRecSpoof(connip, time.Second*10, arg)
+	arg := new(dm.RecSpoof)
+	arg.Ip, err = util.IPtoInt32(ip)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func pickIp(host string) (string, error) {
+func pickIP(host string) (string, error) {
 
 	glog.Infof("Looking up addresses for %s", host)
 	addrs, err := net.LookupHost(host)
@@ -172,6 +171,6 @@ func pickIp(host string) (string, error) {
 
 func (c *plVantagepointT) startScamperProcs() {
 	glog.Info("Starting scamper procs")
-	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.Ip, c.sc.Port)
+	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.IP, c.sc.Port)
 	c.mp.ManageProcess(sp, true, 10000, c.handleScamperStop)
 }

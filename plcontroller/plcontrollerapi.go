@@ -29,29 +29,61 @@
 package plcontroller
 
 import (
+	"fmt"
+	"sync"
+
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/golang/glog"
 	con "golang.org/x/net/context"
 )
 
+var (
+	// ErrorEmptyArgList is returned when a measurement request comes in with an
+	// empty list of args
+	ErrorEmptyArgList = fmt.Errorf("Empty argument list.")
+	// ErrorTimeout is returned when a measurement times out
+	ErrorTimeout = fmt.Errorf("Measurement timed out")
+)
+
 const id = "ID"
 
-func (c *plControllerT) Ping(ctx con.Context, arg *dm.PingArg) (pr *dm.Ping, err error) {
-	val := ctx.Value(id)
-	glog.Info("Ping Called for req: %s", val)
-	pr = new(dm.Ping)
-	*pr, err = plController.runPing(*arg)
-	glog.Info("Ping done for req: %s, got: %v", val, pr)
-	return
+func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer) error {
+	pings := pa.GetPings()
+	if len(pings) == 0 {
+		return ErrorEmptyArgList
+	}
+	doneChan := make(chan struct{})
+	errChan := make(chan error)
+	var wg sync.WaitGroup
+	for _, ping := range pings {
+		wg.Add(1)
+		go func(st plc.PLController_PingServer, w *sync.WaitGroup, p *dm.PingMeasurement, ec chan error) {
+			defer wg.Done()
+			pr, err := c.runPing(p)
+			if err != nil {
+				pr.Error = err.Error()
+			}
+			if e := st.Send(&pr); e != nil {
+				ec <- e
+			}
+		}(stream, &wg, ping, errChan)
+	}
+
+	go func() {
+		wg.Wait()
+		close(doneChan)
+	}()
+	select {
+	case <-doneChan:
+		return nil
+	case err := <-errChan:
+		return err
+	}
 }
 
-func (c *plControllerT) Traceroute(ctx con.Context, arg *dm.TracerouteArg) (tr *dm.Traceroute, err error) {
-	val := ctx.Value(id)
-	glog.Info("Traceroute Called for req: %s", val)
-	tr = new(dm.Traceroute)
-	*tr, err = plController.runTraceroute(*arg)
-	glog.Info("Traceroute done for req: %s, got: %v", val, tr)
-	return
+func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController_TracerouteServer) error {
+	return nil
 }
 
 func (c *plControllerT) ReceiveSpoof(ctx con.Context, arg *dm.RecSpoof) (ret *dm.NotifyRecSpoofResponse, err error) {
@@ -66,8 +98,8 @@ func (c *plControllerT) NotifyRecSpoof(ctx con.Context, arg *dm.RecSpoof) (nr *d
 	return
 }
 
-func (c *plControllerT) GetVPs(ctx con.Context, arg *dm.VPRequest) (ret *dm.VPReturn, err error) {
+func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
 	glog.Info("Getting All VPs")
-	ret = new(dm.VPReturn)
-	return
+
+	return nil
 }

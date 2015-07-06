@@ -9,9 +9,9 @@ import "github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto";
 
 service PLController {
 
-    rpc Ping(datamodel.PingArg) returns (datamodel.Ping) {}
-    rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.Traceroute) {}
+    rpc Ping(datamodel.PingArg) returns (stream datamodel.Ping) {}
+    rpc Traceroute(datamodel.TracerouteArg) returns (stream datamodel.Traceroute) {}
     rpc ReceiveSpoof(datamodel.RecSpoof) returns (datamodel.NotifyRecSpoofResponse) {}
-    rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
+    rpc GetVPs(datamodel.VPRequest) returns (stream datamodel.VPReturn) {}
 
 }

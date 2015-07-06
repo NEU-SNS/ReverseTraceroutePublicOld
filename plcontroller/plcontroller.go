@@ -75,7 +75,7 @@ func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 
 var plController plControllerT
 
-func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
+func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
@@ -101,7 +101,7 @@ func (c *plControllerT) runPing(pa dm.PingArg) (dm.Ping, error) {
 	return ret, nil
 }
 
-func (c *plControllerT) runTraceroute(ta dm.TracerouteArg) (dm.Traceroute, error) {
+func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
 	if timeout == 0 {
@@ -132,9 +132,9 @@ func decodeResponse(res []byte, ret interface{}) error {
 	return json.NewDecoder(bytes.NewReader(res)).Decode(ret)
 }
 
-func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {
+func convertWarts(path string, b []byte) ([]byte, error) {
 	glog.Info("Converting Warts")
-	res, err := util.ConvertBytes(c.sc.ScParserPath, b)
+	res, err := util.ConvertBytes(path, b)
 	if err != nil {
 		glog.Errorf("Failed to converte bytes: %v", err)
 		return []byte{}, err
@@ -143,15 +143,12 @@ func (c *plControllerT) convertWarts(b []byte) ([]byte, error) {
 	return res, err
 }
 
-func (c *plControllerT) addSocket(sock scamper.Socket) {
-
+func (c *plControllerT) addSocket(sock *scamper.Socket) {
+	c.client.AddSocket(sock)
 }
 
-func (c *plControllerT) getSocket(n string) (scamper.Socket, error) {
-	glog.Infof("Getting socket for %s, len: %d", n, len(n))
-
-	glog.Errorf("Did not find socket for %s", n)
-	return scamper.Socket{}, fmt.Errorf("Could not find socket: %s", n)
+func (c *plControllerT) getSocket(n string) (*scamper.Socket, error) {
+	return c.client.GetSocket(n)
 }
 
 // Start starts a plcontroller with the given configuration
