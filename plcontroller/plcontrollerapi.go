@@ -54,20 +54,38 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 		return ErrorEmptyArgList
 	}
 	doneChan := make(chan struct{})
-	errChan := make(chan error)
+	errChan := make(chan error, len(pings))
+	quitChan := make(chan struct{})
 	var wg sync.WaitGroup
 	for _, ping := range pings {
 		wg.Add(1)
-		go func(st plc.PLController_PingServer, w *sync.WaitGroup, p *dm.PingMeasurement, ec chan error) {
+		go func(st plc.PLController_PingServer, w *sync.WaitGroup, p *dm.PingMeasurement) {
+			glog.Infof("Rinning ping: %v", p)
 			defer wg.Done()
-			pr, err := c.runPing(p)
-			if err != nil {
-				pr.Error = err.Error()
+			sendChan := make(chan struct{})
+			var pp *dm.Ping
+			for {
+				select {
+				case <-quitChan:
+					return
+				case <-sendChan:
+					glog.Infof("Sending ping: %v", pp)
+					if e := st.Send(pp); e != nil {
+						errChan <- e
+						close(quitChan)
+					}
+					return
+				default:
+					pr, err := c.runPing(p)
+					glog.Infof("Got ping result: %v, with error %v", pr, err)
+					if err != nil {
+						pr.Error = err.Error()
+					}
+					pp = &pr
+					close(sendChan)
+				}
 			}
-			if e := st.Send(&pr); e != nil {
-				ec <- e
-			}
-		}(stream, &wg, ping, errChan)
+		}(stream, &wg, ping)
 	}
 
 	go func() {
@@ -83,7 +101,52 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 }
 
 func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController_TracerouteServer) error {
-	return nil
+	traces := ta.GetTraceroutes()
+	if len(traces) == 0 {
+		return ErrorEmptyArgList
+	}
+	doneChan := make(chan struct{})
+	errChan := make(chan error, len(traces))
+	quitChan := make(chan struct{})
+	var wg sync.WaitGroup
+	for _, trace := range traces {
+		wg.Add(1)
+		go func(st plc.PLController_TracerouteServer, w *sync.WaitGroup, t *dm.TracerouteMeasurement) {
+			defer wg.Done()
+			sendChan := make(chan struct{})
+			var ttr *dm.Traceroute
+			for {
+				select {
+				case <-quitChan:
+					return
+				case <-sendChan:
+					if e := st.Send(ttr); e != nil {
+						errChan <- e
+						close(quitChan)
+					}
+					return
+				default:
+					tr, err := c.runTraceroute(t)
+					if err != nil {
+						tr.Error = err.Error()
+					}
+					ttr = &tr
+					close(sendChan)
+				}
+			}
+		}(stream, &wg, trace)
+	}
+
+	go func() {
+		wg.Wait()
+		close(doneChan)
+	}()
+	select {
+	case <-doneChan:
+		return nil
+	case err := <-errChan:
+		return err
+	}
 }
 
 func (c *plControllerT) ReceiveSpoof(ctx con.Context, arg *dm.RecSpoof) (ret *dm.NotifyRecSpoofResponse, err error) {

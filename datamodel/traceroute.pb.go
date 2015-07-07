@@ -126,6 +126,7 @@ type Traceroute struct {
 	Tos        int32            `protobuf:"varint,18,opt,name=tos" json:"tos,omitempty"`
 	ProbeSize  int32            `protobuf:"varint,19,opt,name=probe_size" json:"probe_size,omitempty"`
 	Hops       []*TracerouteHop `protobuf:"bytes,20,rep,name=hops" json:"hops,omitempty"`
+	Error      string           `protobuf:"bytes,21,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *Traceroute) Reset()         { *m = Traceroute{} }

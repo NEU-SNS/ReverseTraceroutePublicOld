@@ -80,6 +80,7 @@ message Traceroute {
 	 int32 tos                  = 18;
 	 int32 probe_size           = 19;
   repeated TracerouteHop hops = 20;
+  string error                = 21;
 }
 
 message TracerouteTime {
