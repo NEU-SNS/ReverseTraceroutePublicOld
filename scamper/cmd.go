@@ -96,7 +96,6 @@ type Cmd struct {
 	userIDCache string
 	resp        Response
 	userID      uint32
-	arg         interface{}
 }
 
 func (c *Cmd) marshal() []byte {
@@ -144,7 +143,6 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	default:
 		err = fmt.Errorf("Failed to create Cmd, type not found")
 	}
-	c.arg = arg
 	return
 }
 

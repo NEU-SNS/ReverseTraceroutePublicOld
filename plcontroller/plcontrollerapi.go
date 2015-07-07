@@ -42,14 +42,18 @@ var (
 	// ErrorEmptyArgList is returned when a measurement request comes in with an
 	// empty list of args
 	ErrorEmptyArgList = fmt.Errorf("Empty argument list.")
+	// ErrorNilArgList is returned when a measurement request comes in with a nil
+	// argument list
+	ErrorNilArgList = fmt.Errorf("Nil argument list.")
 	// ErrorTimeout is returned when a measurement times out
-	ErrorTimeout = fmt.Errorf("Measurement timed out")
+	ErrorTimeout = fmt.Errorf("Measurement timed out.")
 )
-
-const id = "ID"
 
 func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer) error {
 	pings := pa.GetPings()
+	if pings == nil {
+		return ErrorNilArgList
+	}
 	if len(pings) == 0 {
 		return ErrorEmptyArgList
 	}
@@ -102,6 +106,9 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 
 func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController_TracerouteServer) error {
 	traces := ta.GetTraceroutes()
+	if traces == nil {
+		return ErrorNilArgList
+	}
 	if len(traces) == 0 {
 		return ErrorEmptyArgList
 	}
@@ -149,9 +156,15 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 	}
 }
 
-func (c *plControllerT) ReceiveSpoof(ctx con.Context, arg *dm.RecSpoof) (ret *dm.NotifyRecSpoofResponse, err error) {
-	ret = nil
-	err = nil
+func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {
+	spoofs := rs.GetSpoofs()
+	if spoofs == nil {
+		return ErrorNilArgList
+	}
+	if len(spoofs) == 0 {
+		return ErrorEmptyArgList
+	}
+	ret, err = c.recSpoof(rs)
 	return
 }
 

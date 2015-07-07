@@ -5,8 +5,15 @@ option go_package = "datamodel";
 package datamodel;
 
 message RecSpoof {
-    uint32 ip = 1;
+    repeated Spoof spoofs = 1;
+}
+
+message Spoof {
+  string ip = 1;
+  uint32 id = 2;
 }
 
 message NotifyRecSpoofResponse {
+  Spoof spoof  = 1;
+  string error = 2;
 }

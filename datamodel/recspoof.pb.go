@@ -36,19 +36,44 @@ import proto "github.com/golang/protobuf/proto"
 var _ = proto.Marshal
 
 type RecSpoof struct {
-	Ip uint32 `protobuf:"varint,1,opt,name=ip" json:"ip,omitempty"`
+	Spoofs []*Spoof `protobuf:"bytes,1,rep,name=spoofs" json:"spoofs,omitempty"`
 }
 
 func (m *RecSpoof) Reset()         { *m = RecSpoof{} }
 func (m *RecSpoof) String() string { return proto.CompactTextString(m) }
 func (*RecSpoof) ProtoMessage()    {}
 
+func (m *RecSpoof) GetSpoofs() []*Spoof {
+	if m != nil {
+		return m.Spoofs
+	}
+	return nil
+}
+
+type Spoof struct {
+	Ip string `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
+	Id uint32 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
+}
+
+func (m *Spoof) Reset()         { *m = Spoof{} }
+func (m *Spoof) String() string { return proto.CompactTextString(m) }
+func (*Spoof) ProtoMessage()    {}
+
 type NotifyRecSpoofResponse struct {
+	Spoof *Spoof `protobuf:"bytes,1,opt,name=spoof" json:"spoof,omitempty"`
+	Error string `protobuf:"bytes,2,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *NotifyRecSpoofResponse) Reset()         { *m = NotifyRecSpoofResponse{} }
 func (m *NotifyRecSpoofResponse) String() string { return proto.CompactTextString(m) }
 func (*NotifyRecSpoofResponse) ProtoMessage()    {}
+
+func (m *NotifyRecSpoofResponse) GetSpoof() *Spoof {
+	if m != nil {
+		return m.Spoof
+	}
+	return nil
+}
 
 func init() {
 }
