@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"sync"
 	"time"
 
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -59,8 +58,17 @@ type plControllerT struct {
 	db        da.VantagePointProvider
 	w         *fsnotify.Watcher
 	conf      Config
-	mu        sync.Mutex
-	client    *scamper.Client
+	client    Client
+	spoofs    *spoofMap
+}
+
+// Client is the measurment client interface
+// TODO: Remove interface dependency on scamper
+type Client interface {
+	AddSocket(*scamper.Socket)
+	RemoveSocket(string)
+	GetSocket(string) (*scamper.Socket, error)
+	DoMeasurement(string, interface{}) (<-chan scamper.Response, error)
 }
 
 func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
@@ -74,6 +82,11 @@ func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 }
 
 var plController plControllerT
+
+func (c *plControllerT) recSpoof(rs *dm.RecSpoof) (*dm.NotifyRecSpoofResponse, error) {
+
+	return nil, nil
+}
 
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
@@ -152,11 +165,11 @@ func (c *plControllerT) getSocket(n string) (*scamper.Socket, error) {
 }
 
 // Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db da.VantagePointProvider) chan error {
+func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client) chan error {
 	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
 	if db == nil {
-		errChan <- fmt.Errorf("Nill db in plController")
+		errChan <- fmt.Errorf("Nil db in plController")
 		return errChan
 	}
 	plController.db = db
@@ -171,6 +184,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider) chan error {
 		errChan <- err
 		return errChan
 	}
+	plController.spoofs = newSpoofMap()
 	plController.config = c
 	plController.startTime = time.Now()
 	plController.mp = mproc.New()
@@ -179,7 +193,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider) chan error {
 	if !noScamp {
 		plController.startScamperProc()
 	}
-	plController.client = scamper.NewClient()
+	plController.client = cl
 	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
 	//best to call it after startScamperProc otherwise you'll send an error
 	//and trigger any error logic in whatever code is using this

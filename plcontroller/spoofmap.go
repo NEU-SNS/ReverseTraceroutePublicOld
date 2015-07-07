@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -25,45 +25,53 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// Package main is a dummy for testing
-package main
+//Package plcontroller is the library for creating a planet-lab controller
+package plcontroller
 
 import (
-	"flag"
-	"fmt"
-	"io"
-	"runtime"
-
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
-	ctx "golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	flag.Parse()
+type sender interface {
+	Send(interface{}) error
+}
 
-	conn, err := grpc.Dial("129.10.113.205:45000")
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-	cl := plc.NewPLControllerClient(conn)
-	pa := &dm.PingArg{Pings: []*dm.PingMeasurement{&dm.PingMeasurement{Src: "129.10.113.205", Dst: "8.8.8.8"}, &dm.PingMeasurement{Src: "129.10.113.205", Dst: "8.8.4.4"}}}
-	stream, err := cl.Ping(ctx.Background(), pa)
-	if err != nil {
-		panic(err)
-	}
+type spoofMap struct {
+	spoofs map[uint32]dm.Spoof
+	rec    chan interface{}
+	reg    chan dm.Spoof
+	quit   chan interface{}
+}
+
+func newSpoofMap() *spoofMap {
+	sps := make(map[uint32]dm.Spoof)
+	recChan := make(chan interface{}, 20)
+	regChan := make(chan dm.Spoof, 20)
+	qc := make(chan interface{})
+	return &spoofMap{spoofs: sps, rec: recChan, reg: regChan, quit: qc}
+}
+
+func (s *spoofMap) Register(sp dm.Spoof) {
+	s.reg <- sp
+}
+
+func (s *spoofMap) Quit() {
+	close(s.quit)
+}
+
+func (s *spoofMap) Receive(sp interface{}) {
+	s.rec <- sp
+}
+
+func (s *spoofMap) monitor() {
 	for {
-		ping, err := stream.Recv()
-		if err == io.EOF {
-			break
+		select {
+		case <-s.quit:
+			return
+		case sp := <-s.reg:
+			s.spoofs[sp.Id] = sp
+		case rec := <-s.rec:
+			continue
 		}
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(ping)
 	}
-	fmt.Println("Got all pings")
 }

@@ -36,7 +36,6 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
 	capi "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -46,15 +45,6 @@ import (
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
-
-const (
-	// ID is the key for the measurement Id stored in the context argument
-	ID = "ID"
-)
-
-func getUUID() string {
-	return uuid.NewUUID().String()
-}
 
 type controllerT struct {
 	config    Config
@@ -164,9 +154,7 @@ func (c *controllerT) startRPC(eChan chan error) {
 
 func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
 	st := time.Now()
-	uuid := getUUID()
-	glog.Infof("%s: Ping starting", uuid)
-	nctx := con.WithValue(ctx, ID, uuid)
+	glog.Infof("%s: Ping starting")
 	sr = new(dm.StatsReturn)
 	s, mt, err := c.getService(sa.Service)
 	if err != nil {
@@ -182,7 +170,7 @@ func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsRet
 		sr.Ret = makeErrorReturn(st)
 		return
 	}
-	sr.Stats, err = mt.Stats(nctx, sa)
+	sr.Stats, err = mt.Stats(ctx, sa)
 	if err != nil {
 		sr.Ret = makeErrorReturn(st)
 		return
@@ -209,9 +197,7 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 
 func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
 	st := time.Now()
-	uuid := getUUID()
-	glog.Infof("%s: Ping starting", uuid)
-	nctx := con.WithValue(ctx, ID, uuid)
+	glog.Infof("%s: Ping starting")
 	pr = new(dm.PingReturn)
 
 	mt, err := c.getMeasurementTool(pa.Service)
@@ -219,7 +205,7 @@ func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn
 		pr.Ret = makeErrorReturn(st)
 		return
 	}
-	pr.Ping, err = mt.Ping(nctx, pa)
+	pr.Ping, err = mt.Ping(ctx, pa)
 	if err != nil {
 		pr.Ret = makeErrorReturn(st)
 		return
@@ -252,9 +238,7 @@ func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
 
 func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
 	st := time.Now()
-	uuid := getUUID()
-	glog.Infof("%s: Traceroute starting", uuid)
-	nctx := con.WithValue(ctx, ID, uuid)
+	glog.Infof("%s: Traceroute starting")
 	tr = new(dm.TracerouteReturn)
 	makeRequest := !ta.CheckCache
 	if ta.CheckCache {

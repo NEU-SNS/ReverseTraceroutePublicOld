@@ -229,7 +229,7 @@ func (s *Socket) readConn() {
 			if resp.RType != DATA {
 				continue
 			}
-
+			// The first two data messages received are the header of the warts format
 			if s.rc < 2 {
 				s.wartsHeader[s.rc] = resp
 				s.rc++

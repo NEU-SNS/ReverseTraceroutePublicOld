@@ -131,33 +131,41 @@ func (sm *socketMap) Get(addr string) (*Socket, error) {
 	return nil, ErrorSocketNotFound
 }
 
+// Client is the interface of the scamper client
+type Client interface {
+	AddSocket(*Socket)
+	RemoveSocket(string)
+	GetSocket(string) (*Socket, error)
+	DoMeasurement(string, interface{}) (<-chan Response, error)
+}
+
 // Client is the main object for interacting with scamper
-type Client struct {
+type client struct {
 	sockets *socketMap
 }
 
 // NewClient creates a new Client
-func NewClient() *Client {
-	return &Client{sockets: newSocketMap()}
+func NewClient() Client {
+	return &client{sockets: newSocketMap()}
 }
 
 // AddSocket adds a socket to the client
-func (c *Client) AddSocket(s *Socket) {
+func (c *client) AddSocket(s *Socket) {
 	c.sockets.Add(s)
 }
 
 // RemoveSocket removes a socket from the client
-func (c *Client) RemoveSocket(addr string) {
+func (c *client) RemoveSocket(addr string) {
 	c.sockets.Remove(addr)
 }
 
 // GetSocket gets a socket registered in the client
-func (c *Client) GetSocket(addr string) (*Socket, error) {
+func (c *client) GetSocket(addr string) (*Socket, error) {
 	return c.sockets.Get(addr)
 }
 
 // DoMeasurement run the measurement described by arg from the address addr
-func (c *Client) DoMeasurement(addr string, arg interface{}) (<-chan Response, error) {
+func (c *client) DoMeasurement(addr string, arg interface{}) (<-chan Response, error) {
 	s, err := c.sockets.Get(addr)
 	if err != nil {
 		return nil, err
