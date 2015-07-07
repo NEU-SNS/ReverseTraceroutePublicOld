@@ -166,7 +166,12 @@ func (s *Socket) Stop() {
 	for cmd := range s.cmds.forEach() {
 		close(cmd.done)
 	}
-	close(s.closeChan)
+	select {
+	case <-s.closeChan:
+		return
+	default:
+		close(s.closeChan)
+	}
 }
 
 func (s *Socket) monitorResponses() {
@@ -189,23 +194,16 @@ func (s *Socket) monitorResponses() {
 func (s *Socket) reconnect() error {
 	con, err := s.df("unix", s.fname)
 	if err != nil {
-		close(s.closeChan)
 		return err
 	}
 	s.con = con
 	return nil
 }
 
-func (s *Socket) monitorConn() {
+func (s *Socket) readConn() {
 	rw := bufio.NewReadWriter(bufio.NewReader(s.con), bufio.NewWriter(s.con))
 	for {
 		select {
-		case c := <-s.cmdChan:
-			err := c.issueCommand(s.con)
-			if err != nil {
-				glog.Errorf("Error issuing command %s", c.Marshal())
-				continue
-			}
 		case <-s.closeChan:
 			s.con.Close()
 			return
@@ -265,6 +263,27 @@ func (s *Socket) monitorConn() {
 			resp.DS = len(cwarts)
 			s.respChan <- resp
 		}
+
+	}
+
+}
+
+func (s *Socket) monitorConn() {
+	go s.readConn()
+	for {
+		select {
+		case c := <-s.cmdChan:
+			glog.Infof("Issuing cmd: %v", c)
+			err := c.issueCommand(s.con)
+			if err != nil {
+				glog.Errorf("Error issuing command %s", c.Marshal())
+				continue
+			}
+		case <-s.closeChan:
+			s.con.Close()
+			return
+
+		}
 	}
 }
 
@@ -296,6 +315,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	glog.Infof("Running cmd: %v", cmd)
 	s.cmdChan <- &cmd
 	return cr.done, err
 }

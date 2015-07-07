@@ -118,25 +118,26 @@ func (c *Cmd) Marshal() []byte {
 // IssueCommand marshals the Cmd and writes it to the provided writer
 func (c *Cmd) issueCommand(w io.Writer) error {
 	cmd := c.marshal()
+	glog.Infof("Writing cmd: %s", cmd)
 	_, err := w.Write(cmd)
 	return err
 }
 
 func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	switch arg.(type) {
-	case dm.PingMeasurement:
-		oID := arg.(dm.PingMeasurement).UserId
-		if pa, ok := arg.(dm.PingMeasurement); ok {
+	case *dm.PingMeasurement:
+		if pa, ok := arg.(*dm.PingMeasurement); ok {
+			oID := pa.UserId
 			pa.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(pa, PING)
+			c, err = createCmd(*pa, PING)
 			c.userIDCache = oID
 			c.userID = id
 		}
-	case dm.TracerouteMeasurement:
-		oID := arg.(dm.TracerouteMeasurement).Userid
-		if ta, ok := arg.(dm.TracerouteMeasurement); ok {
+	case *dm.TracerouteMeasurement:
+		if ta, ok := arg.(*dm.TracerouteMeasurement); ok {
+			oID := ta.Userid
 			ta.Userid = fmt.Sprintf("%d", id)
-			c, err = createCmd(ta, TRACEROUTE)
+			c, err = createCmd(*ta, TRACEROUTE)
 			c.userIDCache = oID
 			c.userID = id
 		}
