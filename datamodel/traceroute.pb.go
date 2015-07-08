@@ -56,7 +56,7 @@ type TracerouteMeasurement struct {
 	Src          string `protobuf:"bytes,18,opt,name=src" json:"src,omitempty"`
 	Tos          string `protobuf:"bytes,19,opt,name=tos" json:"tos,omitempty"`
 	TimeExceeded bool   `protobuf:"varint,20,opt,name=time_exceeded" json:"time_exceeded,omitempty"`
-	Userid       string `protobuf:"bytes,21,opt,name=userid" json:"userid,omitempty"`
+	UserId       string `protobuf:"bytes,21,opt,name=user_id" json:"user_id,omitempty"`
 	Wait         string `protobuf:"bytes,22,opt,name=wait" json:"wait,omitempty"`
 	WaitProbe    string `protobuf:"bytes,23,opt,name=wait_probe" json:"wait_probe,omitempty"`
 	GssEntry     string `protobuf:"bytes,24,opt,name=gss_entry" json:"gss_entry,omitempty"`

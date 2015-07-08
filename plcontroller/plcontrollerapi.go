@@ -164,8 +164,17 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 	if len(spoofs) == 0 {
 		return ErrorEmptyArgList
 	}
-	ret, err = c.recSpoof(rs)
-	return
+	for _, spoof := range spoofs {
+		ret, err := c.recSpoof(spoof)
+		if err != nil {
+			ret.Error = err.Error()
+		}
+		if e := stream.Send(ret); e != nil {
+			return e
+		}
+	}
+
+	return nil
 }
 
 func (c *plControllerT) NotifyRecSpoof(ctx con.Context, arg *dm.RecSpoof) (nr *dm.NotifyRecSpoofResponse, err error) {

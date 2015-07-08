@@ -29,38 +29,67 @@ Copyright (c) 2015, Northeastern University
 package plcontroller
 
 import (
+	"fmt"
+	"time"
+
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+)
+
+var (
+	// ErrorIDInUse is returned when the id of a spoofed request is already in use.
+	ErrorIDInUse = fmt.Errorf("The is received is already in use.")
 )
 
 type sender interface {
 	Send(interface{}) error
 }
 
+type spoof struct {
+	S    dm.Spoof
+	Time time.Time
+}
+
 type spoofMap struct {
-	spoofs map[uint32]dm.Spoof
+	spoofs map[uint32]spoof
 	rec    chan interface{}
 	reg    chan dm.Spoof
+	regErr chan error
+	recErr chan error
 	quit   chan interface{}
 }
 
 func newSpoofMap() *spoofMap {
-	sps := make(map[uint32]dm.Spoof)
+	sps := make(map[uint32]spoof)
 	recChan := make(chan interface{}, 20)
 	regChan := make(chan dm.Spoof, 20)
+	errChan := make(chan error)
+	regeChan := make(chan error)
 	qc := make(chan interface{})
-	return &spoofMap{spoofs: sps, rec: recChan, reg: regChan, quit: qc}
+	return &spoofMap{spoofs: sps, rec: recChan, reg: regChan, quit: qc, regErr: regeChan, recErr: errChan}
 }
 
-func (s *spoofMap) Register(sp dm.Spoof) {
+func (s *spoofMap) Register(sp dm.Spoof) error {
 	s.reg <- sp
+	return <-s.regErr
 }
 
 func (s *spoofMap) Quit() {
 	close(s.quit)
 }
 
-func (s *spoofMap) Receive(sp interface{}) {
+func (s *spoofMap) register(sp dm.Spoof) error {
+	if curr, ok := s.spoofs[sp.Id]; ok {
+		if time.Since(curr.Time) < time.Second*60 {
+			return ErrorIDInUse
+		}
+	}
+	s.spoofs[sp.Id] = spoof{S: sp, Time: time.Now()}
+	return nil
+}
+
+func (s *spoofMap) Receive(sp interface{}) error {
 	s.rec <- sp
+	return <-s.recErr
 }
 
 func (s *spoofMap) monitor() {
@@ -69,8 +98,8 @@ func (s *spoofMap) monitor() {
 		case <-s.quit:
 			return
 		case sp := <-s.reg:
-			s.spoofs[sp.Id] = sp
-		case rec := <-s.rec:
+			s.regErr <- s.register(sp)
+		case <-s.rec:
 			continue
 		}
 	}

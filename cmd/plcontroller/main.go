@@ -36,6 +36,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess/testdataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller"
+	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 )
@@ -105,7 +106,7 @@ func main() {
 		glog.Errorf("Failed to created db: %v", err)
 		exit(1)
 	}
-	err = <-plcontroller.Start(conf, false, db)
+	err = <-plcontroller.Start(conf, false, db, scamper.NewClient())
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
 		exit(1)
