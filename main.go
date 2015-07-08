@@ -55,6 +55,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	ta := &dm.TracerouteArg{Traceroutes: []*dm.TracerouteMeasurement{&dm.TracerouteMeasurement{Src: "129.10.113.205", Dst: "8.8.8.8"}, &dm.TracerouteMeasurement{Src: "129.10.113.205", Dst: "8.8.4.4"}}}
+	st, err := cl.Traceroute(ctx.Background(), ta)
+	if err != nil {
+		panic(err)
+	}
 	for {
 		ping, err := stream.Recv()
 		if err == io.EOF {
@@ -65,5 +70,16 @@ func main() {
 		}
 		fmt.Println(ping)
 	}
-	fmt.Println("Got all pings")
+
+	for {
+		trace, err := st.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(trace)
+	}
+	fmt.Println("Got all measurements")
 }

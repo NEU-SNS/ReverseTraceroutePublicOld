@@ -83,7 +83,7 @@ func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 
 var plController plControllerT
 
-func (c *plControllerT) recSpoof(rs *dm.RecSpoof) (*dm.NotifyRecSpoofResponse, error) {
+func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
 
 	return nil, nil
 }

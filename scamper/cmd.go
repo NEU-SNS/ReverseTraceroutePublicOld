@@ -134,8 +134,8 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 		}
 	case *dm.TracerouteMeasurement:
 		if ta, ok := arg.(*dm.TracerouteMeasurement); ok {
-			oID := ta.Userid
-			ta.Userid = fmt.Sprintf("%d", id)
+			oID := ta.UserId
+			ta.UserId = fmt.Sprintf("%d", id)
 			c, err = createCmd(*ta, TRACEROUTE)
 			c.userIDCache = oID
 			c.userID = id
