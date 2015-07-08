@@ -13,7 +13,14 @@ message Spoof {
   uint32 id = 2;
 }
 
+message SpoofedProbe {
+  uint32 id = 1;
+  string ip = 2;
+}
+
 message NotifyRecSpoofResponse {
-  Spoof spoof  = 1;
-  string error = 2;
+  string error = 1;
+}
+
+message ReceiveSpoofedProbesResponse {
 }

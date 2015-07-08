@@ -59,21 +59,29 @@ func (m *Spoof) Reset()         { *m = Spoof{} }
 func (m *Spoof) String() string { return proto.CompactTextString(m) }
 func (*Spoof) ProtoMessage()    {}
 
+type SpoofedProbe struct {
+	Id uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
+	Ip string `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
+}
+
+func (m *SpoofedProbe) Reset()         { *m = SpoofedProbe{} }
+func (m *SpoofedProbe) String() string { return proto.CompactTextString(m) }
+func (*SpoofedProbe) ProtoMessage()    {}
+
 type NotifyRecSpoofResponse struct {
-	Spoof *Spoof `protobuf:"bytes,1,opt,name=spoof" json:"spoof,omitempty"`
-	Error string `protobuf:"bytes,2,opt,name=error" json:"error,omitempty"`
+	Error string `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *NotifyRecSpoofResponse) Reset()         { *m = NotifyRecSpoofResponse{} }
 func (m *NotifyRecSpoofResponse) String() string { return proto.CompactTextString(m) }
 func (*NotifyRecSpoofResponse) ProtoMessage()    {}
 
-func (m *NotifyRecSpoofResponse) GetSpoof() *Spoof {
-	if m != nil {
-		return m.Spoof
-	}
-	return nil
+type ReceiveSpoofedProbesResponse struct {
 }
+
+func (m *ReceiveSpoofedProbesResponse) Reset()         { *m = ReceiveSpoofedProbesResponse{} }
+func (m *ReceiveSpoofedProbesResponse) String() string { return proto.CompactTextString(m) }
+func (*ReceiveSpoofedProbesResponse) ProtoMessage()    {}
 
 func init() {
 }

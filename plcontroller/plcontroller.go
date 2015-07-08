@@ -84,8 +84,9 @@ func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 var plController plControllerT
 
 func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
-
-	return nil, nil
+	resp := &dm.NotifyRecSpoofResponse{}
+	err := c.spoofs.Register(*rs)
+	return resp, err
 }
 
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
@@ -165,7 +166,7 @@ func (c *plControllerT) getSocket(n string) (*scamper.Socket, error) {
 }
 
 // Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client) chan error {
+func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client, s Sender) chan error {
 	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
 	if db == nil {
@@ -184,7 +185,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client) chan e
 		errChan <- err
 		return errChan
 	}
-	plController.spoofs = newSpoofMap()
+	plController.spoofs = newSpoofMap(s)
 	plController.config = c
 	plController.startTime = time.Now()
 	plController.mp = mproc.New()
@@ -250,5 +251,6 @@ func (c *plControllerT) handleSig(s os.Signal) {
 		c.w.Close()
 	}
 	c.removeAllVps()
+	c.spoofs.Quit()
 	c.db.Close()
 }
