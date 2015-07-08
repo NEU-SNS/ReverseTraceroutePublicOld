@@ -6,10 +6,11 @@ option go_package = "controllerapi";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto";
 
 service Controller {
-
     rpc Ping(datamodel.PingArg) returns (datamodel.PingReturn) {}
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.TracerouteReturn) {}
     rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
+    rpc ReceiveSpoofedProbes(stream datamodel.SpoofedProbe) returns (datamodel.ReceiveSpoofedProbesResponse) {}
 }

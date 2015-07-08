@@ -35,7 +35,6 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/golang/glog"
-	con "golang.org/x/net/context"
 )
 
 var (
@@ -173,14 +172,7 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 			return e
 		}
 	}
-
 	return nil
-}
-
-func (c *plControllerT) NotifyRecSpoof(ctx con.Context, arg *dm.RecSpoof) (nr *dm.NotifyRecSpoofResponse, err error) {
-	glog.Infof("Recieving notification for a recieved spoof")
-	nr = new(dm.NotifyRecSpoofResponse)
-	return
 }
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {

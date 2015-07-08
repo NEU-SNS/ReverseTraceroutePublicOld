@@ -38,10 +38,15 @@ import (
 var (
 	// ErrorIDInUse is returned when the id of a spoofed request is already in use.
 	ErrorIDInUse = fmt.Errorf("The is received is already in use.")
+	// ErrorSpoofNotFound is returned when a spoof is received that doesn't have
+	// have a matching id
+	ErrorSpoofNotFound = fmt.Errorf("Received a spoof with no matching Id")
 )
 
-type sender interface {
-	Send(interface{}) error
+// Sender is the interface for something that can sent a slice of SpoofedProbes
+// to an address
+type Sender interface {
+	Send([]dm.SpoofedProbe, string) error
 }
 
 type spoof struct {
@@ -50,22 +55,38 @@ type spoof struct {
 }
 
 type spoofMap struct {
-	spoofs map[uint32]spoof
-	rec    chan interface{}
-	reg    chan dm.Spoof
-	regErr chan error
-	recErr chan error
-	quit   chan interface{}
+	spoofs    map[uint32]spoof
+	rec       chan dm.SpoofedProbe
+	reg       chan dm.Spoof
+	regErr    chan error
+	recErr    chan error
+	send      chan dm.SpoofedProbe
+	quit      chan interface{}
+	transport Sender
 }
 
-func newSpoofMap() *spoofMap {
+func newSpoofMap(s Sender) (sm *spoofMap) {
 	sps := make(map[uint32]spoof)
-	recChan := make(chan interface{}, 20)
 	regChan := make(chan dm.Spoof, 20)
+	recChan := make(chan dm.SpoofedProbe, 20)
+	sendChan := make(chan dm.SpoofedProbe, 100)
 	errChan := make(chan error)
 	regeChan := make(chan error)
 	qc := make(chan interface{})
-	return &spoofMap{spoofs: sps, rec: recChan, reg: regChan, quit: qc, regErr: regeChan, recErr: errChan}
+
+	sm = &spoofMap{
+		spoofs:    sps,
+		rec:       recChan,
+		reg:       regChan,
+		quit:      qc,
+		regErr:    regeChan,
+		recErr:    errChan,
+		send:      sendChan,
+		transport: s,
+	}
+	go sm.monitor()
+	go sm.sendSpoofs()
+	return
 }
 
 func (s *spoofMap) Register(sp dm.Spoof) error {
@@ -87,9 +108,37 @@ func (s *spoofMap) register(sp dm.Spoof) error {
 	return nil
 }
 
-func (s *spoofMap) Receive(sp interface{}) error {
+func (s *spoofMap) receive(sp dm.SpoofedProbe) error {
+	if spoof, ok := s.spoofs[sp.Id]; ok {
+		sp.Ip = spoof.S.Ip
+		s.send <- sp
+		return nil
+	}
+	return ErrorSpoofNotFound
+}
+
+func (s *spoofMap) Receive(sp dm.SpoofedProbe) error {
 	s.rec <- sp
 	return <-s.recErr
+}
+
+func (s *spoofMap) sendSpoofs() {
+	probes := make(map[string][]dm.SpoofedProbe)
+	for {
+		select {
+		case <-s.quit:
+			return
+		case <-time.After(time.Second):
+			for ip := range probes {
+				go func(ps []dm.SpoofedProbe, addr string) {
+					s.transport.Send(ps, addr)
+				}(probes[ip], ip)
+			}
+			probes = make(map[string][]dm.SpoofedProbe)
+		case sp := <-s.rec:
+			probes[sp.Ip] = append(probes[sp.Ip], sp)
+		}
+	}
 }
 
 func (s *spoofMap) monitor() {
@@ -99,8 +148,8 @@ func (s *spoofMap) monitor() {
 			return
 		case sp := <-s.reg:
 			s.regErr <- s.register(sp)
-		case <-s.rec:
-			continue
+		case rec := <-s.rec:
+			s.recErr <- s.receive(rec)
 		}
 	}
 }

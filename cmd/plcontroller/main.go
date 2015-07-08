@@ -106,7 +106,7 @@ func main() {
 		glog.Errorf("Failed to created db: %v", err)
 		exit(1)
 	}
-	err = <-plcontroller.Start(conf, false, db, scamper.NewClient())
+	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{})
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
 		exit(1)
