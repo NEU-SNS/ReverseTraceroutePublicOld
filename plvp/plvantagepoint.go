@@ -36,7 +36,6 @@ import (
 	"sync"
 	"time"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
@@ -133,28 +132,11 @@ func (c *plVantagepointT) monitorSpoofedPings(ips chan net.IP, ec chan error) {
 			select {
 			case ip := <-ips:
 				glog.Infof("Got IP from spoof monitor: %d", ip)
-				err := c.sendRecSpoofIP(ip)
-				if err != nil {
-					glog.Errorf("Failed to notify recspoof: %v", err)
-				}
 			case err := <-ec:
 				glog.Errorf("Recieved error from spoof monitor: %v", err)
 			}
 		}
 	}()
-}
-
-func (c *plVantagepointT) sendRecSpoofIP(ip net.IP) error {
-	_, err := pickIP(c.config.Local.Host)
-	if err != nil {
-		return err
-	}
-	arg := new(dm.RecSpoof)
-	arg.Ip, err = util.IPtoInt32(ip)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func pickIP(host string) (string, error) {

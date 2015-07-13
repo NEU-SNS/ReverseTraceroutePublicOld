@@ -33,6 +33,7 @@ import (
 	"net"
 
 	"github.com/golang/glog"
+	opt "github.com/rhansen2/ipv4optparser"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/internal/iana"
 )
@@ -73,6 +74,7 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 			ec <- err
 			continue
 		}
+
 		if echo, ok := mess.Body.(*icmp.Echo); ok {
 			if echo.ID == ID && echo.Seq == SEQ {
 				if len(echo.Data) < 4 {
@@ -86,6 +88,15 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 				if ip == nil {
 					ec <- fmt.Errorf("Could not create IP from echo reply body")
 					continue
+				}
+				header, err := icmp.ParseIPv4Header(buf)
+				if err != nil {
+					glog.Errorf("Failed to parse header: %v", err)
+					continue
+				}
+				_, err = opt.Parse(header.Options)
+				if err != nil {
+					glog.Errorf("Failed to parse IPv4 options: %v", err)
 				}
 				glog.Infof("Got spoofed echo-reply from: %s", ip)
 				ips <- ip
