@@ -24,6 +24,8 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+//Package plcontroller is the library for creating a planet-lab controller
 package plcontroller
 
 import (
@@ -47,7 +49,7 @@ type ControllerSender struct{}
 // Send satisfies the Sender interface for a ControllerSender
 func (cs ControllerSender) Send(sps []dm.SpoofedProbe, addr string) error {
 	saddr := fmt.Sprintf("%s:%d", addr, controllerPort)
-	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second))
+	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5))
 	if err != nil {
 		return err
 	}
