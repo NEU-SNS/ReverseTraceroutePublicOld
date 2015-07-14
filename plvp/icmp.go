@@ -36,6 +36,7 @@ import (
 	opt "github.com/rhansen2/ipv4optparser"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/internal/iana"
+	"golang.org/x/net/ipv4"
 )
 
 const (
@@ -47,28 +48,33 @@ const (
 
 // SpoofPingMonitor monitors for ICMP echo replies that match the magic numbers
 type SpoofPingMonitor struct {
-	conn *icmp.PacketConn
+	conn *ipv4.RawConn
 }
 
 // Start the SpoofPingMonitor
 func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
-	pc, err := icmp.ListenPacket("ip4:icmp", addr)
+	pc, err := net.ListenPacket(fmt.Sprintf("ip4:%d", iana.ProtocolICMP), addr)
 	if err != nil {
 		glog.Errorf("Error starting SpoofPingMonitor: %v", err)
 		ec <- err
 		return
 	}
-	sm.conn = pc
+	sm.conn, err = ipv4.NewRawConn(pc)
+	if err != nil {
+		ec <- err
+		return
+	}
 	for {
-		buf := make([]byte, 1024)
-		_, _, err := sm.conn.ReadFrom(buf)
+		buf := make([]byte, 1500)
+
+		header, pload, _, err := sm.conn.ReadFrom(buf)
 		if err != nil {
 			glog.Errorf("Could not read packet")
 			ec <- err
 			continue
 		}
-		mess, err := icmp.ParseMessage(iana.ProtocolICMP, buf)
+		mess, err := icmp.ParseMessage(iana.ProtocolICMP, pload)
 		if err != nil {
 			glog.Errorf("Couldn't parse IPv4 message: %v", err)
 			ec <- err
@@ -89,16 +95,33 @@ func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
 					ec <- fmt.Errorf("Could not create IP from echo reply body")
 					continue
 				}
-				header, err := icmp.ParseIPv4Header(buf)
-				if err != nil {
-					glog.Errorf("Failed to parse header: %v", err)
-					continue
-				}
-				_, err = opt.Parse(header.Options)
+				var id uint32
+				id |= uint32(echo.Data[4]) << 24
+				id |= uint32(echo.Data[5]) << 16
+				id |= uint32(echo.Data[6]) << 8
+				id |= uint32(echo.Data[7])
+				options, err := opt.Parse(header.Options)
 				if err != nil {
 					glog.Errorf("Failed to parse IPv4 options: %v", err)
 				}
-				glog.Infof("Got spoofed echo-reply from: %s", ip)
+				for _, option := range options {
+					glog.Info(option.Type)
+					if option.Type == opt.RecordRoute {
+						_, err = option.ToRecordRoute()
+						if err != nil {
+							glog.Errorf("Error parsing record route: %v", err)
+							continue
+						}
+					}
+					if option.Type == opt.InternetTimestamp {
+						_, err = option.ToTimeStamp()
+						if err != nil {
+							glog.Errorf("Error parsing timestamp: %v", err)
+							continue
+						}
+					}
+				}
+				glog.Infof("Got spoofed echo-reply from: %s, with id: %d", ip, id)
 				ips <- ip
 				continue
 
