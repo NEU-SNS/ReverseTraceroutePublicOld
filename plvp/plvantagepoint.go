@@ -142,6 +142,9 @@ func Start(c Config) chan error {
 }
 
 func (c *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
+	if len(probes) == 0 {
+		return
+	}
 	c.am.Lock()
 	ip := c.addr
 	c.am.Unlock()
