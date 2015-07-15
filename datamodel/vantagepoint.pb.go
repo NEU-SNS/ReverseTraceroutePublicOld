@@ -78,6 +78,3 @@ func (m *VPReturn) GetVps() []*VantagePoint {
 	}
 	return nil
 }
-
-func init() {
-}

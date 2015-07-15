@@ -36,22 +36,29 @@ import (
 	"sync"
 	"time"
 
+	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
+	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
+	ctx "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type plVantagepointT struct {
 	sc       scamper.Config
 	spoofmon *SpoofPingMonitor
-	dest     string
 	mp       mproc.MProc
 	config   Config
 	mu       sync.Mutex
 	lu       time.Time
 	plc      *plClient
+	monec    chan error
+	monip    chan dm.Probe
+	am       sync.Mutex // protect addr
+	addr     string
 }
 
 var plVantagepoint plVantagepointT
@@ -64,7 +71,13 @@ func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *p
 	}
 	c.sc.IP = sip
 	arg := fmt.Sprintf("%s:%s", sip, c.sc.Port)
+	c.am.Lock()
+	c.addr = fmt.Sprintf("%s:%s", sip, c.config.Local.Port)
+	c.am.Unlock()
 	p.SetArg(scamper.ADDRINDEX, arg)
+	c.spoofmon.Quit()
+	c.spoofmon = NewSpoofPingMonitor()
+	c.spoofmon.Start(arg, c.monip, c.monec)
 	switch err.(type) {
 	default:
 		return false
@@ -75,6 +88,7 @@ func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *p
 
 func (c *plVantagepointT) handleSig(s os.Signal) {
 	c.mp.KillAll()
+	c.spoofmon.Quit()
 }
 
 // HandleSig handles signals
@@ -106,9 +120,10 @@ func Start(c Config) chan error {
 		errChan <- err
 		return errChan
 	}
+	plVantagepoint.addr = sip
 	plVantagepoint.sc = *con
 	plVantagepoint.mp = mproc.New()
-	plVantagepoint.spoofmon = &SpoofPingMonitor{}
+	plVantagepoint.spoofmon = NewSpoofPingMonitor()
 	plVantagepoint.plc = &plClient{}
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
@@ -116,24 +131,46 @@ func Start(c Config) chan error {
 		errChan <- err
 		return errChan
 	}
-	monec := make(chan error, 1)
-	monip := make(chan net.IP, 1)
-	go plVantagepoint.spoofmon.Start(monaddr, monip, monec)
-	go plVantagepoint.monitorSpoofedPings(monip, monec)
+	plVantagepoint.monec = make(chan error, 1)
+	plVantagepoint.monip = make(chan dm.Probe, 1)
+	go plVantagepoint.spoofmon.Start(monaddr, plVantagepoint.monip, plVantagepoint.monec)
+	go plVantagepoint.monitorSpoofedPings(plVantagepoint.monip, plVantagepoint.monec)
 	if c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
 	}
 	return errChan
 }
 
-func (c *plVantagepointT) monitorSpoofedPings(ips chan net.IP, ec chan error) {
+func (c *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
+	c.am.Lock()
+	ip := c.addr
+	c.am.Unlock()
+	addr := fmt.Sprintf("%s:%s", ip, c.config.Local.Port)
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second))
+	if err != nil {
+		glog.Errorf("Failed to send spoofs: %v", err)
+		return
+	}
+	client := plc.NewPLControllerClient(cc)
+	_, err = client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
+	if err != nil {
+		glog.Errorf("Error sending probes: %v", err)
+	}
+}
+
+func (c *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {
+	sprobes := make([]*dm.Probe, 0)
 	go func() {
 		for {
 			select {
-			case ip := <-ips:
-				glog.Infof("Got IP from spoof monitor: %d", ip)
+			case probe := <-probes:
+				glog.Infof("Got IP from spoof monitor: %v", probe)
+				sprobes = append(sprobes, &probe)
 			case err := <-ec:
 				glog.Errorf("Recieved error from spoof monitor: %v", err)
+			case <-time.After(2 * time.Second):
+				c.sendSpoofs(sprobes)
+				sprobes = make([]*dm.Probe, 0)
 			}
 		}
 	}()

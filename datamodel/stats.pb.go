@@ -78,6 +78,3 @@ func (m *StatsReturn) GetStats() *Stats {
 	}
 	return nil
 }
-
-func init() {
-}

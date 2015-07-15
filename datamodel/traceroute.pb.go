@@ -192,6 +192,3 @@ func (m *TracerouteReturn) GetTraceroute() *MTraceroute {
 	}
 	return nil
 }
-
-func init() {
-}

@@ -4,22 +4,50 @@ option go_package = "datamodel";
 
 package datamodel;
 
+enum TSType {
+    TSOnly    = 0;
+    TSAndAddr = 1;
+    TSPreSpec = 3;
+}
+
 message RecSpoof {
-    repeated Spoof spoofs = 1;
+    repeated uint32 ids = 1 [packed=true];
 }
 
-message Spoof {
-  string ip = 1;
-  uint32 id = 2;
+message SpoofedProbes {
+    repeated Probe probes = 1;
 }
 
-message SpoofedProbe {
-  uint32 id = 1;
-  string ip = 2;
+message SpoofedProbesResponse {
+}
+
+message Probe {
+    uint32 spoofer_ip =  1;
+    uint32 probe_id   =  2;
+    uint32 src        =  4;
+    uint32 dst        =  5;
+    uint32 id         =  6;
+    uint32 seq_num    =  7; 
+    RecordRoute r_r   =  8;
+    TimeStamp ts      =  9; 
+}
+
+message RecordRoute {
+    repeated uint32 hops = 1 [packed=true];
+}
+
+message TimeStamp {
+              TSType type =  1;
+    repeated Stamp stamps =  2;
+}
+
+message Stamp {
+    uint32 time =  1;
+    uint32 ip   =  2;
 }
 
 message NotifyRecSpoofResponse {
-  string error = 1;
+    string error = 1;
 }
 
 message ReceiveSpoofedProbesResponse {

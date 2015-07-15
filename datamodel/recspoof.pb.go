@@ -35,38 +35,120 @@ import proto "github.com/golang/protobuf/proto"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
+type TSType int32
+
+const (
+	TSType_TSOnly    TSType = 0
+	TSType_TSAndAddr TSType = 1
+	TSType_TSPreSpec TSType = 3
+)
+
+var TSType_name = map[int32]string{
+	0: "TSOnly",
+	1: "TSAndAddr",
+	3: "TSPreSpec",
+}
+var TSType_value = map[string]int32{
+	"TSOnly":    0,
+	"TSAndAddr": 1,
+	"TSPreSpec": 3,
+}
+
+func (x TSType) String() string {
+	return proto.EnumName(TSType_name, int32(x))
+}
+
 type RecSpoof struct {
-	Spoofs []*Spoof `protobuf:"bytes,1,rep,name=spoofs" json:"spoofs,omitempty"`
+	Ids []uint32 `protobuf:"varint,1,rep,packed,name=ids" json:"ids,omitempty"`
 }
 
 func (m *RecSpoof) Reset()         { *m = RecSpoof{} }
 func (m *RecSpoof) String() string { return proto.CompactTextString(m) }
 func (*RecSpoof) ProtoMessage()    {}
 
-func (m *RecSpoof) GetSpoofs() []*Spoof {
+type SpoofedProbes struct {
+	Probes []*Probe `protobuf:"bytes,1,rep,name=probes" json:"probes,omitempty"`
+}
+
+func (m *SpoofedProbes) Reset()         { *m = SpoofedProbes{} }
+func (m *SpoofedProbes) String() string { return proto.CompactTextString(m) }
+func (*SpoofedProbes) ProtoMessage()    {}
+
+func (m *SpoofedProbes) GetProbes() []*Probe {
 	if m != nil {
-		return m.Spoofs
+		return m.Probes
 	}
 	return nil
 }
 
-type Spoof struct {
-	Ip string `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
-	Id uint32 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
+type SpoofedProbesResponse struct {
 }
 
-func (m *Spoof) Reset()         { *m = Spoof{} }
-func (m *Spoof) String() string { return proto.CompactTextString(m) }
-func (*Spoof) ProtoMessage()    {}
+func (m *SpoofedProbesResponse) Reset()         { *m = SpoofedProbesResponse{} }
+func (m *SpoofedProbesResponse) String() string { return proto.CompactTextString(m) }
+func (*SpoofedProbesResponse) ProtoMessage()    {}
 
-type SpoofedProbe struct {
-	Id uint32 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
-	Ip string `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
+type Probe struct {
+	SpooferIp uint32       `protobuf:"varint,1,opt,name=spoofer_ip" json:"spoofer_ip,omitempty"`
+	ProbeId   uint32       `protobuf:"varint,2,opt,name=probe_id" json:"probe_id,omitempty"`
+	Src       uint32       `protobuf:"varint,4,opt,name=src" json:"src,omitempty"`
+	Dst       uint32       `protobuf:"varint,5,opt,name=dst" json:"dst,omitempty"`
+	Id        uint32       `protobuf:"varint,6,opt,name=id" json:"id,omitempty"`
+	SeqNum    uint32       `protobuf:"varint,7,opt,name=seq_num" json:"seq_num,omitempty"`
+	RR        *RecordRoute `protobuf:"bytes,8,opt,name=r_r" json:"r_r,omitempty"`
+	Ts        *TimeStamp   `protobuf:"bytes,9,opt,name=ts" json:"ts,omitempty"`
 }
 
-func (m *SpoofedProbe) Reset()         { *m = SpoofedProbe{} }
-func (m *SpoofedProbe) String() string { return proto.CompactTextString(m) }
-func (*SpoofedProbe) ProtoMessage()    {}
+func (m *Probe) Reset()         { *m = Probe{} }
+func (m *Probe) String() string { return proto.CompactTextString(m) }
+func (*Probe) ProtoMessage()    {}
+
+func (m *Probe) GetRR() *RecordRoute {
+	if m != nil {
+		return m.RR
+	}
+	return nil
+}
+
+func (m *Probe) GetTs() *TimeStamp {
+	if m != nil {
+		return m.Ts
+	}
+	return nil
+}
+
+type RecordRoute struct {
+	Hops []uint32 `protobuf:"varint,1,rep,packed,name=hops" json:"hops,omitempty"`
+}
+
+func (m *RecordRoute) Reset()         { *m = RecordRoute{} }
+func (m *RecordRoute) String() string { return proto.CompactTextString(m) }
+func (*RecordRoute) ProtoMessage()    {}
+
+type TimeStamp struct {
+	Type   TSType   `protobuf:"varint,1,opt,name=type,enum=datamodel.TSType" json:"type,omitempty"`
+	Stamps []*Stamp `protobuf:"bytes,2,rep,name=stamps" json:"stamps,omitempty"`
+}
+
+func (m *TimeStamp) Reset()         { *m = TimeStamp{} }
+func (m *TimeStamp) String() string { return proto.CompactTextString(m) }
+func (*TimeStamp) ProtoMessage()    {}
+
+func (m *TimeStamp) GetStamps() []*Stamp {
+	if m != nil {
+		return m.Stamps
+	}
+	return nil
+}
+
+type Stamp struct {
+	Time uint32 `protobuf:"varint,1,opt,name=time" json:"time,omitempty"`
+	Ip   uint32 `protobuf:"varint,2,opt,name=ip" json:"ip,omitempty"`
+}
+
+func (m *Stamp) Reset()         { *m = Stamp{} }
+func (m *Stamp) String() string { return proto.CompactTextString(m) }
+func (*Stamp) ProtoMessage()    {}
 
 type NotifyRecSpoofResponse struct {
 	Error string `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`
@@ -84,4 +166,5 @@ func (m *ReceiveSpoofedProbesResponse) String() string { return proto.CompactTex
 func (*ReceiveSpoofedProbesResponse) ProtoMessage()    {}
 
 func init() {
+	proto.RegisterEnum("datamodel.TSType", TSType_name, TSType_value)
 }

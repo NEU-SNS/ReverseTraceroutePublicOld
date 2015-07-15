@@ -41,6 +41,3 @@ type RegisterResponse struct {
 func (m *RegisterResponse) Reset()         { *m = RegisterResponse{} }
 func (m *RegisterResponse) String() string { return proto.CompactTextString(m) }
 func (*RegisterResponse) ProtoMessage()    {}
-
-func init() {
-}

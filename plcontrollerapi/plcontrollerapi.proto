@@ -13,5 +13,5 @@ service PLController {
     rpc Traceroute(datamodel.TracerouteArg) returns (stream datamodel.Traceroute) {}
     rpc ReceiveSpoof(datamodel.RecSpoof) returns (stream datamodel.NotifyRecSpoofResponse) {}
     rpc GetVPs(datamodel.VPRequest) returns (stream datamodel.VPReturn) {}
-
+    rpc AcceptProbes(datamodel.SpoofedProbes) returns (datamodel.SpoofedProbesResponse) {}
 }
