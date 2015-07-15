@@ -104,26 +104,26 @@ func makeTimestamp(ts opt.TimeStampOption) (dm.TimeStamp, error) {
 	return time, nil
 }
 
-func getProbe(conn *ipv4.RawConn) (dm.Probe, error) {
+func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 	// 1500 should be good because we're sending small packets and its the standard MTU
 	pBuf := make([]byte, 1500)
-	probe := dm.Probe{}
+	probe := &dm.Probe{}
 	// Try and get a packet
 	header, pload, _, err := conn.ReadFrom(pBuf)
 	if err != nil {
-		return probe, ErrorReadError
+		return nil, ErrorReadError
 	}
 	// Parse the payload for ICMP stuff
 	mess, err := icmp.ParseMessage(iana.ProtocolICMP, pload)
 	if err != nil {
-		return probe, err
+		return nil, err
 	}
 	if echo, ok := mess.Body.(*icmp.Echo); ok {
-		if echo.ID != ID || echo.Seq == SEQ {
-			return probe, ErrorNonSpoofedProbe
+		if echo.ID != ID || echo.Seq != SEQ {
+			return nil, ErrorNonSpoofedProbe
 		}
 		if len(echo.Data) < 8 {
-			return probe, ErrorSpoofedProbeNoID
+			return nil, ErrorSpoofedProbeNoID
 		}
 		// GetIP of spoofer out of packet
 		ip := net.IPv4(echo.Data[0],
@@ -131,41 +131,45 @@ func getProbe(conn *ipv4.RawConn) (dm.Probe, error) {
 			echo.Data[2],
 			echo.Data[3])
 		if ip == nil {
-			return probe, ErrorNoSpooferIP
+			return nil, ErrorNoSpooferIP
 		}
 		// Get the Id out of the data
 		id := makeId(echo.Data[4], echo.Data[5], echo.Data[6], echo.Data[7])
 		probe.ProbeId = id
-		probe.SpooferIp, err = util.IPStringToInt32(ip.String())
+		probe.SpooferIp, err = util.IPtoInt32(ip)
 		if err != nil {
-			return probe, ErrorSpooferIP
+			return nil, ErrorSpooferIP
 		}
+		probe.Src, err = util.IPtoInt32(header.Src)
+		probe.Dst, err = util.IPtoInt32(header.Dst)
 		// Parse the options
 		options, err := opt.Parse(header.Options)
 		if err != nil {
 			glog.Errorf("Failed to parse IPv4 options: %v", err)
-			return probe, ErrorFailedToParseOptions
+			return nil, ErrorFailedToParseOptions
 		}
+		probe.SeqNum = uint32(echo.Seq)
+		probe.Id = uint32(echo.ID)
 		for _, option := range options {
 			switch option.Type {
 			case opt.RecordRoute:
 				rr, err := option.ToRecordRoute()
 				if err != nil {
-					return probe, ErrorFailedToConvertOption
+					return nil, ErrorFailedToConvertOption
 				}
 				rec, err := makeRecordRoute(rr)
 				if err != nil {
-					return probe, ErrorFailedToConvertOption
+					return nil, ErrorFailedToConvertOption
 				}
 				probe.RR = &rec
 			case opt.InternetTimestamp:
 				ts, err := option.ToTimeStamp()
 				if err != nil {
-					return probe, ErrorFailedToConvertOption
+					return nil, ErrorFailedToConvertOption
 				}
 				nts, err := makeTimestamp(ts)
 				if err != nil {
-					return probe, ErrorFailedToConvertOption
+					return nil, ErrorFailedToConvertOption
 				}
 				probe.Ts = &nts
 			}
@@ -187,7 +191,9 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 			c.Close()
 		default:
 			var pr *dm.Probe
-			if *pr, err = getProbe(c); err != nil {
+			if pr, err = getProbe(c); err != nil {
+				glog.Infof("Got probe: %v", pr)
+				glog.Flush()
 				ec <- err
 				switch err {
 				case ErrorReadError:
@@ -198,6 +204,8 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 						return
 					}
 				}
+				glog.Errorf("Error getting probe: %v", err)
+				continue
 			}
 			probes <- *pr
 		}
