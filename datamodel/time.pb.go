@@ -43,6 +43,3 @@ type Time struct {
 func (m *Time) Reset()         { *m = Time{} }
 func (m *Time) String() string { return proto.CompactTextString(m) }
 func (*Time) ProtoMessage()    {}
-
-func init() {
-}

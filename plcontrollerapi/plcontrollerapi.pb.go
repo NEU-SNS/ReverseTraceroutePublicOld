@@ -56,9 +56,6 @@ var _ grpc.ClientConn
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
-func init() {
-}
-
 // Client API for PLController service
 
 type PLControllerClient interface {
@@ -66,6 +63,7 @@ type PLControllerClient interface {
 	Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (PLController_TracerouteClient, error)
 	ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error)
 	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error)
+	AcceptProbes(ctx context.Context, in *datamodel6.SpoofedProbes, opts ...grpc.CallOption) (*datamodel6.SpoofedProbesResponse, error)
 }
 
 type pLControllerClient struct {
@@ -204,6 +202,15 @@ func (x *pLControllerGetVPsClient) Recv() (*datamodel5.VPReturn, error) {
 	return m, nil
 }
 
+func (c *pLControllerClient) AcceptProbes(ctx context.Context, in *datamodel6.SpoofedProbes, opts ...grpc.CallOption) (*datamodel6.SpoofedProbesResponse, error) {
+	out := new(datamodel6.SpoofedProbesResponse)
+	err := grpc.Invoke(ctx, "/.PLController/AcceptProbes", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for PLController service
 
 type PLControllerServer interface {
@@ -211,6 +218,7 @@ type PLControllerServer interface {
 	Traceroute(*datamodel4.TracerouteArg, PLController_TracerouteServer) error
 	ReceiveSpoof(*datamodel6.RecSpoof, PLController_ReceiveSpoofServer) error
 	GetVPs(*datamodel5.VPRequest, PLController_GetVPsServer) error
+	AcceptProbes(context.Context, *datamodel6.SpoofedProbes) (*datamodel6.SpoofedProbesResponse, error)
 }
 
 func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
@@ -301,10 +309,27 @@ func (x *pLControllerGetVPsServer) Send(m *datamodel5.VPReturn) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+	in := new(datamodel6.SpoofedProbes)
+	if err := codec.Unmarshal(buf, in); err != nil {
+		return nil, err
+	}
+	out, err := srv.(PLControllerServer).AcceptProbes(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 var _PLController_serviceDesc = grpc.ServiceDesc{
 	ServiceName: ".PLController",
 	HandlerType: (*PLControllerServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AcceptProbes",
+			Handler:    _PLController_AcceptProbes_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Ping",

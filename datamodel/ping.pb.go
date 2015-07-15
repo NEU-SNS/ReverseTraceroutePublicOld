@@ -211,6 +211,3 @@ func (m *PingReturn) GetPing() *Ping {
 	}
 	return nil
 }
-
-func init() {
-}

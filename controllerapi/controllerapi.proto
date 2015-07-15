@@ -12,5 +12,5 @@ service Controller {
     rpc Ping(datamodel.PingArg) returns (datamodel.PingReturn) {}
     rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.TracerouteReturn) {}
     rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-    rpc ReceiveSpoofedProbes(stream datamodel.SpoofedProbe) returns (datamodel.ReceiveSpoofedProbesResponse) {}
+    rpc ReceiveSpoofedProbes(stream datamodel.Probe) returns (datamodel.ReceiveSpoofedProbesResponse) {}
 }

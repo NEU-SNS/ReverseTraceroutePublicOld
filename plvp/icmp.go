@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"net"
 
+	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 	opt "github.com/rhansen2/ipv4optparser"
 	"golang.org/x/net/icmp"
@@ -48,92 +50,166 @@ const (
 
 // SpoofPingMonitor monitors for ICMP echo replies that match the magic numbers
 type SpoofPingMonitor struct {
-	conn *ipv4.RawConn
+	quit chan struct{}
 }
 
-// Start the SpoofPingMonitor
-func (sm *SpoofPingMonitor) Start(addr string, ips chan net.IP, ec chan error) {
-	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
+func NewSpoofPingMonitor() *SpoofPingMonitor {
+	qc := make(chan struct{})
+	return &SpoofPingMonitor{quit: qc}
+}
+
+func reconnect(addr string) (*ipv4.RawConn, error) {
 	pc, err := net.ListenPacket(fmt.Sprintf("ip4:%d", iana.ProtocolICMP), addr)
+	if err != nil {
+		return nil, err
+	}
+	return ipv4.NewRawConn(pc)
+}
+
+var (
+	ErrorNotICMPEcho           = fmt.Errorf("Received Re")
+	ErrorNonSpoofedProbe       = fmt.Errorf("Received ICMP Probe that was not spoofed")
+	ErrorSpoofedProbeNoID      = fmt.Errorf("Received a spoofed probe with no id")
+	ErrorNoSpooferIP           = fmt.Errorf("No spoofer IP found in packet")
+	ErrorFailedToParseOptions  = fmt.Errorf("Failed to parse IPv4 options")
+	ErrorFailedToConvertOption = fmt.Errorf("Failed to convert IPv4 option")
+	ErrorSpooferIP             = fmt.Errorf("Failed to convert spoofer ip")
+	ErrorReadError             = fmt.Errorf("Failed to read from conn")
+)
+
+func makeId(a, b, c, d byte) uint32 {
+	var id uint32
+	id |= uint32(a) << 24
+	id |= uint32(b) << 16
+	id |= uint32(c) << 8
+	id |= uint32(d)
+	return id
+}
+
+func makeRecordRoute(rr opt.RecordRouteOption) (dm.RecordRoute, error) {
+	rec := dm.RecordRoute{}
+	for _, r := range rr.Routes {
+		rec.Hops = append(rec.Hops, uint32(r))
+	}
+	return rec, nil
+}
+
+func makeTimestamp(ts opt.TimeStampOption) (dm.TimeStamp, error) {
+	time := dm.TimeStamp{}
+	time.Type = dm.TSType(ts.Flags)
+	for _, st := range ts.Stamps {
+		nst := dm.Stamp{Time: uint32(st.Time), Ip: uint32(st.Addr)}
+		time.Stamps = append(time.Stamps, &nst)
+	}
+	return time, nil
+}
+
+func getProbe(conn *ipv4.RawConn) (dm.Probe, error) {
+	// 1500 should be good because we're sending small packets and its the standard MTU
+	pBuf := make([]byte, 1500)
+	probe := dm.Probe{}
+	// Try and get a packet
+	header, pload, _, err := conn.ReadFrom(pBuf)
+	if err != nil {
+		return probe, ErrorReadError
+	}
+	// Parse the payload for ICMP stuff
+	mess, err := icmp.ParseMessage(iana.ProtocolICMP, pload)
+	if err != nil {
+		return probe, err
+	}
+	if echo, ok := mess.Body.(*icmp.Echo); ok {
+		if echo.ID != ID || echo.Seq == SEQ {
+			return probe, ErrorNonSpoofedProbe
+		}
+		if len(echo.Data) < 8 {
+			return probe, ErrorSpoofedProbeNoID
+		}
+		// GetIP of spoofer out of packet
+		ip := net.IPv4(echo.Data[0],
+			echo.Data[1],
+			echo.Data[2],
+			echo.Data[3])
+		if ip == nil {
+			return probe, ErrorNoSpooferIP
+		}
+		// Get the Id out of the data
+		id := makeId(echo.Data[4], echo.Data[5], echo.Data[6], echo.Data[7])
+		probe.ProbeId = id
+		probe.SpooferIp, err = util.IPStringToInt32(ip.String())
+		if err != nil {
+			return probe, ErrorSpooferIP
+		}
+		// Parse the options
+		options, err := opt.Parse(header.Options)
+		if err != nil {
+			glog.Errorf("Failed to parse IPv4 options: %v", err)
+			return probe, ErrorFailedToParseOptions
+		}
+		for _, option := range options {
+			switch option.Type {
+			case opt.RecordRoute:
+				rr, err := option.ToRecordRoute()
+				if err != nil {
+					return probe, ErrorFailedToConvertOption
+				}
+				rec, err := makeRecordRoute(rr)
+				if err != nil {
+					return probe, ErrorFailedToConvertOption
+				}
+				probe.RR = &rec
+			case opt.InternetTimestamp:
+				ts, err := option.ToTimeStamp()
+				if err != nil {
+					return probe, ErrorFailedToConvertOption
+				}
+				nts, err := makeTimestamp(ts)
+				if err != nil {
+					return probe, ErrorFailedToConvertOption
+				}
+				probe.Ts = &nts
+			}
+		}
+	}
+	return probe, nil
+}
+
+func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan error) {
+	c, err := reconnect(addr)
 	if err != nil {
 		glog.Errorf("Error starting SpoofPingMonitor: %v", err)
 		ec <- err
 		return
 	}
-	sm.conn, err = ipv4.NewRawConn(pc)
-	if err != nil {
-		ec <- err
-		return
-	}
 	for {
-		buf := make([]byte, 1500)
-
-		header, pload, _, err := sm.conn.ReadFrom(buf)
-		if err != nil {
-			glog.Errorf("Could not read packet")
-			ec <- err
-			continue
-		}
-		mess, err := icmp.ParseMessage(iana.ProtocolICMP, pload)
-		if err != nil {
-			glog.Errorf("Couldn't parse IPv4 message: %v", err)
-			ec <- err
-			continue
-		}
-
-		if echo, ok := mess.Body.(*icmp.Echo); ok {
-			if echo.ID == ID && echo.Seq == SEQ {
-				if len(echo.Data) < 4 {
-					glog.Infof("Not enough data in echo %v", echo.Data)
-					continue
-				}
-				ip := net.IPv4(echo.Data[0],
-					echo.Data[1],
-					echo.Data[2],
-					echo.Data[3])
-				if ip == nil {
-					ec <- fmt.Errorf("Could not create IP from echo reply body")
-					continue
-				}
-				var id uint32
-				id |= uint32(echo.Data[4]) << 24
-				id |= uint32(echo.Data[5]) << 16
-				id |= uint32(echo.Data[6]) << 8
-				id |= uint32(echo.Data[7])
-				options, err := opt.Parse(header.Options)
-				if err != nil {
-					glog.Errorf("Failed to parse IPv4 options: %v", err)
-				}
-				for _, option := range options {
-					glog.Info(option.Type)
-					if option.Type == opt.RecordRoute {
-						_, err = option.ToRecordRoute()
-						if err != nil {
-							glog.Errorf("Error parsing record route: %v", err)
-							continue
-						}
-					}
-					if option.Type == opt.InternetTimestamp {
-						_, err = option.ToTimeStamp()
-						if err != nil {
-							glog.Errorf("Error parsing timestamp: %v", err)
-							continue
-						}
+		select {
+		case <-sm.quit:
+			c.Close()
+		default:
+			var pr *dm.Probe
+			if *pr, err = getProbe(c); err != nil {
+				ec <- err
+				switch err {
+				case ErrorReadError:
+					c, err = reconnect(addr)
+					if err != nil {
+						glog.Errorf("Failed to reconnect: %v", err)
+						ec <- err
+						return
 					}
 				}
-				glog.Infof("Got spoofed echo-reply from: %s, with id: %d", ip, id)
-				ips <- ip
-				continue
-
 			}
-			glog.Info("Got non-spoofed echo-reply")
-			continue
+			probes <- *pr
 		}
-		glog.Info("Received non-echo icmp packet")
 	}
 }
 
-// Stop stops the SpoofPingMonitor
-func (sm *SpoofPingMonitor) Stop() error {
-	return sm.conn.Close()
+// Start the SpoofPingMonitor
+func (sm *SpoofPingMonitor) Start(addr string, probes chan<- dm.Probe, ec chan error) {
+	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
+	go sm.poll(addr, probes, ec)
+}
+
+func (s *SpoofPingMonitor) Quit() {
+	close(s.quit)
 }

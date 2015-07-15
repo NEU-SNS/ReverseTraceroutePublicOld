@@ -41,6 +41,3 @@ type UpdateResponse struct {
 func (m *UpdateResponse) Reset()         { *m = UpdateResponse{} }
 func (m *UpdateResponse) String() string { return proto.CompactTextString(m) }
 func (*UpdateResponse) ProtoMessage()    {}
-
-func init() {
-}

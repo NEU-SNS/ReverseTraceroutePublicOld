@@ -56,9 +56,6 @@ var _ grpc.ClientConn
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
-func init() {
-}
-
 // Client API for Controller service
 
 type ControllerClient interface {
@@ -113,7 +110,7 @@ func (c *controllerClient) ReceiveSpoofedProbes(ctx context.Context, opts ...grp
 }
 
 type Controller_ReceiveSpoofedProbesClient interface {
-	Send(*datamodel6.SpoofedProbe) error
+	Send(*datamodel6.Probe) error
 	CloseAndRecv() (*datamodel6.ReceiveSpoofedProbesResponse, error)
 	grpc.ClientStream
 }
@@ -122,7 +119,7 @@ type controllerReceiveSpoofedProbesClient struct {
 	grpc.ClientStream
 }
 
-func (x *controllerReceiveSpoofedProbesClient) Send(m *datamodel6.SpoofedProbe) error {
+func (x *controllerReceiveSpoofedProbesClient) Send(m *datamodel6.Probe) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -192,7 +189,7 @@ func _Controller_ReceiveSpoofedProbes_Handler(srv interface{}, stream grpc.Serve
 
 type Controller_ReceiveSpoofedProbesServer interface {
 	SendAndClose(*datamodel6.ReceiveSpoofedProbesResponse) error
-	Recv() (*datamodel6.SpoofedProbe, error)
+	Recv() (*datamodel6.Probe, error)
 	grpc.ServerStream
 }
 
@@ -204,8 +201,8 @@ func (x *controllerReceiveSpoofedProbesServer) SendAndClose(m *datamodel6.Receiv
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *controllerReceiveSpoofedProbesServer) Recv() (*datamodel6.SpoofedProbe, error) {
-	m := new(datamodel6.SpoofedProbe)
+func (x *controllerReceiveSpoofedProbesServer) Recv() (*datamodel6.Probe, error) {
+	m := new(datamodel6.Probe)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

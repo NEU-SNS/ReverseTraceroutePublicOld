@@ -44,6 +44,7 @@ type Config struct {
 // LocalConfig represents the configuration of the vantage-point minus Scamper
 type LocalConfig struct {
 	Addr         string
+	Port         string
 	Proto        string
 	CloseStdDesc bool
 	PProfAddr    string
