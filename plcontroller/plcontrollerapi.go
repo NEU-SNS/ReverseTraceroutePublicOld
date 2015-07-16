@@ -35,6 +35,7 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/golang/glog"
+	con "golang.org/x/net/context"
 )
 
 var (
@@ -173,6 +174,20 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 		}
 	}
 	return nil
+}
+
+func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
+	ps := probes.GetProbes()
+	if ps == nil {
+		return nil, ErrorNilArgList
+	}
+	if len(ps) == 0 {
+		return nil, ErrorEmptyArgList
+	}
+	for _, p := range ps {
+		c.acceptProbe(p)
+	}
+	return &dm.SpoofedProbesResponse{}, nil
 }
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {

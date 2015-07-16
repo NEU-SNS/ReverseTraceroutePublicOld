@@ -115,6 +115,11 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	return ret, nil
 }
 
+func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
+	glog.Infof("Accepting Probe: %v", probe)
+	return c.spoofs.Receive(*probe)
+}
+
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
@@ -209,11 +214,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client, s Send
 func (c *plControllerT) startRPC(eChan chan error) {
 	var addr string
 	if c.config.Local.AutoConnect {
-		saddr, err := util.GetBindAddr()
-		if err != nil {
-			eChan <- err
-			return
-		}
+		saddr := "0.0.0.0"
 		addr = fmt.Sprintf("%s:%d", saddr, 45000)
 	} else {
 		addr = c.config.Local.Addr

@@ -49,7 +49,7 @@ func init() {
 	flag.StringVar(&f.Local.Addr, "a", ":45000",
 		"The address that the controller will bind to.")
 	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to the eth0 IP, will use port 45000")
+		"Autoconnect to 0.0.0.0 and will use port 45000")
 	flag.StringVar(&f.Local.Proto, "p", "tcp",
 		"The protocol that the controller will use.")
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
