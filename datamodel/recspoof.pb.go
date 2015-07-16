@@ -59,12 +59,28 @@ func (x TSType) String() string {
 }
 
 type RecSpoof struct {
-	Ids []uint32 `protobuf:"varint,1,rep,packed,name=ids" json:"ids,omitempty"`
+	Spoofs []*Spoof `protobuf:"bytes,1,rep,name=spoofs" json:"spoofs,omitempty"`
 }
 
 func (m *RecSpoof) Reset()         { *m = RecSpoof{} }
 func (m *RecSpoof) String() string { return proto.CompactTextString(m) }
 func (*RecSpoof) ProtoMessage()    {}
+
+func (m *RecSpoof) GetSpoofs() []*Spoof {
+	if m != nil {
+		return m.Spoofs
+	}
+	return nil
+}
+
+type Spoof struct {
+	Ip string `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
+	Id uint32 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
+}
+
+func (m *Spoof) Reset()         { *m = Spoof{} }
+func (m *Spoof) String() string { return proto.CompactTextString(m) }
+func (*Spoof) ProtoMessage()    {}
 
 type SpoofedProbes struct {
 	Probes []*Probe `protobuf:"bytes,1,rep,name=probes" json:"probes,omitempty"`
@@ -97,6 +113,7 @@ type Probe struct {
 	SeqNum    uint32       `protobuf:"varint,7,opt,name=seq_num" json:"seq_num,omitempty"`
 	RR        *RecordRoute `protobuf:"bytes,8,opt,name=r_r" json:"r_r,omitempty"`
 	Ts        *TimeStamp   `protobuf:"bytes,9,opt,name=ts" json:"ts,omitempty"`
+	SenderIp  string       `protobuf:"bytes,10,opt,name=sender_ip" json:"sender_ip,omitempty"`
 }
 
 func (m *Probe) Reset()         { *m = Probe{} }

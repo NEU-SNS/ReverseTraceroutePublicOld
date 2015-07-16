@@ -46,7 +46,7 @@ var (
 // Sender is the interface for something that can sent a slice of SpoofedProbes
 // to an address
 type Sender interface {
-	Send([]dm.SpoofedProbe, string) error
+	Send([]dm.Probe, string) error
 }
 
 type spoof struct {
@@ -56,11 +56,11 @@ type spoof struct {
 
 type spoofMap struct {
 	spoofs    map[uint32]spoof
-	rec       chan dm.SpoofedProbe
+	rec       chan dm.Probe
 	reg       chan dm.Spoof
 	regErr    chan error
 	recErr    chan error
-	send      chan dm.SpoofedProbe
+	send      chan dm.Probe
 	quit      chan interface{}
 	transport Sender
 }
@@ -68,8 +68,8 @@ type spoofMap struct {
 func newSpoofMap(s Sender) (sm *spoofMap) {
 	sps := make(map[uint32]spoof)
 	regChan := make(chan dm.Spoof, 20)
-	recChan := make(chan dm.SpoofedProbe, 20)
-	sendChan := make(chan dm.SpoofedProbe, 100)
+	recChan := make(chan dm.Probe, 20)
+	sendChan := make(chan dm.Probe, 100)
 	errChan := make(chan error)
 	regeChan := make(chan error)
 	qc := make(chan interface{})
@@ -108,35 +108,36 @@ func (s *spoofMap) register(sp dm.Spoof) error {
 	return nil
 }
 
-func (s *spoofMap) receive(sp dm.SpoofedProbe) error {
+func (s *spoofMap) receive(sp dm.Probe) error {
 	if spoof, ok := s.spoofs[sp.Id]; ok {
-		sp.Ip = spoof.S.Ip
+		delete(s.spoofs, sp.Id)
+		sp.SenderIp = spoof.S.Ip
 		s.send <- sp
 		return nil
 	}
 	return ErrorSpoofNotFound
 }
 
-func (s *spoofMap) Receive(sp dm.SpoofedProbe) error {
+func (s *spoofMap) Receive(sp dm.Probe) error {
 	s.rec <- sp
 	return <-s.recErr
 }
 
 func (s *spoofMap) sendSpoofs() {
-	probes := make(map[string][]dm.SpoofedProbe)
+	probes := make(map[string][]dm.Probe)
 	for {
 		select {
 		case <-s.quit:
 			return
 		case <-time.After(time.Second):
 			for ip := range probes {
-				go func(ps []dm.SpoofedProbe, addr string) {
+				go func(ps []dm.Probe, addr string) {
 					s.transport.Send(ps, addr)
 				}(probes[ip], ip)
 			}
-			probes = make(map[string][]dm.SpoofedProbe)
+			probes = make(map[string][]dm.Probe)
 		case sp := <-s.rec:
-			probes[sp.Ip] = append(probes[sp.Ip], sp)
+			probes[sp.SenderIp] = append(probes[sp.SenderIp], sp)
 		}
 	}
 }

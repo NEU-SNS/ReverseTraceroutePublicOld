@@ -47,7 +47,7 @@ const (
 type ControllerSender struct{}
 
 // Send satisfies the Sender interface for a ControllerSender
-func (cs ControllerSender) Send(sps []dm.SpoofedProbe, addr string) error {
+func (cs ControllerSender) Send(sps []dm.Probe, addr string) error {
 	saddr := fmt.Sprintf("%s:%d", addr, controllerPort)
 	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5))
 	if err != nil {

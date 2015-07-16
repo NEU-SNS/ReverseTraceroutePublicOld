@@ -62,7 +62,7 @@ func init() {
 	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed")
 	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to the eth0 IP, will use port 35000")
+		"Autoconnect to 0.0.0.0 and will use port 35000")
 	flag.StringVar(&f.ConfigPath, "c", "",
 		"Path to the config file.")
 	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55555",

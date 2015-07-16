@@ -47,7 +47,7 @@ func init() {
 	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
 	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to the eth0 IP, will use port 55000")
+		"Autoconnect to 0.0.0.0 and will use port 55000")
 	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55557",
 		"The address to use for pperf")
 	flag.StringVar(&f.Local.Host, "url", "fakepl",
