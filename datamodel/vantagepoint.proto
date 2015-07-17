@@ -6,18 +6,15 @@ package datamodel;
 
 message VantagePoint {
     string hostname    =  1;
-    string ip          =  2;
+    uint32 ip          =  2;
     bool sshable       =  3;
-    bool ts            =  4;
+    bool timestamp     =  4;
     bool record_route  =  5;
     bool active        =  6;
     int64 last_updated =  7;
-    bool sudo_problem  =  8;
-    bool spoof         =  9;
-    string controller  = 10;
-    bool rec_spoof     = 11;
-    bool scamper_up    = 12;
-    int64 last_active  = 13;
+    bool can_spoof     =  9;
+    uint32 controller  = 10;
+    bool receive_spoof = 11;
 }
 
 message VPRequest {

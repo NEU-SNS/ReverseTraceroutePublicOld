@@ -55,11 +55,12 @@ type plControllerT struct {
 	config    Config
 	sc        scamper.Config
 	mp        mproc.MProc
-	db        da.VantagePointProvider
+	db        da.VPProvider
 	w         *fsnotify.Watcher
 	conf      Config
 	client    Client
 	spoofs    *spoofMap
+	shutdown  chan struct{}
 }
 
 // Client is the measurment client interface
@@ -171,7 +172,7 @@ func (c *plControllerT) getSocket(n string) (*scamper.Socket, error) {
 }
 
 // Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client, s Sender) chan error {
+func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
 	glog.Info("Starting plcontroller")
 	errChan := make(chan error, 2)
 	if db == nil {
@@ -190,6 +191,7 @@ func Start(c Config, noScamp bool, db da.VantagePointProvider, cl Client, s Send
 		errChan <- err
 		return errChan
 	}
+	plController.shutdown = make(chan struct{})
 	plController.spoofs = newSpoofMap(s)
 	plController.config = c
 	plController.startTime = time.Now()
@@ -245,6 +247,7 @@ func HandleSig(s os.Signal) {
 
 func (c *plControllerT) handleSig(s os.Signal) {
 	glog.Infof("Got signal %v", s)
+	close(c.shutdown)
 	if c.mp != nil {
 		c.mp.KillAll()
 	}

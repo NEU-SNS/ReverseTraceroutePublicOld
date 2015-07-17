@@ -36,19 +36,16 @@ import proto "github.com/golang/protobuf/proto"
 var _ = proto.Marshal
 
 type VantagePoint struct {
-	Hostname    string `protobuf:"bytes,1,opt,name=hostname" json:"hostname,omitempty"`
-	Ip          string `protobuf:"bytes,2,opt,name=ip" json:"ip,omitempty"`
-	Sshable     bool   `protobuf:"varint,3,opt,name=sshable" json:"sshable,omitempty"`
-	Ts          bool   `protobuf:"varint,4,opt,name=ts" json:"ts,omitempty"`
-	RecordRoute bool   `protobuf:"varint,5,opt,name=record_route" json:"record_route,omitempty"`
-	Active      bool   `protobuf:"varint,6,opt,name=active" json:"active,omitempty"`
-	LastUpdated int64  `protobuf:"varint,7,opt,name=last_updated" json:"last_updated,omitempty"`
-	SudoProblem bool   `protobuf:"varint,8,opt,name=sudo_problem" json:"sudo_problem,omitempty"`
-	Spoof       bool   `protobuf:"varint,9,opt,name=spoof" json:"spoof,omitempty"`
-	Controller  string `protobuf:"bytes,10,opt,name=controller" json:"controller,omitempty"`
-	RecSpoof    bool   `protobuf:"varint,11,opt,name=rec_spoof" json:"rec_spoof,omitempty"`
-	ScamperUp   bool   `protobuf:"varint,12,opt,name=scamper_up" json:"scamper_up,omitempty"`
-	LastActive  int64  `protobuf:"varint,13,opt,name=last_active" json:"last_active,omitempty"`
+	Hostname     string `protobuf:"bytes,1,opt,name=hostname" json:"hostname,omitempty"`
+	Ip           uint32 `protobuf:"varint,2,opt,name=ip" json:"ip,omitempty"`
+	Sshable      bool   `protobuf:"varint,3,opt,name=sshable" json:"sshable,omitempty"`
+	Timestamp    bool   `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"`
+	RecordRoute  bool   `protobuf:"varint,5,opt,name=record_route" json:"record_route,omitempty"`
+	Active       bool   `protobuf:"varint,6,opt,name=active" json:"active,omitempty"`
+	LastUpdated  int64  `protobuf:"varint,7,opt,name=last_updated" json:"last_updated,omitempty"`
+	CanSpoof     bool   `protobuf:"varint,9,opt,name=can_spoof" json:"can_spoof,omitempty"`
+	Controller   uint32 `protobuf:"varint,10,opt,name=controller" json:"controller,omitempty"`
+	ReceiveSpoof bool   `protobuf:"varint,11,opt,name=receive_spoof" json:"receive_spoof,omitempty"`
 }
 
 func (m *VantagePoint) Reset()         { *m = VantagePoint{} }

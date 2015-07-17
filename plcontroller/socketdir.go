@@ -43,8 +43,9 @@ func (c *plControllerT) handlEvents(ec chan error) {
 	glog.Info("Started event handling loop")
 	for {
 		select {
+		case <-c.shutdown:
+			return
 		case e := <-c.w.Events:
-
 			if e.Op&fsnotify.Create == fsnotify.Create {
 				glog.Infof("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
@@ -52,11 +53,11 @@ func (c *plControllerT) handlEvents(ec chan error) {
 					c.conf.Scamper.ConverterPath,
 					json.Unmarshal,
 					net.Dial)
-
 				if err != nil {
 					ec <- err
 					continue
 				}
+				c.db.UpdateController(util.IpStringToInt32(s.IP()), , )
 				c.client.AddSocket(s)
 				break
 			}

@@ -192,6 +192,12 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
 	glog.Info("Getting All VPs")
-
+	vps, err := c.db.GetVPs()
+	if err != nil {
+		return nil
+	}
+	if err := stream.Send(&dm.VPReturn{Vps: vps}); err != nil {
+		return err
+	}
 	return nil
 }
