@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,50 +24,69 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package dataaccess contains the access to the data
-package dataaccess
+package sql_test
 
 import (
-	"time"
+	"os"
+	"testing"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
+	"github.com/golang/glog"
 )
 
-// DataProvider is the interface for a data store than can access
-// both pings and traceroutes
-type DataProvider interface {
-	TracerouteProvider
-	PingProvider
-	Closer
+var conf = sql.DbConfig{
+	UName:    "revtr",
+	Password: "password",
+	Host:     "localhost",
+	Port:     "3306",
+	Db:       "plcontroller",
 }
 
-// Closer are things that close
-type Closer interface {
-	Close() error
+var db *sql.DB
+
+func TestMain(m *testing.M) {
+	var err error
+	db, err = sql.NewDB(conf)
+	if err != nil {
+		glog.Info(err)
+		glog.Flush()
+		os.Exit(1)
+	}
+	defer db.Close()
+	result := m.Run()
+	glog.Flush()
+	os.Exit(result)
 }
 
-// Staleness how old of a stored item to accept
-type Staleness time.Duration
+func TestGetVps(t *testing.T) {
+	vps, err := db.GetVPs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(vps)
 
-// TracerouteProvider is the interface for getting traceroutes
-type TracerouteProvider interface {
-	StoreTraceroute(*dm.Traceroute, dm.ServiceT) error
-	GetTRBySrcDst(string, string) (*dm.MTraceroute, error)
-	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.MTraceroute, error)
-	GetIntersectingTraceroute(string, string, Staleness) (*dm.MTraceroute, error)
 }
 
-// PingProvider is the interface for getting pings
-type PingProvider interface {
-	GetPingBySrcDst(string, string) (*dm.Ping, error)
-	StorePing(*dm.Ping) error
+func TestUpdateControllerNullController(t *testing.T) {
+	var ip uint32 = 68101001
+	err := db.UpdateController(ip, 0, 167772161)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
-type VPProvider interface {
-	GetVPs() ([]*dm.VantagePoint, error)
-	UpdateController(uint32, uint32, uint32) error
-	UpdateActive(uint32, uint32, bool) error
-	UpdateCanSpoof(uint32, uint32, bool) error
-	Closer
+func TestUpdateControllerDifferentController(t *testing.T) {
+	var ip uint32 = 68101001
+	err := db.UpdateController(ip, 167772162, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateControllerSetToNull(t *testing.T) {
+	var ip uint32 = 68101001
+	err := db.UpdateController(ip, 167772161, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
