@@ -90,3 +90,15 @@ func TestUpdateControllerSetToNull(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestUpdateCanSpoof(t *testing.T) {
+	var ip uint32 = 68101001
+	err := db.UpdateCanSpoof(ip, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.UpdateCanSpoof(ip, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

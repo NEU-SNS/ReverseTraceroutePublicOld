@@ -35,6 +35,7 @@ import (
 	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 	"gopkg.in/fsnotify.v1"
 )
@@ -57,13 +58,36 @@ func (c *plControllerT) handlEvents(ec chan error) {
 					ec <- err
 					continue
 				}
-				c.db.UpdateController(util.IpStringToInt32(s.IP()), , )
+				ip, err := util.IPStringToInt32(s.IP())
+				if err != nil {
+					ec <- err
+					glog.Errorf("Failed to convert socket IP: %v", err)
+					continue
+				}
+				err = c.db.UpdateController(ip, c.ip)
+				if err != nil {
+					ec <- err
+					glog.Errorf("Failed to update controller  %v", err)
+					continue
+				}
 				c.client.AddSocket(s)
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
 				glog.Infof("Received fs event: %v", e)
 				ip := strings.Split(path.Base(e.Name), ":")[0]
+				nip, err := util.IPStringToInt32(ip)
+				if err != nil {
+					ec <- err
+					glog.Errorf("Failed to convert socket IP: %v", err)
+					continue
+				}
+				err = c.db.UpdateController(nip, 0)
+				if err != nil {
+					ec <- err
+					glog.Errorf("Failed to update controller  %v", err)
+					continue
+				}
 				c.client.RemoveSocket(ip)
 				break
 			}
@@ -73,6 +97,13 @@ func (c *plControllerT) handlEvents(ec chan error) {
 
 //This is only for use when a server is going down
 func (c *plControllerT) removeAllVps() {
+	for sock := range c.client.GetAllSockets() {
+		ip, err := util.IPStringToInt32(sock.IP())
+		if err != nil {
+			continue
+		}
+		c.db.UpdateController(ip, 0)
+	}
 }
 
 func (c *plControllerT) watchDir(dir string, ec chan error) {
