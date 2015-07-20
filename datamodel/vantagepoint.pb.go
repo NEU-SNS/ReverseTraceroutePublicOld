@@ -46,6 +46,8 @@ type VantagePoint struct {
 	CanSpoof     bool   `protobuf:"varint,9,opt,name=can_spoof" json:"can_spoof,omitempty"`
 	Controller   uint32 `protobuf:"varint,10,opt,name=controller" json:"controller,omitempty"`
 	ReceiveSpoof bool   `protobuf:"varint,11,opt,name=receive_spoof" json:"receive_spoof,omitempty"`
+	Site         string `protobuf:"bytes,12,opt,name=site" json:"site,omitempty"`
+	SpoofChecked int64  `protobuf:"varint,13,opt,name=spoof_checked" json:"spoof_checked,omitempty"`
 }
 
 func (m *VantagePoint) Reset()         { *m = VantagePoint{} }

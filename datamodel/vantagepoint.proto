@@ -5,16 +5,19 @@ option go_package = "datamodel";
 package datamodel;
 
 message VantagePoint {
-    string hostname    =  1;
-    uint32 ip          =  2;
-    bool sshable       =  3;
-    bool timestamp     =  4;
-    bool record_route  =  5;
-    bool active        =  6;
-    int64 last_updated =  7;
-    bool can_spoof     =  9;
-    uint32 controller  = 10;
-    bool receive_spoof = 11;
+    string hostname      =  1;
+    uint32 ip            =  2;
+    bool sshable         =  3;
+    bool timestamp       =  4;
+    bool record_route    =  5;
+    bool active          =  6;
+    int64 last_updated   =  7;
+    bool can_spoof       =  9;
+    uint32 controller    = 10;
+    bool receive_spoof   = 11;
+    string site          = 12;
+    int64 spoof_checked  = 13;
+    
 }
 
 message VPRequest {

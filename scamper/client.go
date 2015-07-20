@@ -63,12 +63,6 @@ var (
 	ErrorTimeout = errors.New("Timeout")
 )
 
-//TODO: A possible optimization to make is to open a single connection,
-// resuse it until it fails, and using the -U option to assign an id to
-// each measurement and then return them to the proper caller. This
-// would also involve blocking on a conn waiting for data at any time
-// measurements are out.
-
 // Response represents a response from scamper
 type Response struct {
 	RType  SResponseT
@@ -131,12 +125,23 @@ func (sm *socketMap) Get(addr string) (*Socket, error) {
 	return nil, ErrorSocketNotFound
 }
 
+func (sm *socketMap) GetAll() []*Socket {
+	sm.Lock()
+	defer sm.Unlock()
+	socks := make([]*Socket, 0)
+	for _, sock := range sm.socks {
+		socks = append(socks, sock)
+	}
+	return socks
+}
+
 // Client is the interface of the scamper client
 type Client interface {
 	AddSocket(*Socket)
 	RemoveSocket(string)
 	GetSocket(string) (*Socket, error)
 	DoMeasurement(string, interface{}) (<-chan Response, error)
+	GetAllSockets() <-chan *Socket
 }
 
 // Client is the main object for interacting with scamper
@@ -162,6 +167,17 @@ func (c *client) RemoveSocket(addr string) {
 // GetSocket gets a socket registered in the client
 func (c *client) GetSocket(addr string) (*Socket, error) {
 	return c.sockets.Get(addr)
+}
+
+func (c *client) GetAllSockets() <-chan *Socket {
+	schan := make(chan *Socket)
+	go func() {
+		for _, sock := range c.sockets.GetAll() {
+			schan <- sock
+		}
+		close(schan)
+	}()
+	return schan
 }
 
 // DoMeasurement run the measurement described by arg from the address addr

@@ -60,6 +60,7 @@ type plControllerT struct {
 	conf      Config
 	client    Client
 	spoofs    *spoofMap
+	ip        uint32
 	shutdown  chan struct{}
 }
 
@@ -70,6 +71,7 @@ type Client interface {
 	RemoveSocket(string)
 	GetSocket(string) (*scamper.Socket, error)
 	DoMeasurement(string, interface{}) (<-chan scamper.Response, error)
+	GetAllSockets() <-chan *scamper.Socket
 }
 
 func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
@@ -163,14 +165,6 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 	return res, err
 }
 
-func (c *plControllerT) addSocket(sock *scamper.Socket) {
-	c.client.AddSocket(sock)
-}
-
-func (c *plControllerT) getSocket(n string) (*scamper.Socket, error) {
-	return c.client.GetSocket(n)
-}
-
 // Start starts a plcontroller with the given configuration
 func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
 	glog.Info("Starting plcontroller")
@@ -191,6 +185,19 @@ func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan e
 		errChan <- err
 		return errChan
 	}
+	ips, err := util.GetBindAddr()
+	if err != nil {
+		glog.Errorf("Failed to get bind address: %v", err)
+		errChan <- err
+		return errChan
+	}
+	ip, err := util.IPStringToInt32(ips)
+	if err != nil {
+		glog.Errorf("Failed to convert ip string: %v", err)
+		errChan <- err
+		return errChan
+	}
+	plController.ip = ip
 	plController.shutdown = make(chan struct{})
 	plController.spoofs = newSpoofMap(s)
 	plController.config = c

@@ -32,7 +32,6 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/golang/glog"
 )
 import _ "github.com/go-sql-driver/mysql"
 
@@ -67,12 +66,14 @@ type VantagePoint struct {
 	Ip           uint32
 	Controller   sql.NullInt64
 	HostName     string
+	Site         string
 	TimeStamp    bool
 	RecordRoute  bool
 	CanSpoof     bool
 	Active       bool
 	ReceiveSpoof bool
 	LastUpdated  time.Time
+	SpoofChecked time.Time
 }
 
 func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
@@ -88,6 +89,8 @@ func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
 	nvp.Active = vp.Active
 	nvp.ReceiveSpoof = vp.ReceiveSpoof
 	nvp.LastUpdated = vp.LastUpdated.Unix()
+	nvp.Site = vp.Site
+	nvp.SpoofChecked = vp.LastUpdated.Unix()
 	return nvp
 }
 
@@ -136,13 +139,13 @@ const (
 UPDATE 
 	vantage_point
 SET
-	controller = IF(controller = ? OR controller IS NULL, ?, controller)
+	controller = ? 
 WHERE 
 	ip = ?
 `
 )
 
-func (db *DB) UpdateController(ip, controller, newc uint32) error {
+func (db *DB) UpdateController(ip, newc uint32) error {
 	var snewc sql.NullInt64
 	if newc == 0 {
 		snewc.Valid = false
@@ -150,9 +153,7 @@ func (db *DB) UpdateController(ip, controller, newc uint32) error {
 		snewc.Valid = true
 		snewc.Int64 = int64(newc)
 	}
-
-	glog.Info(snewc)
-	_, err := db.db.Exec(updateControllerQuery, controller, snewc, ip)
+	_, err := db.db.Exec(updateControllerQuery, snewc, ip)
 	return err
 }
 
@@ -161,14 +162,14 @@ const (
 UPDATE
 	vantage_point
 SET
-	active = IF(controller = ?, ?, active)
+	active = ?
 WHERE
 	ip = ?
 `
 )
 
-func (db *DB) UpdateActive(ip, controller uint32, active bool) error {
-	_, err := db.db.Exec(updateActiveQuery, controller, active, ip)
+func (db *DB) UpdateActive(ip uint32, active bool) error {
+	_, err := db.db.Exec(updateActiveQuery, active, ip)
 	return err
 }
 
@@ -177,14 +178,15 @@ const (
 UPDATE
 	vantage_point
 SET
-	can_spoof = IF(controller = ?, ?, can_spoof)
+	can_spoof = ?,
+	spoof_checked = NOW()
 WHERE
 	ip = ?
 `
 )
 
-func (db *DB) UpdateCanSpoof(ip, controller uint32, canSpoof bool) error {
-	_, err := db.db.Exec(updateCanSpoofQuery, controller, canSpoof, ip)
+func (db *DB) UpdateCanSpoof(ip uint32, canSpoof bool) error {
+	_, err := db.db.Exec(updateCanSpoofQuery, canSpoof, ip)
 	return err
 }
 
