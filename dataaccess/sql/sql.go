@@ -33,7 +33,7 @@ import (
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
-import _ "github.com/go-sql-driver/mysql"
+import "github.com/go-sql-driver/mysql"
 
 type DB struct {
 	db *sql.DB
@@ -73,7 +73,7 @@ type VantagePoint struct {
 	Active       bool
 	ReceiveSpoof bool
 	LastUpdated  time.Time
-	SpoofChecked time.Time
+	SpoofChecked mysql.NullTime
 }
 
 func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
@@ -90,17 +90,19 @@ func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
 	nvp.ReceiveSpoof = vp.ReceiveSpoof
 	nvp.LastUpdated = vp.LastUpdated.Unix()
 	nvp.Site = vp.Site
-	nvp.SpoofChecked = vp.LastUpdated.Unix()
+	if vp.SpoofChecked.Valid {
+		nvp.SpoofChecked = vp.LastUpdated.Unix()
+	}
 	return nvp
 }
 
 const (
 	getVpsQuery string = `
-SELECT 
-	ip, controller, hostname, timestamp, 
-	record_route, can_spoof, active, 
-    receive_spoof, last_updated 
-FROM 
+SELECT
+	ip, controller, hostname, timestamp,
+	record_route, can_spoof, active,
+    receive_spoof, last_updated
+FROM
 	vantage_point;
 `
 )
@@ -136,24 +138,38 @@ func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 
 const (
 	updateControllerQuery string = `
-UPDATE 
+UPDATE
 	vantage_point
 SET
-	controller = ? 
-WHERE 
+	controller = ?,
+	active = ?
+WHERE
+	ip = ?
+`
+	updateControllerQueryNull string = `
+UPDATE
+	vantage_point
+SET
+	controller = IF(controller = ?, NULL, controller),
+	active = IF(controller = ?, ?, active)
+WHERE
 	ip = ?
 `
 )
 
-func (db *DB) UpdateController(ip, newc uint32) error {
-	var snewc sql.NullInt64
+func (db *DB) UpdateController(ip, newc, con uint32) error {
+	args := make([]interface{}, 0)
+	var active bool
+	query := updateControllerQuery
 	if newc == 0 {
-		snewc.Valid = false
+		query = updateControllerQueryNull
+		args = append(args, con, con)
 	} else {
-		snewc.Valid = true
-		snewc.Int64 = int64(newc)
+		args = append(args, newc)
+		active = true
 	}
-	_, err := db.db.Exec(updateControllerQuery, snewc, ip)
+	args = append(args, active, ip)
+	_, err := db.db.Exec(query, args...)
 	return err
 }
 

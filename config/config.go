@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2015, Northeastern University
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
      * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
      * Neither the name of the Northeastern University nor the
        names of its contributors may be used to endorse or promote products
        derived from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,25 +24,34 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package config handles the config parsing for the various commands
 package config
 
-import (
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"os"
-)
+import "flag"
 
-func ParseConfig(path string, out interface{}) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	err = yaml.Unmarshal(data, out)
+func merge(f *flag.FlagSet, fn func(string) *string) error {
+	setFlags := make(map[string]bool)
+	f.Visit(func(fl *flag.Flag) {
+		setFlags[fl.Name] = true
+	})
+	var err error
+	f.VisitAll(func(fl *flag.Flag) {
+		if !setFlags[fl.Name] {
+			val := fn(fl.Name)
+			if val == nil {
+				return
+			}
+			err = fl.Value.Set(*val)
+		}
+	})
+	return err
+}
+
+// Parse fills in the flag set using environment variables and config files
+// opts is an object that will represent the format of the config files being parsed
+func Parse(f *flag.FlagSet, opts interface{}) error {
+	err := mergeEnvironment(f)
 	if err != nil {
 		return err
 	}

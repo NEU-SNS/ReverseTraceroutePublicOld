@@ -238,9 +238,7 @@ func (s *Socket) readConn() {
 			dec := &util.UUDecodingWriter{}
 			s.wartsHeader[0].WriteTo(dec)
 			s.wartsHeader[1].WriteTo(dec)
-			glog.Infof("Writing: %s", resp.Bytes())
 			resp.WriteTo(dec)
-			glog.Infof("Converting warts: %s", dec.Bytes())
 			cwarts, err := convertWarts(s.converterPath, dec.Bytes())
 			if err != nil {
 				resp.Err = err
@@ -294,7 +292,6 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 		glog.Errorf("Failed to converte bytes: %v, %s", err, b)
 		return []byte{}, err
 	}
-	glog.Infof("Results of converting: %s", res)
 	return res, err
 }
 

@@ -66,7 +66,7 @@ type PingProvider interface {
 
 type VPProvider interface {
 	GetVPs() ([]*dm.VantagePoint, error)
-	UpdateController(uint32, uint32) error
+	UpdateController(uint32, uint32, uint32) error
 	UpdateActive(uint32, bool) error
 	UpdateCanSpoof(uint32, bool) error
 	Closer

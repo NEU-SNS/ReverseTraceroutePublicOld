@@ -67,7 +67,7 @@ func reconnect(addr string) (*ipv4.RawConn, error) {
 }
 
 var (
-	ErrorNotICMPEcho           = fmt.Errorf("Received Re")
+	ErrorNotICMPEcho           = fmt.Errorf("Received Non ICMP Probe")
 	ErrorNonSpoofedProbe       = fmt.Errorf("Received ICMP Probe that was not spoofed")
 	ErrorSpoofedProbeNoID      = fmt.Errorf("Received a spoofed probe with no id")
 	ErrorNoSpooferIP           = fmt.Errorf("No spoofer IP found in packet")
@@ -174,8 +174,9 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 				probe.Ts = &nts
 			}
 		}
+		return probe, nil
 	}
-	return probe, nil
+	return nil, ErrorNotICMPEcho
 }
 
 func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan error) {
@@ -192,8 +193,6 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {
-				glog.Infof("Got probe: %v", pr)
-				glog.Flush()
 				ec <- err
 				switch err {
 				case ErrorReadError:
@@ -204,7 +203,6 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 						return
 					}
 				}
-				glog.Errorf("Error getting probe: %v", err)
 				continue
 			}
 			probes <- *pr

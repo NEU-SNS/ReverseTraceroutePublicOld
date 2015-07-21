@@ -30,12 +30,6 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
-type Flags struct {
-	Local      LocalConfig
-	Scamper    ScamperConfig
-	ConfigPath string
-}
-
 type Config struct {
 	Local   LocalConfig
 	Scamper ScamperConfig
@@ -43,20 +37,18 @@ type Config struct {
 }
 
 type LocalConfig struct {
-	Addr         string
-	Proto        string
-	CloseStdDesc bool
-	PProfAddr    string
-	Timeout      int64
-	AutoConnect  bool
-	SecureConn   bool
-	CertFile     string
-	KeyFile      string
+	Addr         string `flag:"a"`
+	Port         int    `flag:"p"`
+	CloseStdDesc bool   `flag:"D"`
+	PProfAddr    string `flag:"pprof"`
+	Timeout      int64  `flag:"t"`
+	CertFile     string `flag:"cert-file"`
+	KeyFile      string `flag:"key-file"`
 }
 
 type ScamperConfig struct {
-	Port          string
-	SockDir       string
-	BinPath       string
-	ConverterPath string
+	Port          string `flag:"scamper-port"`
+	SockDir       string `flag:"socket-dir"`
+	BinPath       string `flag:"scamper-bin"`
+	ConverterPath string `flag:"converter-path"`
 }

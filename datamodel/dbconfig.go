@@ -27,11 +27,9 @@
 package datamodel
 
 type DbConfig struct {
-	ServiceSpace      string
-	TracerouteSpace   string
-	TraceHopSpace     string
-	PingSpace         string
-	VantagePointSpace string
-	Host              string
-	Port              int
+	UName    string
+	Password string
+	Db       string
+	Host     string
+	Port     string
 }

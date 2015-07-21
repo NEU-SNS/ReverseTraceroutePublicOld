@@ -64,7 +64,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 					glog.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
-				err = c.db.UpdateController(ip, c.ip)
+				err = c.db.UpdateController(ip, c.ip, c.ip)
 				if err != nil {
 					ec <- err
 					glog.Errorf("Failed to update controller  %v", err)
@@ -82,7 +82,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 					glog.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
-				err = c.db.UpdateController(nip, 0)
+				err = c.db.UpdateController(nip, 0, c.ip)
 				if err != nil {
 					ec <- err
 					glog.Errorf("Failed to update controller  %v", err)
@@ -102,7 +102,7 @@ func (c *plControllerT) removeAllVps() {
 		if err != nil {
 			continue
 		}
-		c.db.UpdateController(ip, 0)
+		c.db.UpdateController(ip, 0, c.ip)
 	}
 }
 

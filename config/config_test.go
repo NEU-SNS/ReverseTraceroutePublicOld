@@ -24,83 +24,43 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package config
 
-import (
-	"os"
-	"testing"
-)
+import "testing"
 
 type SubConfig struct {
-	Name string
-	Age  int
+	Name string `flag:"sub_name"`
+	Age  int    `flag:"sub_age"`
 }
 
 type Config struct {
-	Name   string
-	Num    int
-	Array  []int
+	Name   string `flag:"name"`
+	Num    int    `flag:"num"`
 	SubCon SubConfig
 }
 
 const config = `
 name: Rob
 num: 65
-array: [1, 2, 3]
 subcon:
     name: Rob
     age: 25
 `
 
 var testConfig = Config{
-	Name:  "Rob",
-	Num:   65,
-	Array: []int{1, 2, 3},
+	Name: "Rob",
+	Num:  65,
 	SubCon: SubConfig{
 		Name: "Rob",
 		Age:  25,
 	},
 }
 
-func TestParseConfig(t *testing.T) {
-	f, err := os.Create("testparse.config")
+func TestBuildMap(t *testing.T) {
+	out, err := buildMap(testConfig)
 	if err != nil {
-		t.Fatalf("Error creating file: %v", err)
+		t.Fatal(err)
 	}
-	defer os.Remove("testparse.config")
-	var conf Config
-	f.Write([]byte(config))
-	err = ParseConfig("testparse.config", &conf)
-	t.Logf("%v", conf)
-	t.Logf("%v", testConfig)
-	if err != nil {
-		t.Fatalf("Failed parse config: %v", err)
-	}
-
-	if testConfig.Name != conf.Name {
-		t.Fatalf("Failed to parse Config.Name")
-	}
-	if testConfig.Num != conf.Num {
-		t.Fatalf("Failed to parse Config.Num")
-	}
-	if testConfig.SubCon != conf.SubCon {
-		t.Fatalf("Failed to parse Config.SubCon")
-	}
-	if len(testConfig.Array) != len(conf.Array) {
-		t.Fatalf("Failed to parse Config.Array")
-	}
-
-	for i := 0; i < len(testConfig.Array); i++ {
-		if testConfig.Array[i] != conf.Array[i] {
-			t.Fatalf("Failed to parse Config.Array[%d]", i)
-		}
-	}
-}
-
-func TestParseConfigBadPath(t *testing.T) {
-	var conf Config
-	err := ParseConfig("-", &conf)
-	if err == nil {
-		t.Fatalf("TestParseConfigBadPath: Didnt return error with bad path")
-	}
+	t.Log(out)
 }

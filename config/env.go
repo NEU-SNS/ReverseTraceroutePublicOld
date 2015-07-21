@@ -24,84 +24,58 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package sql_test
+package config
 
 import (
+	"flag"
 	"os"
-	"testing"
-
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
-	"github.com/golang/glog"
+	"strings"
 )
 
-var conf = sql.DbConfig{
-	UName:    "revtr",
-	Password: "password",
-	Host:     "localhost",
-	Port:     "3306",
-	Db:       "plcontroller",
+// Order of options are flag -> environment -> config file
+
+func mergeConfigFile(f *flag.FlagSet) error {
+	return nil
 }
 
-var db *sql.DB
+var envPrefix string
 
-func TestMain(m *testing.M) {
-	var err error
-	db, err = sql.NewDB(conf)
-	if err != nil {
-		glog.Info(err)
-		glog.Flush()
-		os.Exit(1)
-	}
-	defer db.Close()
-	result := m.Run()
-	glog.Flush()
-	os.Exit(result)
+// SetEnvPrefix Sets the prefix to environment variables
+func SetEnvPrefix(pre string) {
+	envPrefix = pre
 }
 
-func TestGetVps(t *testing.T) {
-	vps, err := db.GetVPs()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(vps)
-
+type env struct {
+	env map[string]*string
 }
 
-const (
-	cip = 167772161
-)
+func newEnv() *env {
+	split := "="
+	en := make(map[string]*string)
 
-func TestUpdateControllerSetToNull(t *testing.T) {
-	var ip uint32 = 68101001
-	err := db.UpdateController(ip, 167772161, cip)
-	if err != nil {
-		t.Fatal(err)
+	for _, val := range os.Environ() {
+		split := strings.SplitAfterN(val, split, 2)
+		en[split[0]] = &split[1]
 	}
-}
-func TestUpdateControllerNullController(t *testing.T) {
-	var ip uint32 = 68101001
-	err := db.UpdateController(ip, 0, cip)
-	if err != nil {
-		t.Fatal(err)
-	}
+	return &env{env: en}
 }
 
-func TestUpdateControllerDifferentController(t *testing.T) {
-	var ip uint32 = 68101001
-	err := db.UpdateController(ip, 167772162, cip)
-	if err != nil {
-		t.Fatal(err)
-	}
+func (e *env) Get(key string) *string {
+	return e.env[key]
 }
 
-func TestUpdateCanSpoof(t *testing.T) {
-	var ip uint32 = 68101001
-	err := db.UpdateCanSpoof(ip, true)
-	if err != nil {
-		t.Fatal(err)
+func mergeEnvironment(f *flag.FlagSet) error {
+	env := newEnv()
+	fn := func(name string) *string {
+		key := strings.ToUpper(strings.Join(
+			[]string{
+				envPrefix,
+				name,
+			},
+			"_",
+		))
+		return env.Get(key)
 	}
-	err = db.UpdateCanSpoof(ip, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := merge(f, fn)
+	return err
 }
