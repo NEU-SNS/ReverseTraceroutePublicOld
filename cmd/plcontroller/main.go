@@ -34,41 +34,40 @@ import (
 	"syscall"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess/testdataaccess"
+	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 )
 
-var f plcontroller.Flags
+var conf plcontroller.Config
 
 func init() {
-	flag.Int64Var(&f.Local.Timeout, "t", 60,
+	config.SetEnvPrefix("REVTR")
+	config.AddConfigPath("./plcontroller.config")
+
+	flag.Int64Var(&conf.Local.Timeout, "t", 60,
 		"The default timeout used for measurement requests.")
-	flag.StringVar(&f.Local.Addr, "a", ":45000",
+	flag.StringVar(&conf.Local.Addr, "a", ":45000",
 		"The address that the controller will bind to.")
-	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to 0.0.0.0 and will use port 45000")
-	flag.StringVar(&f.Local.Proto, "p", "tcp",
+	flag.IntVar(&conf.Local.Port, "p", 4380,
 		"The protocol that the controller will use.")
-	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
+	flag.BoolVar(&conf.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed.")
-	flag.StringVar(&f.Scamper.Port, "P", "55000",
+	flag.StringVar(&conf.Scamper.Port, "scamper-port", "4381",
 		"Port that Scamper will use.")
-	flag.StringVar(&f.Scamper.SockDir, "S", "/tmp/scamper_sockets",
+	flag.StringVar(&conf.Scamper.SockDir, "socket-dir", "/tmp/scamper_sockets",
 		"Directory that scamper will use for its sockets")
-	flag.StringVar(&f.Scamper.BinPath, "B", "/usr/local/bin/sc_remoted",
+	flag.StringVar(&conf.Scamper.BinPath, "scamper-bin", "/usr/local/bin/sc_remoted",
 		"Path to the scamper binary")
-	flag.StringVar(&f.Scamper.ConverterPath, "X", "/usr/local/bin/sc_warts2json",
+	flag.StringVar(&conf.Scamper.ConverterPath, "converter-path", "/usr/local/bin/sc_warts2json",
 		"Path for warts parser")
-	flag.StringVar(&f.ConfigPath, "c", "",
-		"Path to the config file")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55556",
+	flag.StringVar(&conf.Local.PProfAddr, "pprof", "localhost:55556",
 		"The port for pprof")
-	flag.StringVar(&f.Local.CertFile, "cert-file", "cert.pem",
+	flag.StringVar(&conf.Local.CertFile, "cert-file", "cert.pem",
 		"The path the the cert file for the the server")
-	flag.StringVar(&f.Local.KeyFile, "key-file", "key.pem",
+	flag.StringVar(&conf.Local.KeyFile, "key-file", "key.pem",
 		"The path to the private key for the file")
 }
 
@@ -85,28 +84,35 @@ func sigHandle() {
 
 func main() {
 	go sigHandle()
-	flag.Parse()
 	defer glog.Flush()
-	var conf plcontroller.Config
 
-	if f.ConfigPath != "" {
-		err := config.ParseConfig(f.ConfigPath, &conf)
-		if err != nil {
-			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			exit(1)
-		}
-	} else {
-		conf.Local = f.Local
-		conf.Scamper = f.Scamper
+	flag.Parse()
+	var parseConf plcontroller.Config
+
+	err := config.Parse(flag.CommandLine, &parseConf)
+	if err != nil {
+		glog.Errorf("Failed to parse config: %v", err)
+		exit(1)
 	}
+
 	util.CloseStdFiles(conf.Local.CloseStdDesc)
 	util.StartPProf(conf.Local.PProfAddr)
-	db, err := da.NewVP()
+
+	db, err := sql.NewDB(sql.DbConfig{
+		UName:    conf.Db.UName,
+		Password: conf.Db.Password,
+		Host:     conf.Db.Host,
+		Port:     conf.Db.Port,
+		Db:       conf.Db.Db,
+	})
+
 	if err != nil {
 		glog.Errorf("Failed to created db: %v", err)
 		exit(1)
 	}
+
 	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{})
+
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
 		exit(1)

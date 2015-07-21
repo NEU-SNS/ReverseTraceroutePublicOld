@@ -165,71 +165,69 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 	return res, err
 }
 
-// Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
-	glog.Info("Starting plcontroller")
-	errChan := make(chan error, 2)
+func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPProvider, cl Client, s Sender) {
 	if db == nil {
-		errChan <- fmt.Errorf("Nil db in plController")
-		return errChan
+		ec <- fmt.Errorf("Nil db in plController")
+		return
 	}
-	plController.db = db
 	var sc scamper.Config
-	sc.Port = c.Scamper.Port
-	sc.Path = c.Scamper.SockDir
-	sc.ScPath = c.Scamper.BinPath
-	sc.ScParserPath = c.Scamper.ConverterPath
+	sc.Port = con.Scamper.Port
+	sc.Path = con.Scamper.SockDir
+	sc.ScPath = con.Scamper.BinPath
+	sc.ScParserPath = con.Scamper.ConverterPath
 	err := scamper.ParseConfig(sc)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
-		errChan <- err
-		return errChan
+		ec <- err
+		return
 	}
 	ips, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Failed to get bind address: %v", err)
-		errChan <- err
-		return errChan
+		ec <- err
+		return
 	}
 	ip, err := util.IPStringToInt32(ips)
 	if err != nil {
 		glog.Errorf("Failed to convert ip string: %v", err)
-		errChan <- err
-		return errChan
+		ec <- err
+		return
 	}
-	plController.ip = ip
-	plController.shutdown = make(chan struct{})
-	plController.spoofs = newSpoofMap(s)
-	plController.config = c
-	plController.startTime = time.Now()
-	plController.mp = mproc.New()
-	plController.sc = sc
-	plController.conf = c
+
+	c.db = db
+	c.ip = ip
+	c.shutdown = make(chan struct{})
+	c.spoofs = newSpoofMap(s)
+	c.config = con
+	c.startTime = time.Now()
+	c.mp = mproc.New()
+	c.sc = sc
 	if !noScamp {
-		plController.startScamperProc()
+		c.startScamperProc()
 	}
-	plController.client = cl
+	c.client = cl
 	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
 	//best to call it after startScamperProc otherwise you'll send an error
 	//and trigger any error logic in whatever code is using this
-	plController.watchDir(sc.Path, errChan)
-	var opts []grpc.ServerOption
-	plController.server = grpc.NewServer(opts...)
-	plc.RegisterPLControllerServer(plController.server, &plController)
-	go plController.startRPC(errChan)
+	c.watchDir(sc.Path, ec)
+	c.server = grpc.NewServer()
+	plc.RegisterPLControllerServer(plController.server, c)
+	go c.startRPC(ec)
+}
+
+// Start starts a plcontroller with the given configuration
+func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
+	glog.Info("Starting plcontroller")
+	errChan := make(chan error, 2)
+	go plController.run(errChan, c, noScamp, db, cl, s)
 	return errChan
 }
 
 func (c *plControllerT) startRPC(eChan chan error) {
-	var addr string
-	if c.config.Local.AutoConnect {
-		saddr := "0.0.0.0"
-		addr = fmt.Sprintf("%s:%d", saddr, 45000)
-	} else {
-		addr = c.config.Local.Addr
-	}
+	addr := fmt.Sprintf("%s:%d", c.config.Local.Addr,
+		c.config.Local.Port)
 	glog.Infof("Conecting to: %s", addr)
-	l, e := net.Listen(c.config.Local.Proto, addr)
+	l, e := net.Listen("tcp", addr)
 	if e != nil {
 		glog.Errorf("Failed to listen: %v", e)
 		eChan <- e
@@ -244,7 +242,7 @@ func (c *plControllerT) startRPC(eChan chan error) {
 
 func (c *plControllerT) startScamperProc() {
 	sp := scamper.GetProc(c.sc.Path, c.sc.Port, c.sc.ScPath)
-	plController.mp.ManageProcess(sp, true, 1000, handleScamperStop)
+	c.mp.ManageProcess(sp, true, 1000, handleScamperStop)
 }
 
 // HandleSig allows the plController to react appropriately to signals
@@ -261,7 +259,11 @@ func (c *plControllerT) handleSig(s os.Signal) {
 	if c.w != nil {
 		c.w.Close()
 	}
-	c.removeAllVps()
-	c.spoofs.Quit()
-	c.db.Close()
+	if c.db != nil {
+		c.removeAllVps()
+		c.db.Close()
+	}
+	if c.spoofs != nil {
+		c.spoofs.Quit()
+	}
 }

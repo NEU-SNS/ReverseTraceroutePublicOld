@@ -44,18 +44,18 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
-	conn, err := grpc.Dial("129.10.113.205:45000")
+	conn, err := grpc.Dial("129.10.113.205:4380")
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
 	cl := plc.NewPLControllerClient(conn)
-	pa := &dm.PingArg{Pings: []*dm.PingMeasurement{&dm.PingMeasurement{Src: "129.10.113.205", Dst: "8.8.8.8"}, &dm.PingMeasurement{Src: "129.10.113.205", Dst: "8.8.4.4"}}}
+	pa := &dm.PingArg{Pings: []*dm.PingMeasurement{&dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.8.8"}, &dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.4.4"}}}
 	stream, err := cl.Ping(ctx.Background(), pa)
 	if err != nil {
 		panic(err)
 	}
-	ta := &dm.TracerouteArg{Traceroutes: []*dm.TracerouteMeasurement{&dm.TracerouteMeasurement{Src: "129.10.113.205", Dst: "8.8.8.8"}, &dm.TracerouteMeasurement{Src: "129.10.113.205", Dst: "8.8.4.4"}}}
+	ta := &dm.TracerouteArg{Traceroutes: []*dm.TracerouteMeasurement{&dm.TracerouteMeasurement{Src: "129.110.125.52", Dst: "8.8.8.8"}, &dm.TracerouteMeasurement{Src: "129.110.125.52", Dst: "8.8.4.4"}}}
 	st, err := cl.Traceroute(ctx.Background(), ta)
 	if err != nil {
 		panic(err)

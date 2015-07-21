@@ -75,9 +75,6 @@ func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *p
 	c.addr = fmt.Sprintf("%s:%s", sip, c.config.Local.Port)
 	c.am.Unlock()
 	p.SetArg(scamper.ADDRINDEX, arg)
-	c.spoofmon.Quit()
-	c.spoofmon = NewSpoofPingMonitor()
-	c.spoofmon.Start(arg, c.monip, c.monec)
 	switch err.(type) {
 	default:
 		return false
