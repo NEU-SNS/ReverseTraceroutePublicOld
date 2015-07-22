@@ -37,18 +37,48 @@ type Config struct {
 }
 
 type LocalConfig struct {
-	Addr         string `flag:"a"`
-	Port         int    `flag:"p"`
-	CloseStdDesc bool   `flag:"D"`
-	PProfAddr    string `flag:"pprof"`
-	Timeout      int64  `flag:"t"`
-	CertFile     string `flag:"cert-file"`
-	KeyFile      string `flag:"key-file"`
+	Addr         *string `flag:"a"`
+	Port         *int    `flag:"p"`
+	CloseStdDesc *bool   `flag:"D"`
+	PProfAddr    *string `flag:"pprof"`
+	Timeout      *int64  `flag:"t"`
+	CertFile     *string `flag:"cert-file"`
+	KeyFile      *string `flag:"key-file"`
 }
 
 type ScamperConfig struct {
-	Port          string `flag:"scamper-port"`
-	SockDir       string `flag:"socket-dir"`
-	BinPath       string `flag:"scamper-bin"`
-	ConverterPath string `flag:"converter-path"`
+	Port          *string `flag:"scamper-port"`
+	SockDir       *string `flag:"socket-dir"`
+	BinPath       *string `flag:"scamper-bin"`
+	ConverterPath *string `flag:"converter-path"`
+}
+
+func NewConfig() Config {
+	lc := LocalConfig{
+		Addr:         new(string),
+		Port:         new(int),
+		CloseStdDesc: new(bool),
+		PProfAddr:    new(string),
+		Timeout:      new(int64),
+		CertFile:     new(string),
+		KeyFile:      new(string),
+	}
+	sc := ScamperConfig{
+		Port:          new(string),
+		SockDir:       new(string),
+		BinPath:       new(string),
+		ConverterPath: new(string),
+	}
+	db := dm.DbConfig{
+		UName:    new(string),
+		Password: new(string),
+		Db:       new(string),
+		Host:     new(string),
+		Port:     new(string),
+	}
+	return Config{
+		Local:   lc,
+		Scamper: sc,
+		Db:      db,
+	}
 }

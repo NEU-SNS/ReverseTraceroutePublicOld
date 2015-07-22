@@ -27,9 +27,9 @@
 package datamodel
 
 type DbConfig struct {
-	UName    string
-	Password string
-	Db       string
-	Host     string
-	Port     string
+	UName    *string `flag:"db-uname"`
+	Password *string `flag:"db-pass"`
+	Db       *string `flag:"db-name"`
+	Host     *string `flag:"db-host"`
+	Port     *string `flag:"db-port"`
 }

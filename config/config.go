@@ -28,7 +28,10 @@
 // Package config handles the config parsing for the various commands
 package config
 
-import "flag"
+import (
+	"flag"
+	"os"
+)
 
 func merge(f *flag.FlagSet, fn func(string) *string) error {
 	setFlags := make(map[string]bool)
@@ -51,7 +54,12 @@ func merge(f *flag.FlagSet, fn func(string) *string) error {
 // Parse fills in the flag set using environment variables and config files
 // opts is an object that will represent the format of the config files being parsed
 func Parse(f *flag.FlagSet, opts interface{}) error {
+	f.Parse(os.Args[1:])
 	err := mergeEnvironment(f)
+	if err != nil {
+		return err
+	}
+	err = mergeFiles(f, opts)
 	if err != nil {
 		return err
 	}
