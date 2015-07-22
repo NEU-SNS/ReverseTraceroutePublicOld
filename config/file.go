@@ -34,12 +34,15 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/golang/glog"
+
 	"gopkg.in/yaml.v2"
 )
 
 func parseYamlConfig(path string, opts interface{}) error {
 	f, err := os.Open(path)
 	if err != nil && os.IsNotExist(err) {
+		glog.Errorf("Error opening config file: %s, %v", path, err)
 		var ret error
 		if os.IsNotExist(err) {
 			// Return nil, not a problem if we don't find a config file
@@ -86,6 +89,10 @@ func (cp configPathOrder) Swap(i, j int)      { cp[i], cp[j] = cp[j], cp[i] }
 func (cp configPathOrder) Less(i, j int) bool { return cp[i].Order < cp[j].Order }
 
 func mergeFiles(f *flag.FlagSet, opts interface{}) error {
+	ov := reflect.ValueOf(opts)
+	if ov.Kind() != reflect.Ptr || ov.IsNil() {
+		return fmt.Errorf("mergeFiles, opts invalid type")
+	}
 	paths := make([]configPath, len(configPaths))
 	var i int
 	for _, val := range configPaths {
@@ -98,8 +105,9 @@ func mergeFiles(f *flag.FlagSet, opts interface{}) error {
 		if err != nil {
 			return err
 		}
-		ops, err := buildMap(opts)
+		ops, err := buildMap(ov)
 		if err != nil {
+			glog.Errorf("Failed to build map: %v", err)
 			return nil
 		}
 		err = handleFile(f, ops)
@@ -119,18 +127,14 @@ func mergeMaps(a, b map[string]string) {
 	}
 }
 
-func buildMap(opts interface{}) (map[string]string, error) {
+func buildMap(opts reflect.Value) (map[string]string, error) {
 	res := make(map[string]string)
-	ot := reflect.TypeOf(opts)
-	ov := reflect.ValueOf(opts)
-	if ot.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("Option object must be a struct")
-	}
+	ot := opts.Elem().Type()
 	numFields := ot.NumField()
 	for i := 0; i < numFields; i++ {
 		field := ot.Field(i)
 		if field.Type.Kind() == reflect.Struct {
-			subOpts, err := buildMap(ov.Field(i).Interface())
+			subOpts, err := buildMap(opts.Elem().Field(i).Addr())
 			if err != nil {
 				return nil, err
 			}
@@ -138,7 +142,13 @@ func buildMap(opts interface{}) (map[string]string, error) {
 			continue
 		}
 		name := field.Tag.Get("flag")
-		res[name] = fmt.Sprintf("%v", ov.Field(i).Interface())
+		if name == "" {
+			continue
+		}
+		if opts.Elem().Field(i).IsNil() {
+			continue
+		}
+		res[name] = fmt.Sprintf("%v", opts.Elem().Field(i).Elem())
 	}
 	return res, nil
 }
@@ -146,7 +156,9 @@ func buildMap(opts interface{}) (map[string]string, error) {
 func handleFile(f *flag.FlagSet, opts map[string]string) error {
 	err := merge(f, func(name string) *string {
 		if val, ok := opts[name]; ok {
-			return &val
+			if val != "" {
+				return &val
+			}
 		}
 		return nil
 	})

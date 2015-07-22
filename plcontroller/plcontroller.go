@@ -96,7 +96,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
-		timeout = c.conf.Local.Timeout
+		timeout = *c.conf.Local.Timeout
 	}
 	ret := dm.Ping{}
 
@@ -127,7 +127,7 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	glog.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
 	if timeout == 0 {
-		timeout = c.conf.Local.Timeout
+		timeout = *(c.conf.Local.Timeout)
 	}
 	ret := dm.Traceroute{}
 
@@ -165,32 +165,37 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 	return res, err
 }
 
+// When this returns the server is essentially dead, so call stop before any return
 func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPProvider, cl Client, s Sender) {
 	if db == nil {
 		ec <- fmt.Errorf("Nil db in plController")
+		c.stop()
 		return
 	}
 	var sc scamper.Config
-	sc.Port = con.Scamper.Port
-	sc.Path = con.Scamper.SockDir
-	sc.ScPath = con.Scamper.BinPath
-	sc.ScParserPath = con.Scamper.ConverterPath
+	sc.Port = *con.Scamper.Port
+	sc.Path = *con.Scamper.SockDir
+	sc.ScPath = *con.Scamper.BinPath
+	sc.ScParserPath = *con.Scamper.ConverterPath
 	err := scamper.ParseConfig(sc)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
 		ec <- err
+		c.stop()
 		return
 	}
 	ips, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Failed to get bind address: %v", err)
 		ec <- err
+		c.stop()
 		return
 	}
 	ip, err := util.IPStringToInt32(ips)
 	if err != nil {
 		glog.Errorf("Failed to convert ip string: %v", err)
 		ec <- err
+		c.stop()
 		return
 	}
 
@@ -224,8 +229,8 @@ func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan e
 }
 
 func (c *plControllerT) startRPC(eChan chan error) {
-	addr := fmt.Sprintf("%s:%d", c.config.Local.Addr,
-		c.config.Local.Port)
+	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
+		*c.config.Local.Port)
 	glog.Infof("Conecting to: %s", addr)
 	l, e := net.Listen("tcp", addr)
 	if e != nil {
@@ -250,9 +255,10 @@ func HandleSig(s os.Signal) {
 	plController.handleSig(s)
 }
 
-func (c *plControllerT) handleSig(s os.Signal) {
-	glog.Infof("Got signal %v", s)
-	close(c.shutdown)
+func (c *plControllerT) stop() {
+	if c.shutdown != nil {
+		close(c.shutdown)
+	}
 	if c.mp != nil {
 		c.mp.KillAll()
 	}
@@ -266,4 +272,9 @@ func (c *plControllerT) handleSig(s os.Signal) {
 	if c.spoofs != nil {
 		c.spoofs.Quit()
 	}
+}
+
+func (c *plControllerT) handleSig(s os.Signal) {
+	glog.Infof("Got signal %v", s)
+	c.stop()
 }

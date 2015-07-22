@@ -202,10 +202,9 @@ func Int32ToIPString(ip uint32) (string, error) {
 func IPStringToInt32(ips string) (uint32, error) {
 	ip := net.ParseIP(ips)
 	if ip == nil {
-		return 0, fmt.Errorf("Nil ip in IpToInt64")
+		return 0, fmt.Errorf("Nil ip in IpToInt32")
 	}
 	ip = ip.To4()
-	glog.Infof("Converting IP: %s, to int64", ip.String())
 	var res uint32
 	res |= uint32(ip[0]) << 24
 	res |= uint32(ip[1]) << 16
