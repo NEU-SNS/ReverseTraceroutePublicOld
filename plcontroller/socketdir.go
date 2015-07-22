@@ -51,7 +51,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 				glog.Infof("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
 					e.Name,
-					*c.conf.Scamper.ConverterPath,
+					*c.config.Scamper.ConverterPath,
 					json.Unmarshal,
 					net.Dial)
 				if err != nil {
