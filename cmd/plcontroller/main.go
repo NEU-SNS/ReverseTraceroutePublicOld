@@ -63,7 +63,7 @@ func init() {
 		"Path to the scamper binary")
 	flag.StringVar(conf.Scamper.ConverterPath, "converter-path", "/usr/local/bin/sc_warts2json",
 		"Path for warts parser")
-	flag.StringVar(conf.Local.PProfAddr, "pprof", "localhost:55556",
+	flag.StringVar(conf.Local.PProfAddr, "pprof", ":55556",
 		"The port for pprof")
 	flag.StringVar(conf.Local.CertFile, "cert-file", "cert.pem",
 		"The path the the cert file for the the server")
@@ -103,7 +103,6 @@ func main() {
 	}
 
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
-	util.StartPProf(*conf.Local.PProfAddr)
 
 	db, err := sql.NewDB(sql.DbConfig{
 		UName:    *conf.Db.UName,

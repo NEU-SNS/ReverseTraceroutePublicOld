@@ -32,6 +32,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -44,24 +45,53 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"gopkg.in/fsnotify.v1"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
+var (
+	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+	rpcCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "RpcCount",
+		Help:      "Count of Rpc Calls sent",
+	})
+)
+var id uint32 = rand.Uint32()
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("plcontroller_%d", id)
+	}
+	return fmt.Sprintf("plcontroller_%s", name)
+}
+
+func init() {
+	prometheus.MustRegister(procCollector)
+	prometheus.MustRegister(rpcCounter)
+}
+
 type plControllerT struct {
-	startTime time.Time
-	spid      int
-	server    *grpc.Server
-	config    Config
-	sc        scamper.Config
-	mp        mproc.MProc
-	db        da.VPProvider
-	w         *fsnotify.Watcher
-	conf      Config
-	client    Client
-	spoofs    *spoofMap
-	ip        uint32
-	shutdown  chan struct{}
+	spid     int
+	server   *grpc.Server
+	config   Config
+	sc       scamper.Config
+	mp       mproc.MProc
+	db       da.VPProvider
+	w        *fsnotify.Watcher
+	conf     Config
+	client   Client
+	spoofs   *spoofMap
+	ip       uint32
+	shutdown chan struct{}
 }
 
 // Client is the measurment client interface
@@ -95,8 +125,9 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
+	glog.Errorf("%v, %v", c.conf, c)
 	if timeout == 0 {
-		timeout = *c.conf.Local.Timeout
+		timeout = *(c.conf.Local.Timeout)
 	}
 	ret := dm.Ping{}
 
@@ -104,7 +135,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	if err != nil {
 		return ret, err
 	}
-
+	rpcCounter.Inc()
 	select {
 	case r := <-resp:
 		err := decodeResponse(r.Bytes(), &ret)
@@ -126,6 +157,7 @@ func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
+	glog.Errorf("%v, %v", c.conf, c)
 	if timeout == 0 {
 		timeout = *(c.conf.Local.Timeout)
 	}
@@ -135,7 +167,7 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	if err != nil {
 		return ret, err
 	}
-
+	rpcCounter.Inc()
 	select {
 	case r := <-resp:
 		err := decodeResponse(r.Bytes(), &ret)
@@ -204,7 +236,6 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	c.shutdown = make(chan struct{})
 	c.spoofs = newSpoofMap(s)
 	c.config = con
-	c.startTime = time.Now()
 	c.mp = mproc.New()
 	c.sc = sc
 	if !noScamp {
@@ -223,6 +254,10 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 // Start starts a plcontroller with the given configuration
 func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
 	glog.Info("Starting plcontroller")
+	http.Handle("/metrics", prometheus.Handler())
+	go func() {
+		glog.Error(http.ListenAndServe(*c.Local.PProfAddr, nil))
+	}()
 	errChan := make(chan error, 2)
 	go plController.run(errChan, c, noScamp, db, cl, s)
 	return errChan
