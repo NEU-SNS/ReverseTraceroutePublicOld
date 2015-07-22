@@ -87,7 +87,6 @@ type plControllerT struct {
 	mp       mproc.MProc
 	db       da.VPProvider
 	w        *fsnotify.Watcher
-	conf     Config
 	client   Client
 	spoofs   *spoofMap
 	ip       uint32
@@ -125,9 +124,8 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	glog.Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
-	glog.Errorf("%v, %v", c.conf, c)
 	if timeout == 0 {
-		timeout = *(c.conf.Local.Timeout)
+		timeout = *c.config.Local.Timeout
 	}
 	ret := dm.Ping{}
 
@@ -157,9 +155,8 @@ func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	glog.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
-	glog.Errorf("%v, %v", c.conf, c)
 	if timeout == 0 {
-		timeout = *(c.conf.Local.Timeout)
+		timeout = *c.config.Local.Timeout
 	}
 	ret := dm.Traceroute{}
 
