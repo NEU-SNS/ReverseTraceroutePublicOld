@@ -33,8 +33,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-
-	"github.com/golang/glog"
 )
 
 // SResponseT represents the type of responses scamper can send
@@ -80,10 +78,8 @@ func (r Response) Bytes() []byte {
 
 // WriteTo writes the response to the given io.Writer
 func (r Response) WriteTo(w io.Writer) (n int64, err error) {
-	glog.Infof("Writing data %v", r.Data)
 	c, err := w.Write(r.Data)
 	n = int64(c)
-	glog.Infof("Wrote %d bytes", n)
 	return
 }
 
@@ -111,8 +107,9 @@ func (sm *socketMap) Add(s *Socket) {
 func (sm *socketMap) Remove(addr string) {
 	sm.Lock()
 	defer sm.Unlock()
-	sock := sm.socks[addr]
-	sock.Stop()
+	if sock, ok := sm.socks[addr]; ok {
+		sock.Stop()
+	}
 	delete(sm.socks, addr)
 }
 

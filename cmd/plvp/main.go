@@ -39,27 +39,53 @@ import (
 	"github.com/golang/glog"
 )
 
-var f plvp.Flags
+var conf plvp.Config = plvp.NewConfig()
 
 func init() {
-	flag.StringVar(&f.Local.Addr, "a", ":65000",
+	config.SetEnvPrefix("REVTR")
+	config.AddConfigPath("./plvp.config")
+	flag.StringVar(conf.Local.Addr, "a", ":65000",
 		"The address to run the local service on")
-	flag.BoolVar(&f.Local.CloseStdDesc, "d", false,
+	flag.BoolVar(conf.Local.CloseStdDesc, "d", false,
 		"Close std file descripters")
-	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
+	flag.BoolVar(conf.Local.AutoConnect, "auto-connect", false,
 		"Autoconnect to 0.0.0.0 and will use port 55000")
-	flag.StringVar(&f.Local.PProfAddr, "P", "localhost:55557",
+	flag.StringVar(conf.Local.PProfAddr, "pprof-addr", ":55557",
 		"The address to use for pperf")
-	flag.StringVar(&f.Local.Host, "url", "fakepl",
+	flag.StringVar(conf.Local.Host, "host", "plcontroller.revtr.ccs.neu.edu",
 		"The url for the plcontroller service")
-	flag.StringVar(&f.Local.Proto, "p", "tcp",
-		"The protocol that the controller will use.")
-	flag.StringVar(&f.Scamper.BinPath, "b", "/usr/local/bin/scamper",
+	flag.IntVar(conf.Local.Port, "p", 4380,
+		"The port the controller service is listening on")
+	flag.BoolVar(conf.Local.StartScamp, "start-scamper", true,
+		"Determines if scamper starts or not.")
+	flag.StringVar(conf.Scamper.BinPath, "b", "/usr/local/bin/scamper",
 		"The path to the scamper binary")
-	flag.StringVar(&f.Scamper.Port, "scamper-port", "55000",
+	flag.StringVar(conf.Scamper.Port, "scamper-port", "4381",
 		"The port scamper will try to connect to.")
-	flag.StringVar(&f.ConfigPath, "c", "",
-		"Path to the config file")
+	flag.StringVar(conf.Scamper.Host, "scamper-host", "plcontroller.revtr.ccs.neu.edu",
+		"The host that the sc_remoted process is running, should most likely match the host arg")
+}
+
+func main() {
+	go sigHandle()
+	defer glog.Flush()
+	var parseConf plvp.Config
+	err := config.Parse(flag.CommandLine, &parseConf)
+	if err != nil {
+		glog.Exitf("Failed to parse config: %v", err)
+		exit(1)
+	}
+	util.CloseStdFiles(*conf.Local.CloseStdDesc)
+	err = <-plvp.Start(conf)
+	if err != nil {
+		glog.Errorf("PLVP Start returned with error: %v", err)
+		exit(1)
+	}
+}
+
+func exit(status int) {
+	glog.Flush()
+	os.Exit(status)
 }
 
 func sigHandle() {
@@ -71,36 +97,4 @@ func sigHandle() {
 		plvp.HandleSig(sig)
 		exit(1)
 	}
-}
-
-func main() {
-	go sigHandle()
-	flag.Parse()
-	defer glog.Flush()
-	var conf plvp.Config
-	if f.ConfigPath != "" {
-
-		err := config.ParseConfig(f.ConfigPath, &conf)
-
-		if err != nil {
-			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			exit(1)
-		}
-	} else {
-		conf.Local = f.Local
-		conf.Scamper = f.Scamper
-	}
-
-	util.CloseStdFiles(conf.Local.CloseStdDesc)
-	util.StartPProf(conf.Local.PProfAddr)
-	err := <-plvp.Start(conf)
-	if err != nil {
-		glog.Errorf("PLVP Start returned with error: %v", err)
-		exit(1)
-	}
-}
-
-func exit(status int) {
-	glog.Flush()
-	os.Exit(status)
 }

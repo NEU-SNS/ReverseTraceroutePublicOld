@@ -50,9 +50,7 @@ func main() {
 	}
 	defer conn.Close()
 	cl := plc.NewPLControllerClient(conn)
-	fmt.Println("about to ping")
 	pa := &dm.PingArg{Pings: []*dm.PingMeasurement{&dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.8.8"}, &dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.4.4"}}}
-	fmt.Println("pinged")
 	stream, err := cl.Ping(ctx.Background(), pa)
 	if err != nil {
 		panic(err)

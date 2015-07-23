@@ -35,6 +35,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -60,8 +61,20 @@ var (
 	rpcCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: getName(),
 		Subsystem: "rpc",
-		Name:      "RpcCount",
+		Name:      "count",
 		Help:      "Count of Rpc Calls sent",
+	})
+	timeoutCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "timeout_count",
+		Help:      "Count of Rpc Timeouts",
+	})
+	errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "error_count",
+		Help:      "Count of Rpc Errors",
 	})
 )
 var id uint32 = rand.Uint32()
@@ -71,12 +84,14 @@ func getName() string {
 	if err != nil {
 		return fmt.Sprintf("plcontroller_%d", id)
 	}
-	return fmt.Sprintf("plcontroller_%s", name)
+	return fmt.Sprintf("plcontroller_%s", strings.Replace(name, ".", "_", -1))
 }
 
 func init() {
 	prometheus.MustRegister(procCollector)
 	prometheus.MustRegister(rpcCounter)
+	prometheus.MustRegister(timeoutCounter)
+	prometheus.MustRegister(errorCounter)
 }
 
 type plControllerT struct {
@@ -138,12 +153,13 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	case r := <-resp:
 		err := decodeResponse(r.Bytes(), &ret)
 		if err != nil {
+			errorCounter.Inc()
 			return ret, fmt.Errorf("Could not decode ping response: %v", err)
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
+		timeoutCounter.Inc()
 		return ret, fmt.Errorf("Ping timed out")
 	}
-	glog.Infof("Ping done: %v", ret)
 	return ret, nil
 }
 
@@ -169,13 +185,13 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	case r := <-resp:
 		err := decodeResponse(r.Bytes(), &ret)
 		if err != nil {
+			errorCounter.Inc()
 			return ret, fmt.Errorf("Could not decode traceroute response: %v", err)
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
+		timeoutCounter.Inc()
 		return ret, fmt.Errorf("Traceroute timed out")
 	}
-
-	glog.Infof("Traceroute done: %v", ret)
 	return ret, nil
 }
 
@@ -196,9 +212,10 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 
 // When this returns the server is essentially dead, so call stop before any return
 func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPProvider, cl Client, s Sender) {
+	defer glog.Flush()
 	if db == nil {
-		ec <- fmt.Errorf("Nil db in plController")
 		c.stop()
+		ec <- fmt.Errorf("Nil db in plController")
 		return
 	}
 	var sc scamper.Config
@@ -209,22 +226,23 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	err := scamper.ParseConfig(sc)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
-		ec <- err
+
 		c.stop()
+		ec <- err
 		return
 	}
 	ips, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Failed to get bind address: %v", err)
-		ec <- err
 		c.stop()
+		ec <- err
 		return
 	}
 	ip, err := util.IPStringToInt32(ips)
 	if err != nil {
 		glog.Errorf("Failed to convert ip string: %v", err)
-		ec <- err
 		c.stop()
+		ec <- err
 		return
 	}
 
@@ -239,22 +257,23 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 		c.startScamperProc()
 	}
 	c.client = cl
-	//Watch dir doesn't make the scamper dir if it doesn't exist so it's
-	//best to call it after startScamperProc otherwise you'll send an error
-	//and trigger any error logic in whatever code is using this
 	c.watchDir(sc.Path, ec)
 	c.server = grpc.NewServer()
 	plc.RegisterPLControllerServer(plController.server, c)
 	go c.startRPC(ec)
 }
 
+func startHttp(addr string) {
+	for {
+		glog.Error(http.ListenAndServe(addr, nil))
+	}
+}
+
 // Start starts a plcontroller with the given configuration
 func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
 	glog.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
-	go func() {
-		glog.Error(http.ListenAndServe(*c.Local.PProfAddr, nil))
-	}()
+	go startHttp(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
 	go plController.run(errChan, c, noScamp, db, cl, s)
 	return errChan

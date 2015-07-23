@@ -163,6 +163,9 @@ func NewSocket(fname, cPath string, um unmarshal, dial DialFunc) (*Socket, error
 
 // Stop closes the connection the socket represents
 func (s *Socket) Stop() {
+	if s == nil {
+		return
+	}
 	for cmd := range s.cmds.forEach() {
 		close(cmd.done)
 	}
@@ -286,7 +289,6 @@ func (s *Socket) monitorConn() {
 }
 
 func convertWarts(path string, b []byte) ([]byte, error) {
-	glog.Info("Converting Warts")
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
 		glog.Errorf("Failed to converte bytes: %v, %s", err, b)
