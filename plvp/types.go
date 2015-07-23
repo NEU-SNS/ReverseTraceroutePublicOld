@@ -30,9 +30,8 @@ package plvp
 
 // Flags represents the arguments to the vantage-point
 type Flags struct {
-	Local      LocalConfig
-	Scamper    ScamperConfig
-	ConfigPath string
+	Local   LocalConfig
+	Scamper ScamperConfig
 }
 
 // Config represents the configuration of the vantage-point
@@ -43,22 +42,45 @@ type Config struct {
 
 // LocalConfig represents the configuration of the vantage-point minus Scamper
 type LocalConfig struct {
-	Addr         string
-	Port         string
-	Proto        string
-	CloseStdDesc bool
-	PProfAddr    string
-	AutoConnect  bool
-	SecureConn   bool
-	CertPath     string
-	KeyPath      string
-	StartScamp   bool
-	Host         string
+	Addr         *string `flag:"a"`
+	CloseStdDesc *bool   `flag:"d"`
+	Port         *int    `flag:"p"`
+	PProfAddr    *string `flag:"pprof-addr"`
+	AutoConnect  *bool   `flag:"auto-connect"`
+	SecureConn   *bool   `flag:"secure-conn"`
+	CertPath     *string `flag:"cert-path"`
+	KeyPath      *string `flag:"key-path"`
+	StartScamp   *bool   `flag:"start-scamper"`
+	Host         *string `flag:"host"`
 }
 
 // ScamperConfig represents the scamper configuration options
 type ScamperConfig struct {
-	BinPath string
-	Host    string
-	Port    string
+	BinPath *string `flag:"b"`
+	Host    *string `flag:"scamper-host"`
+	Port    *string `flag:"scamper-port"`
+}
+
+func NewConfig() Config {
+	lc := LocalConfig{
+		Addr:         new(string),
+		AutoConnect:  new(bool),
+		CloseStdDesc: new(bool),
+		PProfAddr:    new(string),
+		SecureConn:   new(bool),
+		CertPath:     new(string),
+		KeyPath:      new(string),
+		StartScamp:   new(bool),
+		Host:         new(string),
+		Port:         new(int),
+	}
+	sc := ScamperConfig{
+		Port:    new(string),
+		Host:    new(string),
+		BinPath: new(string),
+	}
+	return Config{
+		Local:   lc,
+		Scamper: sc,
+	}
 }

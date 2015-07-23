@@ -126,7 +126,7 @@ func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 		return nil
 	}
 	return proc.New(scamperPath, nil,
-		IPv4, PORT, scampPort, SOCKETDIR, sockDir)
+		IPv4, "-O tka", PORT, scampPort, SOCKETDIR, sockDir)
 }
 
 // GetVPProc returns a process which is suitable to run on a planet-lab VP

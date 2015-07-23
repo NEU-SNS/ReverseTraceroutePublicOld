@@ -31,8 +31,10 @@ package plcontroller
 import (
 	"encoding/json"
 	"net"
+	"os"
 	"path"
 	"strings"
+	"syscall"
 
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
@@ -106,8 +108,43 @@ func (c *plControllerT) removeAllVps() {
 	}
 }
 
+func cleanDir(dir string) error {
+	d, err := os.Lstat(dir)
+	if err != nil {
+		return nil
+	}
+	if err != nil {
+		if err, ok := err.(*os.PathError); ok &&
+			(os.IsNotExist(err.Err) || err.Err == syscall.ENOTDIR) {
+			return nil
+		}
+		return err
+	}
+	if !d.IsDir() {
+		return nil
+	}
+	dc, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	files, err := dc.Readdirnames(-1)
+	for _, fname := range files {
+		err := os.RemoveAll(dir + string(os.PathSeparator) + fname)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *plControllerT) watchDir(dir string, ec chan error) {
 	glog.Infof("Starting to watch dir: %s", dir)
+	err := cleanDir(dir)
+	if err != nil {
+		glog.Infof("Failed to clean watch directory: %v", err)
+		ec <- err
+		return
+	}
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		glog.Infof("Failed to create watcher: %v", err)

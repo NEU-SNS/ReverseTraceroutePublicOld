@@ -33,6 +33,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,9 +44,40 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	"net/http"
+	_ "net/http/pprof"
 )
+
+var (
+	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+	spoofCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "spoof",
+		Name:      "count",
+		Help:      "Count of the spoofed probes received",
+	})
+)
+
+var id uint32 = rand.Uint32()
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("plvp_%d", id)
+	}
+	return fmt.Sprintf("plvp_%s", strings.Replace(name, ".", "_", -1))
+}
+
+func init() {
+	prometheus.MustRegister(procCollector)
+	prometheus.MustRegister(spoofCounter)
+}
 
 type plVantagepointT struct {
 	sc       scamper.Config
@@ -53,7 +85,6 @@ type plVantagepointT struct {
 	mp       mproc.MProc
 	config   Config
 	mu       sync.Mutex
-	lu       time.Time
 	plc      *plClient
 	monec    chan error
 	monip    chan dm.Probe
@@ -63,17 +94,17 @@ type plVantagepointT struct {
 
 var plVantagepoint plVantagepointT
 
-func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	sip, e := pickIP(c.config.Local.Host)
+func (vp *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
+	sip, e := pickIP(*vp.config.Local.Host)
 	if e != nil {
 		glog.Errorf("Couldn't resolve host on restart")
 		return true
 	}
-	c.sc.IP = sip
-	arg := fmt.Sprintf("%s:%s", sip, c.sc.Port)
-	c.am.Lock()
-	c.addr = fmt.Sprintf("%s:%s", sip, c.config.Local.Port)
-	c.am.Unlock()
+	vp.sc.IP = sip
+	arg := fmt.Sprintf("%s:%s", sip, vp.sc.Port)
+	vp.am.Lock()
+	vp.addr = fmt.Sprintf("%s:%d", sip, *vp.config.Local.Port)
+	vp.am.Unlock()
 	p.SetArg(scamper.ADDRINDEX, arg)
 	switch err.(type) {
 	default:
@@ -83,9 +114,18 @@ func (c *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *p
 	}
 }
 
-func (c *plVantagepointT) handleSig(s os.Signal) {
-	c.mp.KillAll()
-	c.spoofmon.Quit()
+func (vp *plVantagepointT) handleSig(s os.Signal) {
+	glog.Infof("Got signal: %v", s)
+	vp.stop()
+}
+
+func (vp *plVantagepointT) stop() {
+	if vp.mp != nil {
+		vp.mp.KillAll()
+	}
+	if vp.spoofmon != nil {
+		vp.spoofmon.Quit()
+	}
 }
 
 // HandleSig handles signals
@@ -93,29 +133,27 @@ func HandleSig(s os.Signal) {
 	plVantagepoint.handleSig(s)
 }
 
-// Start a plvp with the given config
-func Start(c Config) chan error {
-	glog.Info("Starting plvp with config: %v", c)
+// The vp is dead if this method needs to return, so call stop() to clean up before returning
+func (vp *plVantagepointT) run(c Config, ec chan error) {
+	vp.config = c
 	defer glog.Flush()
-	errChan := make(chan error, 1)
-
-	plVantagepoint.config = c
-
 	con := new(scamper.Config)
-	con.ScPath = c.Scamper.BinPath
-	sip, err := pickIP(c.Scamper.Host)
+	con.ScPath = *c.Scamper.BinPath
+	sip, err := pickIP(*c.Scamper.Host)
 	if err != nil {
-		glog.Errorf("Could not resolve url: %s, with err: %v", c.Local.Host, err)
-		errChan <- err
-		return errChan
+		glog.Errorf("Could not resolve url: %s, with err: %v", *c.Local.Host, err)
+		vp.stop()
+		ec <- err
+		return
 	}
 	con.IP = sip
-	con.Port = c.Scamper.Port
+	con.Port = *c.Scamper.Port
 	err = scamper.ParseConfig(*con)
 	if err != nil {
 		glog.Errorf("Invalid scamper args: %v", err)
-		errChan <- err
-		return errChan
+		vp.stop()
+		ec <- err
+		return
 	}
 	plVantagepoint.addr = sip
 	plVantagepoint.sc = *con
@@ -125,27 +163,44 @@ func Start(c Config) chan error {
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Could not get bind addr: %v", err)
-		errChan <- err
-		return errChan
+		vp.stop()
+		ec <- err
+		return
 	}
 	plVantagepoint.monec = make(chan error, 1)
 	plVantagepoint.monip = make(chan dm.Probe, 1)
 	go plVantagepoint.spoofmon.Start(monaddr, plVantagepoint.monip, plVantagepoint.monec)
 	go plVantagepoint.monitorSpoofedPings(plVantagepoint.monip, plVantagepoint.monec)
-	if c.Local.StartScamp {
+	if *c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
 	}
-	return errChan
 }
 
-func (c *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
+func startHttp(addr string) {
+	for {
+		glog.Error(http.ListenAndServe(addr, nil))
+	}
+}
+
+// Start a plvp with the given config
+func Start(c Config) chan error {
+	glog.Info("Starting plvp with config: %v", c)
+	http.Handle("/metrics", prometheus.Handler())
+	go startHttp(*c.Local.PProfAddr)
+	errChan := make(chan error, 1)
+	go plVantagepoint.run(c, errChan)
+	return errChan
+
+}
+
+func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
 		return
 	}
-	c.am.Lock()
-	ip := c.addr
-	c.am.Unlock()
-	addr := fmt.Sprintf("%s:%s", ip, c.config.Local.Port)
+	vp.am.Lock()
+	ip := vp.addr
+	vp.am.Unlock()
+	addr := fmt.Sprintf("%s:%s", ip, vp.config.Local.Port)
 	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second))
 	if err != nil {
 		glog.Errorf("Failed to send spoofs: %v", err)
@@ -158,18 +213,23 @@ func (c *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	}
 }
 
-func (c *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {
+func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {
 	sprobes := make([]*dm.Probe, 0)
 	go func() {
 		for {
 			select {
 			case probe := <-probes:
 				glog.Infof("Got IP from spoof monitor: %v", probe)
+				spoofCounter.Inc()
 				sprobes = append(sprobes, &probe)
 			case err := <-ec:
+				switch err {
+				case ErrorNotICMPEcho, ErrorNonSpoofedProbe:
+					continue
+				}
 				glog.Errorf("Recieved error from spoof monitor: %v", err)
 			case <-time.After(2 * time.Second):
-				c.sendSpoofs(sprobes)
+				vp.sendSpoofs(sprobes)
 				sprobes = make([]*dm.Probe, 0)
 			}
 		}

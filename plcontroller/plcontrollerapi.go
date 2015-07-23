@@ -64,7 +64,6 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 	for _, ping := range pings {
 		wg.Add(1)
 		go func(st plc.PLController_PingServer, w *sync.WaitGroup, p *dm.PingMeasurement) {
-			glog.Infof("Rinning ping: %v", p)
 			defer wg.Done()
 			sendChan := make(chan struct{})
 			var pp *dm.Ping
@@ -129,7 +128,6 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 				case <-sendChan:
 					if e := st.Send(ttr); e != nil {
 						errChan <- e
-						close(quitChan)
 					}
 					return
 				default:
@@ -152,6 +150,7 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 	case <-doneChan:
 		return nil
 	case err := <-errChan:
+		close(quitChan)
 		return err
 	}
 }
