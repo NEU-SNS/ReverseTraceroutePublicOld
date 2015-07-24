@@ -29,7 +29,6 @@ package main
 
 import (
 	"flag"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,11 +36,76 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
+	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
 )
 
-var f controller.Flags
+var conf = controller.NewConfig()
+
+func init() {
+	config.SetEnvPrefix("REVTR")
+	config.AddConfigPath("./controller.config")
+
+	flag.StringVar(conf.Local.Addr, "a", ":35000",
+		"The address that the controller will bind to.")
+	flag.BoolVar(conf.Local.CloseStdDesc, "D", false,
+		"Determines if the sandard file descriptors are closed")
+	flag.StringVar(conf.Local.PProfAddr, "pprof", "localhost:55555",
+		"The port for pprof")
+	flag.BoolVar(conf.Local.AutoConnect, "auto-connect", false,
+		"Autoconnect to 0.0.0.0 and will use port 35000")
+	flag.StringVar(conf.Local.CertFile, "cert-file", "cert.pem",
+		"The path the the cert file for the the server")
+	flag.IntVar(conf.Local.Port, "p", 4382,
+		"The port that the controller will use.")
+	flag.StringVar(conf.Local.KeyFile, "key-file", "key.pem",
+		"The path to the private key for the file")
+	flag.Int64Var(conf.Local.ConnTimeout, "conn-timeout", 60,
+		"How long to wait for an rpc connection to timeout")
+	flag.StringVar(conf.Db.UName, "db-uname", "",
+		"The username for the database")
+	flag.StringVar(conf.Db.Password, "db-pass", "",
+		"The password for the database")
+	flag.StringVar(conf.Db.Db, "db-name", "",
+		"The name of the database to use")
+	flag.StringVar(conf.Db.Host, "db-host", "localhost",
+		"The host of the database")
+	flag.StringVar(conf.Db.Port, "db-port", "3306",
+		"The port used for the database connection")
+}
+
+func main() {
+	go sigHandle()
+	defer glog.Flush()
+	var parseConf controller.Config
+	err := config.Parse(flag.CommandLine, &parseConf)
+	if err != nil {
+		glog.Errorf("Failed to parse config: %v", err)
+		exit(1)
+	}
+
+	util.CloseStdFiles(*conf.Local.CloseStdDesc)
+
+	_, err := sql.NewDB(sql.DbConfig{
+		UName:    *conf.Db.UName,
+		Password: *conf.Db.Password,
+		Host:     *conf.Db.Host,
+		Port:     *conf.Db.Port,
+		Db:       *conf.Db.Db,
+	})
+	if err != nil {
+		glog.Errorf("Failed to create db: %v", err)
+		exit(1)
+	}
+
+	err = <-controller.Start(conf, nil, cache.New())
+
+	if err != nil {
+		glog.Errorf("Controller Start returned with error: %v", err)
+		exit(1)
+	}
+}
 
 func sigHandle() {
 	c := make(chan os.Signal, 1)
@@ -50,55 +114,6 @@ func sigHandle() {
 	for sig := range c {
 		glog.Infof("Got signal: %v", sig)
 		controller.HandleSig(sig)
-		exit(1)
-	}
-}
-
-func init() {
-	flag.StringVar(&f.Local.Addr, "a", ":35000",
-		"The address that the controller will bind to.")
-	flag.StringVar(&f.Local.Proto, "p", "tcp",
-		"The protocol that the controller will use.")
-	flag.BoolVar(&f.Local.CloseStdDesc, "D", false,
-		"Determines if the sandard file descriptors are closed")
-	flag.BoolVar(&f.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to 0.0.0.0 and will use port 35000")
-	flag.StringVar(&f.ConfigPath, "c", "",
-		"Path to the config file.")
-	flag.StringVar(&f.Local.PProfAddr, "pprof", "localhost:55555",
-		"The port for pprof")
-	flag.StringVar(&f.Local.CertFile, "cert-file", "cert.pem",
-		"The path the the cert file for the the server")
-	flag.StringVar(&f.Local.KeyFile, "key-file", "key.pem",
-		"The path to the private key for the file")
-}
-
-func main() {
-	go sigHandle()
-	flag.Parse()
-	defer glog.Flush()
-	var conf controller.Config
-	if f.ConfigPath != "" {
-		err := config.ParseConfig(f.ConfigPath, &conf)
-		if err != nil {
-			glog.Errorf("Failed to parse config file: %s", f.ConfigPath)
-			exit(1)
-		}
-	} else {
-		conf.Local = f.Local
-	}
-	util.CloseStdFiles(f.Local.CloseStdDesc)
-	util.StartPProf(conf.Local.PProfAddr)
-	db, err := da.New(conf.Db)
-	if err != nil {
-		glog.Errorf("Failed to create db: %v", err)
-		exit(1)
-	}
-
-	glog.Infof("Starting controller with config: %v", conf)
-	err = <-controller.Start(conf, db, cache.New())
-	if err != nil {
-		glog.Errorf("Controller Start returned with error: %v", err)
 		exit(1)
 	}
 }

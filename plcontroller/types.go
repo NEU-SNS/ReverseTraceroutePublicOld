@@ -69,13 +69,7 @@ func NewConfig() Config {
 		BinPath:       new(string),
 		ConverterPath: new(string),
 	}
-	db := dm.DbConfig{
-		UName:    new(string),
-		Password: new(string),
-		Db:       new(string),
-		Host:     new(string),
-		Port:     new(string),
-	}
+	db := dm.NewDbConfig()
 	return Config{
 		Local:   lc,
 		Scamper: sc,

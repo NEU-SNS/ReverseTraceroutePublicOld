@@ -52,7 +52,7 @@ func init() {
 	flag.StringVar(conf.Local.Addr, "a", "0.0.0.0",
 		"The address that the controller will bind to.")
 	flag.IntVar(conf.Local.Port, "p", 4380,
-		"The protocol that the controller will use.")
+		"The port that the controller will use.")
 	flag.BoolVar(conf.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed.")
 	flag.StringVar(conf.Scamper.Port, "scamper-port", "4381",
@@ -79,17 +79,6 @@ func init() {
 		"The host of the database")
 	flag.StringVar(conf.Db.Port, "db-port", "3306",
 		"The port used for the database connection")
-}
-
-func sigHandle() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
-		syscall.SIGQUIT, syscall.SIGSTOP)
-	for sig := range c {
-		glog.Infof("Got signal: %v", sig)
-		plcontroller.HandleSig(sig)
-		exit(1)
-	}
 }
 
 func main() {
@@ -121,6 +110,17 @@ func main() {
 
 	if err != nil {
 		glog.Errorf("PLController Start returned with error: %v", err)
+		exit(1)
+	}
+}
+
+func sigHandle() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
+		syscall.SIGQUIT, syscall.SIGSTOP)
+	for sig := range c {
+		glog.Infof("Got signal: %v", sig)
+		plcontroller.HandleSig(sig)
 		exit(1)
 	}
 }
