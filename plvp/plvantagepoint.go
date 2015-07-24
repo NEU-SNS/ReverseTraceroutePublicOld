@@ -197,6 +197,7 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
 		return
 	}
+	glog.Infof("Sending: %d spoofed probes", len(probes))
 	vp.am.Lock()
 	ip := vp.addr
 	vp.am.Unlock()
