@@ -85,12 +85,12 @@ func (c *plClient) Ping(ctx con.Context, pa *dm.PingArg) (*dm.Ping, error) {
 	if !c.connOpen {
 		return nil, fmt.Errorf("PLClient not connected")
 	}
-	return c.client.Ping(ctx, pa)
+	return nil, nil
 }
 
 func (c *plClient) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (*dm.Traceroute, error) {
 	if !c.connOpen {
 		return nil, fmt.Errorf("PLClient not connected")
 	}
-	return c.client.Traceroute(ctx, ta)
+	return nil, nil
 }

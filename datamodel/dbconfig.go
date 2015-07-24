@@ -33,3 +33,14 @@ type DbConfig struct {
 	Host     *string `flag:"db-host"`
 	Port     *string `flag:"db-port"`
 }
+
+func NewDbConfig() DbConfig {
+	db := DbConfig{
+		UName:    new(string),
+		Password: new(string),
+		Db:       new(string),
+		Host:     new(string),
+		Port:     new(string),
+	}
+	return db
+}

@@ -61,26 +61,35 @@ type Request struct {
 	Type  dm.MType
 }
 
-type Flags struct {
-	Local      LocalConfig
-	ConfigPath string
-	Db         dm.DbConfig
-}
-
 type Config struct {
 	Local LocalConfig
 	Db    dm.DbConfig
 }
 
 type LocalConfig struct {
-	Addr         string
-	CloseStdDesc bool
-	PProfAddr    string
-	Proto        string
-	AutoConnect  bool
-	SecureConn   bool
-	CertFile     string
-	KeyFile      string
-	ConnTimeout  int64
-	Services     []*dm.Service
+	Addr         *string `flag:"a"`
+	Port         *int    `flag:"p"`
+	CloseStdDesc *bool   `flag:"D"`
+	PProfAddr    *string `flag:"pprof"`
+	AutoConnect  *bool   `flag:"auto-connect"`
+	CertFile     *string `flag:"cert-file"`
+	KeyFile      *string `flag:"key-file"`
+	ConnTimeout  *int64  `flag:"conn-timeout"`
+}
+
+func NewConfig() Config {
+	lc := LocalConfig{
+		Addr:         new(string),
+		CloseStdDesc: new(bool),
+		PProfAddr:    new(string),
+		AutoConnect:  new(bool),
+		CertFile:     new(string),
+		KeyFile:      new(string),
+		ConnTimeout:  new(int64),
+	}
+	c := Config{
+		Local: lc,
+		Db:    dm.NewDbConfig(),
+	}
+	return c
 }

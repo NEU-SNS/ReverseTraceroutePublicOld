@@ -326,6 +326,6 @@ func (c *plControllerT) stop() {
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
-	glog.Infof("Got signal %v", s)
+	glog.Infof("Got signal: %v", s)
 	c.stop()
 }

@@ -31,20 +31,65 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
-	capi "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	_ "net/http/pprof"
 )
+
+var (
+	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+	rpcCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "count",
+		Help:      "Count of Rpc Calls sent",
+	})
+	timeoutCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "timeout_count",
+		Help:      "Count of Rpc Timeouts",
+	})
+	errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "error_count",
+		Help:      "Count of Rpc Errors",
+	})
+)
+var id uint32 = rand.Uint32()
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("controller_%d", id)
+	}
+	return fmt.Sprintf("controller_%s", strings.Replace(name, ".", "_", -1))
+}
+
+func init() {
+	prometheus.MustRegister(procCollector)
+	prometheus.MustRegister(rpcCounter)
+	prometheus.MustRegister(timeoutCounter)
+	prometheus.MustRegister(errorCounter)
+}
 
 type controllerT struct {
 	config    Config
@@ -61,74 +106,19 @@ type controllerT struct {
 
 var controller controllerT
 
-func (c *controllerT) getRequests() int64 {
-	c.mu.Lock()
-	req := c.requests
-	c.mu.Unlock()
-	return req
-}
-
-func (c *controllerT) addRequest() {
-	c.mu.Lock()
-	c.requests++
-	c.mu.Unlock()
-}
-
-func (c *controllerT) addTime(t time.Duration) {
-	c.mu.Lock()
-	c.time += t
-	c.mu.Unlock()
-}
-
-func (c *controllerT) getTime() time.Duration {
-	c.mu.Lock()
-	time := c.time
-	c.mu.Unlock()
-	return time
-}
-
-func (c *controllerT) addReqStats(req Request) {
-	c.mu.Lock()
-	c.time += req.Dur
-	c.requests++
-	c.mu.Unlock()
-}
-
-func (c *controllerT) getStatsInfo() (t time.Duration, req int64) {
-	c.mu.Lock()
-	t, req = c.time, c.requests
-	c.mu.Unlock()
-	return
-}
-
 // HandleSig handles and signals received from the OS
 func HandleSig(sig os.Signal) {
 	controller.handleSig(sig)
 }
 
 func (c *controllerT) handleSig(sig os.Signal) {
-	c.db.Close()
-}
-
-func (c *controllerT) getStats() dm.Stats {
-	utime := time.Since(c.startTime)
-	t, req := c.getStatsInfo()
-	var tt time.Duration
-	if t == 0 {
-		tt = 0
-	} else {
-		avg := int64(t) / int64(req)
-		tt = time.Duration(avg)
-	}
-	s := dm.Stats{StartTime: c.startTime.UnixNano(),
-		UpTime: utime.Nanoseconds(), Requests: req,
-		TotReqTime: t.Nanoseconds(), AvgReqTime: tt.Nanoseconds()}
-	return s
+	glog.Infof("Got signal: %v", sig)
+	c.stop()
 }
 
 func (c *controllerT) startRPC(eChan chan error) {
 	var addr string
-	if c.config.Local.AutoConnect {
+	if *c.config.Local.AutoConnect {
 		saddr, err := util.GetBindAddr()
 		if err != nil {
 			eChan <- err
@@ -136,10 +126,10 @@ func (c *controllerT) startRPC(eChan chan error) {
 		}
 		addr = fmt.Sprintf("%s:%d", saddr, 35000)
 	} else {
-		addr = c.config.Local.Addr
+		addr = *c.config.Local.Addr
 	}
 	glog.Infof("Conecting to: %s", addr)
-	l, e := net.Listen(c.config.Local.Proto, addr)
+	l, e := net.Listen("tcp", addr)
 	if e != nil {
 		glog.Errorf("Failed to listen: %v", e)
 		eChan <- e
@@ -152,33 +142,6 @@ func (c *controllerT) startRPC(eChan chan error) {
 	}
 }
 
-func (c *controllerT) doStats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
-	st := time.Now()
-	glog.Infof("%s: Ping starting")
-	sr = new(dm.StatsReturn)
-	s, mt, err := c.getService(sa.Service)
-	if err != nil {
-		sr.Ret = makeErrorReturn(st)
-		return
-	}
-	ip, err := s.GetIp()
-	if err != nil {
-		return nil, err
-	}
-	err = mt.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
-	if err != nil {
-		sr.Ret = makeErrorReturn(st)
-		return
-	}
-	sr.Stats, err = mt.Stats(ctx, sa)
-	if err != nil {
-		sr.Ret = makeErrorReturn(st)
-		return
-	}
-	sr.Ret = makeSuccessReturn(st)
-	return
-}
-
 func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, error) {
 	s, mt, err := c.getService(serv)
 	if err != nil {
@@ -188,7 +151,7 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 	if err != nil {
 		return nil, err
 	}
-	err = mt.Connect(ip, time.Duration(c.config.Local.ConnTimeout)*time.Second)
+	err = mt.Connect(ip, time.Duration(*c.config.Local.ConnTimeout)*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -196,21 +159,9 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 }
 
 func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
-	st := time.Now()
 	glog.Infof("%s: Ping starting")
 	pr = new(dm.PingReturn)
 
-	mt, err := c.getMeasurementTool(pa.Service)
-	if err != nil {
-		pr.Ret = makeErrorReturn(st)
-		return
-	}
-	pr.Ping, err = mt.Ping(ctx, pa)
-	if err != nil {
-		pr.Ret = makeErrorReturn(st)
-		return
-	}
-	pr.Ret = makeSuccessReturn(st)
 	return
 }
 
@@ -226,7 +177,7 @@ func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
 	}
 	lhops := make([]uint32, len(hops))
 	for i, hop := range hops {
-		ip, err := util.IpStringToInt32(hop.Addr)
+		ip, err := util.IPStringToInt32(hop.Addr)
 		if err != nil {
 			return nil
 		}
@@ -240,46 +191,6 @@ func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *d
 	st := time.Now()
 	glog.Infof("%s: Traceroute starting")
 	tr = new(dm.TracerouteReturn)
-	makeRequest := !ta.CheckCache
-	if ta.CheckCache {
-		trace, e := c.db.GetTRBySrcDstWithStaleness(ta.Host, ta.Dst, da.Staleness(ta.Staleness))
-		if e == nil {
-			glog.Infof("Got traceroute from db: %v", trace)
-			tr.Traceroute = trace
-			tr.Ret = makeSuccessReturn(st)
-			return
-		}
-		glog.Errorf("Failed to get traceroute from db: %v, got: %v", e, trace)
-		makeRequest = true
-	}
-
-	if makeRequest {
-		mt, e := c.getMeasurementTool(ta.Service)
-		if e != nil {
-			tr.Ret = makeErrorReturn(st)
-			return
-		}
-		trace, e := mt.Traceroute(nctx, ta)
-		if e != nil {
-			tr.Ret = makeErrorReturn(st)
-			return
-		}
-		tr.Traceroute = makeMTraceroute(trace, ta.Service)
-		if tr.Traceroute == nil {
-			tr.Ret = makeErrorReturn(st)
-			err = fmt.Errorf("Invalid traceroute received")
-			return
-		}
-		go func() {
-			e = c.db.StoreTraceroute(trace, ta.Service)
-			if e != nil {
-				glog.Errorf("Failed to store traceroute: %v", e)
-			}
-		}()
-		tr.Ret = makeSuccessReturn(st)
-		return
-	}
-
 	tr.Ret = makeErrorReturn(st)
 	err = fmt.Errorf("doTraceroute failed to find in cache or remote")
 	return
@@ -307,28 +218,47 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 	return c.router.GetService(s)
 }
 
-// Start starts a central controller with the given configuration
-func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
-	errChan := make(chan error, 2)
+func startHttp(addr string) {
+	for {
+		glog.Error(http.ListenAndServe(addr, nil))
+	}
+}
+
+func (c *controllerT) stop() {
+	if c.db != nil {
+		c.db.Close()
+	}
+}
+
+func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache ca.Cache) {
 	if db == nil {
 		glog.Errorf("Nil db in Controller Start")
-		errChan <- errors.New("Controller Start, nil DB")
-		return errChan
+		c.stop()
+		ec <- errors.New("Controller Start, nil DB")
+		return
 	}
 	if cache == nil {
 		glog.Errorf("Nil cache in Controller start")
-		errChan <- errors.New("Controller Start, nil Cache")
-		return errChan
+		c.stop()
+		ec <- errors.New("Controller Start, nil Cache")
+		return
 	}
-	controller.config = c
+	controller.config = con
 	controller.startTime = time.Now()
 	controller.db = db
 	controller.cache = cache
 	controller.router = createRouter()
-	controller.router.RegisterServices(c.Local.Services...)
 	var opts []grpc.ServerOption
 	controller.server = grpc.NewServer(opts...)
-	capi.RegisterControllerServer(controller.server, &controller)
-	go controller.startRPC(errChan)
+	go controller.startRPC(ec)
+}
+
+// Start starts a central controller with the given configuration
+func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
+	glog.Info("Starting controller")
+	http.Handle("/metrics", prometheus.Handler())
+	go startHttp(*c.Local.PProfAddr)
+	errChan := make(chan error, 2)
+	go controller.run(errChan, c, db, cache)
 	return errChan
 }
