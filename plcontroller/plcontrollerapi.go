@@ -80,8 +80,8 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 					return
 				default:
 					pr, err := c.runPing(p)
-					glog.Infof("Got ping result: %v, with error %v", pr, err)
 					if err != nil {
+						glog.Infof("Got ping result: %v, with error %v", pr, err)
 						pr.Error = err.Error()
 					}
 					pp = &pr
@@ -133,6 +133,7 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 				default:
 					tr, err := c.runTraceroute(t)
 					if err != nil {
+						glog.Infof("Got traceroute result: %v, with error %v", tr, err)
 						tr.Error = err.Error()
 					}
 					ttr = &tr
