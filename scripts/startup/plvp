@@ -1,0 +1,79 @@
+#!/bin/sh
+# plvp: The Planet Lab Vantage Point Flavor
+# 
+# chkconfig: 2345 95 95
+# description: PLVP server daemon
+#
+# processname: plvp
+# pidfile: /var/run/plvp.pid
+### BEGIN INIT INFO
+# Provides: plvp
+# Required-Start:    $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start plvp at boot time
+# Description:       Run the plvp at boot
+### END INIT INFO
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+PWD=/home/uw_geoloc4/revtr
+
+PATH=$PATH:/home/uw_geoloc4/revtr
+
+RETVAL=0
+
+prog="plvp"
+log_file="/var/log/$prog"
+
+start() {
+    cd $PWD
+    printf "Starting $prog:\t"
+    echo "$(date)" >> $log_file
+    $prog >> $log_file 2>&1 &
+    RETVAL=$?
+    PID=$!
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog && echo "$PID" > "/var/run/${prog}.pid"
+    [ $RETVAL -eq 0 ] && success
+    echo
+}
+
+stop() {
+    printf "Stopping $prog:\t"
+    killproc -p "/var/run/plvp.pid" $prog -TERM
+    RETVAL=$?
+    echo
+    if [ $RETVAL -eq 0 ]; then
+        rm -f /var/lock/subsys/$prog
+        rm -f /var/run/plvp.pid
+    fi
+}
+
+case "$1" in 
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status $prog
+        RETVAL=$?
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    condrestart)
+        if [ -f /var/lock/subsys/$prog ]; then
+            stop
+            start
+        fi
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        ;;
+esac
+
+exit $RETVAL
