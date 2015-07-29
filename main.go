@@ -33,9 +33,11 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -50,36 +52,64 @@ func main() {
 	}
 	defer conn.Close()
 	cl := plc.NewPLControllerClient(conn)
-	pa := &dm.PingArg{Pings: []*dm.PingMeasurement{&dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.8.8"}, &dm.PingMeasurement{Src: "129.110.125.52", Dst: "8.8.4.4"}}}
-	stream, err := cl.Ping(ctx.Background(), pa)
+	vps, err := cl.GetVPs(ctx.Background(), &dm.VPRequest{})
 	if err != nil {
 		panic(err)
-	}
-	ta := &dm.TracerouteArg{Traceroutes: []*dm.TracerouteMeasurement{&dm.TracerouteMeasurement{Src: "129.110.125.52", Dst: "8.8.8.8"}, &dm.TracerouteMeasurement{Src: "129.110.125.52", Dst: "8.8.4.4"}}}
-	st, err := cl.Traceroute(ctx.Background(), ta)
-	if err != nil {
-		panic(err)
-	}
-	for {
-		ping, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(ping)
 	}
 
+	vplist := make([]*dm.VantagePoint, 0)
 	for {
-		trace, err := st.Recv()
+		vpp, err := vps.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(trace)
+		vplist = append(vplist, vpp.GetVps()...)
 	}
-	fmt.Println("Got all measurements")
+	pingreq := &dm.PingArg{
+		Pings: make([]*dm.PingMeasurement, 0),
+	}
+	fmt.Println("Num of vps: ", len(vplist))
+	dst := new(string)
+	for i, vp := range vplist {
+		if i == 0 {
+			ip, err := util.Int32ToIPString(vp.Ip)
+			if err != nil {
+				panic(err)
+			}
+			dst = &ip
+			continue
+		}
+		if vp.Controller != 0 {
+			src, err := util.Int32ToIPString(vp.Ip)
+			if err != nil {
+				panic(err)
+			}
+			pingreq.Pings = append(pingreq.Pings, &dm.PingMeasurement{
+				Src: src,
+				Dst: *dst,
+				RR:  true,
+			})
+		}
+	}
+	fmt.Println(pingreq)
+	fmt.Println("Num of requests: ", len(pingreq.Pings))
+	fmt.Println("Starting: ", time.Now())
+	st, err := cl.Ping(ctx.Background(), pingreq)
+	if err != nil {
+		panic(err)
+	}
+	for {
+		pr, err := st.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(pr)
+	}
+	fmt.Println("Done: ", time.Now())
 }

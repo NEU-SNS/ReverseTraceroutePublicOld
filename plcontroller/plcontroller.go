@@ -84,7 +84,8 @@ func getName() string {
 	if err != nil {
 		return fmt.Sprintf("plcontroller_%d", id)
 	}
-	return fmt.Sprintf("plcontroller_%s", strings.Replace(name, ".", "_", -1))
+	r := strings.NewReplacer(".", "_", "-", "")
+	return fmt.Sprintf("plcontroller_%s", r.Replace(name))
 }
 
 func init() {

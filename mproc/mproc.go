@@ -89,6 +89,7 @@ func (mp *mProc) KillAll() {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	for _, v := range mp.managedProcs {
+		glog.V(1).Infoln("Killing: ", v)
 		v.endKeepAlive()
 		v.mu.Lock()
 		v.p.Kill()

@@ -214,10 +214,8 @@ func (s *Socket) readConn() {
 			line, err := rw.ReadString('\n')
 
 			if err != nil {
-				glog.Errorf("Error reading from socket: %v", err)
 				s.con.Close()
 				if err = s.reconnect(); err != nil {
-					glog.Error("Failed to reopen connection")
 					return
 				}
 				s.rc = 0
