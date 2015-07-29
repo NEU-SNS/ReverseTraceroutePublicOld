@@ -26,22 +26,23 @@ RETVAL=0
 
 prog="plvp"
 log_file="/var/log/$prog"
+pid_file="/var/run/${prog}.pid"
 
 start() {
     cd $PWD
     printf "Starting $prog:\t"
     echo "$(date)" >> $log_file
-    $prog >> $log_file 2>&1 &
+    $PWD/$prog >> $log_file 2>&1 &
     RETVAL=$?
     PID=$!
-    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog && echo "$PID" > "/var/run/${prog}.pid"
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog && echo "$PID" > ${pid_file}
     [ $RETVAL -eq 0 ] && success
     echo
 }
 
 stop() {
     printf "Stopping $prog:\t"
-    killproc -p "/var/run/plvp.pid" $prog -TERM
+    killproc -p $pid_file $PWD/$prog 
     RETVAL=$?
     echo
     if [ $RETVAL -eq 0 ]; then

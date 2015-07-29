@@ -29,9 +29,10 @@ package proc
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"os"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 type Process struct {
@@ -68,6 +69,7 @@ func (p *Process) Prog() string {
 }
 
 func (p *Process) Pid() (int, error) {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
@@ -75,10 +77,12 @@ func (p *Process) Pid() (int, error) {
 		return p.proc.Pid, nil
 	}
 	glog.Errorln("Attempted to get Pid for unstarted process: %v", p)
+
 	return 0, errors.New("The Process is not yet started")
 }
 
 func (p *Process) Start() (int, error) {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.started {
@@ -112,64 +116,83 @@ func (p *Process) Start() (int, error) {
 }
 
 func (p *Process) HasProc() bool {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.proc != nil
 }
 
 func (p *Process) Signal(sig os.Signal) error {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
 		if glog.V(1) {
 			glog.Infof("Signaling PID: %d with signal %v\n", p.proc.Pid, sig)
 		}
+
 		return p.proc.Signal(sig)
 	}
+
 	return errors.New("Cannot Signal a process that hasn't started)")
 }
 
 func (p *Process) Kill() error {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
 		if glog.V(1) {
 			glog.Infof("Killing PID: %d", p.proc.Pid)
 		}
-		return p.proc.Kill()
+		res := p.proc.Kill()
+		return res
 	}
+
+	glog.Infoln("Unlocking")
 	return errors.New("Cannot Kill a process that hasn't started)")
 }
 
 func (p *Process) Wait() chan error {
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	done := make(chan error, 1)
 	go func() {
-		p.mu.Lock()
-		defer p.mu.Unlock()
 		if glog.V(1) {
 			glog.Infof("Waiting on PID: %d", p.proc.Pid)
 		}
-		state, err := p.proc.Wait()
+		p.mu.Lock()
+		pr := p.proc
+		p.mu.Unlock()
+		state, err := pr.Wait()
 		if err == nil {
 			done <- err
 		}
+		p.mu.Lock()
 		p.procState = state
+		p.mu.Unlock()
 		done <- nil
 	}()
+
 	return done
 }
 
 func (p *Process) GetWaitStatus() *os.ProcessState {
+
+	glog.Infoln("Locking")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.procState == nil {
+
+		glog.Infoln("Unlocking")
 		return nil
 	}
 
 	ps := *p.procState
+
+	glog.Infoln("Unlocking")
 	return &ps
 
 }

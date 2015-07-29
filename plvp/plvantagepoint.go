@@ -71,7 +71,8 @@ func getName() string {
 	if err != nil {
 		return fmt.Sprintf("plvp_%d", id)
 	}
-	return fmt.Sprintf("plvp_%s", strings.Replace(name, ".", "_", -1))
+	r := strings.NewReplacer(".", "_", "-", "")
+	return fmt.Sprintf("plvp_%s", r.Replace(name))
 }
 
 func init() {
@@ -121,6 +122,7 @@ func (vp *plVantagepointT) handleSig(s os.Signal) {
 
 func (vp *plVantagepointT) stop() {
 	if vp.mp != nil {
+		glog.Infoln("Killing all processes")
 		vp.mp.KillAll()
 	}
 	if vp.spoofmon != nil {
@@ -155,11 +157,11 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 		ec <- err
 		return
 	}
-	plVantagepoint.addr = sip
-	plVantagepoint.sc = *con
-	plVantagepoint.mp = mproc.New()
-	plVantagepoint.spoofmon = NewSpoofPingMonitor()
-	plVantagepoint.plc = &plClient{}
+	vp.addr = sip
+	vp.sc = *con
+	vp.mp = mproc.New()
+	vp.spoofmon = NewSpoofPingMonitor()
+	vp.plc = &plClient{}
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
 		glog.Errorf("Could not get bind addr: %v", err)
@@ -167,10 +169,10 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 		ec <- err
 		return
 	}
-	plVantagepoint.monec = make(chan error, 1)
-	plVantagepoint.monip = make(chan dm.Probe, 1)
-	go plVantagepoint.spoofmon.Start(monaddr, plVantagepoint.monip, plVantagepoint.monec)
-	go plVantagepoint.monitorSpoofedPings(plVantagepoint.monip, plVantagepoint.monec)
+	vp.monec = make(chan error, 1)
+	vp.monip = make(chan dm.Probe, 1)
+	go vp.spoofmon.Start(monaddr, plVantagepoint.monip, plVantagepoint.monec)
+	go vp.monitorSpoofedPings(plVantagepoint.monip, plVantagepoint.monec)
 	if *c.Local.StartScamp {
 		plVantagepoint.startScamperProcs()
 	}
@@ -249,8 +251,8 @@ func pickIP(host string) (string, error) {
 	return addrs[rand.Intn(len(addrs))], nil
 }
 
-func (c *plVantagepointT) startScamperProcs() {
+func (vp *plVantagepointT) startScamperProcs() {
 	glog.Info("Starting scamper procs")
-	sp := scamper.GetVPProc(c.sc.ScPath, c.sc.IP, c.sc.Port)
-	c.mp.ManageProcess(sp, true, 10000, c.handleScamperStop)
+	sp := scamper.GetVPProc(vp.sc.ScPath, vp.sc.IP, vp.sc.Port)
+	vp.mp.ManageProcess(sp, true, 10000, vp.handleScamperStop)
 }
