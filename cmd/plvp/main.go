@@ -39,11 +39,21 @@ import (
 	"github.com/golang/glog"
 )
 
+var (
+	defaultConfig = "./plvp.config"
+	configPath    string
+)
+
 var conf plvp.Config = plvp.NewConfig()
 
 func init() {
 	config.SetEnvPrefix("REVTR")
-	config.AddConfigPath("./plvp.config")
+	if configPath == "" {
+		config.AddConfigPath(defaultConfig)
+	} else {
+		config.AddConfigPath(configPath)
+	}
+
 	flag.StringVar(conf.Local.Addr, "a", ":65000",
 		"The address to run the local service on")
 	flag.BoolVar(conf.Local.CloseStdDesc, "d", false,

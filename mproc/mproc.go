@@ -105,7 +105,7 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc)
 	}
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
-	glog.Infof("Starting process: %s", p.String())
+	glog.V(1).Infof("Starting process: %s", p.String())
 	_, err := p.Start()
 	if err != nil {
 		return 0, err
@@ -138,7 +138,7 @@ func (mp *mProc) keepAlive(id uint32) {
 		}
 		if err == nil {
 			ps := p.p.GetWaitStatus()
-			glog.Infof("KeepAlive Proc: %s, PID: %d stopped, status: %v",
+			glog.V(1).Infof("KeepAlive Proc: %s, PID: %d stopped, status: %v",
 				p.p.Prog(), pid, ps)
 
 			mp.mu.Lock()
@@ -153,7 +153,7 @@ func (mp *mProc) keepAlive(id uint32) {
 						return
 					}
 				}
-				glog.Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
+				glog.V(1).Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
 				p.remRetry -= 1
 				mp.keepAlive(id)
 			}
