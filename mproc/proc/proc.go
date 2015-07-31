@@ -149,7 +149,6 @@ func (p *Process) Kill() error {
 		return res
 	}
 
-	glog.Infoln("Unlocking")
 	return errors.New("Cannot Kill a process that hasn't started)")
 }
 
@@ -180,19 +179,15 @@ func (p *Process) Wait() chan error {
 
 func (p *Process) GetWaitStatus() *os.ProcessState {
 
-	glog.Infoln("Locking")
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.procState == nil {
-
-		glog.Infoln("Unlocking")
 		return nil
 	}
 
 	ps := *p.procState
 
-	glog.Infoln("Unlocking")
 	return &ps
 
 }

@@ -82,7 +82,7 @@ func (m *PingArg) GetPings() []*PingMeasurement {
 
 type PingStats struct {
 	Replies int32   `protobuf:"varint,1,opt,name=replies" json:"replies,omitempty"`
-	Loss    int32   `protobuf:"varint,2,opt,name=loss" json:"loss,omitempty"`
+	Loss    float32 `protobuf:"fixed32,2,opt,name=loss" json:"loss,omitempty"`
 	Min     float32 `protobuf:"fixed32,3,opt,name=min" json:"min,omitempty"`
 	Max     float32 `protobuf:"fixed32,4,opt,name=max" json:"max,omitempty"`
 	Avg     float32 `protobuf:"fixed32,5,opt,name=avg" json:"avg,omitempty"`
