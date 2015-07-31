@@ -40,7 +40,7 @@ message PingArg {
 
 message PingStats {
     int32 replies = 1;
-    int32 loss    = 2;
+    float loss    = 2;
     float min     = 3;
     float max     = 4;
     float avg     = 5;

@@ -301,20 +301,26 @@ func (s *Socket) getID() uint32 {
 	return id
 }
 
+func (s *Socket) RemoveMeasurement(id uint32) error {
+	s.cmds.rmCmd(id)
+	return nil
+}
+
 // DoMeasurement perform the measurement described by arg
-func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, error) {
-	cmd, err := newCmd(arg, s.getID())
+func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error) {
+	id := s.getID()
+	cmd, err := newCmd(arg, id)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	cr := cmdResponse{cmd: &cmd, done: make(chan Response, 1)}
 	err = s.cmds.addCmd(cr)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	glog.Infof("Running cmd: %v", cmd)
 	s.cmdChan <- &cmd
-	return cr.done, err
+	return cr.done, id, err
 }
 
 // IP Gets the ip of the remote machine that is connected to the socket

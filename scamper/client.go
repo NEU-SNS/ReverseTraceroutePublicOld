@@ -137,7 +137,8 @@ type Client interface {
 	AddSocket(*Socket)
 	RemoveSocket(string)
 	GetSocket(string) (*Socket, error)
-	DoMeasurement(string, interface{}) (<-chan Response, error)
+	RemoveMeasurement(addr string, id uint32) error
+	DoMeasurement(string, interface{}) (<-chan Response, uint32, error)
 	GetAllSockets() <-chan *Socket
 }
 
@@ -177,15 +178,23 @@ func (c *client) GetAllSockets() <-chan *Socket {
 	return schan
 }
 
-// DoMeasurement run the measurement described by arg from the address addr
-func (c *client) DoMeasurement(addr string, arg interface{}) (<-chan Response, error) {
+func (c *client) RemoveMeasurement(addr string, id uint32) error {
 	s, err := c.sockets.Get(addr)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	ch, err := s.DoMeasurement(arg)
+	return s.RemoveMeasurement(id)
+}
+
+// DoMeasurement run the measurement described by arg from the address addr
+func (c *client) DoMeasurement(addr string, arg interface{}) (<-chan Response, uint32, error) {
+	s, err := c.sockets.Get(addr)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return ch, nil
+	ch, id, err := s.DoMeasurement(arg)
+	if err != nil {
+		return nil, 0, err
+	}
+	return ch, id, nil
 }

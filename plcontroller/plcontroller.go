@@ -115,7 +115,8 @@ type Client interface {
 	AddSocket(*scamper.Socket)
 	RemoveSocket(string)
 	GetSocket(string) (*scamper.Socket, error)
-	DoMeasurement(string, interface{}) (<-chan scamper.Response, error)
+	RemoveMeasurement(string, uint32) error
+	DoMeasurement(string, interface{}) (<-chan scamper.Response, uint32, error)
 	GetAllSockets() <-chan *scamper.Socket
 }
 
@@ -145,7 +146,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	}
 	ret := dm.Ping{}
 
-	resp, err := c.client.DoMeasurement(pa.Src, pa)
+	resp, id, err := c.client.DoMeasurement(pa.Src, pa)
 	if err != nil {
 		return ret, err
 	}
@@ -159,6 +160,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
+		c.client.RemoveMeasurement(pa.Src, id)
 		return ret, fmt.Errorf("Ping timed out")
 	}
 	return ret, nil
@@ -177,7 +179,7 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	}
 	ret := dm.Traceroute{}
 
-	resp, err := c.client.DoMeasurement(ta.Src, ta)
+	resp, id, err := c.client.DoMeasurement(ta.Src, ta)
 	if err != nil {
 		return ret, err
 	}
@@ -191,6 +193,7 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
+		c.client.RemoveMeasurement(ta.Src, id)
 		return ret, fmt.Errorf("Traceroute timed out")
 	}
 	return ret, nil
@@ -324,6 +327,9 @@ func (c *plControllerT) stop() {
 	if c.spoofs != nil {
 		c.spoofs.Quit()
 	}
+	// Wait 5 seconds... I think sc_remoted needs time to properly clean-up
+	<-time.After(time.Second * 5)
+	cleanDir(*c.config.Scamper.SockDir)
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
