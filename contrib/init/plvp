@@ -23,7 +23,7 @@ RETVAL=0
 
 prog="plvp"
 log_dir="/var/log/$prog"
-log_file="$prog_dir/$prog"
+log_file="$log_dir/$prog"
 lock_file="/var/lock/subsys/$prog"
 pid_file="/var/run/$prog.pid"
 exec="/usr/local/bin/$prog"

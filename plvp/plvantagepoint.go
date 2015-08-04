@@ -141,18 +141,19 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 	defer glog.Flush()
 	con := new(scamper.Config)
 	con.ScPath = *c.Scamper.BinPath
-	sip, err := pickIP(*c.Scamper.Host)
+
+	con.IP = *c.Scamper.Host
+	con.Port = *c.Scamper.Port
+	err := scamper.ParseConfig(*con)
 	if err != nil {
-		glog.Errorf("Could not resolve url: %s, with err: %v", *c.Local.Host, err)
+		glog.Errorf("Invalid scamper args: %v", err)
 		vp.stop()
 		ec <- err
 		return
 	}
-	con.IP = sip
-	con.Port = *c.Scamper.Port
-	err = scamper.ParseConfig(*con)
+	sip, err := pickIP(*c.Scamper.Host)
 	if err != nil {
-		glog.Errorf("Invalid scamper args: %v", err)
+		glog.Errorf("Could not resolve url: %s, with err: %v", *c.Local.Host, err)
 		vp.stop()
 		ec <- err
 		return
