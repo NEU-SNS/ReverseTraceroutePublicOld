@@ -10,13 +10,13 @@ message VantagePoint {
     bool sshable         =  3;
     bool timestamp       =  4;
     bool record_route    =  5;
-    bool active          =  6;
-    int64 last_updated   =  7;
-    bool can_spoof       =  9;
-    uint32 controller    = 10;
-    bool receive_spoof   = 11;
-    string site          = 12;
-    int64 spoof_checked  = 13;
+    int64 last_updated   =  6;
+    bool can_spoof       =  7;
+    uint32 controller    =  8;
+    bool receive_spoof   =  9;
+    string site          = 10;
+    int64 spoof_checked  = 11;
+    uint32 port          = 12;
     
 }
 

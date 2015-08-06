@@ -50,7 +50,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 			return
 		case e := <-c.w.Events:
 			if e.Op&fsnotify.Create == fsnotify.Create {
-				glog.Infof("Received fs event: %v", e)
+				glog.V(2).Infof("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
 					e.Name,
 					*c.config.Scamper.ConverterPath,

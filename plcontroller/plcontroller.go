@@ -265,6 +265,27 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	c.server = grpc.NewServer()
 	plc.RegisterPLControllerServer(plController.server, c)
 	go c.startRPC(ec)
+	go func() {
+		glog.Info("Starting VP monitoring")
+		for {
+			select {
+			case <-c.shutdown:
+				return
+			case <-time.After(time.Minute * 2):
+				glog.Info("Checking VPs....")
+				vps, err := c.db.GetVPs()
+				if err != nil {
+					glog.Errorf("Failed to get VPs: %v", err)
+					return
+				}
+				err = maintainVPs(vps, *c.config.Local.PLUName, *c.config.Local.SSHKeyPath, c.db)
+				if err != nil {
+					glog.Errorf("Failed to maintain VPS: %v", err)
+					return
+				}
+			}
+		}
+	}()
 }
 
 func startHttp(addr string) {
@@ -314,11 +335,11 @@ func (c *plControllerT) stop() {
 	if c.shutdown != nil {
 		close(c.shutdown)
 	}
-	if c.mp != nil {
-		c.mp.KillAll()
-	}
 	if c.w != nil {
 		c.w.Close()
+	}
+	if c.mp != nil {
+		c.mp.KillAll()
 	}
 	if c.db != nil {
 		c.removeAllVps()
