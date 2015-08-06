@@ -41,13 +41,13 @@ type VantagePoint struct {
 	Sshable      bool   `protobuf:"varint,3,opt,name=sshable" json:"sshable,omitempty"`
 	Timestamp    bool   `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"`
 	RecordRoute  bool   `protobuf:"varint,5,opt,name=record_route" json:"record_route,omitempty"`
-	Active       bool   `protobuf:"varint,6,opt,name=active" json:"active,omitempty"`
-	LastUpdated  int64  `protobuf:"varint,7,opt,name=last_updated" json:"last_updated,omitempty"`
-	CanSpoof     bool   `protobuf:"varint,9,opt,name=can_spoof" json:"can_spoof,omitempty"`
-	Controller   uint32 `protobuf:"varint,10,opt,name=controller" json:"controller,omitempty"`
-	ReceiveSpoof bool   `protobuf:"varint,11,opt,name=receive_spoof" json:"receive_spoof,omitempty"`
-	Site         string `protobuf:"bytes,12,opt,name=site" json:"site,omitempty"`
-	SpoofChecked int64  `protobuf:"varint,13,opt,name=spoof_checked" json:"spoof_checked,omitempty"`
+	LastUpdated  int64  `protobuf:"varint,6,opt,name=last_updated" json:"last_updated,omitempty"`
+	CanSpoof     bool   `protobuf:"varint,7,opt,name=can_spoof" json:"can_spoof,omitempty"`
+	Controller   uint32 `protobuf:"varint,8,opt,name=controller" json:"controller,omitempty"`
+	ReceiveSpoof bool   `protobuf:"varint,9,opt,name=receive_spoof" json:"receive_spoof,omitempty"`
+	Site         string `protobuf:"bytes,10,opt,name=site" json:"site,omitempty"`
+	SpoofChecked int64  `protobuf:"varint,11,opt,name=spoof_checked" json:"spoof_checked,omitempty"`
+	Port         uint32 `protobuf:"varint,12,opt,name=port" json:"port,omitempty"`
 }
 
 func (m *VantagePoint) Reset()         { *m = VantagePoint{} }

@@ -44,6 +44,8 @@ type LocalConfig struct {
 	Timeout      *int64  `flag:"t"`
 	CertFile     *string `flag:"cert-file"`
 	KeyFile      *string `flag:"key-file"`
+	SSHKeyPath   *string `flag:"sshkey-path"`
+	PLUName      *string `flag:"pluname"`
 }
 
 type ScamperConfig struct {
@@ -62,6 +64,8 @@ func NewConfig() Config {
 		Timeout:      new(int64),
 		CertFile:     new(string),
 		KeyFile:      new(string),
+		SSHKeyPath:   new(string),
+		PLUName:      new(string),
 	}
 	sc := ScamperConfig{
 		Port:          new(string),

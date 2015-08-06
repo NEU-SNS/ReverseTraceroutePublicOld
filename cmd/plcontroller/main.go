@@ -41,11 +41,20 @@ import (
 	"github.com/golang/glog"
 )
 
+var (
+	defaultConfig = "./plcontroller.config"
+	configPath    string
+)
+
 var conf = plcontroller.NewConfig()
 
 func init() {
 	config.SetEnvPrefix("REVTR")
-	config.AddConfigPath("./plcontroller.config")
+	if configPath == "" {
+		config.AddConfigPath(defaultConfig)
+	} else {
+		config.AddConfigPath(configPath)
+	}
 
 	flag.Int64Var(conf.Local.Timeout, "t", 60,
 		"The default timeout used for measurement requests.")
@@ -69,6 +78,10 @@ func init() {
 		"The path the the cert file for the the server")
 	flag.StringVar(conf.Local.KeyFile, "key-file", "key.pem",
 		"The path to the private key for the file")
+	flag.StringVar(conf.Local.SSHKeyPath, "sshkey-path", "",
+		"The path to the key for connecting to planet-lab")
+	flag.StringVar(conf.Local.PLUName, "pluname", "",
+		"The username to use for logging into planet-lab nodes")
 	flag.StringVar(conf.Db.UName, "db-uname", "",
 		"The username for the database")
 	flag.StringVar(conf.Db.Password, "db-pass", "",

@@ -74,6 +74,7 @@ type VantagePoint struct {
 	ReceiveSpoof bool
 	LastUpdated  time.Time
 	SpoofChecked mysql.NullTime
+	Port         uint32
 }
 
 func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
@@ -86,13 +87,13 @@ func (vp *VantagePoint) ToDataModel() *dm.VantagePoint {
 	nvp.Timestamp = vp.TimeStamp
 	nvp.RecordRoute = vp.TimeStamp
 	nvp.CanSpoof = vp.CanSpoof
-	nvp.Active = vp.Active
 	nvp.ReceiveSpoof = vp.ReceiveSpoof
 	nvp.LastUpdated = vp.LastUpdated.Unix()
 	nvp.Site = vp.Site
 	if vp.SpoofChecked.Valid {
 		nvp.SpoofChecked = vp.LastUpdated.Unix()
 	}
+	nvp.Port = vp.Port
 	return nvp
 }
 
@@ -100,8 +101,8 @@ const (
 	getVpsQuery string = `
 SELECT
 	ip, controller, hostname, timestamp,
-	record_route, can_spoof, active,
-    receive_spoof, last_updated
+	record_route, can_spoof,
+    receive_spoof, last_updated, port
 FROM
 	vantage_point;
 `
@@ -123,9 +124,9 @@ func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 			&vp.TimeStamp,
 			&vp.RecordRoute,
 			&vp.CanSpoof,
-			&vp.Active,
 			&vp.ReceiveSpoof,
 			&vp.LastUpdated,
+			&vp.Port,
 		)
 		if err != nil {
 			return vps, err
@@ -141,8 +142,7 @@ const (
 UPDATE
 	vantage_point
 SET
-	controller = ?,
-	active = ?
+	controller = ?
 WHERE
 	ip = ?
 `
@@ -150,8 +150,7 @@ WHERE
 UPDATE
 	vantage_point
 SET
-	controller = IF(controller = ?, NULL, controller),
-	active = IF(controller = ?, ?, active)
+	controller = IF(controller = ?, NULL, controller)
 WHERE
 	ip = ?
 `
@@ -159,16 +158,14 @@ WHERE
 
 func (db *DB) UpdateController(ip, newc, con uint32) error {
 	args := make([]interface{}, 0)
-	var active bool
 	query := updateControllerQuery
 	if newc == 0 {
 		query = updateControllerQueryNull
-		args = append(args, con, con)
+		args = append(args, con)
 	} else {
 		args = append(args, newc)
-		active = true
 	}
-	args = append(args, active, ip)
+	args = append(args, ip)
 	_, err := db.db.Exec(query, args...)
 	return err
 }
@@ -203,6 +200,22 @@ WHERE
 
 func (db *DB) UpdateCanSpoof(ip uint32, canSpoof bool) error {
 	_, err := db.db.Exec(updateCanSpoofQuery, canSpoof, ip)
+	return err
+}
+
+const (
+	updateCheckStatus string = `
+UPDATE
+	vantage_point
+SET
+	last_health_check = ?
+WHERE
+	ip = ?
+`
+)
+
+func (db *DB) UpdateCheckStatus(ip uint32, result string) error {
+	_, err := db.db.Exec(updateCheckStatus, result, ip)
 	return err
 }
 

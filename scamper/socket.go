@@ -358,7 +358,6 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		resp.RType = ERR
 		return resp, nil
 	case strings.Contains(r, string(DATA)):
-		glog.Infof("Parsing Data response: %s", r)
 		resp.RType = DATA
 		split := strings.Split(r, " ")
 		if len(split) != 2 {

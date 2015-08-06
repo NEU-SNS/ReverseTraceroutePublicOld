@@ -69,5 +69,6 @@ type VPProvider interface {
 	UpdateController(uint32, uint32, uint32) error
 	UpdateActive(uint32, bool) error
 	UpdateCanSpoof(uint32, bool) error
+	UpdateCheckStatus(uint32, string) error
 	Closer
 }
