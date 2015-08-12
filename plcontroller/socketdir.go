@@ -76,7 +76,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				glog.Infof("Received fs event: %v", e)
+				glog.V(2).Infof("Received fs event: %v", e)
 				ip := strings.Split(path.Base(e.Name), ":")[0]
 				nip, err := util.IPStringToInt32(ip)
 				if err != nil {
