@@ -28,6 +28,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -42,6 +43,8 @@ import (
 var (
 	defaultConfig = "./plvp.config"
 	configPath    string
+	versionNo     string
+	vFlag         bool
 )
 
 var conf plvp.Config = plvp.NewConfig()
@@ -53,7 +56,8 @@ func init() {
 	} else {
 		config.AddConfigPath(configPath)
 	}
-
+	flag.BoolVar(&vFlag, "version", false,
+		"Prints the current version")
 	flag.StringVar(conf.Local.Addr, "a", ":65000",
 		"The address to run the local service on")
 	flag.BoolVar(conf.Local.CloseStdDesc, "d", false,
@@ -79,6 +83,10 @@ func init() {
 func main() {
 	go sigHandle()
 	defer glog.Flush()
+	if vFlag {
+		fmt.Println(versionNo)
+		return
+	}
 	var parseConf plvp.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {

@@ -38,7 +38,12 @@ start() {
         RETVAL=$?
         PID=$!
         [ $RETVAL -eq 0 ] && touch $lock_file && echo "$PID" > ${pid_file}
-        [ $RETVAL -eq 0 ] && success
+        RETVAL=$?
+        if [ $RETVAL -eq 0 ]; then
+           success
+        else
+           failure
+        fi
         echo
     else
         failure

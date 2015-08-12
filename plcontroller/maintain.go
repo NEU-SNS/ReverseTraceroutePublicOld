@@ -27,14 +27,11 @@ Copyright (c) 2015, Northeastern University
 package plcontroller
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net"
+	"os/exec"
 	"regexp"
+	"sync"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -50,6 +47,7 @@ const (
 	pidExists procStatus = "Service dead but pid file exists"
 	unknown   procStatus = "Could not get service status"
 
+	sshPath string = "/usr/bin/ssh"
 	status  string = "sudo /sbin/service plvp status"
 	restart string = "sudo /sbin/service plvp restart"
 	start   string = "sudo /sbin/service plvp start"
@@ -64,155 +62,166 @@ var (
 	errorFailedToStart    = fmt.Errorf("Could not start service")
 	errorUnknownService   = fmt.Errorf("Unknown service")
 
-	run     = regexp.MustCompile("running")
+	run     = regexp.MustCompile("running\\.\\.\\.")
 	stop    = regexp.MustCompile("stopped")
 	nf      = regexp.MustCompile("unrecognized")
 	failed  = regexp.MustCompile("FAILED")
 	pidLeft = regexp.MustCompile("plvp dead but pid file exists")
+
+	args = []string{"-o", "ConnectTimeout=20", "-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
 func maintainVPs(vps []*dm.VantagePoint, uname, certpath string, db dataaccess.VPProvider) error {
-	s, err := getCert(certpath)
-	if err != nil {
-		return err
-	}
-	conf := &ssh.ClientConfig{
-		User: uname,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(s),
-		},
-	}
+	var wg sync.WaitGroup
 	for _, vp := range vps {
-		err := checkVP(vp, conf)
-		var res string
-		if err != nil {
-			res = err.Error()
-		} else {
-			res = "Healthy"
-		}
-		err = db.UpdateCheckStatus(vp.Ip, res)
-		if err != nil {
-			glog.Errorf("Failed to update Check Status: %v", err)
-		}
+		wg.Add(1)
+		go func(v *dm.VantagePoint) {
+			defer wg.Done()
+			err := checkVP(v, uname, certpath)
+			var res string
+			if err != nil {
+				res = err.Error()
+			} else {
+				res = "Healthy"
+			}
+			err = db.UpdateCheckStatus(v.Ip, res)
+			if err != nil {
+				glog.Errorf("Failed to update Check Status: %v", err)
+			}
+		}(vp)
 
 	}
+	wg.Wait()
 	return nil
 }
-func getCert(path string) (ssh.Signer, error) {
-	f, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
+
+func getCmd(vp *dm.VantagePoint, uname, certPath, cmds string) *exec.Cmd {
+	creds := fmt.Sprintf("%s@%s", uname, vp.Hostname)
+	port := fmt.Sprintf("%d", vp.Port)
+	cmdArg := []string{
+		creds,
+		"-i",
+		certPath,
+		"-p",
+		port,
 	}
-	s, err := ssh.ParsePrivateKey(f)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
+	cmdArg = append(cmdArg, args...)
+	cmdArg = append(cmdArg, cmds)
+	cmd := exec.Command(sshPath, cmdArg...)
+	return cmd
 }
 
-func checkVP(vp *dm.VantagePoint, config *ssh.ClientConfig) error {
+func checkVP(vp *dm.VantagePoint, uname, certPath string) error {
 	if vp == nil {
 		return errorNilVP
 	}
-	cl, err := dial("tcp4", fmt.Sprintf("%s:%d", vp.Hostname, vp.Port), config, time.Second*5)
-	if err != nil {
-		return err
-	}
-	defer cl.Close()
-	sess, err := cl.NewSession()
-	if err != nil {
-		return err
-	}
-	stat, err := checkRunning(sess)
-	if _, ok := err.(*ssh.ExitError); err != nil && !ok {
-		return err
-	}
-	sess, err = cl.NewSession()
+	stat, err := checkRunning(getCmd(vp, uname, certPath, status))
 	if err != nil {
 		return err
 	}
 	switch stat {
 	case running:
-		return handleRunning(vp, sess)
+		return handleRunning(vp, getCmd(vp, uname, certPath, restart))
 	case stopped:
-		return handleStopped(sess)
+		return handleStopped(getCmd(vp, uname, certPath, start))
 	case notFound:
+		return errorUnknownService
 	case pidExists:
-		resetService(sess)
+		resetService(getCmd(vp, uname, certPath, restart))
 	case unknown:
 		return errorUnknownService
 	}
 	return nil
 }
 
-func handleStopped(sess *ssh.Session) error {
-	defer sess.Close()
-	var out bytes.Buffer
-	sess.Stdout = &out
-	err := sess.Run(start)
-	if _, ok := err.(*ssh.ExitError); err != nil && !ok {
+func handleStopped(cmd *exec.Cmd) error {
+	ec := make(chan error, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if _, ok := err.(*exec.ExitError); err != nil && !ok {
+			ec <- err
+			return
+		}
+		if failed.Match(out) {
+			ec <- errorFailedToStart
+		}
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			return err
+		}
+	case err := <-ec:
 		return err
-	}
-	if failed.Match(out.Bytes()) {
-		return errorFailedToStart
 	}
 	return nil
 }
 
-func resetService(sess *ssh.Session) error {
-	var out bytes.Buffer
-	sess.Stdout = &out
-	err := sess.Run(restart)
-	if _, ok := err.(*ssh.ExitError); err != nil && !ok {
+func resetService(cmd *exec.Cmd) error {
+	ec := make(chan error, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if _, ok := err.(*exec.ExitError); err != nil && !ok {
+			ec <- err
+			return
+		}
+		if failed.Match(out) {
+			ec <- errorFailedToRestart
+		}
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			return err
+		}
+	case err := <-ec:
 		return err
-	}
-	if failed.Match(out.Bytes()) {
-		glog.Errorf("Failed to restart: %s", out.String())
-		return errorFailedToRestart
 	}
 	return nil
 }
 
-func handleRunning(vp *dm.VantagePoint, sess *ssh.Session) error {
-	defer sess.Close()
+func handleRunning(vp *dm.VantagePoint, cmd *exec.Cmd) error {
 	if vp.Controller != 0 {
 		return nil
 	}
-	return resetService(sess)
+	return resetService(cmd)
 	return nil
 }
 
-func checkRunning(sess *ssh.Session) (procStatus, error) {
-	var out bytes.Buffer
-	defer sess.Close()
-	sess.Stdout = &out
-	err := sess.Run(status)
-	if err != nil {
+func checkRunning(cmd *exec.Cmd) (procStatus, error) {
+	ec := make(chan error, 1)
+	ps := make(chan procStatus, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if _, ok := err.(*exec.ExitError); err != nil && !ok {
+			ec <- err
+			return
+		}
+		switch {
+		case run.Match(out):
+			ps <- running
+		case stop.Match(out):
+			ps <- stopped
+		case nf.Match(out):
+			ps <- notFound
+		case pidLeft.Match(out):
+			ps <- pidExists
+		}
+	}()
+
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			return unknown, err
+		}
+	case err := <-ec:
 		return unknown, err
-	}
-	if run.Match(out.Bytes()) {
-		return running, nil
-	}
-	if stop.Match(out.Bytes()) {
-		return stopped, nil
-	}
-	if nf.Match(out.Bytes()) {
-		return notFound, nil
-	}
-	if pidLeft.Match(out.Bytes()) {
-		return pidExists, nil
+	case stat := <-ps:
+		return stat, nil
 	}
 	return unknown, nil
-}
-
-func dial(n, addr string, conf *ssh.ClientConfig, to time.Duration) (*ssh.Client, error) {
-	con, err := net.DialTimeout(n, addr, to)
-	if err != nil {
-		return nil, err
-	}
-	conn, nc, rc, err := ssh.NewClientConn(con, addr, conf)
-	if err != nil {
-		return nil, err
-	}
-	return ssh.NewClient(conn, nc, rc), nil
 }
