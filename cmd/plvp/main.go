@@ -83,15 +83,16 @@ func init() {
 func main() {
 	go sigHandle()
 	defer glog.Flush()
-	if vFlag {
-		fmt.Println(versionNo)
-		return
-	}
+
 	var parseConf plvp.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
 		glog.Exitf("Failed to parse config: %v", err)
 		exit(1)
+	}
+	if vFlag {
+		fmt.Println(versionNo)
+		exit(0)
 	}
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 	err = <-plvp.Start(conf)

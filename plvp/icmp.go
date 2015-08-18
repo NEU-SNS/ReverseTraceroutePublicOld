@@ -37,7 +37,6 @@ import (
 	"github.com/golang/glog"
 	opt "github.com/rhansen2/ipv4optparser"
 	"golang.org/x/net/icmp"
-	"golang.org/x/net/internal/iana"
 	"golang.org/x/net/ipv4"
 )
 
@@ -46,6 +45,11 @@ const (
 	ID = 0xf0f1
 	// SEQ is the ICMP seq number magic number
 	SEQ = 0xf2f3
+)
+
+var (
+	dummy           ipv4.ICMPType
+	icmpProtocolNum = dummy.Protocol()
 )
 
 // SpoofPingMonitor monitors for ICMP echo replies that match the magic numbers
@@ -59,7 +63,7 @@ func NewSpoofPingMonitor() *SpoofPingMonitor {
 }
 
 func reconnect(addr string) (*ipv4.RawConn, error) {
-	pc, err := net.ListenPacket(fmt.Sprintf("ip4:%d", iana.ProtocolICMP), addr)
+	pc, err := net.ListenPacket(fmt.Sprintf("ip4:%d", icmpProtocolNum), addr)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +118,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 		return nil, ErrorReadError
 	}
 	// Parse the payload for ICMP stuff
-	mess, err := icmp.ParseMessage(iana.ProtocolICMP, pload)
+	mess, err := icmp.ParseMessage(icmpProtocolNum, pload)
 	if err != nil {
 		return nil, err
 	}

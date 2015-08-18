@@ -94,13 +94,14 @@ func main() {
 			})
 		}
 	}
-	fmt.Println(pingreq)
+	//fmt.Println(pingreq)
 	fmt.Println("Num of requests: ", len(pingreq.Pings))
 	fmt.Println("Starting: ", time.Now())
 	st, err := cl.Ping(ctx.Background(), pingreq)
 	if err != nil {
 		panic(err)
 	}
+	ps := make([]*dm.Ping, 0)
 	for {
 		pr, err := st.Recv()
 		if err == io.EOF {
@@ -109,7 +110,24 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(pr)
+		//fmt.Println(pr)
+		ps = append(ps, pr)
+	}
+	for _, p := range ps {
+		resp := p.GetResponses()
+		if resp == nil || len(resp) == 0 {
+			continue
+		}
+		for _, re := range resp {
+			if len(re.RR) > 0 {
+				fmt.Println(p.Src, "RR:", re.RR)
+				for i, r := range re.RR {
+					if r == p.Src {
+						fmt.Println(p.Src, "includes src in RR at addr:", i)
+					}
+				}
+			}
+		}
 	}
 	fmt.Println("Done: ", time.Now())
 }
