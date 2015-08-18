@@ -27,18 +27,38 @@
 package plcontroller
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
-	"time"
 
-	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
-var conf = Config{Local: LocalConfig{Addr: "localhost:45000",
-	Proto: "tcp"}, Scamper: ScamperConfig{Port: "45454", SockDir: "/tmp/scamper_sockets", BinPath: "/usr/local/bin/sc_remoted",
-	ConverterPath: "/usr/local/bin/sc_warts2json"}}
+var (
+	addr          = "localhost:45000"
+	proto         = "tcp"
+	port          = "45454"
+	sockdir       = "/tmp/scamper_sockets"
+	binpath       = "/usr/local/bin/sc_remoted"
+	converterpath = "/usr/local/bin/sc_warts2json"
+)
 
+var conf = Config{
+	Local: LocalConfig{
+		Addr: &addr,
+	},
+	Scamper: ScamperConfig{
+		Port:          &port,
+		SockDir:       &sockdir,
+		BinPath:       &binpath,
+		ConverterPath: &converterpath,
+	},
+}
+
+/*
 func TestStart(t *testing.T) {
-	eChan := Start(conf, true)
+	vp, _ := testdataaccess.NewVP()
+	eChan := Start(conf, true, vp, scamper.NewClient(), ControllerSender{})
 
 	select {
 	case e := <-eChan:
@@ -50,10 +70,26 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartInvalidIP(t *testing.T) {
-	var c = Config{Local: LocalConfig{Addr: "-1:45000",
-		Proto: "tcp"}, Scamper: ScamperConfig{Port: "45454", SockDir: "/tmp/scamper_sockets", BinPath: "/usr/local/bin/sc_remoted",
-		ConverterPath: "/usr/local/bin/sc_warts2json"}}
-	eChan := Start(c, true)
+	var (
+		addr        = "-1:45000"
+		port        = "45454"
+		sockdir     = "/tmp/scamper_sockets"
+		binpath     = "/usr/local/bin/sc_remoted"
+		convertpath = "/usr/local/bin/sc_warts2json"
+	)
+	var c = Config{
+		Local: LocalConfig{
+			Addr: &addr,
+		},
+		Scamper: ScamperConfig{
+			Port:          &port,
+			SockDir:       &sockdir,
+			BinPath:       &binpath,
+			ConverterPath: &convertpath,
+		},
+	}
+	vp, _ := testdataaccess.NewVP()
+	eChan := Start(c, true, vp, scamper.NewClient(), ControllerSender{})
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
@@ -63,10 +99,26 @@ func TestStartInvalidIP(t *testing.T) {
 }
 
 func TestStartInvalidPort(t *testing.T) {
-	var c = Config{Local: LocalConfig{Addr: "localhost:PORT",
-		Proto: "tcp"}, Scamper: ScamperConfig{Port: "45454", SockDir: "/tmp/scamper_sockets", BinPath: "/usr/local/bin/sc_remoted",
-		ConverterPath: "/usr/local/bin/sc_warts2json"}}
-	eChan := Start(c, true)
+	var (
+		addr        = "localhost:PORT"
+		port        = "45454"
+		sockdir     = "/tmp/scamper_sockets"
+		binpath     = "/usr/local/bin/sc_remoted"
+		convertpath = "/usr/local/bin/sc_warts2json"
+	)
+	var c = Config{
+		Local: LocalConfig{
+			Addr: &addr,
+		},
+		Scamper: ScamperConfig{
+			Port:          &port,
+			SockDir:       &sockdir,
+			BinPath:       &binpath,
+			ConverterPath: &convertpath,
+		},
+	}
+	vp, _ := testdataaccess.NewVP()
+	eChan := Start(c, true, vp, scamper.NewClient(), ControllerSender{})
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
@@ -76,60 +128,42 @@ func TestStartInvalidPort(t *testing.T) {
 }
 
 func TestStartPortOutOfRange(t *testing.T) {
-	var c = Config{Local: LocalConfig{Addr: "localhost:70000",
-		Proto: "tcp"}, Scamper: ScamperConfig{Port: "45454", SockDir: "/tmp/scamper_sockets", BinPath: "/usr/local/bin/sc_remoted",
-		ConverterPath: "/usr/local/bin/sc_warts2json"}}
-	eChan := Start(c, true)
+	var (
+		addr        = "localhost:7000"
+		port        = "45454"
+		sockdir     = "/tmp/scamper_sockets"
+		binpath     = "/usr/local/bin/sc_remoted"
+		convertpath = "/usr/local/bin/sc_warts2json"
+	)
+	var c = Config{
+		Local: LocalConfig{
+			Addr: &addr,
+		},
+		Scamper: ScamperConfig{
+			Port:          &port,
+			SockDir:       &sockdir,
+			BinPath:       &binpath,
+			ConverterPath: &convertpath,
+		},
+	}
+
+	vp, _ := testdataaccess.NewVP()
+	eChan := Start(c, true, vp, scamper.NewClient(), ControllerSender{})
 	select {
 	case <-eChan:
 	case <-time.After(time.Second * 2):
 		t.Fatal("TestStartPortOutOfRange no error thrown with port 70000")
 	}
 }
-
-func TestGetStats(t *testing.T) {
-	stat := plController.getStats()
-	if stat.TotReqTime != 0 && stat.Requests != 0 {
-		t.Fatal("Stats returned incorrect data")
+*/
+func TestInstallService(t *testing.T) {
+	vp := &datamodel.VantagePoint{
+		Hostname: "mlab1.prg01.measurement-lab.org",
+		Port:     806,
 	}
-}
-
-func TestGetStatsInfo(t *testing.T) {
-	tt, c := plController.getStatsInfo()
-	if tt != 0 && c != 0 {
-		t.Fatal("Stats returned incorrect data")
-	}
-}
-
-func TestIncreaseStats(t *testing.T) {
-	tim := time.Now()
-	tt, c := plController.getStatsInfo()
-	plController.increaseStats(tim)
-	ft, fc := plController.getStatsInfo()
-	if ft <= tt || fc <= c {
-		t.Fatal("Increase stats failed to increase stats")
-	}
-}
-
-func TestAddSocket(t *testing.T) {
-	path := "/tmp/fake"
-	getName := "fake"
-	sock := scamper.NewSocket(path)
-	plController.addSocket(sock)
-	sock, err := plController.getSocket(getName)
+	random := rand.Int()
+	err := installService(getCmd(vp, "uw_geoloc4", "/home/rhansen2/.ssh/id_rsa_pl", fmt.Sprintf(install, random, random, "http://www.ccs.neu.edu/home/rhansen2/plvp-0.0.1-2.i386.rpm", "plvp-0.0.1-2.i386.rpm")))
 	if err != nil {
-		t.Fatal("Failed to add socket")
-	}
-}
-
-func TestRemoveSocket(t *testing.T) {
-	path := "/tmp/fake"
-	getName := "fake"
-	sock := scamper.NewSocket(path)
-	plController.addSocket(sock)
-	plController.removeSocket(sock)
-	sock, err := plController.getSocket(getName)
-	if err == nil {
-		t.Fatal("Failed to remove socket")
+		t.Fatalf("Failed to install service: %v", err)
 	}
 }

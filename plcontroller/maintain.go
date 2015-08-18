@@ -28,13 +28,17 @@ package plcontroller
 
 import (
 	"fmt"
+	"math/rand"
+	"net/url"
 	"os/exec"
+	"path"
 	"regexp"
 	"sync"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/httpupdate"
 	"github.com/golang/glog"
 )
 
@@ -51,6 +55,14 @@ const (
 	status  string = "sudo /sbin/service plvp status"
 	restart string = "sudo /sbin/service plvp restart"
 	start   string = "sudo /sbin/service plvp start"
+	install string = "sudo bash << EOF\n" +
+		"cd /tmp\n" +
+		"mkdir %d\n" +
+		"cd %d\n" +
+		"/usr/bin/wget %s\n" +
+		"/usr/bin/yum install -y --nogpgcheck %s\n" +
+		"EOF\n"
+	version string = "/usr/local/bin/plvp --version"
 )
 
 var (
@@ -72,23 +84,29 @@ var (
 		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
-func maintainVPs(vps []*dm.VantagePoint, uname, certpath string, db dataaccess.VPProvider) error {
+func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db dataaccess.VPProvider, dc chan struct{}) error {
 	var wg sync.WaitGroup
 	for _, vp := range vps {
 		wg.Add(1)
 		go func(v *dm.VantagePoint) {
 			defer wg.Done()
-			err := checkVP(v, uname, certpath)
+			err := checkVP(v, uname, certpath, updateUrl)
 			var res string
 			if err != nil {
 				res = err.Error()
 			} else {
 				res = "Healthy"
 			}
-			err = db.UpdateCheckStatus(v.Ip, res)
-			if err != nil {
-				glog.Errorf("Failed to update Check Status: %v", err)
+			select {
+			case <-dc:
+				return
+			default:
+				err = db.UpdateCheckStatus(v.Ip, res)
+				if err != nil {
+					glog.Errorf("Failed to update Check Status: %v", err)
+				}
 			}
+
 		}(vp)
 
 	}
@@ -112,7 +130,7 @@ func getCmd(vp *dm.VantagePoint, uname, certPath, cmds string) *exec.Cmd {
 	return cmd
 }
 
-func checkVP(vp *dm.VantagePoint, uname, certPath string) error {
+func checkVP(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
 	if vp == nil {
 		return errorNilVP
 	}
@@ -122,11 +140,30 @@ func checkVP(vp *dm.VantagePoint, uname, certPath string) error {
 	}
 	switch stat {
 	case running:
+		return nil
 		return handleRunning(vp, getCmd(vp, uname, certPath, restart))
 	case stopped:
 		return handleStopped(getCmd(vp, uname, certPath, start))
 	case notFound:
-		return errorUnknownService
+		httpupdate.CheckUpdate(updateUrl, "0.0.0")
+		urlString := httpupdate.FetchUrl()
+		url, err := url.Parse(urlString)
+		if err != nil {
+			return err
+		}
+		random := rand.Int()
+		err = installService(
+			getCmd(
+				vp,
+				uname,
+				certPath,
+				fmt.Sprintf(install, random, random, urlString, path.Base(url.Path)),
+			),
+		)
+		if err != nil {
+			return err
+		}
+		return handleStopped(getCmd(vp, uname, certPath, start))
 	case pidExists:
 		resetService(getCmd(vp, uname, certPath, restart))
 	case unknown:
@@ -135,8 +172,35 @@ func checkVP(vp *dm.VantagePoint, uname, certPath string) error {
 	return nil
 }
 
+func getVersion(cmd *exec.Cmd) (string, error) {
+	ec := make(chan error, 1)
+	version := make(chan string, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			ec <- err
+			return
+		}
+		version <- string(out)
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			return "", nil
+		}
+		return "", errorVpTimeout
+	case err := <-ec:
+		return "", err
+	case v := <-version:
+		return v, nil
+	}
+	return "", nil
+}
+
 func handleStopped(cmd *exec.Cmd) error {
 	ec := make(chan error, 1)
+	dc := make(chan struct{})
 	go func() {
 		out, err := cmd.CombinedOutput()
 		if _, ok := err.(*exec.ExitError); err != nil && !ok {
@@ -145,7 +209,9 @@ func handleStopped(cmd *exec.Cmd) error {
 		}
 		if failed.Match(out) {
 			ec <- errorFailedToStart
+			return
 		}
+		close(dc)
 	}()
 	select {
 	case <-time.After(time.Second * 25):
@@ -153,14 +219,17 @@ func handleStopped(cmd *exec.Cmd) error {
 		if err != nil {
 			return err
 		}
+		return errorVpTimeout
 	case err := <-ec:
 		return err
+	case <-dc:
 	}
 	return nil
 }
 
 func resetService(cmd *exec.Cmd) error {
 	ec := make(chan error, 1)
+	dc := make(chan struct{})
 	go func() {
 		out, err := cmd.CombinedOutput()
 		if _, ok := err.(*exec.ExitError); err != nil && !ok {
@@ -169,7 +238,9 @@ func resetService(cmd *exec.Cmd) error {
 		}
 		if failed.Match(out) {
 			ec <- errorFailedToRestart
+			return
 		}
+		close(dc)
 	}()
 	select {
 	case <-time.After(time.Second * 25):
@@ -177,8 +248,10 @@ func resetService(cmd *exec.Cmd) error {
 		if err != nil {
 			return err
 		}
+		return errorVpTimeout
 	case err := <-ec:
 		return err
+	case <-dc:
 	}
 	return nil
 }
@@ -188,7 +261,6 @@ func handleRunning(vp *dm.VantagePoint, cmd *exec.Cmd) error {
 		return nil
 	}
 	return resetService(cmd)
-	return nil
 }
 
 func checkRunning(cmd *exec.Cmd) (procStatus, error) {
@@ -209,6 +281,8 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 			ps <- notFound
 		case pidLeft.Match(out):
 			ps <- pidExists
+		default:
+			ec <- errorUnknownService
 		}
 	}()
 
@@ -218,10 +292,35 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 		if err != nil {
 			return unknown, err
 		}
+		return unknown, errorVpTimeout
 	case err := <-ec:
 		return unknown, err
 	case stat := <-ps:
 		return stat, nil
 	}
 	return unknown, nil
+}
+
+func installService(cmd *exec.Cmd) error {
+	ec := make(chan error, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			glog.Errorf("Failed to install service: %s", out)
+		}
+		ec <- err
+		return
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			glog.Error("Failed killing process, install service")
+			return err
+		}
+		return errorVpTimeout
+	case err := <-ec:
+		return err
+	}
+	return nil
 }

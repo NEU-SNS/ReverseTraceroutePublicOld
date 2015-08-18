@@ -92,6 +92,9 @@ func init() {
 		"The host of the database")
 	flag.StringVar(conf.Db.Port, "db-port", "3306",
 		"The port used for the database connection")
+	flag.StringVar(conf.Local.UpdateUrl, "update-url",
+		"http://www.ccs.neu.edu/home/rhansen2/plvp.json",
+		"The path for the version info of the plvps")
 }
 
 func main() {

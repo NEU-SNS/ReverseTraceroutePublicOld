@@ -36,7 +36,7 @@ import (
 type testAccess struct{}
 
 // NewVP creates a test data access
-func NewVP() (da.VantagePointProvider, error) {
+func NewVP() (da.VPProvider, error) {
 	return &testAccess{}, nil
 }
 
@@ -87,9 +87,6 @@ func (t *testAccess) GetTimeStamps() ([]*dm.VantagePoint, error) {
 func (t *testAccess) GetRecordRoute() ([]*dm.VantagePoint, error) {
 	return nil, nil
 }
-func (t *testAccess) UpdateCanSpoof(int64) error {
-	return nil
-}
 func (t *testAccess) GetRecSpoof() ([]*dm.VantagePoint, error) {
 	return nil, nil
 }
@@ -98,6 +95,26 @@ func (t *testAccess) GetActive() ([]*dm.VantagePoint, error) {
 }
 func (t *testAccess) GetAll() ([]*dm.VantagePoint, error) {
 	return nil, nil
+}
+
+func (t *testAccess) GetVPs() ([]*dm.VantagePoint, error) {
+	return nil, nil
+}
+
+func (t *testAccess) UpdateActive(ip uint32, active bool) error {
+	return nil
+}
+
+func (t *testAccess) UpdateCanSpoof(ip uint32, can bool) error {
+	return nil
+}
+
+func (t *testAccess) UpdateCheckStatus(ip uint32, stat string) error {
+	return nil
+}
+
+func (t *testAccess) UpdateController(ip, old, nc uint32) error {
+	return nil
 }
 
 func (t *testAccess) Close() error {

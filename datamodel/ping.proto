@@ -73,7 +73,7 @@ message TsAndAddr {
 
 message Ping {
 	string version                  =  1;
-    string type                   =  2;
+    string type                     =  2;
 	string method                   =  3;
 	string src                      =  4;
 	string dst                      =  5;
@@ -87,7 +87,7 @@ message Ping {
 	repeated string flags           = 13;
 	repeated PingResponse responses = 14;
 	PingStats statistics            = 15;
-  string error                    = 16;
+    string error                    = 16;
 }
 
 message PingReturn {

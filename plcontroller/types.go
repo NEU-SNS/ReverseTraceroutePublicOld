@@ -46,6 +46,7 @@ type LocalConfig struct {
 	KeyFile      *string `flag:"key-file"`
 	SSHKeyPath   *string `flag:"sshkey-path"`
 	PLUName      *string `flag:"pluname"`
+	UpdateUrl    *string `flag:"update-url"`
 }
 
 type ScamperConfig struct {
@@ -66,6 +67,7 @@ func NewConfig() Config {
 		KeyFile:      new(string),
 		SSHKeyPath:   new(string),
 		PLUName:      new(string),
+		UpdateUrl:    new(string),
 	}
 	sc := ScamperConfig{
 		Port:          new(string),

@@ -42,7 +42,7 @@ import (
 func parseYamlConfig(path string, opts interface{}) error {
 	f, err := os.Open(path)
 	if err != nil && os.IsNotExist(err) {
-		glog.Errorf("Error opening config file: %s, %v", path, err)
+		glog.Infof("Error opening config file: %s, %v", path, err)
 		var ret error
 		if os.IsNotExist(err) {
 			// Return nil, not a problem if we don't find a config file
