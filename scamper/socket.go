@@ -254,7 +254,7 @@ func (s *Socket) readConn() {
 			if err != nil {
 				resp.Err = err
 				s.respChan <- resp
-				glog.Errorf("Could not parse UserId from response: %s", err)
+				glog.Errorf("Could not parse UserId from response: %s, %s", err, cwarts)
 				continue
 			}
 			resp.UserID = uid.UserID
