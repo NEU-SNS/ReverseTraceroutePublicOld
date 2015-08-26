@@ -127,9 +127,11 @@ type Socket struct {
 	con           net.Conn
 	wartsHeader   [2]Response
 	rc            uint32
-	userID        uint32
 	unmarsh       unmarshal
 	df            DialFunc
+	// Protects userID
+	mu     sync.Mutex
+	userID uint32
 }
 
 //DialFunc is a function to connect to a network
@@ -272,7 +274,7 @@ func (s *Socket) monitorConn() {
 	for {
 		select {
 		case c := <-s.cmdChan:
-			glog.Infof("Issuing cmd: %v", c)
+			glog.V(1).Infof("Issuing cmd: %v", c)
 			err := c.issueCommand(s.con)
 			if err != nil {
 				glog.Errorf("Error issuing command %s", c.Marshal())
@@ -296,8 +298,10 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 }
 
 func (s *Socket) getID() uint32 {
+	s.mu.Lock()
 	id := s.userID
 	s.userID++
+	s.mu.Unlock()
 	return id
 }
 
@@ -318,7 +322,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 	if err != nil {
 		return nil, 0, err
 	}
-	glog.Infof("Running cmd: %v", cmd)
+	glog.V(1).Infof("Running cmd: %v", cmd)
 	s.cmdChan <- &cmd
 	return cr.done, id, err
 }

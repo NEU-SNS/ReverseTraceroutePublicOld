@@ -162,7 +162,7 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := make([]byte, 1024*50)
+	res := make([]byte, 100*1024)
 	n, err := stdout.Read(res)
 	if err != nil {
 		return res, err
