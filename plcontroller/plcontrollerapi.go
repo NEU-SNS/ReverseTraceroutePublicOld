@@ -31,6 +31,7 @@ package plcontroller
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
@@ -50,6 +51,7 @@ var (
 )
 
 func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer) error {
+	glog.Infof("Ping Request for %d pings", len(pa.Pings))
 	pings := pa.GetPings()
 	if pings == nil {
 		return ErrorNilArgList
@@ -57,17 +59,23 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 	if len(pings) == 0 {
 		return ErrorEmptyArgList
 	}
-	doneChan := make(chan struct{})
 	sendChan := make(chan *dm.Ping, len(pings))
 	var wg sync.WaitGroup
 	for _, ping := range pings {
 		wg.Add(1)
 		go func(p *dm.PingMeasurement) {
+			start := time.Now()
 			defer wg.Done()
 			pr, err := c.runPing(p)
 			if err != nil {
-				glog.Infof("Got ping result: %v, with error %v", pr, err)
+				glog.V(1).Infof("Got ping result: %v, with error %v", pr, err)
 				pr.Error = err.Error()
+				pr.Src = p.Src
+				pr.Dst = p.Dst
+				pr.Start = &dm.Time{
+					Sec:  int64(start.Second()),
+					Usec: int64(start.Nanosecond() / 1000),
+				}
 			}
 			sendChan <- &pr
 		}(ping)
@@ -75,19 +83,14 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 
 	go func() {
 		wg.Wait()
-		close(doneChan)
+		close(sendChan)
 	}()
-	for {
-		select {
-		case <-doneChan:
-			return nil
-		case p := <-sendChan:
-			if err := stream.Send(p); err != nil {
-				return err
-			}
+	for p := range sendChan {
+		if err := stream.Send(p); err != nil {
+			return err
 		}
 	}
-
+	return nil
 }
 
 func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController_TracerouteServer) error {
@@ -98,17 +101,24 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 	if len(traces) == 0 {
 		return ErrorEmptyArgList
 	}
-	doneChan := make(chan struct{})
 	sendChan := make(chan *dm.Traceroute, len(traces))
 	var wg sync.WaitGroup
 	for _, trace := range traces {
 		wg.Add(1)
 		go func(t *dm.TracerouteMeasurement) {
+			start := time.Now()
 			defer wg.Done()
 			tr, err := c.runTraceroute(t)
 			if err != nil {
 				glog.Infof("Got tracerotue result: %v, with error %v", tr, err)
 				tr.Error = err.Error()
+				tr.Src = t.Src
+				tr.Dst = t.Dst
+				tr.Start = &dm.TracerouteTime{
+					Sec:   int64(start.Second()),
+					Usec:  int64(start.Nanosecond() / 1000),
+					Ftime: dm.TTime(start).String(),
+				}
 			}
 			sendChan <- &tr
 		}(trace)
@@ -116,18 +126,14 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 
 	go func() {
 		wg.Wait()
-		close(doneChan)
+		close(sendChan)
 	}()
-	for {
-		select {
-		case <-doneChan:
-			return nil
-		case t := <-sendChan:
-			if err := stream.Send(t); err != nil {
-				return err
-			}
+	for t := range sendChan {
+		if err := stream.Send(t); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {

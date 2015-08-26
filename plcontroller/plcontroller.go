@@ -139,7 +139,7 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 }
 
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
-	glog.Infof("Running ping for: %v", pa)
+	glog.V(2).Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -156,7 +156,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		err := decodeResponse(r.Bytes(), &ret)
 		if err != nil {
 			errorCounter.Inc()
-			return ret, fmt.Errorf("Could not decode ping response: %v", err)
+			return ret, fmt.Errorf("Could not decode ping response: %v, resp: %s", err, r.Bytes())
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
@@ -167,7 +167,6 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 }
 
 func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
-	glog.Infof("Accepting Probe: %v", probe)
 	return c.spoofs.Receive(*probe)
 }
 

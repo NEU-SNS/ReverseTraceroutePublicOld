@@ -32,6 +32,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"runtime"
@@ -54,12 +55,15 @@ var (
 	uname    string
 	passwd   string
 	conFmt   string = "%s:%s@tcp(localhost:3306)/record_routes?parseTime=true"
+	outDir   string
+	writeDb  bool
+	runId    string
 )
 
 const (
 	insertPing = `
-INSERT INTO record_routes.pings(src, dst, start, version, type, ping_sent, probe_size, ttl, wait, timeout, flags)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO record_routes.pings(src, dst, start, version, type, ping_sent, probe_size, ttl, wait, timeout, flags, runId, error)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 	insertResponse = "INSERT INTO record_routes.ping_responses(src, dst, start, `from`, seq, reply_size, reply_ttl, reply_proto, tx, rx, rtt, probe_ipid, reply_ipid, icmp_type, icmp_code, response) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	insertHop      = "INSERT INTO record_routes.routes(src, dst, start,`from`,hop, ip, ping_response) VALUES(?, ?, ?, ?, ?, ?, ?)"
@@ -71,14 +75,29 @@ func init() {
 	flag.BoolVar(&rr, "r", true, "Option to run with record route")
 	flag.StringVar(&uname, "uname", "", "Username for the db")
 	flag.StringVar(&passwd, "passwd", "", "Password for the db")
+	flag.StringVar(&runId, "id", "", "Id to associate with the measurement set limit: 45")
+	flag.BoolVar(&writeDb, "db", false, "Set if it is desired to write to the db")
+	flag.StringVar(&outDir, "out", "", "Directory to write output to")
 }
 
 func main() {
-	grpc.EnableTracing = true
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
-	if passwd == "" || uname == "" {
+	if runId == "" {
+		fmt.Fprintln(os.Stderr, "RunId not provided")
+		os.Exit(1)
+	}
+	if outDir == "" {
+		fmt.Fprintln(os.Stderr, "Outdir not provided")
+		os.Exit(1)
+	}
+	if (passwd == "" || uname == "") && writeDb {
 		fmt.Fprintln(os.Stderr, "Missing db args")
+		os.Exit(1)
+	}
+	err := os.Mkdir(outDir, os.ModeDir|0755)
+	if err != nil && !os.IsExist(err) {
+		fmt.Fprintln(os.Stderr, "Error creating outdir: %v", err)
 		os.Exit(1)
 	}
 	db, err := sql.Open("mysql", fmt.Sprintf(conFmt, uname, passwd))
@@ -86,14 +105,21 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Failed to open db: %v", err)
 		os.Exit(1)
 	}
+	defer db.Close()
+	if err = db.Ping(); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to ping db: %v", err)
+		os.Exit(1)
+	}
 	if filePath == "" {
 		fmt.Fprintln(os.Stderr, "File path is a required argument")
+		db.Close()
 		os.Exit(1)
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open %s: %v\n", filePath, err)
+		db.Close()
 		os.Exit(1)
 	}
 	defer file.Close()
@@ -108,18 +134,21 @@ func main() {
 		if len(split) != 2 {
 			fmt.Fprintf(os.Stderr, "Failed to parse line:%d in input: %s\n", line, scanner.Text())
 			file.Close()
+			db.Close()
 			os.Exit(1)
 		}
 		ip1 := net.ParseIP(split[0])
 		if ip1 == nil {
 			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, split[0])
 			file.Close()
+			db.Close()
 			os.Exit(1)
 		}
 		ip2 := net.ParseIP(split[1])
 		if ip2 == nil {
 			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, split[1])
 			file.Close()
+			db.Close()
 			os.Exit(1)
 		}
 
@@ -136,7 +165,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to connect to controller: %v", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
 	cl := plc.NewPLControllerClient(conn)
 	fmt.Println("Num of requests:", len(pingReq.Pings))
 	start := time.Now()
@@ -158,8 +186,13 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error while running measurement: %v", err)
 			os.Exit(1)
 		}
-		if pr.Error != "" {
-			continue
+		err = os.Mkdir(fmt.Sprintf("%s/%s", outDir, pr.Src), os.ModeDir|0755)
+		if err != nil && !os.IsExist(err) {
+			fmt.Fprintln(os.Stderr, "Error creating dir: %v", pr.Src)
+		}
+		err = ioutil.WriteFile(fmt.Sprintf("%s/%s/%s_%s", outDir, pr.Src, pr.Src, pr.Dst), []byte(pr.String()), 0666)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not write file: %v", err)
 		}
 		err = storePing(pr, db)
 		if err != nil {
@@ -168,9 +201,7 @@ func main() {
 		ps = append(ps, pr)
 	}
 	end := time.Now()
-	fmt.Println("Finished:", end, "Took:", time.Since(start))
-
-	db.Close()
+	fmt.Println("Finished:", end, "Took:", time.Since(start), "Received:", len(ps), "responses")
 }
 
 func storePing(p *dm.Ping, db *sql.DB) error {
@@ -187,15 +218,19 @@ func storePing(p *dm.Ping, db *sql.DB) error {
 		return err
 	}
 	start := time.Unix(p.Start.Sec, util.MicroToNanoSec(p.Start.Usec))
-	_, err = tran.Exec(insertPing, src, dst, start.UnixNano(), p.Version, p.Type, p.PingSent, p.ProbeSize, p.Ttl, p.Wait, p.Timeout, fmt.Sprintf("%v", p.Flags))
+	_, err = tran.Exec(insertPing, src, dst, start.UnixNano(), p.Version, p.Type, p.PingSent, p.ProbeSize, p.Ttl, p.Wait, p.Timeout, fmt.Sprintf("%v", p.Flags), runId, p.Error)
 	if err != nil {
 		tran.Rollback()
 		return err
 	}
 	stats := p.GetStatistics()
 	if stats == nil {
-		tran.Rollback()
-		return err
+		err = tran.Commit()
+		if err != nil {
+			tran.Rollback()
+			return err
+		}
+		return nil
 	}
 	_, err = tran.Exec(insertStats, src, dst, start.UnixNano(), stats.Replies, stats.Loss, stats.Min, stats.Max, stats.Avg, stats.Stddev)
 	if err != nil {
