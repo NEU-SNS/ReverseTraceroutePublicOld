@@ -247,7 +247,7 @@ func (s *Socket) readConn() {
 				resp.Err = err
 				s.respChan <- resp
 				glog.Error("Failed to convert warts")
-				continue
+				return
 			}
 			resp.Data = cwarts
 			resp.DS = len(cwarts)
@@ -257,7 +257,7 @@ func (s *Socket) readConn() {
 				resp.Err = err
 				s.respChan <- resp
 				glog.Errorf("Could not parse UserId from response: %s, %s", err, cwarts)
-				continue
+				return
 			}
 			resp.UserID = uid.UserID
 			resp.Data = cwarts
