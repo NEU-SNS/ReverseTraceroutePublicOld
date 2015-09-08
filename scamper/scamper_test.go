@@ -32,9 +32,7 @@ import (
 	"net"
 	"os"
 	"testing"
-	"time"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/golang/glog"
 )
@@ -89,6 +87,7 @@ func TestSocket(t *testing.T) {
 
 }
 
+/*
 func TestSocketDoMeasurement(t *testing.T) {
 	soc, err := scamper.NewSocket(
 		sockPath,
@@ -101,14 +100,13 @@ func TestSocketDoMeasurement(t *testing.T) {
 	}
 	testIDStr := "0"
 	var testID uint32
-	ping := dm.PingArg{
-		Service: dm.ServiceT_PLANET_LAB,
-		Dst:     "8.8.8.8",
-		Src:     testIP,
-		UserId:  testIDStr,
+	ping := dm.PingMeasurement{
+		Dst:    "8.8.8.8",
+		Src:    testIP,
+		UserId: testIDStr,
 	}
 
-	rec, err := soc.DoMeasurement(ping)
+	rec, _, err := soc.DoMeasurement(ping)
 	if err != nil {
 		t.Fatalf("Failed to do measurement: %v", err)
 	}
@@ -122,6 +120,7 @@ func TestSocketDoMeasurement(t *testing.T) {
 	}
 	soc.Stop()
 }
+*/
 
 func TestSocketIP(t *testing.T) {
 	soc, err := scamper.NewSocket(
@@ -155,7 +154,7 @@ func TestSocketPort(t *testing.T) {
 
 func TestClientDoMeasurementNoSocket(t *testing.T) {
 	client := scamper.NewClient()
-	_, err := client.DoMeasurement("192.168.1.1", 6)
+	_, _, err := client.DoMeasurement("192.168.1.1", 6)
 	if err == nil {
 		t.Fatal("Client failed to throw error for unknown socket")
 	}
@@ -209,6 +208,7 @@ func TestClientGetSocket(t *testing.T) {
 	}
 }
 
+/*
 func TestClientDoMeasurement(t *testing.T) {
 	soc, err := scamper.NewSocket(
 		sockPath,
@@ -221,15 +221,14 @@ func TestClientDoMeasurement(t *testing.T) {
 	}
 	testIDStr := "0"
 	var testID uint32
-	ping := dm.PingArg{
-		Service: dm.ServiceT_PLANET_LAB,
-		Dst:     "8.8.8.8",
-		Src:     testIP,
-		UserId:  testIDStr,
+	ping := dm.PingMeasurement{
+		Dst:    "8.8.8.8",
+		Src:    testIP,
+		UserId: testIDStr,
 	}
 	client := scamper.NewClient()
 	client.AddSocket(soc)
-	rec, err := client.DoMeasurement(soc.IP(), ping)
+	rec, _, err := client.DoMeasurement(soc.IP(), ping)
 	if err != nil {
 		t.Fatalf("Failed to do measurement: %v", err)
 	}
@@ -242,4 +241,17 @@ func TestClientDoMeasurement(t *testing.T) {
 		t.Fatal("Timeout running measurement")
 	}
 	soc.Stop()
+}
+*/
+
+func TestParseWarts(t *testing.T) {
+	content, err := ioutil.ReadFile("../doc/test_warts.warts")
+	if err != nil {
+		t.Fatal("ParsePing could not read file")
+	}
+	_, err = scamper.ParseWarts(content)
+	if err != nil {
+		t.Fatalf("ParsePing failed: %v", err)
+	}
+
 }

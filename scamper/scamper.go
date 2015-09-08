@@ -53,6 +53,8 @@ const (
 	// SUDO the cmd must be run with sudo
 	SUDO      = "/usr/bin/sudo"
 	ADDRINDEX = 2
+	//PPS
+	PPS = "-p"
 )
 
 // Config is the configuration options for the scamper process
@@ -132,5 +134,5 @@ func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 // GetVPProc returns a process which is suitable to run on a planet-lab VP
 func GetVPProc(scpath, host, port string) *proc.Process {
 	faddr := fmt.Sprintf("%s:%s", host, port)
-	return proc.New(scpath, nil, REMOTE, faddr)
+	return proc.New(scpath, nil, REMOTE, faddr, PPS, "100")
 }

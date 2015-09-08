@@ -50,14 +50,19 @@ import (
 import _ "github.com/go-sql-driver/mysql"
 
 var (
-	filePath string
-	rr       bool
-	uname    string
-	passwd   string
-	conFmt   string = "%s:%s@tcp(localhost:3306)/record_routes?parseTime=true"
-	outDir   string
-	writeDb  bool
-	runId    string
+	srcPath   string
+	dstPath   string
+	rr        bool
+	uname     string
+	passwd    string
+	conFmt    string = "%s:%s@tcp(localhost:3306)/record_routes?parseTime=true"
+	outDir    string
+	writeDb   bool
+	runId     string
+	version   string = "0.0.1"
+	showV     bool
+	batchSize int
+	delay     time.Duration
 )
 
 const (
@@ -71,18 +76,30 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 )
 
 func init() {
-	flag.StringVar(&filePath, "f", "", "Path to the file containing src dst pairs")
+	flag.StringVar(&srcPath, "s", "", "Path to the file containing src addresses")
+	flag.StringVar(&dstPath, "d", "", "Path to the file containing dst addresses")
 	flag.BoolVar(&rr, "r", true, "Option to run with record route")
 	flag.StringVar(&uname, "uname", "", "Username for the db")
 	flag.StringVar(&passwd, "passwd", "", "Password for the db")
-	flag.StringVar(&runId, "id", "", "Id to associate with the measurement set limit: 45")
+	flag.StringVar(&runId, "id", "", "Id to associate with the measurement set")
 	flag.BoolVar(&writeDb, "db", false, "Set if it is desired to write to the db")
 	flag.StringVar(&outDir, "out", "", "Directory to write output to")
+	flag.IntVar(&batchSize, "b", 0, "Number of measurements to run in each batch")
+	flag.DurationVar(&delay, "delay", 0, "How long to wait between measurement sets")
+	flag.BoolVar(&showV, "version", false, "Show the version number")
 }
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
+	if showV {
+		fmt.Println(version)
+		os.Exit(0)
+	}
+	if batchSize == 0 {
+		fmt.Fprintln(os.Stderr, "BatchSize not provided")
+		os.Exit(1)
+	}
 	if runId == "" {
 		fmt.Fprintln(os.Stderr, "RunId not provided")
 		os.Exit(1)
@@ -110,57 +127,110 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Failed to ping db: %v", err)
 		os.Exit(1)
 	}
-	if filePath == "" {
-		fmt.Fprintln(os.Stderr, "File path is a required argument")
+	if srcPath == "" {
+		fmt.Fprintln(os.Stderr, "Src path is a required argument")
 		db.Close()
 		os.Exit(1)
 	}
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open %s: %v\n", filePath, err)
+	if dstPath == "" {
+		fmt.Fprintln(os.Stderr, "Dst path is a required argument")
 		db.Close()
 		os.Exit(1)
 	}
-	defer file.Close()
-	pingReq := &dm.PingArg{
-		Pings: make([]*dm.PingMeasurement, 0),
+
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open %s: %v\n", srcPath, err)
+		db.Close()
+		os.Exit(1)
 	}
-	scanner := bufio.NewScanner(file)
+	defer srcFile.Close()
+	srcs := make([]string, 0)
+	scanner := bufio.NewScanner(srcFile)
 	scanner.Split(bufio.ScanLines)
 	line := 1
 	for scanner.Scan() {
-		split := strings.Split(strings.TrimSpace(scanner.Text()), " ")
-		if len(split) != 2 {
-			fmt.Fprintf(os.Stderr, "Failed to parse line:%d in input: %s\n", line, scanner.Text())
-			file.Close()
-			db.Close()
-			os.Exit(1)
-		}
-		ip1 := net.ParseIP(split[0])
+		ip := scanner.Text()
+		ip1 := net.ParseIP(ip)
 		if ip1 == nil {
-			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, split[0])
-			file.Close()
+			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, ip)
+			srcFile.Close()
 			db.Close()
 			os.Exit(1)
 		}
-		ip2 := net.ParseIP(split[1])
-		if ip2 == nil {
-			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, split[1])
-			file.Close()
-			db.Close()
-			os.Exit(1)
-		}
-
-		pingReq.Pings = append(pingReq.Pings, &dm.PingMeasurement{
-			Src:   ip1.String(),
-			Dst:   ip2.String(),
-			RR:    rr,
-			Count: "1",
-		})
+		srcs = append(srcs, ip1.String())
 		line++
 	}
-	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4380")
+
+	dstFile, err := os.Open(dstPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open %s: %v\n", dstPath, err)
+		srcFile.Close()
+		db.Close()
+		os.Exit(1)
+	}
+	defer dstFile.Close()
+
+	line = 0
+	read := bufio.NewReader(dstFile)
+	dsts := make([]string, 0)
+	for {
+		ip, err := read.ReadString('\n')
+		if err != nil && err != io.EOF {
+			fmt.Fprintf(os.Stderr, "Failed to open %s: %v\n", dstPath, err)
+			srcFile.Close()
+			dstFile.Close()
+			db.Close()
+			os.Exit(1)
+		}
+		if err == io.EOF && line == 0 {
+			break
+		}
+		ip1 := net.ParseIP(strings.TrimSpace(ip))
+		if ip1 == nil {
+			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, ip)
+			srcFile.Close()
+			dstFile.Close()
+			db.Close()
+			os.Exit(1)
+		}
+		dsts = append(dsts, ip1.String())
+		line++
+		if line == batchSize {
+			runMeasurements(srcs, dsts, db)
+			line = 0
+			dsts = make([]string, 0)
+			<-time.After(time.Second)
+			continue
+		}
+		if err == io.EOF {
+			if len(dsts) == 0 {
+				break
+			}
+			runMeasurements(srcs, dsts, db)
+			break
+		}
+
+	}
+
+}
+
+func runMeasurements(srcs, dsts []string, db *sql.DB) error {
+	pingReq := &dm.PingArg{
+		Pings: make([]*dm.PingMeasurement, 0),
+	}
+	for _, src := range srcs {
+		for _, dst := range dsts {
+			pingReq.Pings = append(pingReq.Pings, &dm.PingMeasurement{
+				Src:     src,
+				Dst:     dst,
+				RR:      rr,
+				Timeout: 60,
+			})
+		}
+	}
+	conn, err := grpc.Dial("plcontroller.revtr.ccs.neu.edu:4380")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to controller: %v", err)
 		os.Exit(1)
@@ -184,7 +254,7 @@ func main() {
 		if err != nil {
 			conn.Close()
 			fmt.Fprintf(os.Stderr, "Error while running measurement: %v", err)
-			os.Exit(1)
+			return err
 		}
 		err = os.Mkdir(fmt.Sprintf("%s/%s", outDir, pr.Src), os.ModeDir|0755)
 		if err != nil && !os.IsExist(err) {
@@ -202,6 +272,7 @@ func main() {
 	}
 	end := time.Now()
 	fmt.Println("Finished:", end, "Took:", time.Since(start), "Received:", len(ps), "responses")
+	return nil
 }
 
 func storePing(p *dm.Ping, db *sql.DB) error {
