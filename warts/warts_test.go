@@ -33,7 +33,6 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
-	"github.com/golang/glog"
 )
 
 func TestParsePing(t *testing.T) {
@@ -92,76 +91,75 @@ func BenchmarkParse(b *testing.B) {
 	var res []interface{}
 	for i := 0; i < b.N; i++ {
 		res, _ = warts.Parse(content)
-	}
-	for _, item := range res {
-		switch i := item.(type) {
-		case warts.Ping:
-			glog.Info(i)
-			p := datamodel.Ping{}
-			p.Src = i.Flags.Src.String()
-			p.Dst = i.Flags.Dst.String()
-			p.Version = i.Version
-			p.Type = i.Type
-			p.Method = i.Flags.PingMethod.String()
-			dmt := &datamodel.Time{}
-			dmt.Sec = i.Flags.StartTime.Sec
-			dmt.Usec = i.Flags.StartTime.Usec
-			p.Start = dmt
-			p.PingSent = int32(i.Flags.ProbeCount)
-			p.ProbeSize = int32(i.Flags.ProbeSize)
-			p.Userid = i.Flags.UserID
-			p.Ttl = int32(i.Flags.ProbeTTL)
-			p.Wait = int32(i.Flags.ProbeWaitS)
-			p.Timeout = int32(i.Flags.ProbeTimeout)
-			p.Flags = i.Flags.PF.Strings()
-			replies := make([]*datamodel.PingResponse, i.ReplyCount)
-			for i, resp := range i.PingReplies {
-				rep := &datamodel.PingResponse{}
-				rep.From = resp.Addr.String()
-				rep.Seq = int32(resp.ProbeID)
-				rep.ReplySize = int32(resp.ReplySize)
-				rep.ReplyTtl = int32(resp.ReplyTTL)
-				rep.ReplyProto = resp.ReplyProto.String()
-				txt := &datamodel.Time{}
-				txt.Sec = resp.Tx.Sec
-				txt.Usec = resp.Tx.Usec
-				rep.Tx = txt
-				rxt := &datamodel.Time{}
-				rxt.Sec = txt.Sec + resp.RTT.Sec
-				rxt.Usec = txt.Usec + resp.RTT.Usec
-				rep.Rx = rxt
-				rep.ProbeIpid = int32(resp.ProbeIPID)
-				rep.ReplyIpid = int32(resp.ReplyIPID)
-				rep.IcmpType = int32((resp.ICMP & 0xFF00) >> 8)
-				rep.IcmpCode = int32(resp.ICMP & 0x00FF)
-				if resp.IsTsOnly() {
-					rep.Tsonly = make([]int64, 0)
-					for _, ts := range resp.V4TS.TimeStamps {
-						rep.Tsonly = append(rep.Tsonly, int64(ts))
+		for _, item := range res {
+			switch i := item.(type) {
+			case warts.Ping:
+				p := datamodel.Ping{}
+				//p.Src = i.Flags.Src.String()
+				//p.Dst = i.Flags.Dst.String()
+				p.Version = i.Version
+				p.Type = i.Type
+				//p.Method = i.Flags.PingMethod.String()
+				dmt := &datamodel.Time{}
+				dmt.Sec = i.Flags.StartTime.Sec
+				dmt.Usec = i.Flags.StartTime.Usec
+				p.Start = dmt
+				p.PingSent = int32(i.Flags.ProbeCount)
+				p.ProbeSize = int32(i.Flags.ProbeSize)
+				p.Userid = i.Flags.UserID
+				p.Ttl = int32(i.Flags.ProbeTTL)
+				p.Wait = int32(i.Flags.ProbeWaitS)
+				p.Timeout = int32(i.Flags.ProbeTimeout)
+				//p.Flags = i.Flags.PF.Strings()
+				replies := make([]*datamodel.PingResponse, i.ReplyCount)
+				for i, resp := range i.PingReplies {
+					rep := &datamodel.PingResponse{}
+					rep.From = resp.Addr.String()
+					rep.Seq = int32(resp.ProbeID)
+					rep.ReplySize = int32(resp.ReplySize)
+					rep.ReplyTtl = int32(resp.ReplyTTL)
+					rep.ReplyProto = resp.ReplyProto.String()
+					txt := &datamodel.Time{}
+					txt.Sec = resp.Tx.Sec
+					txt.Usec = resp.Tx.Usec
+					rep.Tx = txt
+					rxt := &datamodel.Time{}
+					rxt.Sec = txt.Sec + resp.RTT.Sec
+					rxt.Usec = txt.Usec + resp.RTT.Usec
+					rep.Rx = rxt
+					rep.ProbeIpid = int32(resp.ProbeIPID)
+					rep.ReplyIpid = int32(resp.ReplyIPID)
+					rep.IcmpType = int32((resp.ICMP & 0xFF00) >> 8)
+					rep.IcmpCode = int32(resp.ICMP & 0x00FF)
+					if resp.IsTsOnly() {
+						rep.Tsonly = make([]int64, 0)
+						for _, ts := range resp.V4TS.TimeStamps {
+							rep.Tsonly = append(rep.Tsonly, int64(ts))
+						}
+					} else if resp.IsTsAndAddr() {
+						rep.Tsandaddr = make([]*datamodel.TsAndAddr, 0)
+						for i, ts := range resp.V4TS.TimeStamps {
+							tsa := &datamodel.TsAndAddr{}
+							tsa.Ip = resp.V4TS.Addrs[i].String()
+							tsa.Ts = int64(ts)
+							rep.Tsandaddr = append(rep.Tsandaddr, tsa)
+						}
 					}
-				} else if resp.IsTsAndAddr() {
-					rep.Tsandaddr = make([]*datamodel.TsAndAddr, 0)
-					for i, ts := range resp.V4TS.TimeStamps {
-						tsa := &datamodel.TsAndAddr{}
-						tsa.Ip = resp.V4TS.Addrs[i].String()
-						tsa.Ts = int64(ts)
-						rep.Tsandaddr = append(rep.Tsandaddr, tsa)
-					}
+					rep.RR = resp.V4RR.Strings()
+					replies[i] = rep
 				}
-				rep.RR = resp.V4RR.Strings()
-				replies[i] = rep
+				p.Responses = replies
+
+				stat := i.GetStats()
+				pstats := &datamodel.PingStats{}
+				pstats.Loss = float32(stat.Loss)
+				pstats.Max = stat.Max
+				pstats.Min = stat.Min
+				pstats.Avg = stat.Avg
+				pstats.Stddev = stat.StdDev
+				pstats.Replies = int32(stat.Replies)
+				p.Statistics = pstats
 			}
-			p.Responses = replies
-			stat := i.GetStats()
-			pstats := &datamodel.PingStats{}
-			pstats.Loss = float32(stat.Loss)
-			pstats.Max = stat.Max
-			pstats.Min = stat.Min
-			pstats.Avg = stat.Avg
-			pstats.Replies = int32(stat.Replies)
-			p.Statistics = pstats
-			glog.Info(p)
-			glog.Flush()
 		}
 	}
 	result = res
