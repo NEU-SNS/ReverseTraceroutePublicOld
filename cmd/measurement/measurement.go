@@ -59,7 +59,7 @@ var (
 	outDir    string
 	writeDb   bool
 	runId     string
-	version   string = "0.0.1"
+	version   string = "0.0.3"
 	showV     bool
 	batchSize int
 	delay     time.Duration
@@ -227,14 +227,16 @@ func runMeasurements(srcs, dsts []string, db *sql.DB) error {
 				Dst:     dst,
 				RR:      rr,
 				Timeout: 60,
+				Count:   "1",
 			})
 		}
 	}
-	conn, err := grpc.Dial("plcontroller.revtr.ccs.neu.edu:4380")
+	conn, err := grpc.Dial("129.10.113.189:4380")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to controller: %v", err)
 		os.Exit(1)
 	}
+	defer conn.Close()
 	cl := plc.NewPLControllerClient(conn)
 	fmt.Println("Num of requests:", len(pingReq.Pings))
 	start := time.Now()

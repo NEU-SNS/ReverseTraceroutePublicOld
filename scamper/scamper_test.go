@@ -26,17 +26,7 @@ Copyright (c) 2015, Northeastern University
 */
 package scamper_test
 
-import (
-	"encoding/json"
-	"io/ioutil"
-	"net"
-	"os"
-	"testing"
-
-	"github.com/NEU-SNS/ReverseTraceroute/scamper"
-	"github.com/golang/glog"
-)
-
+/*
 var sockPath = "/tmp/192.168.1.2:5000"
 var testIP = "192.168.1.2"
 var testPort = "5000"
@@ -87,7 +77,6 @@ func TestSocket(t *testing.T) {
 
 }
 
-/*
 func TestSocketDoMeasurement(t *testing.T) {
 	soc, err := scamper.NewSocket(
 		sockPath,
@@ -120,7 +109,6 @@ func TestSocketDoMeasurement(t *testing.T) {
 	}
 	soc.Stop()
 }
-*/
 
 func TestSocketIP(t *testing.T) {
 	soc, err := scamper.NewSocket(
@@ -243,15 +231,3 @@ func TestClientDoMeasurement(t *testing.T) {
 	soc.Stop()
 }
 */
-
-func TestParseWarts(t *testing.T) {
-	content, err := ioutil.ReadFile("../doc/test_warts.warts")
-	if err != nil {
-		t.Fatal("ParsePing could not read file")
-	}
-	_, err = scamper.ParseWarts(content)
-	if err != nil {
-		t.Fatalf("ParsePing failed: %v", err)
-	}
-
-}
