@@ -66,24 +66,22 @@ type PingStats struct {
 
 func (p Ping) GetStats() PingStats {
 	var min, max syscall.Timeval
-	min.Sec = math.MaxInt64
-	min.Usec = math.MaxInt64
-	max.Sec = math.MinInt64
-	max.Usec = math.MinInt64
 	ret := PingStats{}
 	ret.Replies = p.ReplyCount
 	dups := 0
 	sum := int64(0)
 	for i, rep := range p.PingReplies {
+		if i == 0 {
+			min = rep.RTT
+			max = rep.RTT
+		}
 		sum += ((rep.RTT.Sec * 1000000) + rep.RTT.Usec)
 		switch timevalComp(min, rep.RTT) {
-		case 0, 1:
-		case -1:
+		case 1:
 			min = rep.RTT
 		}
 		switch timevalComp(max, rep.RTT) {
-		case 0, -1:
-		case 1:
+		case -1:
 			max = rep.RTT
 		}
 		if uint16(i) >= p.Flags.PingsSent {
@@ -95,23 +93,24 @@ func (p Ping) GetStats() PingStats {
 	} else {
 		ret.Loss = 0
 	}
-	var d float32
+	var d, stdsum float64
+	len64 := float64(len(p.PingReplies))
 	if len(p.PingReplies) > 0 {
-		ret.Avg = float32(sum) / float32(len(p.PingReplies)) / 1000
-		d = ret.Avg
-		stdsum := float32(0)
+		ret.Avg = float32(sum) / float32(len64) / 1000
+		d = float64(ret.Avg * 1000)
 		for _, rep := range p.PingReplies {
-			rtt := rep.RTT.Nano() / 1000
-			diff := float32(rtt) - d
-			stdsum += (diff * diff)
+			rtt := float64((rep.RTT.Sec * 1000000) + rep.RTT.Usec)
+			diff := rtt - d
+			stdsum += math.Pow(diff, 2)
 		}
-		us := math.Sqrt(float64(sum / int64(len(p.PingReplies))))
-		ret.StdDev = float32(us)
+		us := math.Sqrt(stdsum / len64)
+		ret.StdDev = float32(us) / 1000
 	}
+
 	musec := (max.Sec * 1000000) + max.Usec
 	minusec := (min.Sec * 1000000) + min.Usec
-	ret.Max = float32(musec/1000) + float32((musec%1000)/1000)
-	ret.Min = float32(minusec/1000) + float32((minusec%1000)/1000)
+	ret.Max = float32(musec) / 1000
+	ret.Min = float32(minusec) / 1000
 	return ret
 }
 
@@ -122,22 +121,17 @@ func timevalComp(l, r syscall.Timeval) int {
 	rsec = r.Sec
 	lusec = l.Usec
 	rusec = r.Usec
-	if lsec == rsec {
-		if lsec == rsec {
-			return 0
-		} else {
-			if lusec < rusec {
-				return -1
-			} else {
-				return 1
-			}
-		}
-	} else {
-		if lsec < rsec {
-			return -1
-		} else {
-			return 1
-		}
+	if lsec < rsec {
+		return -1
+	}
+	if lsec > rsec {
+		return 1
+	}
+	if lusec < rusec {
+		return -1
+	}
+	if lusec > rusec {
+		return 1
 	}
 	return 0
 }
