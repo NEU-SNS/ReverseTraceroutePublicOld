@@ -8,3 +8,8 @@ message Time {
     int64 sec  = 1;
     int64 usec = 2;
 }
+
+message RTT {
+    int64 sec  = 1;
+    int64 usec = 2;
+}

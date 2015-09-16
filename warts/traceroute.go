@@ -47,7 +47,7 @@ type TracerouteHop struct {
 	ReplyTTL       uint8
 	Flags          uint8
 	ProbeID        uint8
-	RTT            uint32
+	RTT            syscall.Timeval
 	ICMPTypeCode   uint16
 	ProbeSize      uint16
 	ReplySize      uint16
@@ -124,12 +124,12 @@ type TracerouteFlags struct {
 	SrcID        Address
 	DstID        Address
 	StartTime    syscall.Timeval
-	StopReason   uint8
+	StopReason   StopReason
 	StopData     uint8
 	TraceFlags   uint8
 	Attempts     uint8
 	HopLimit     uint8
-	TraceType    uint8
+	TraceType    TraceType
 	ProbeSize    uint16
 	SourcePort   uint16
 	DestPort     uint16
@@ -147,6 +147,94 @@ type TracerouteFlags struct {
 	Src          Address
 	Dst          Address
 	UserID       uint32
+}
+
+type TraceType uint8
+
+func (tt TraceType) String() string {
+	types := []string{
+		"NULL",
+		"icmp-echo",
+		"udp",
+		"tcp",
+		"icmp-echo-paris",
+		"udp-paris",
+		"tcp-ack",
+	}
+	return types[tt]
+}
+
+type StopReason uint8
+
+func (sr StopReason) String() string {
+	reasons := []string{
+		"NONE",
+		"COMPLETED",
+		"UNREACH",
+		"ICMP",
+		"LOOP",
+		"GAPLIMIT",
+		"ERROR",
+		"HOPLIMIT",
+		"GSS",
+		"HALTED",
+	}
+	return reasons[sr]
+}
+
+func (tf TracerouteFlags) String() string {
+	return fmt.Sprintf(
+		"\nListID: %d\n"+
+			"CycleID: %d\n"+
+			"Src: %s\n"+
+			"Dst: %s\n"+
+			"Start Time: %v\n"+
+			"Stop Reason: %d\n"+
+			"Hop Limit: %d\n"+
+			"Trace Flags: %d\n"+
+			"Attempts: %d\n"+
+			"TraceType: %d\n"+
+			"Probe Size: %d\n"+
+			"Source Port: %d\n"+
+			"Dest. Port: %d\n"+
+			"StartTTL: %d\n"+
+			"IPToS: %d\n"+
+			"Timeout: %d\n"+
+			"Loops: %d\n"+
+			"HopsProbed: %d\n"+
+			"GapLimit: %d\n"+
+			"GapAction: %d\n"+
+			"LoopAction: %d\n"+
+			"ProbesSent: %d\n"+
+			"Min Wait: %d\n"+
+			"Confidence: %d\n"+
+			"UserID: %d\n",
+		tf.ListID,
+		tf.CycleID,
+		tf.Src,
+		tf.Dst,
+		tf.StartTime,
+		tf.StopReason,
+		tf.HopLimit,
+		tf.TraceFlags,
+		tf.Attempts,
+		tf.TraceType,
+		tf.ProbeSize,
+		tf.SourcePort,
+		tf.DestPort,
+		tf.StartTTL,
+		tf.IPToS,
+		tf.TimeoutS,
+		tf.Loops,
+		tf.HopsProbed,
+		tf.GapLimit,
+		tf.GapAction,
+		tf.LoopAction,
+		tf.ProbesSent,
+		tf.MinWaitCenti,
+		tf.Confidence,
+		tf.UserID,
+	)
 }
 
 func readTraceroute(f io.Reader) (Traceroute, error) {
@@ -231,10 +319,12 @@ func readTracerouteHop(f io.Reader, addrs *AddressRefs) (TracerouteHop, error) {
 				return th, err
 			}
 		case 6:
-			th.RTT, err = readUint32(f)
+			val, err := readUint32(f)
 			if err != nil {
 				return th, err
 			}
+			th.RTT.Sec = int64(val) / 1000000
+			th.RTT.Usec = int64(val) % 1000000
 		case 7:
 			th.ICMPTypeCode, err = readUint16(f)
 			if err != nil {
@@ -357,10 +447,11 @@ func readTracerouteFlags(f io.Reader, addrs *AddressRefs) (TracerouteFlags, erro
 				return tf, err
 			}
 		case 6:
-			tf.StopReason, err = readUint8(f)
+			ret, err := readUint8(f)
 			if err != nil {
 				return tf, err
 			}
+			tf.StopReason = StopReason(ret)
 		case 7:
 			tf.StopData, err = readUint8(f)
 			if err != nil {
@@ -382,10 +473,11 @@ func readTracerouteFlags(f io.Reader, addrs *AddressRefs) (TracerouteFlags, erro
 				return tf, err
 			}
 		case 11:
-			tf.TraceType, err = readUint8(f)
+			val, err := readUint8(f)
 			if err != nil {
 				return tf, err
 			}
+			tf.TraceType = TraceType(val)
 		case 12:
 			tf.ProbeSize, err = readUint16(f)
 			if err != nil {

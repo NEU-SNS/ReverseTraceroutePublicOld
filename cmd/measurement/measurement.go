@@ -231,7 +231,8 @@ func runMeasurements(srcs, dsts []string, db *sql.DB) error {
 			})
 		}
 	}
-	conn, err := grpc.Dial("129.10.113.189:4380")
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	conn, err := grpc.Dial("129.10.113.189:4380", opts...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to controller: %v", err)
 		os.Exit(1)

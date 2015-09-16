@@ -2,13 +2,14 @@ syntax = "proto3";
 
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/returnt.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/service.proto";
+import "github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto";
 
 option go_package = "datamodel";
 
 package datamodel;
 
 message TracerouteMeasurement {
-  int64 staleness       =  1;
+  int64 staleness         =  1;
 	string host           =  2;
 	string dst            =  3;
 	string confidence     =  4;
@@ -33,8 +34,8 @@ message TracerouteMeasurement {
 	string wait_probe     = 23;
 	string gss_entry      = 24;
 	string lss_name       = 25;
-   int64 timeout        = 26;
-    bool check_cache    = 27;
+     int64 timeout        = 26;
+      bool check_cache    = 27;
 
 }
 
@@ -43,44 +44,44 @@ message TracerouteArg {
 }
 
 message TracerouteHop {
- string addr        =  1;
-	int32 probe_ttl   =  2;
-	int32 probe_id    =  3;
-	int32 probe_size  =  4;
-	float rtt         =  5;
-	int32 reply_ttl   =  6;
-	int32 reply_tos   =  7;
-	int32 reply_size  =  8;
-	int32 reply_ipid  =  9;
-	int32 icmp_type   = 10;
-	int32 icmp_code   = 11;
-	int32 icmp_q_ttl  = 12;
-	int32 icmp_q_ipl  = 13;
-	int32 icmp_q_tos  = 14;
+   string addr         =  1;
+	uint32 probe_ttl   =  2;
+	uint32 probe_id    =  3;
+	uint32 probe_size  =  4;
+	   RTT rtt         =  5;
+	uint32 reply_ttl   =  6;
+	uint32 reply_tos   =  7;
+	uint32 reply_size  =  8;
+	uint32 reply_ipid  =  9;
+	uint32 icmp_type   = 10;
+	uint32 icmp_code   = 11;
+	uint32 icmp_q_ttl  = 12;
+	uint32 icmp_q_ipl  = 13;
+	uint32 icmp_q_tos  = 14;
 }
 
 message Traceroute {
 	string version              =  1;
 	string type                 =  2;
-	 int32 user_id              =  3;
+	uint32 user_id              =  3;
 	string method               =  4;
 	string src                  =  5;
 	string dst                  =  6;
-	 int32 sport                =  7;
-   int32 dport                =  8;
+	uint32 sport                =  7;
+    uint32 dport                =  8;
 	string stop_reason          =  9;
-	 int32 stop_data            = 10;
+	uint32 stop_data            = 10;
 	TracerouteTime start        = 11;
-	 int32 hop_count            = 12;
-	 int32 attempts             = 13;
-	 int32 hoplimit             = 14;
-	int32 firsthop              = 15;
-	 int32 wait                 = 16;
-	 int32 wait_probe           = 17;
-	 int32 tos                  = 18;
-	 int32 probe_size           = 19;
-  repeated TracerouteHop hops = 20;
-  string error                = 21;
+	uint32 hop_count            = 12;
+	uint32 attempts             = 13;
+	uint32 hoplimit             = 14;
+	uint32 firsthop             = 15;
+	uint32 wait                 = 16;
+	uint32 wait_probe           = 17;
+	uint32 tos                  = 18;
+	uint32 probe_size           = 19;
+  repeated TracerouteHop hops   = 20;
+    string error                = 21;
 }
 
 message TracerouteTime {

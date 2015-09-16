@@ -26,6 +26,79 @@
 */
 package datamodel
 
+import (
+	"github.com/NEU-SNS/ReverseTraceroute/warts"
+)
+
 func createPing() interface{} {
 	return new(Ping)
+}
+
+func ConvertPing(in warts.Ping) Ping {
+	p := Ping{}
+	p.Src = in.Flags.Src.String()
+	p.Dst = in.Flags.Dst.String()
+	p.Version = in.Version
+	p.Type = in.Type
+	p.Method = in.Flags.PingMethod.String()
+	dmt := &Time{}
+	dmt.Sec = in.Flags.StartTime.Sec
+	dmt.Usec = in.Flags.StartTime.Usec
+	p.Start = dmt
+	p.PingSent = int32(in.Flags.ProbeCount)
+	p.ProbeSize = int32(in.Flags.ProbeSize)
+	p.Userid = in.Flags.UserID
+	p.Ttl = int32(in.Flags.ProbeTTL)
+	p.Wait = int32(in.Flags.ProbeWaitS)
+	p.Timeout = int32(in.Flags.ProbeTimeout)
+	p.Flags = in.Flags.PF.Strings()
+	replies := make([]*PingResponse, in.ReplyCount)
+	for i, resp := range in.PingReplies {
+		rep := &PingResponse{}
+		rep.From = resp.Addr.String()
+		rep.Seq = int32(resp.ProbeID)
+		rep.ReplySize = int32(resp.ReplySize)
+		rep.ReplyTtl = int32(resp.ReplyTTL)
+		rep.ReplyProto = resp.ReplyProto.String()
+		txt := &Time{}
+		txt.Sec = resp.Tx.Sec
+		txt.Usec = resp.Tx.Usec
+		rep.Tx = txt
+		rxt := &Time{}
+		rxt.Sec = txt.Sec + resp.RTT.Sec
+		rxt.Usec = txt.Usec + resp.RTT.Usec
+		rep.Rx = rxt
+		rep.ProbeIpid = int32(resp.ProbeIPID)
+		rep.ReplyIpid = int32(resp.ReplyIPID)
+		rep.IcmpType = int32((resp.ICMP & 0xFF00) >> 8)
+		rep.IcmpCode = int32(resp.ICMP & 0x00FF)
+		if resp.IsTsOnly() {
+			rep.Tsonly = make([]int64, 0)
+			for _, ts := range resp.V4TS.TimeStamps {
+				rep.Tsonly = append(rep.Tsonly, int64(ts))
+			}
+		} else if resp.IsTsAndAddr() {
+			rep.Tsandaddr = make([]*TsAndAddr, 0)
+			for i, ts := range resp.V4TS.TimeStamps {
+				tsa := &TsAndAddr{}
+				tsa.Ip = resp.V4TS.Addrs[i].String()
+				tsa.Ts = int64(ts)
+				rep.Tsandaddr = append(rep.Tsandaddr, tsa)
+			}
+		}
+		rep.RR = resp.V4RR.Strings()
+		replies[i] = rep
+	}
+	p.Responses = replies
+	stat := in.GetStats()
+	pstats := &PingStats{}
+	pstats.Loss = float32(stat.Loss)
+	pstats.Max = stat.Max
+	pstats.Min = stat.Min
+	pstats.Avg = stat.Avg
+	pstats.Stddev = stat.StdDev
+	pstats.Replies = int32(stat.Replies)
+	p.Statistics = pstats
+
+	return p
 }
