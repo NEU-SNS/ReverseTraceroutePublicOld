@@ -85,46 +85,53 @@ func (m *TracerouteArg) GetTraceroutes() []*TracerouteMeasurement {
 }
 
 type TracerouteHop struct {
-	Addr      string  `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`
-	ProbeTtl  int32   `protobuf:"varint,2,opt,name=probe_ttl" json:"probe_ttl,omitempty"`
-	ProbeId   int32   `protobuf:"varint,3,opt,name=probe_id" json:"probe_id,omitempty"`
-	ProbeSize int32   `protobuf:"varint,4,opt,name=probe_size" json:"probe_size,omitempty"`
-	Rtt       float32 `protobuf:"fixed32,5,opt,name=rtt" json:"rtt,omitempty"`
-	ReplyTtl  int32   `protobuf:"varint,6,opt,name=reply_ttl" json:"reply_ttl,omitempty"`
-	ReplyTos  int32   `protobuf:"varint,7,opt,name=reply_tos" json:"reply_tos,omitempty"`
-	ReplySize int32   `protobuf:"varint,8,opt,name=reply_size" json:"reply_size,omitempty"`
-	ReplyIpid int32   `protobuf:"varint,9,opt,name=reply_ipid" json:"reply_ipid,omitempty"`
-	IcmpType  int32   `protobuf:"varint,10,opt,name=icmp_type" json:"icmp_type,omitempty"`
-	IcmpCode  int32   `protobuf:"varint,11,opt,name=icmp_code" json:"icmp_code,omitempty"`
-	IcmpQTtl  int32   `protobuf:"varint,12,opt,name=icmp_q_ttl" json:"icmp_q_ttl,omitempty"`
-	IcmpQIpl  int32   `protobuf:"varint,13,opt,name=icmp_q_ipl" json:"icmp_q_ipl,omitempty"`
-	IcmpQTos  int32   `protobuf:"varint,14,opt,name=icmp_q_tos" json:"icmp_q_tos,omitempty"`
+	Addr      string `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`
+	ProbeTtl  uint32 `protobuf:"varint,2,opt,name=probe_ttl" json:"probe_ttl,omitempty"`
+	ProbeId   uint32 `protobuf:"varint,3,opt,name=probe_id" json:"probe_id,omitempty"`
+	ProbeSize uint32 `protobuf:"varint,4,opt,name=probe_size" json:"probe_size,omitempty"`
+	Rtt       *RTT   `protobuf:"bytes,5,opt,name=rtt" json:"rtt,omitempty"`
+	ReplyTtl  uint32 `protobuf:"varint,6,opt,name=reply_ttl" json:"reply_ttl,omitempty"`
+	ReplyTos  uint32 `protobuf:"varint,7,opt,name=reply_tos" json:"reply_tos,omitempty"`
+	ReplySize uint32 `protobuf:"varint,8,opt,name=reply_size" json:"reply_size,omitempty"`
+	ReplyIpid uint32 `protobuf:"varint,9,opt,name=reply_ipid" json:"reply_ipid,omitempty"`
+	IcmpType  uint32 `protobuf:"varint,10,opt,name=icmp_type" json:"icmp_type,omitempty"`
+	IcmpCode  uint32 `protobuf:"varint,11,opt,name=icmp_code" json:"icmp_code,omitempty"`
+	IcmpQTtl  uint32 `protobuf:"varint,12,opt,name=icmp_q_ttl" json:"icmp_q_ttl,omitempty"`
+	IcmpQIpl  uint32 `protobuf:"varint,13,opt,name=icmp_q_ipl" json:"icmp_q_ipl,omitempty"`
+	IcmpQTos  uint32 `protobuf:"varint,14,opt,name=icmp_q_tos" json:"icmp_q_tos,omitempty"`
 }
 
 func (m *TracerouteHop) Reset()         { *m = TracerouteHop{} }
 func (m *TracerouteHop) String() string { return proto.CompactTextString(m) }
 func (*TracerouteHop) ProtoMessage()    {}
 
+func (m *TracerouteHop) GetRtt() *RTT {
+	if m != nil {
+		return m.Rtt
+	}
+	return nil
+}
+
 type Traceroute struct {
 	Version    string           `protobuf:"bytes,1,opt,name=version" json:"version,omitempty"`
 	Type       string           `protobuf:"bytes,2,opt,name=type" json:"type,omitempty"`
-	UserId     int32            `protobuf:"varint,3,opt,name=user_id" json:"user_id,omitempty"`
+	UserId     uint32           `protobuf:"varint,3,opt,name=user_id" json:"user_id,omitempty"`
 	Method     string           `protobuf:"bytes,4,opt,name=method" json:"method,omitempty"`
 	Src        string           `protobuf:"bytes,5,opt,name=src" json:"src,omitempty"`
 	Dst        string           `protobuf:"bytes,6,opt,name=dst" json:"dst,omitempty"`
-	Sport      int32            `protobuf:"varint,7,opt,name=sport" json:"sport,omitempty"`
-	Dport      int32            `protobuf:"varint,8,opt,name=dport" json:"dport,omitempty"`
+	Sport      uint32           `protobuf:"varint,7,opt,name=sport" json:"sport,omitempty"`
+	Dport      uint32           `protobuf:"varint,8,opt,name=dport" json:"dport,omitempty"`
 	StopReason string           `protobuf:"bytes,9,opt,name=stop_reason" json:"stop_reason,omitempty"`
-	StopData   int32            `protobuf:"varint,10,opt,name=stop_data" json:"stop_data,omitempty"`
+	StopData   uint32           `protobuf:"varint,10,opt,name=stop_data" json:"stop_data,omitempty"`
 	Start      *TracerouteTime  `protobuf:"bytes,11,opt,name=start" json:"start,omitempty"`
-	HopCount   int32            `protobuf:"varint,12,opt,name=hop_count" json:"hop_count,omitempty"`
-	Attempts   int32            `protobuf:"varint,13,opt,name=attempts" json:"attempts,omitempty"`
-	Hoplimit   int32            `protobuf:"varint,14,opt,name=hoplimit" json:"hoplimit,omitempty"`
-	Firsthop   int32            `protobuf:"varint,15,opt,name=firsthop" json:"firsthop,omitempty"`
-	Wait       int32            `protobuf:"varint,16,opt,name=wait" json:"wait,omitempty"`
-	WaitProbe  int32            `protobuf:"varint,17,opt,name=wait_probe" json:"wait_probe,omitempty"`
-	Tos        int32            `protobuf:"varint,18,opt,name=tos" json:"tos,omitempty"`
-	ProbeSize  int32            `protobuf:"varint,19,opt,name=probe_size" json:"probe_size,omitempty"`
+	HopCount   uint32           `protobuf:"varint,12,opt,name=hop_count" json:"hop_count,omitempty"`
+	Attempts   uint32           `protobuf:"varint,13,opt,name=attempts" json:"attempts,omitempty"`
+	Hoplimit   uint32           `protobuf:"varint,14,opt,name=hoplimit" json:"hoplimit,omitempty"`
+	Firsthop   uint32           `protobuf:"varint,15,opt,name=firsthop" json:"firsthop,omitempty"`
+	Wait       uint32           `protobuf:"varint,16,opt,name=wait" json:"wait,omitempty"`
+	WaitProbe  uint32           `protobuf:"varint,17,opt,name=wait_probe" json:"wait_probe,omitempty"`
+	Tos        uint32           `protobuf:"varint,18,opt,name=tos" json:"tos,omitempty"`
+	ProbeSize  uint32           `protobuf:"varint,19,opt,name=probe_size" json:"probe_size,omitempty"`
 	Hops       []*TracerouteHop `protobuf:"bytes,20,rep,name=hops" json:"hops,omitempty"`
 	Error      string           `protobuf:"bytes,21,opt,name=error" json:"error,omitempty"`
 }

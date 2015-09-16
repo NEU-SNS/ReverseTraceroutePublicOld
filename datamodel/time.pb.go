@@ -43,3 +43,12 @@ type Time struct {
 func (m *Time) Reset()         { *m = Time{} }
 func (m *Time) String() string { return proto.CompactTextString(m) }
 func (*Time) ProtoMessage()    {}
+
+type RTT struct {
+	Sec  int64 `protobuf:"varint,1,opt,name=sec" json:"sec,omitempty"`
+	Usec int64 `protobuf:"varint,2,opt,name=usec" json:"usec,omitempty"`
+}
+
+func (m *RTT) Reset()         { *m = RTT{} }
+func (m *RTT) String() string { return proto.CompactTextString(m) }
+func (*RTT) ProtoMessage()    {}
