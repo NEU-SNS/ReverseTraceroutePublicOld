@@ -33,7 +33,7 @@ import (
 
 type WartsHeader struct {
 	Magic  uint16
-	Type   uint16
+	Type   WartsT
 	Length uint32
 }
 
@@ -52,8 +52,10 @@ func readHeader(f io.Reader) (WartsHeader, error) {
 	if wh.Magic != 0x1205 {
 		return wh, fmt.Errorf("Incorrect warts magic: %x, %x", wh.Magic, head)
 	}
-	wh.Type |= uint16(head[2]) << 8
-	wh.Type |= uint16(head[3])
+	var t uint16
+	t |= uint16(head[2]) << 8
+	t |= uint16(head[3])
+	wh.Type = WartsT(t)
 	wh.Length |= uint32(head[4]) << 24
 	wh.Length |= uint32(head[5]) << 16
 	wh.Length |= uint32(head[6]) << 8

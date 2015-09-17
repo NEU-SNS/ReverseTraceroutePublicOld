@@ -41,7 +41,9 @@ func TestParsePing(t *testing.T) {
 	if err != nil {
 		t.Fatal("ParsePing could not read file")
 	}
-	_, err = warts.Parse(content)
+	pingFilter := make([]warts.WartsT, 1)
+	pingFilter[0] = warts.PingT
+	_, err = warts.Parse(content, pingFilter)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
@@ -52,7 +54,9 @@ func TestParsePingTSPreSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal("ParsePing could not read file")
 	}
-	_, err = warts.Parse(content)
+	pingFilter := make([]warts.WartsT, 1)
+	pingFilter[0] = warts.PingT
+	_, err = warts.Parse(content, pingFilter)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
@@ -63,7 +67,9 @@ func TestParsePingRR(t *testing.T) {
 	if err != nil {
 		t.Fatal("ParsePing could not read file")
 	}
-	_, err = warts.Parse(content)
+	pingFilter := make([]warts.WartsT, 1)
+	pingFilter[0] = warts.PingT
+	_, err = warts.Parse(content, pingFilter)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
@@ -74,7 +80,9 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Fatal("TestTrace could not read file")
 	}
-	res, err := warts.Parse(content)
+	traceFilter := make([]warts.WartsT, 1)
+	traceFilter[0] = warts.TracerouteT
+	res, err := warts.Parse(content, traceFilter)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -91,7 +99,9 @@ func TestTraceFirstHop(t *testing.T) {
 	if err != nil {
 		t.Fatal("TestTraceFirstHop could not read file")
 	}
-	res, err := warts.Parse(content)
+	traceFilter := make([]warts.WartsT, 1)
+	traceFilter[0] = warts.TracerouteT
+	res, err := warts.Parse(content, traceFilter)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -114,7 +124,9 @@ func BenchmarkParse(b *testing.B) {
 	b.ResetTimer()
 	var res []interface{}
 	for i := 0; i < b.N; i++ {
-		res, _ = warts.Parse(content)
+		pingFilter := make([]warts.WartsT, 1)
+		pingFilter[0] = warts.PingT
+		res, _ = warts.Parse(content, pingFilter)
 		for _, item := range res {
 			switch i := item.(type) {
 			case warts.Ping:

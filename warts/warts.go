@@ -32,20 +32,23 @@ import (
 	"io"
 )
 
+type WartsT uint32
+
 const (
-	ListT              = 0x01
-	CycleStartT        = 0x02
-	CycleDefT          = 0x03
-	CycleStopT         = 0x04
-	AddressT           = 0x05
-	TracerouteT        = 0x06
-	PingT              = 0x07
-	MDATracerouteT     = 0x08
-	AliasResolutionT   = 0x09
-	NeighborDiscoveryT = 0x0a
-	TBitT              = 0x0b
-	StingT             = 0x0c
-	SniffT             = 0x0d
+	ListT              WartsT = 0x01
+	CycleStartT               = 0x02
+	CycleDefT                 = 0x03
+	CycleStopT                = 0x04
+	AddressT                  = 0x05
+	TracerouteT               = 0x06
+	PingT                     = 0x07
+	MDATracerouteT            = 0x08
+	AliasResolutionT          = 0x09
+	NeighborDiscoveryT        = 0x0a
+	TBitT                     = 0x0b
+	StingT                    = 0x0c
+	SniffT                    = 0x0d
+	dummy                     = 0x00
 )
 
 func parseNext(f io.Reader) (interface{}, error) {
@@ -75,7 +78,11 @@ func parseNext(f io.Reader) (interface{}, error) {
 	return head, nil
 }
 
-func Parse(data []byte) ([]interface{}, error) {
+func Parse(data []byte, objs []WartsT) ([]interface{}, error) {
+	types := make(map[WartsT]bool)
+	for _, obj := range objs {
+		types[obj] = true
+	}
 	ret := make([]interface{}, 0)
 	buf := bytes.NewBuffer(data)
 	for {
@@ -86,6 +93,25 @@ func Parse(data []byte) ([]interface{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse warts: %v, %v", err, ret)
 		}
-		ret = append(ret, obj)
+		if types[getWartsT(obj)] {
+			ret = append(ret, obj)
+		}
+	}
+}
+
+func getWartsT(obj interface{}) WartsT {
+	switch obj.(type) {
+	case Ping:
+		return PingT
+	case CycleStart:
+		return CycleStartT
+	case CycleStop:
+		return CycleStopT
+	case Traceroute:
+		return TracerouteT
+	case List:
+		return ListT
+	default:
+		return dummy
 	}
 }
