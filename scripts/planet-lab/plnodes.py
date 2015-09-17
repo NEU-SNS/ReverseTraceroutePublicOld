@@ -40,8 +40,6 @@ class VantagePoint(Base):
 
 
 
-
-
 def resolveName(hostname):
     try:
         ip  = socket.gethostbyname(hostname)
@@ -97,6 +95,20 @@ def main(argv):
     nodeid_to_props = {}
 
     if authorized:
+        s = api_server.GetSlices(auth, SLICE_ID, [ 'expires' ])
+        if len(s) != 1:
+            print "GetSlices didn't respond correctly"
+            sys.exit(1)
+        expires = s[0]['expires']
+        exp = datetime.fromtimestamp(expires, tz=pytz.utc)
+        now = datetime.now(tz=pytz.utc)
+        dif = exp - now
+        eweeks = timedelta(weeks=8)
+        timeAdd = eweeks - dif
+        newexp = exp + timeAdd
+        nexps = calendar.timegm(newexp.timetuple())
+        api_server.UpdateSlice(auth, SLICE_ID, {'expires': nexps})
+
         nodes = api_server.GetNodes(auth)
         for x in nodes:
             node_ids.append(x['node_id'])
