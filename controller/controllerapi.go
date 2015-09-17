@@ -41,13 +41,6 @@ func (c *controllerT) Ping(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, 
 	return
 }
 
-func (c *controllerT) Stats(ctx con.Context, sa *dm.StatsArg) (sr *dm.StatsReturn, err error) {
-	glog.Info("Handling Stats Request")
-	sr = new(dm.StatsReturn)
-	sr, err = c.doStats(ctx, sa)
-	return
-}
-
 func (c *controllerT) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
 	glog.Info("Handling Traceroute Request")
 	tr = new(dm.TracerouteReturn)
