@@ -4,9 +4,10 @@ import sys,xmlrpclib,socket, sys, getopt
 from sqlalchemy import Column
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
-from sqlalchemy.dialects.mysql import INTEGER, TINYINT, VARCHAR, DATETIME
+from sqlalchemy.dialects.mysql import INTEGER, TINYINT, VARCHAR, DATETIME 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import orm
+from sqlalchemy import func
 import struct
 
 conn_string = 'mysql://{0}:{1}@{2}:{3}/plcontroller' 
@@ -21,17 +22,17 @@ class VantagePoint(Base):
     __tablename__ = 'vantage_point'
     
     ip = Column(INTEGER(unsigned=True), primary_key=True)
-    controller = Column(INTEGER(unsigned=True))
-    hostname = Column(VARCHAR(length=255))
-    site = Column(VARCHAR(length=255))
-    timestamp = Column(TINYINT())
-    record_route = Column(TINYINT())
-    can_spoof = Column(TINYINT())
-    receive_spoof = Column(TINYINT())
-    port = Column(INTEGER())
-    last_health_check = Column(VARCHAR(length=255))
-    last_updated = Column(DATETIME())
-    spoof_checked = Column(DATETIME())
+    controller = Column(INTEGER(unsigned=True), nullable=True)
+    hostname = Column(VARCHAR(length=255), default='')
+    site = Column(VARCHAR(length=255), default='')
+    timestamp = Column(TINYINT(), default=0)
+    record_route = Column(TINYINT(), default=0)
+    can_spoof = Column(TINYINT(), default=0)
+    receive_spoof = Column(TINYINT(), default=0)
+    port = Column(INTEGER(), default=0)
+    last_health_check = Column(VARCHAR(length=255), default='')
+    last_updated = Column(DATETIME(), default=func.current_timestamp())
+    spoof_checked = Column(DATETIME(), nullable=True)
 
     def __repr__(self):
         return "<VantagePoint(ip='%d', hostname='%s', site='%s')>" % (
