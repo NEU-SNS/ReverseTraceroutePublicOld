@@ -29,8 +29,6 @@
 package plcontroller
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net"
@@ -45,6 +43,7 @@ import (
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/warts"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -144,26 +143,28 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
 	}
-	ret := dm.Ping{}
 
 	resp, id, err := c.client.DoMeasurement(pa.Src, pa)
 	if err != nil {
-		return ret, err
+		return dm.Ping{}, err
 	}
 	rpcCounter.Inc()
 	select {
 	case r := <-resp:
-		err := decodeResponse(r.Bytes(), &ret)
+		pingFilter := make([]warts.WartsT, 1)
+		pingFilter[0] = warts.PingT
+		res, err := warts.Parse(r.Bytes(), pingFilter)
 		if err != nil {
 			errorCounter.Inc()
-			return ret, fmt.Errorf("Could not decode ping response: %v, resp: %s", err, r.Bytes())
+			return dm.Ping{}, fmt.Errorf("Could not decode ping response: %v, resp: %s", err, r.Bytes())
 		}
+		return dm.ConvertPing(res[0].(warts.Ping)), nil
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		c.client.RemoveMeasurement(pa.Src, id)
-		return ret, fmt.Errorf("Ping timed out")
+		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	}
-	return ret, nil
+	return dm.Ping{}, nil
 }
 
 func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
@@ -176,30 +177,28 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
 	}
-	ret := dm.Traceroute{}
 
 	resp, id, err := c.client.DoMeasurement(ta.Src, ta)
 	if err != nil {
-		return ret, err
+		return dm.Traceroute{}, err
 	}
 	rpcCounter.Inc()
 	select {
 	case r := <-resp:
-		err := decodeResponse(r.Bytes(), &ret)
+		traceFilter := make([]warts.WartsT, 1)
+		traceFilter[0] = warts.TracerouteT
+		res, err := warts.Parse(r.Bytes(), traceFilter)
 		if err != nil {
 			errorCounter.Inc()
-			return ret, fmt.Errorf("Could not decode traceroute response: %v", err)
+			return dm.Traceroute{}, fmt.Errorf("Could not decode traceroute response: %v", err)
 		}
+		return dm.ConvertTraceroute(res[0].(warts.Traceroute)), nil
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		c.client.RemoveMeasurement(ta.Src, id)
-		return ret, fmt.Errorf("Traceroute timed out")
+		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
 	}
-	return ret, nil
-}
-
-func decodeResponse(res []byte, ret interface{}) error {
-	return json.NewDecoder(bytes.NewReader(res)).Decode(ret)
+	return dm.Traceroute{}, nil
 }
 
 func convertWarts(path string, b []byte) ([]byte, error) {
