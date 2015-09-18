@@ -32,7 +32,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 type Process struct {
@@ -73,10 +73,10 @@ func (p *Process) Pid() (int, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
-		glog.V(3).Infoln("Getting Pid for process: %d", p.proc.Pid)
+		log.Infoln("Getting Pid for process: %d", p.proc.Pid)
 		return p.proc.Pid, nil
 	}
-	glog.Errorln("Attempted to get Pid for unstarted process: %v", p)
+	log.Errorln("Attempted to get Pid for unstarted process: %v", p)
 
 	return 0, errors.New("The Process is not yet started")
 }
@@ -102,13 +102,11 @@ func (p *Process) Start() (int, error) {
 			},
 		}
 	}
-	if glog.V(1) {
-		glog.Infof("Starting process: %s\n", p.prog)
-	}
+	log.Infof("Starting process: %s\n", p.prog)
 	proc, err := os.StartProcess(p.prog,
 		append([]string{p.prog}, p.argv...), p.procAttr)
 	if err != nil {
-		glog.Errorf("Failed to start proc: %s error: %v", p.prog, err)
+		log.Errorf("Failed to start proc: %s error: %v", p.prog, err)
 		return 0, err
 	}
 	p.proc = proc
@@ -127,9 +125,7 @@ func (p *Process) Signal(sig os.Signal) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
-		if glog.V(1) {
-			glog.Infof("Signaling PID: %d with signal %v\n", p.proc.Pid, sig)
-		}
+		log.Infof("Signaling PID: %d with signal %v\n", p.proc.Pid, sig)
 
 		return p.proc.Signal(sig)
 	}
@@ -142,9 +138,7 @@ func (p *Process) Kill() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
-		if glog.V(1) {
-			glog.Infof("Killing PID: %d", p.proc.Pid)
-		}
+		log.Infof("Killing PID: %d", p.proc.Pid)
 		res := p.proc.Kill()
 		return res
 	}
@@ -158,9 +152,7 @@ func (p *Process) Wait() chan error {
 	defer p.mu.Unlock()
 	done := make(chan error, 1)
 	go func() {
-		if glog.V(1) {
-			glog.Infof("Waiting on PID: %d", p.proc.Pid)
-		}
+		log.Infof("Waiting on PID: %d", p.proc.Pid)
 		p.mu.Lock()
 		pr := p.proc
 		p.mu.Unlock()

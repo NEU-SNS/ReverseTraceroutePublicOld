@@ -32,7 +32,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -40,7 +39,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 const (
@@ -83,11 +82,11 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 	}
 	pport, err := strconv.Atoi(port)
 	if err != nil {
-		glog.Errorf("Failed to parse port")
+		log.Errorf("Failed to parse port")
 		return 0, nil, err
 	}
 	if pport < 1 || pport > 65535 {
-		glog.Errorf("Invalid port passed to Start: %d", pport)
+		log.Errorf("Invalid port passed to Start: %d", pport)
 		return 0, nil, ErrorInvalidPort
 	}
 	var pip net.IP
@@ -99,7 +98,7 @@ func ParseAddrArg(addr string) (int, net.IP, error) {
 		pip = net.ParseIP(ip)
 	}
 	if pip == nil && !cont {
-		glog.Errorf("Invalid IP passed to Start: %s", ip)
+		log.Errorf("Invalid IP passed to Start: %s", ip)
 		return 0, nil, ErrorInvalidIP
 	}
 	return pport, pip, nil
@@ -110,22 +109,21 @@ func CloseStdFiles(c bool) {
 	if !c {
 		return
 	}
-	glog.Info("Closing standard file descripters")
-	defer glog.Flush()
+	log.Info("Closing standard file descripters")
 	err := os.Stdin.Close()
 
 	if err != nil {
-		glog.Error("Failed to close Stdin")
+		log.Error("Failed to close Stdin")
 		os.Exit(1)
 	}
 	err = os.Stderr.Close()
 	if err != nil {
-		glog.Error("Failed to close Stderr")
+		log.Error("Failed to close Stderr")
 		os.Exit(1)
 	}
 	err = os.Stdout.Close()
 	if err != nil {
-		glog.Error("Failed to close Stdout")
+		log.Error("Failed to close Stdout")
 		os.Exit(1)
 	}
 }

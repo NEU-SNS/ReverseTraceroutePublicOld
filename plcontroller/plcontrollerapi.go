@@ -34,8 +34,8 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
-	"github.com/golang/glog"
 	con "golang.org/x/net/context"
 )
 
@@ -51,7 +51,7 @@ var (
 )
 
 func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer) error {
-	glog.Infof("Ping Request for %d pings", len(pa.Pings))
+	log.Infof("Ping Request for %d pings", len(pa.Pings))
 	pings := pa.GetPings()
 	if pings == nil {
 		return ErrorNilArgList
@@ -68,7 +68,7 @@ func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer)
 			defer wg.Done()
 			pr, err := c.runPing(p)
 			if err != nil {
-				glog.V(1).Infof("Got ping result: %v, with error %v", pr, err)
+				log.Infof("Got ping result: %v, with error %v", pr, err)
 				pr.Error = err.Error()
 				pr.Src = p.Src
 				pr.Dst = p.Dst
@@ -110,7 +110,7 @@ func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController
 			defer wg.Done()
 			tr, err := c.runTraceroute(t)
 			if err != nil {
-				glog.Infof("Got tracerotue result: %v, with error %v", tr, err)
+				log.Infof("Got tracerotue result: %v, with error %v", tr, err)
 				tr.Error = err.Error()
 				tr.Src = t.Src
 				tr.Dst = t.Dst
@@ -171,7 +171,7 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 }
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
-	glog.Info("Getting All VPs")
+	log.Info("Getting All VPs")
 	vps, err := c.db.GetVPs()
 	if err != nil {
 		return nil

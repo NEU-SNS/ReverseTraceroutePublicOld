@@ -33,8 +33,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
-	"github.com/golang/glog"
 )
 
 const (
@@ -89,7 +89,7 @@ func (mp *mProc) KillAll() {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	for _, v := range mp.managedProcs {
-		glog.V(1).Infoln("Killing: ", v)
+		log.Infoln("Killing: ", v)
 		v.endKeepAlive()
 		v.mu.Lock()
 		v.p.Kill()
@@ -105,7 +105,7 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc)
 	}
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
-	glog.V(1).Infof("Starting process: %s", p.String())
+	log.Infof("Starting process: %s", p.String())
 	_, err := p.Start()
 	if err != nil {
 		return 0, err
@@ -130,15 +130,15 @@ func (mp *mProc) keepAlive(id uint32) {
 			p.remRetry = 0
 			return
 		}
-		glog.V(1).Infof("Keep Alive just returned from wait")
+		log.Infof("Keep Alive just returned from wait")
 		pid, e := p.p.Pid()
 		if e != nil {
-			glog.Errorf("mProc Failed to get PID")
+			log.Errorf("mProc Failed to get PID")
 			return
 		}
 		if err == nil {
 			ps := p.p.GetWaitStatus()
-			glog.V(1).Infof("KeepAlive Proc: %s, PID: %d stopped, status: %v",
+			log.Infof("KeepAlive Proc: %s, PID: %d stopped, status: %v",
 				p.p.Prog(), pid, ps)
 
 			mp.mu.Lock()
@@ -148,18 +148,18 @@ func (mp *mProc) keepAlive(id uint32) {
 				pid, err := p.p.Start()
 				if err != nil {
 					exit := p.f(err, p.p.GetWaitStatus(), p.p)
-					glog.Error("Failed to restart process in keepAlive")
+					log.Error("Failed to restart process in keepAlive")
 					if exit {
 						return
 					}
 				}
-				glog.V(1).Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
+				log.Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
 				p.remRetry -= 1
 				mp.keepAlive(id)
 			}
 			return
 		}
-		glog.Errorf("mProc Failed to wait on PID: %d cannot restart", pid)
+		log.Errorf("mProc Failed to wait on PID: %d cannot restart", pid)
 
 	}()
 }
@@ -178,9 +178,7 @@ func (mp *mProc) EndKeepAlive(id uint32) error {
 	}
 
 	pid, _ := p.p.Pid()
-	if glog.V(2) {
-		glog.Infof("Ending keep alive on PID: %d", pid)
-	}
+	log.Infof("Ending keep alive on PID: %d", pid)
 	p.endKeepAlive()
 	return nil
 }

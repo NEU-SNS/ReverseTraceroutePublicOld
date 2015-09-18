@@ -32,7 +32,7 @@ import (
 	"sync"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 type router struct {
@@ -84,7 +84,7 @@ func (r *router) RegisterServices(services ...*dm.Service) {
 	r.rw.Lock()
 	for _, service := range services {
 		r.services[service.Key] = service
-		glog.Infof("Registered service: %v", service)
+		log.Infof("Registered service: %v", service)
 	}
 	r.rw.Unlock()
 }

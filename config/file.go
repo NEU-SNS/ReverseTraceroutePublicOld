@@ -34,7 +34,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 
 	"gopkg.in/yaml.v2"
 )
@@ -42,7 +42,7 @@ import (
 func parseYamlConfig(path string, opts interface{}) error {
 	f, err := os.Open(path)
 	if err != nil && os.IsNotExist(err) {
-		glog.Infof("Error opening config file: %s, %v", path, err)
+		log.Infof("Error opening config file: %s, %v", path, err)
 		var ret error
 		if os.IsNotExist(err) {
 			// Return nil, not a problem if we don't find a config file
@@ -107,7 +107,7 @@ func mergeFiles(f *flag.FlagSet, opts interface{}) error {
 		}
 		ops, err := buildMap(ov)
 		if err != nil {
-			glog.Errorf("Failed to build map: %v", err)
+			log.Errorf("Failed to build map: %v", err)
 			return nil
 		}
 		err = handleFile(f, ops)

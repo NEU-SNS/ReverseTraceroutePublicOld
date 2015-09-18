@@ -81,7 +81,9 @@ func (u *updater) CheckUpdate(statUrl, version string) (bool, error) {
 	u.fetchUrl = stat.Get
 	vr, err := semver.Make(version)
 	if err != nil {
-		return false, err
+		// Return true if the version passed in isn't a semvar
+		// Works around the case when plvp --version fails for older versions
+		return true, nil
 	}
 	vn, err := semver.Make(stat.Version)
 	if err != nil {

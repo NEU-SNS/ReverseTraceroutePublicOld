@@ -38,13 +38,13 @@ import (
 
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"gopkg.in/fsnotify.v1"
@@ -138,7 +138,7 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 }
 
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
-	glog.V(2).Infof("Running ping for: %v", pa)
+	log.Infof("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -172,7 +172,7 @@ func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
 }
 
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
-	glog.Infof("Running traceroute for: %v", ta)
+	log.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -202,19 +202,18 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 }
 
 func convertWarts(path string, b []byte) ([]byte, error) {
-	glog.Info("Converting Warts")
+	log.Info("Converting Warts")
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
-		glog.Errorf("Failed to converte bytes: %v", err)
+		log.Errorf("Failed to converte bytes: %v", err)
 		return []byte{}, err
 	}
-	glog.Infof("Results of converting: %s", res)
+	log.Infof("Results of converting: %s", res)
 	return res, err
 }
 
 // When this returns the server is essentially dead, so call stop before any return
 func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPProvider, cl Client, s Sender) {
-	defer glog.Flush()
 	if db == nil {
 		c.stop()
 		ec <- fmt.Errorf("Nil db in plController")
@@ -227,7 +226,7 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	sc.ScParserPath = *con.Scamper.ConverterPath
 	err := scamper.ParseConfig(sc)
 	if err != nil {
-		glog.Errorf("Invalid scamper args: %v", err)
+		log.Errorf("Invalid scamper args: %v", err)
 
 		c.stop()
 		ec <- err
@@ -235,14 +234,14 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	}
 	ips, err := util.GetBindAddr()
 	if err != nil {
-		glog.Errorf("Failed to get bind address: %v", err)
+		log.Errorf("Failed to get bind address: %v", err)
 		c.stop()
 		ec <- err
 		return
 	}
 	ip, err := util.IPStringToInt32(ips)
 	if err != nil {
-		glog.Errorf("Failed to convert ip string: %v", err)
+		log.Errorf("Failed to convert ip string: %v", err)
 		c.stop()
 		ec <- err
 		return
@@ -265,16 +264,16 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	go c.startRPC(ec)
 	/*
 		go func() {
-			glog.Info("Starting VP monitoring")
+			log.Info("Starting VP monitoring")
 			for {
 				select {
 				case <-c.shutdown:
 					return
 				case <-time.After(time.Minute * 2):
-					glog.Info("Checking VPs....")
+					log.Info("Checking VPs....")
 					vps, err := c.db.GetVPs()
 					if err != nil {
-						glog.Errorf("Failed to get VPs: %v", err)
+						log.Errorf("Failed to get VPs: %v", err)
 						return
 					}
 					err = maintainVPs(
@@ -286,7 +285,7 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 						c.shutdown,
 					)
 					if err != nil {
-						glog.Errorf("Failed to maintain VPS: %v", err)
+						log.Errorf("Failed to maintain VPS: %v", err)
 						return
 					}
 				}
@@ -297,13 +296,13 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 
 func startHttp(addr string) {
 	for {
-		glog.Error(http.ListenAndServe(addr, nil))
+		log.Error(http.ListenAndServe(addr, nil))
 	}
 }
 
 // Start starts a plcontroller with the given configuration
 func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
-	glog.Info("Starting plcontroller")
+	log.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHttp(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
@@ -314,14 +313,14 @@ func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan e
 func (c *plControllerT) startRPC(eChan chan error) {
 	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
 		*c.config.Local.Port)
-	glog.Infof("Conecting to: %s", addr)
+	log.Infof("Conecting to: %s", addr)
 	l, e := net.Listen("tcp", addr)
 	if e != nil {
-		glog.Errorf("Failed to listen: %v", e)
+		log.Errorf("Failed to listen: %v", e)
 		eChan <- e
 		return
 	}
-	glog.Infof("PLController started, listening on: %s", addr)
+	log.Infof("PLController started, listening on: %s", addr)
 	err := c.server.Serve(l)
 	if err != nil {
 		eChan <- err
@@ -361,6 +360,6 @@ func (c *plControllerT) stop() {
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
-	glog.Infof("Got signal: %v", s)
+	log.Infof("Got signal: %v", s)
 	c.stop()
 }

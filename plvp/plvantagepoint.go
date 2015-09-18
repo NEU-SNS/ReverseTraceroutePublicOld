@@ -38,12 +38,12 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -98,7 +98,7 @@ var plVantagepoint plVantagepointT
 func (vp *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
 	sip, e := pickIP(*vp.config.Local.Host)
 	if e != nil {
-		glog.Errorf("Couldn't resolve host on restart")
+		log.Errorf("Couldn't resolve host on restart")
 		return true
 	}
 	vp.sc.IP = sip
@@ -116,13 +116,13 @@ func (vp *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *
 }
 
 func (vp *plVantagepointT) handleSig(s os.Signal) {
-	glog.Infof("Got signal: %v", s)
+	log.Infof("Got signal: %v", s)
 	vp.stop()
 }
 
 func (vp *plVantagepointT) stop() {
 	if vp.mp != nil {
-		glog.Infoln("Killing all processes")
+		log.Infoln("Killing all processes")
 		vp.mp.KillAll()
 	}
 	if vp.spoofmon != nil {
@@ -138,7 +138,6 @@ func HandleSig(s os.Signal) {
 // The vp is dead if this method needs to return, so call stop() to clean up before returning
 func (vp *plVantagepointT) run(c Config, ec chan error) {
 	vp.config = c
-	defer glog.Flush()
 	con := new(scamper.Config)
 	con.ScPath = *c.Scamper.BinPath
 
@@ -146,14 +145,14 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 	con.Port = *c.Scamper.Port
 	err := scamper.ParseConfig(*con)
 	if err != nil {
-		glog.Errorf("Invalid scamper args: %v", err)
+		log.Errorf("Invalid scamper args: %v", err)
 		vp.stop()
 		ec <- err
 		return
 	}
 	sip, err := pickIP(*c.Scamper.Host)
 	if err != nil {
-		glog.Errorf("Could not resolve url: %s, with err: %v", *c.Local.Host, err)
+		log.Errorf("Could not resolve url: %s, with err: %v", *c.Local.Host, err)
 		vp.stop()
 		ec <- err
 		return
@@ -165,7 +164,7 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 	vp.plc = &plClient{}
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
-		glog.Errorf("Could not get bind addr: %v", err)
+		log.Errorf("Could not get bind addr: %v", err)
 		vp.stop()
 		ec <- err
 		return
@@ -181,13 +180,13 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 
 func startHttp(addr string) {
 	for {
-		glog.Error(http.ListenAndServe(addr, nil))
+		log.Error(http.ListenAndServe(addr, nil))
 	}
 }
 
 // Start a plvp with the given config
 func Start(c Config) chan error {
-	glog.Info("Starting plvp with config: %v", c)
+	log.Info("Starting plvp with config: %v", c)
 	http.Handle("/metrics", prometheus.Handler())
 	go startHttp(*c.Local.PProfAddr)
 	errChan := make(chan error, 1)
@@ -200,20 +199,20 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
 		return
 	}
-	glog.Infof("Sending: %d spoofed probes", len(probes))
+	log.Infof("Sending: %d spoofed probes", len(probes))
 	vp.am.Lock()
 	ip := vp.addr
 	vp.am.Unlock()
 	addr := fmt.Sprintf("%s:%s", ip, vp.config.Local.Port)
 	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second))
 	if err != nil {
-		glog.Errorf("Failed to send spoofs: %v", err)
+		log.Errorf("Failed to send spoofs: %v", err)
 		return
 	}
 	client := plc.NewPLControllerClient(cc)
 	_, err = client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
 	if err != nil {
-		glog.Errorf("Error sending probes: %v", err)
+		log.Errorf("Error sending probes: %v", err)
 	}
 }
 
@@ -223,7 +222,7 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 		for {
 			select {
 			case probe := <-probes:
-				glog.Infof("Got IP from spoof monitor: %v", probe)
+				log.Infof("Got IP from spoof monitor: %v", probe)
 				spoofCounter.Inc()
 				sprobes = append(sprobes, &probe)
 			case err := <-ec:
@@ -231,7 +230,7 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 				case ErrorNotICMPEcho, ErrorNonSpoofedProbe:
 					continue
 				}
-				glog.Errorf("Recieved error from spoof monitor: %v", err)
+				log.Errorf("Recieved error from spoof monitor: %v", err)
 			case <-time.After(2 * time.Second):
 				vp.sendSpoofs(sprobes)
 				sprobes = make([]*dm.Probe, 0)
@@ -242,18 +241,18 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 
 func pickIP(host string) (string, error) {
 
-	glog.Infof("Looking up addresses for %s", host)
+	log.Infof("Looking up addresses for %s", host)
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return "", err
 	}
 
-	glog.Infof("Got IPs: %v", addrs)
+	log.Infof("Got IPs: %v", addrs)
 	return addrs[rand.Intn(len(addrs))], nil
 }
 
 func (vp *plVantagepointT) startScamperProcs() {
-	glog.Info("Starting scamper procs")
+	log.Info("Starting scamper procs")
 	sp := scamper.GetVPProc(vp.sc.ScPath, vp.sc.IP, vp.sc.Port)
 	vp.mp.ManageProcess(sp, true, 10000, vp.handleScamperStop)
 }

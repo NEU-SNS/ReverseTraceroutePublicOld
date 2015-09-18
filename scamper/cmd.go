@@ -35,7 +35,7 @@ import (
 	"reflect"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 const (
@@ -105,7 +105,7 @@ func (c *Cmd) marshal() []byte {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	glog.V(1).Infof("Cmd as string: %s", buf.String())
+	log.Infof("Cmd as string: %s", buf.String())
 	return buf.Bytes()
 }
 
@@ -117,7 +117,7 @@ func (c *Cmd) Marshal() []byte {
 // IssueCommand marshals the Cmd and writes it to the provided writer
 func (c *Cmd) issueCommand(w io.Writer) error {
 	cmd := c.marshal()
-	glog.V(1).Infof("Writing cmd: %s", cmd)
+	log.Infof("Writing cmd: %s", cmd)
 	_, err := w.Write(cmd)
 	return err
 }
@@ -159,7 +159,7 @@ func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 		if o, ok := opts[f.Name]; ok {
 			str, err := o.opt(o.format, v.FieldByName(f.Name).Interface())
 			if err != nil {
-				glog.Errorf("Failed on option: %s", f.Name)
+				log.Errorf("Failed on option: %s", f.Name)
 				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
 			}
 			if len(str) == 0 {

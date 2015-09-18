@@ -37,8 +37,8 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 )
 
 var conf = controller.NewConfig()
@@ -77,17 +77,16 @@ func init() {
 
 func main() {
 	go sigHandle()
-	defer glog.Flush()
 	var parseConf controller.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
-		glog.Errorf("Failed to parse config: %v", err)
+		log.Errorf("Failed to parse config: %v", err)
 		exit(1)
 	}
 
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 
-	_, err := sql.NewDB(sql.DbConfig{
+	_, err = sql.NewDB(sql.DbConfig{
 		UName:    *conf.Db.UName,
 		Password: *conf.Db.Password,
 		Host:     *conf.Db.Host,
@@ -95,14 +94,14 @@ func main() {
 		Db:       *conf.Db.Db,
 	})
 	if err != nil {
-		glog.Errorf("Failed to create db: %v", err)
+		log.Errorf("Failed to create db: %v", err)
 		exit(1)
 	}
 
 	err = <-controller.Start(conf, nil, cache.New())
 
 	if err != nil {
-		glog.Errorf("Controller Start returned with error: %v", err)
+		log.Errorf("Controller Start returned with error: %v", err)
 		exit(1)
 	}
 }
@@ -112,13 +111,12 @@ func sigHandle() {
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT,
 		syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
-		glog.Infof("Got signal: %v", sig)
+		log.Infof("Got signal: %v", sig)
 		controller.HandleSig(sig)
 		exit(1)
 	}
 }
 
 func exit(status int) {
-	glog.Flush()
 	os.Exit(status)
 }
