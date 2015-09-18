@@ -33,8 +33,8 @@ import (
 	"net"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 	opt "github.com/rhansen2/ipv4optparser"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -149,7 +149,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 		// Parse the options
 		options, err := opt.Parse(header.Options)
 		if err != nil {
-			glog.Errorf("Failed to parse IPv4 options: %v", err)
+			log.Errorf("Failed to parse IPv4 options: %v", err)
 			return nil, ErrorFailedToParseOptions
 		}
 		probe.SeqNum = uint32(echo.Seq)
@@ -186,7 +186,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan error) {
 	c, err := reconnect(addr)
 	if err != nil {
-		glog.Errorf("Error starting SpoofPingMonitor: %v", err)
+		log.Errorf("Error starting SpoofPingMonitor: %v", err)
 		ec <- err
 		return
 	}
@@ -202,7 +202,7 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 				case ErrorReadError:
 					c, err = reconnect(addr)
 					if err != nil {
-						glog.Errorf("Failed to reconnect: %v", err)
+						log.Errorf("Failed to reconnect: %v", err)
 						ec <- err
 						return
 					}
@@ -216,7 +216,7 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 
 // Start the SpoofPingMonitor
 func (sm *SpoofPingMonitor) Start(addr string, probes chan<- dm.Probe, ec chan error) {
-	glog.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
+	log.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
 	go sm.poll(addr, probes, ec)
 }
 

@@ -42,8 +42,8 @@ import (
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -112,7 +112,7 @@ func HandleSig(sig os.Signal) {
 }
 
 func (c *controllerT) handleSig(sig os.Signal) {
-	glog.Infof("Got signal: %v", sig)
+	log.Infof("Got signal: %v", sig)
 	c.stop()
 }
 
@@ -128,14 +128,14 @@ func (c *controllerT) startRPC(eChan chan error) {
 	} else {
 		addr = *c.config.Local.Addr
 	}
-	glog.Infof("Conecting to: %s", addr)
+	log.Infof("Conecting to: %s", addr)
 	l, e := net.Listen("tcp", addr)
 	if e != nil {
-		glog.Errorf("Failed to listen: %v", e)
+		log.Errorf("Failed to listen: %v", e)
 		eChan <- e
 		return
 	}
-	glog.Infof("Controller started, listening on: %s", addr)
+	log.Infof("Controller started, listening on: %s", addr)
 	err := c.server.Serve(l)
 	if err != nil {
 		eChan <- err
@@ -159,7 +159,7 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 }
 
 func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
-	glog.Infof("%s: Ping starting")
+	log.Infof("%s: Ping starting")
 	pr = new(dm.PingReturn)
 
 	return
@@ -189,7 +189,7 @@ func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
 
 func (c *controllerT) doTraceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
 	st := time.Now()
-	glog.Infof("%s: Traceroute starting")
+	log.Infof("%s: Traceroute starting")
 	tr = new(dm.TracerouteReturn)
 	tr.Ret = makeErrorReturn(st)
 	err = fmt.Errorf("doTraceroute failed to find in cache or remote")
@@ -220,7 +220,7 @@ func (c *controllerT) getService(s dm.ServiceT) (*dm.Service, MeasurementTool, e
 
 func startHttp(addr string) {
 	for {
-		glog.Error(http.ListenAndServe(addr, nil))
+		log.Error(http.ListenAndServe(addr, nil))
 	}
 }
 
@@ -232,13 +232,13 @@ func (c *controllerT) stop() {
 
 func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache ca.Cache) {
 	if db == nil {
-		glog.Errorf("Nil db in Controller Start")
+		log.Errorf("Nil db in Controller Start")
 		c.stop()
 		ec <- errors.New("Controller Start, nil DB")
 		return
 	}
 	if cache == nil {
-		glog.Errorf("Nil cache in Controller start")
+		log.Errorf("Nil cache in Controller start")
 		c.stop()
 		ec <- errors.New("Controller Start, nil Cache")
 		return
@@ -255,7 +255,7 @@ func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache c
 
 // Start starts a central controller with the given configuration
 func Start(c Config, db da.DataProvider, cache ca.Cache) chan error {
-	glog.Info("Starting controller")
+	log.Info("Starting controller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHttp(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)

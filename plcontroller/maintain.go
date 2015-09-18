@@ -39,7 +39,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/httpupdate"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 type procStatus string
@@ -62,7 +62,16 @@ const (
 		"/usr/bin/wget %s\n" +
 		"/usr/bin/yum install -y --nogpgcheck %s\n" +
 		"EOF\n"
-	version string = "/usr/local/bin/plvp --version"
+	version string = "sudo /usr/local/bin/plvp --version"
+	update  string = "sudo bash << EOF\n" +
+		"/sbin/service plvp stop\n" +
+		"/usr/bin/yum remove -y plvp\n" +
+		"cd /tmp\n" +
+		"mkdir %d\n" +
+		"cd %d\n" +
+		"/usr/bin/wget %s\n" +
+		"/usr/bin/yum install -y --nogpgcheck %s\n" +
+		"EOF\n"
 )
 
 var (
@@ -103,7 +112,7 @@ func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db d
 			default:
 				err = db.UpdateCheckStatus(v.Ip, res)
 				if err != nil {
-					glog.Errorf("Failed to update Check Status: %v", err)
+					log.Errorf("Failed to update Check Status: %v", err)
 				}
 			}
 
@@ -140,8 +149,7 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
 	}
 	switch stat {
 	case running:
-		return nil
-		return handleRunning(vp, getCmd(vp, uname, certPath, restart))
+		return handleRunning(vp, uname, certPath, updateUrl)
 	case stopped:
 		return handleStopped(getCmd(vp, uname, certPath, start))
 	case notFound:
@@ -256,11 +264,87 @@ func resetService(cmd *exec.Cmd) error {
 	return nil
 }
 
-func handleRunning(vp *dm.VantagePoint, cmd *exec.Cmd) error {
-	if vp.Controller != 0 {
-		return nil
+func handleRunning(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
+	if vp.Controller == 0 {
+		return resetService(getCmd(vp, uname, certPath, restart))
 	}
-	return resetService(cmd)
+	v, err := checkVersion(getCmd(vp, uname, certPath, version))
+	if err != nil {
+		return err
+	}
+	update, err := httpupdate.CheckUpdate(updateUrl, v)
+	if err != nil {
+		return err
+	}
+	if update {
+		urlString := httpupdate.FetchUrl()
+		url, err := url.Parse(urlString)
+		if err != nil {
+			return err
+		}
+		random := rand.Int()
+		err = updateService(getCmd(
+			vp,
+			uname,
+			certPath,
+			fmt.Sprintf(install, random, random, urlString, path.Base(url.Path)),
+		))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateService(cmd *exec.Cmd) error {
+	ec := make(chan error, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Errorf("Failed to update service: %s", out)
+		}
+		ec <- err
+		return
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			log.Error("Failed killing process, update service")
+			return err
+		}
+		return errorVpTimeout
+	case err := <-ec:
+		return err
+	}
+	return nil
+}
+
+func checkVersion(cmd *exec.Cmd) (string, error) {
+	ec := make(chan error, 1)
+	res := make(chan string, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if _, ok := err.(*exec.ExitError); err != nil && !ok {
+			ec <- err
+			return
+		}
+		res <- string(out)
+	}()
+	select {
+	case <-time.After(time.Second * 25):
+		err := cmd.Process.Kill()
+		if err != nil {
+			return "", err
+		}
+		return "", errorVpTimeout
+	case err := <-ec:
+		return "", err
+	case v := <-res:
+		return v, nil
+	}
+	return "0.0.0", nil
 }
 
 func checkRunning(cmd *exec.Cmd) (procStatus, error) {
@@ -306,7 +390,7 @@ func installService(cmd *exec.Cmd) error {
 	go func() {
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			glog.Errorf("Failed to install service: %s", out)
+			log.Errorf("Failed to install service: %s", out)
 		}
 		ec <- err
 		return
@@ -315,7 +399,7 @@ func installService(cmd *exec.Cmd) error {
 	case <-time.After(time.Second * 25):
 		err := cmd.Process.Kill()
 		if err != nil {
-			glog.Error("Failed killing process, install service")
+			log.Error("Failed killing process, install service")
 			return err
 		}
 		return errorVpTimeout

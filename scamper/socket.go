@@ -38,8 +38,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 )
 
 type stringReadWriter interface {
@@ -187,7 +187,7 @@ func (s *Socket) monitorResponses() {
 		case resp := <-s.respChan:
 			cmdmap, err := s.cmds.getCmd(resp.UserID)
 			if err != nil {
-				glog.Errorf("Failed to get command for id: %d, err: %s", resp.UserID, err)
+				log.Errorf("Failed to get command for id: %d, err: %s", resp.UserID, err)
 				continue
 			}
 			s.cmds.rmCmd(resp.UserID)
@@ -226,7 +226,7 @@ func (s *Socket) readConn() {
 			}
 			resp, err := parseResponse(line, rw)
 			if err != nil {
-				glog.Errorf("Error parsing response: %s", line)
+				log.Errorf("Error parsing response: %s", line)
 				continue
 			}
 			if resp.RType != DATA {
@@ -246,7 +246,7 @@ func (s *Socket) readConn() {
 			if err != nil {
 				resp.Err = err
 				s.respChan <- resp
-				glog.Error("Failed to convert warts")
+				log.Error("Failed to convert warts")
 				return
 			}
 			resp.Data = cwarts
@@ -256,7 +256,7 @@ func (s *Socket) readConn() {
 			if err != nil {
 				resp.Err = err
 				s.respChan <- resp
-				glog.Errorf("Could not parse UserId from response: %s, %s", err, cwarts)
+				log.Errorf("Could not parse UserId from response: %s, %s", err, cwarts)
 				return
 			}
 			resp.UserID = uid.UserID
@@ -274,10 +274,10 @@ func (s *Socket) monitorConn() {
 	for {
 		select {
 		case c := <-s.cmdChan:
-			glog.V(1).Infof("Issuing cmd: %v", c)
+			log.Infof("Issuing cmd: %v", c)
 			err := c.issueCommand(s.con)
 			if err != nil {
-				glog.Errorf("Error issuing command %s", c.Marshal())
+				log.Errorf("Error issuing command %s", c.Marshal())
 				continue
 			}
 		case <-s.closeChan:
@@ -291,7 +291,7 @@ func (s *Socket) monitorConn() {
 func convertWarts(path string, b []byte) ([]byte, error) {
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
-		glog.Errorf("Failed to converte bytes: %v, %s", err, b)
+		log.Errorf("Failed to converte bytes: %v, %s", err, b)
 		return []byte{}, err
 	}
 	return res, err
@@ -322,7 +322,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 	if err != nil {
 		return nil, 0, err
 	}
-	glog.V(1).Infof("Running cmd: %v", cmd)
+	log.Infof("Running cmd: %v", cmd)
 	s.cmdChan <- &cmd
 	return cr.done, id, err
 }

@@ -30,27 +30,27 @@ package controller
 
 import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	con "golang.org/x/net/context"
 )
 
 func (c *controllerT) Ping(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
-	glog.Info("Handling Ping Request")
+	log.Info("Handling Ping Request")
 	pr = new(dm.PingReturn)
 	pr, err = c.doPing(ctx, pa)
 	return
 }
 
 func (c *controllerT) Traceroute(ctx con.Context, ta *dm.TracerouteArg) (tr *dm.TracerouteReturn, err error) {
-	glog.Info("Handling Traceroute Request")
+	log.Info("Handling Traceroute Request")
 	tr = new(dm.TracerouteReturn)
 	tr, err = c.doTraceroute(ctx, ta)
-	glog.Infof("Returning traceroute: %v", tr)
+	log.Infof("Returning traceroute: %v", tr)
 	return
 }
 
 func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
-	glog.Info("Handling VP Request")
+	log.Info("Handling VP Request")
 	vpr = new(dm.VPReturn)
 	vpr, err = c.doGetVPs(ctx, gvp)
 	return

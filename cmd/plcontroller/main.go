@@ -35,10 +35,10 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 )
 
 var (
@@ -99,11 +99,10 @@ func init() {
 
 func main() {
 	go sigHandle()
-	defer glog.Flush()
 	var parseConf plcontroller.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
-		glog.Errorf("Failed to parse config: %v", err)
+		log.Errorf("Failed to parse config: %v", err)
 		exit(1)
 	}
 
@@ -118,14 +117,14 @@ func main() {
 	})
 
 	if err != nil {
-		glog.Errorf("Failed to create db: %v", err)
+		log.Errorf("Failed to create db: %v", err)
 		exit(1)
 	}
 
 	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{})
 
 	if err != nil {
-		glog.Errorf("PLController Start returned with error: %v", err)
+		log.Errorf("PLController Start returned with error: %v", err)
 		exit(1)
 	}
 }
@@ -135,13 +134,12 @@ func sigHandle() {
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
 		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
-		glog.Infof("Got signal: %v", sig)
+		log.Infof("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)
 		exit(1)
 	}
 }
 
 func exit(status int) {
-	glog.Flush()
 	os.Exit(status)
 }

@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 type Service struct {
@@ -51,12 +51,12 @@ func (s *Service) GetIp() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.ips) == 0 || time.Since(s.lastUpdated) > time.Minute*5 {
-		glog.Infof("Resolving url: %s", s.Url)
+		log.Infof("Resolving url: %s", s.Url)
 		ips, err := net.LookupHost(s.Url)
 		if err != nil {
 			return "", err
 		}
-		glog.Infof("Got IPs: %v", ips)
+		log.Infof("Got IPs: %v", ips)
 		s.lastUpdated = time.Now()
 		s.ips = ips
 	}

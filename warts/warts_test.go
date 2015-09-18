@@ -32,7 +32,6 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
-	"github.com/golang/glog"
 )
 
 func TestParsePing(t *testing.T) {
@@ -87,12 +86,10 @@ func TestTrace(t *testing.T) {
 		t.Fatalf("Parse failed: %v", err)
 	}
 	for _, item := range res {
-		switch i := item.(type) {
+		switch item.(type) {
 		case warts.Traceroute:
-			glog.Info(datamodel.ConvertTraceroute(i))
 		}
 	}
-	glog.Flush()
 }
 func TestTraceFirstHop(t *testing.T) {
 	content, err := ioutil.ReadFile("../doc/test_firsthop_trace.warts")
@@ -106,12 +103,10 @@ func TestTraceFirstHop(t *testing.T) {
 		t.Fatalf("Parse failed: %v", err)
 	}
 	for _, item := range res {
-		switch i := item.(type) {
+		switch item.(type) {
 		case warts.Traceroute:
-			glog.Info(datamodel.ConvertTraceroute(i))
 		}
 	}
-	glog.Flush()
 }
 
 var result []interface{}

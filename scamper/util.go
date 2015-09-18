@@ -33,9 +33,9 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 )
 
 // Options for the scamper process
@@ -124,7 +124,7 @@ func GetProc(sockDir, scampPort, scamperPath string) *proc.Process {
 
 	err := checkScamperSockDir(sockDir)
 	if err != nil {
-		glog.Errorf("Error with scamper socket directory: %v", err)
+		log.Errorf("Error with scamper socket directory: %v", err)
 		return nil
 	}
 	return proc.New(scamperPath, nil,

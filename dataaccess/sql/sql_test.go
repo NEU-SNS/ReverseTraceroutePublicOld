@@ -31,7 +31,7 @@ import (
 	"testing"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 var conf = sql.DbConfig{
@@ -48,13 +48,11 @@ func TestMain(m *testing.M) {
 	var err error
 	db, err = sql.NewDB(conf)
 	if err != nil {
-		glog.Info(err)
-		glog.Flush()
+		log.Info(err)
 		os.Exit(1)
 	}
 	defer db.Close()
 	result := m.Run()
-	glog.Flush()
 	os.Exit(result)
 }
 

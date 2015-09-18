@@ -32,8 +32,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
-	"github.com/golang/glog"
 	"google.golang.org/grpc"
 )
 
@@ -52,10 +52,10 @@ func (c *plClient) disconnect() error {
 }
 
 func (c *plClient) connect(addr string, timeout time.Duration) error {
-	glog.Infof("Trying to connect to: %s", addr)
+	log.Infof("Trying to connect to: %s", addr)
 	cc, err := grpc.Dial(addr, grpc.WithTimeout(timeout))
 	if err != nil {
-		glog.Errorf("PlClient Failed to connect: %v", err)
+		log.Errorf("PlClient Failed to connect: %v", err)
 		return err
 	}
 	c.cc = cc

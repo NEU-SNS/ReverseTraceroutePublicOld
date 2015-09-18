@@ -36,21 +36,21 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 	"gopkg.in/fsnotify.v1"
 )
 
 func (c *plControllerT) handlEvents(ec chan error) {
-	glog.Info("Started event handling loop")
+	log.Info("Started event handling loop")
 	for {
 		select {
 		case <-c.shutdown:
 			return
 		case e := <-c.w.Events:
 			if e.Op&fsnotify.Create == fsnotify.Create {
-				glog.V(2).Infof("Received fs event: %v", e)
+				log.Infof("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
 					e.Name,
 					*c.config.Scamper.ConverterPath,
@@ -63,31 +63,31 @@ func (c *plControllerT) handlEvents(ec chan error) {
 				ip, err := util.IPStringToInt32(s.IP())
 				if err != nil {
 					ec <- err
-					glog.Errorf("Failed to convert socket IP: %v", err)
+					log.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
 				err = c.db.UpdateController(ip, c.ip, c.ip)
 				if err != nil {
 					ec <- err
-					glog.Errorf("Failed to update controller  %v", err)
+					log.Errorf("Failed to update controller  %v", err)
 					continue
 				}
 				c.client.AddSocket(s)
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				glog.V(2).Infof("Received fs event: %v", e)
+				log.Infof("Received fs event: %v", e)
 				ip := strings.Split(path.Base(e.Name), ":")[0]
 				nip, err := util.IPStringToInt32(ip)
 				if err != nil {
 					ec <- err
-					glog.Errorf("Failed to convert socket IP: %v", err)
+					log.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
 				err = c.db.UpdateController(nip, 0, c.ip)
 				if err != nil {
 					ec <- err
-					glog.Errorf("Failed to update controller  %v", err)
+					log.Errorf("Failed to update controller  %v", err)
 					continue
 				}
 				c.client.RemoveSocket(ip)
@@ -138,16 +138,16 @@ func cleanDir(dir string) error {
 }
 
 func (c *plControllerT) watchDir(dir string, ec chan error) {
-	glog.Infof("Starting to watch dir: %s", dir)
+	log.Infof("Starting to watch dir: %s", dir)
 	err := cleanDir(dir)
 	if err != nil {
-		glog.Infof("Failed to clean watch directory: %v", err)
+		log.Infof("Failed to clean watch directory: %v", err)
 		ec <- err
 		return
 	}
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		glog.Infof("Failed to create watcher: %v", err)
+		log.Infof("Failed to create watcher: %v", err)
 		ec <- err
 		return
 	}
@@ -155,7 +155,7 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 	go c.handlEvents(ec)
 	err = w.Add(dir)
 	if err != nil {
-		glog.Infof("Failed to add dir: %s, %v", dir, err)
+		log.Infof("Failed to add dir: %s, %v", dir, err)
 		ec <- err
 		return
 	}

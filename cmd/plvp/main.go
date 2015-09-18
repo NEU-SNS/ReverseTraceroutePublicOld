@@ -35,9 +35,9 @@ import (
 	"syscall"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/plvp"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/glog"
 )
 
 var (
@@ -82,12 +82,11 @@ func init() {
 
 func main() {
 	go sigHandle()
-	defer glog.Flush()
 
 	var parseConf plvp.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
-		glog.Exitf("Failed to parse config: %v", err)
+		log.Errorf("Failed to parse config: %v", err)
 		exit(1)
 	}
 	if vFlag {
@@ -97,13 +96,12 @@ func main() {
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 	err = <-plvp.Start(conf)
 	if err != nil {
-		glog.Errorf("PLVP Start returned with error: %v", err)
+		log.Errorf("PLVP Start returned with error: %v", err)
 		exit(1)
 	}
 }
 
 func exit(status int) {
-	glog.Flush()
 	os.Exit(status)
 }
 
@@ -112,7 +110,7 @@ func sigHandle() {
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
 		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
-		glog.Infof("Got signal: %v", sig)
+		log.Infof("Got signal: %v", sig)
 		plvp.HandleSig(sig)
 		exit(1)
 	}

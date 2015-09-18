@@ -34,7 +34,7 @@ import (
 
 	plc "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/golang/glog"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -60,7 +60,7 @@ func (cs ControllerSender) Send(sps []dm.Probe, addr string) error {
 	}
 	for _, sp := range sps {
 		if err := stream.Send(&sp); err != nil {
-			glog.Errorf("Error sending spoofed probe: %v", err)
+			log.Errorf("Error sending spoofed probe: %v", err)
 			stream.CloseSend()
 			return err
 		}
