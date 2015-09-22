@@ -86,6 +86,7 @@ func NewConfig() Config {
 		CertFile:     new(string),
 		KeyFile:      new(string),
 		ConnTimeout:  new(int64),
+		Port:         new(int),
 	}
 	c := Config{
 		Local: lc,

@@ -86,7 +86,7 @@ func main() {
 
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 
-	_, err = sql.NewDB(sql.DbConfig{
+	db, err := sql.NewDB(sql.DbConfig{
 		UName:    *conf.Db.UName,
 		Password: *conf.Db.Password,
 		Host:     *conf.Db.Host,
@@ -98,7 +98,7 @@ func main() {
 		exit(1)
 	}
 
-	err = <-controller.Start(conf, nil, cache.New())
+	err = <-controller.Start(conf, db, cache.New())
 
 	if err != nil {
 		log.Errorf("Controller Start returned with error: %v", err)

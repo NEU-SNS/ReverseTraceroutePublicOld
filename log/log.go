@@ -30,6 +30,7 @@ import (
 	"flag"
 	"io"
 	"os"
+	"path"
 	"runtime"
 
 	"github.com/Sirupsen/logrus"
@@ -94,7 +95,7 @@ func callerInfo() *logrus.Entry {
 	}
 	return logger.WithFields(
 		logrus.Fields{
-			"file": file,
+			"file": path.Base(file),
 			"line": line,
 		},
 	)

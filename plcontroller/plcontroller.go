@@ -151,14 +151,13 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	rpcCounter.Inc()
 	select {
 	case r := <-resp:
-		pingFilter := make([]warts.WartsT, 1)
-		pingFilter[0] = warts.PingT
-		res, err := warts.Parse(r.Bytes(), pingFilter)
-		if err != nil {
+		switch t := r.Ret.(type) {
+		case warts.Ping:
+			return dm.ConvertPing(t), nil
+		default:
 			errorCounter.Inc()
-			return dm.Ping{}, fmt.Errorf("Could not decode ping response: %v, resp: %s", err, r.Bytes())
+			return dm.Ping{}, fmt.Errorf("Wrong type in ping response")
 		}
-		return dm.ConvertPing(res[0].(warts.Ping)), nil
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		c.client.RemoveMeasurement(pa.Src, id)
@@ -185,14 +184,13 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 	rpcCounter.Inc()
 	select {
 	case r := <-resp:
-		traceFilter := make([]warts.WartsT, 1)
-		traceFilter[0] = warts.TracerouteT
-		res, err := warts.Parse(r.Bytes(), traceFilter)
-		if err != nil {
+		switch t := r.Ret.(type) {
+		case warts.Traceroute:
+			return dm.ConvertTraceroute(t), nil
+		default:
 			errorCounter.Inc()
-			return dm.Traceroute{}, fmt.Errorf("Could not decode traceroute response: %v", err)
+			return dm.Traceroute{}, fmt.Errorf("Wrong type in traceroute response")
 		}
-		return dm.ConvertTraceroute(res[0].(warts.Traceroute)), nil
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		c.client.RemoveMeasurement(ta.Src, id)
