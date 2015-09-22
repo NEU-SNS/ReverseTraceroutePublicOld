@@ -40,6 +40,7 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/warts"
 )
 
 type stringReadWriter interface {
@@ -242,6 +243,7 @@ func (s *Socket) readConn() {
 			s.wartsHeader[0].WriteTo(dec)
 			s.wartsHeader[1].WriteTo(dec)
 			resp.WriteTo(dec)
+			/* Return warts data
 			cwarts, err := convertWarts(s.converterPath, dec.Bytes())
 			if err != nil {
 				resp.Err = err
@@ -249,20 +251,32 @@ func (s *Socket) readConn() {
 				log.Error("Failed to convert warts")
 				return
 			}
-			resp.Data = cwarts
-			resp.DS = len(cwarts)
-			uid := &userID{}
-			err = s.unmarsh(cwarts, uid)
-			if err != nil {
-				resp.Err = err
+			*/
+			go func() {
+				filter := make([]warts.WartsT, 0)
+				filter = append(filter, warts.PingT, warts.TracerouteT)
+				res, err := warts.Parse(dec.Bytes(), filter)
+				if err != nil {
+					resp.Err = err
+					s.respChan <- resp
+					log.Errorf("Could not parse response: %s", err)
+					return
+				}
+				if len(res) != 1 {
+					resp.Err = err
+					s.respChan <- resp
+					log.Error("Wrong number of objects parsed from warts")
+					return
+				}
+				switch t := res[0].(type) {
+				case warts.Traceroute:
+					resp.UserID = t.Flags.UserID
+				case warts.Ping:
+					resp.UserID = t.Flags.UserID
+				}
+				resp.Ret = res[0]
 				s.respChan <- resp
-				log.Errorf("Could not parse UserId from response: %s, %s", err, cwarts)
-				return
-			}
-			resp.UserID = uid.UserID
-			resp.Data = cwarts
-			resp.DS = len(cwarts)
-			s.respChan <- resp
+			}()
 		}
 
 	}

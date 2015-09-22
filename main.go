@@ -46,7 +46,9 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
-	conn, err := grpc.Dial("129.10.113.205:4380")
+	opts := make([]grpc.DialOption, 1)
+	opts[0] = grpc.WithInsecure()
+	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4380", opts...)
 	if err != nil {
 		panic(err)
 	}

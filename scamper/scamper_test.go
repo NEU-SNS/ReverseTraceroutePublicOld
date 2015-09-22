@@ -35,8 +35,6 @@ func TestMain(m *testing.M) {
 	setupSocket()
 	result := m.Run()
 	cleanupSocket()
-	// Clear out glog buffer
-	glog.Flush()
 	os.Exit(result)
 }
 

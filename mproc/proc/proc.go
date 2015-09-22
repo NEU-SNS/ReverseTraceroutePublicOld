@@ -102,7 +102,7 @@ func (p *Process) Start() (int, error) {
 			},
 		}
 	}
-	log.Infof("Starting process: %s\n", p.prog)
+	log.Infof("Starting process: %s", p.prog)
 	proc, err := os.StartProcess(p.prog,
 		append([]string{p.prog}, p.argv...), p.procAttr)
 	if err != nil {

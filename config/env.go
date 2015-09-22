@@ -32,7 +32,7 @@ import (
 	"strings"
 )
 
-// Order of options are flag -> environment -> config file
+// Order of options are command line flag -> environment -> config file
 
 func mergeConfigFile(f *flag.FlagSet) error {
 	return nil
@@ -54,7 +54,7 @@ func newEnv() *env {
 	en := make(map[string]*string)
 
 	for _, val := range os.Environ() {
-		split := strings.SplitAfterN(val, split, 2)
+		split := strings.SplitN(val, split, 2)
 		en[split[0]] = &split[1]
 	}
 	return &env{env: en}
@@ -70,7 +70,7 @@ func mergeEnvironment(f *flag.FlagSet) error {
 		key := strings.ToUpper(strings.Join(
 			[]string{
 				envPrefix,
-				name,
+				strings.Replace(name, "-", "_", -1),
 			},
 			"_",
 		))
