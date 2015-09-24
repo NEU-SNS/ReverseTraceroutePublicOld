@@ -32,24 +32,39 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
+type Service uint
+
+const (
+	PLANET_LAB Service = iota + 1
+)
+
 type MeasurementTool interface {
 	Ping(context.Context, *dm.PingArg) (<-chan *dm.Ping, error)
 	Traceroute(context.Context, *dm.TracerouteArg) (<-chan *dm.Traceroute, error)
 	GetVPs(context.Context, *dm.VPRequest) (<-chan *dm.VPReturn, error)
 }
 
+func create(s ServiceDef) (MeasurementTool, error) {
+	switch s.Service {
+	case PLANET_LAB:
+		return nil, nil
+	}
+	return nil, nil
+}
+
 type ServiceDef struct {
-	Addr string
-	Port string
+	Addr    string
+	Port    string
+	Service Service
 }
 
 type Source interface {
-	Get(string) ServiceDef
+	Get(string) (ServiceDef, error)
 	All() []ServiceDef
 }
 
 type Router interface {
-	Get(string) MeasurementTool
+	Get(string) (MeasurementTool, error)
 	All() []MeasurementTool
 	SetSource(Source)
 }
@@ -71,9 +86,12 @@ func (r *router) SetSource(s Source) {
 	r.source = s
 }
 
-func (r *router) Get(addr string) MeasurementTool {
-	r.source.Get(addr)
-	return nil
+func (r *router) Get(addr string) (MeasurementTool, error) {
+	service, err := r.source.Get(addr)
+	if err != nil {
+		return nil, err
+	}
+	return create(service)
 }
 
 func (r *router) All() []MeasurementTool {

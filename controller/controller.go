@@ -158,6 +158,17 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 	return mt, nil
 }
 
+func checkPingCache(ctx con.Context, ->chan []*dm.PingMeasurement) <-chan *dm.Ping {
+	ret := make(chan *dm.Ping)
+	return ret
+}
+
+func processPingMeasurement(ctx con.Context, pa *dm.PingArg) <-chan *dm.Ping {
+	next := make([]*dm.PingMeasurement)
+	ret := make(chan *dm.Ping)
+	return ret
+}
+
 func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
 	log.Infof("%s: Ping starting")
 	pr = new(dm.PingReturn)
