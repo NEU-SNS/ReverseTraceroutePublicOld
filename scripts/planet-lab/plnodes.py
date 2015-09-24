@@ -8,6 +8,9 @@ from sqlalchemy.dialects.mysql import INTEGER, TINYINT, VARCHAR, DATETIME
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import orm
 from sqlalchemy import func
+from datetime import datetime, timedelta
+import calendar
+import pytz
 import struct
 
 conn_string = 'mysql://{0}:{1}@{2}:{3}/plcontroller' 
@@ -145,7 +148,7 @@ def main(argv):
             try:
                 vp = session.query(VantagePoint).filter(VantagePoint.hostname==hostname).one()
                 if ip_addr is not None:
-                    vp.ip_addr = ip_addr
+                    vp.ip = ip2int(ip_addr)
                     session.add(vp)
             except orm.exc.NoResultFound:
                 if ip_addr is not None:

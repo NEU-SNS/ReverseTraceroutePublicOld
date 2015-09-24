@@ -53,18 +53,7 @@ import (
 import _ "github.com/go-sql-driver/mysql"
 
 var (
-	srcPath   string
-	dstPath   string
-	rr        bool
-	uname     string
-	passwd    string
-	conFmt    string = "%s:%s@tcp(localhost:3306)/record_routes?parseTime=true"
-	outDir    string
-	writeDb   bool
-	runId     string
-	showV     bool
-	batchSize int
-	delay     time.Duration
+	conFmt string = "%s:%s@tcp(localhost:3306)/record_routes?parseTime=true"
 )
 
 const (
@@ -77,22 +66,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	insertStats    = "INSERT INTO record_routes.ping_stats(src, dst, start, replies, loss, min, max, avg, stddev) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
-func init() {
-	/*
-		flag.StringVar(&srcPath, "s", "", "Path to the file containing src addresses")
-		flag.StringVar(&dstPath, "d", "", "Path to the file containing dst addresses")
-		flag.BoolVar(&rr, "r", true, "Option to run with record route")
-		flag.StringVar(&uname, "uname", "", "Username for the db")
-		flag.StringVar(&passwd, "passwd", "", "Password for the db")
-		flag.StringVar(&runId, "id", "", "Id to associate with the measurement set")
-		flag.BoolVar(&writeDb, "db", false, "Set if it is desired to write to the db")
-		flag.StringVar(&outDir, "out", "", "Directory to write output to")
-		flag.IntVar(&batchSize, "b", 0, "Number of measurements to run in each batch")
-		flag.DurationVar(&delay, "delay", 0, "How long to wait between measurement sets")
-		flag.BoolVar(&showV, "version", false, "Show the version number")
-	*/
-}
-
 type Prefix struct {
 	net   *net.IPNet
 	ones  int
@@ -102,9 +75,9 @@ type Prefix struct {
 
 var done = fmt.Errorf("Done")
 
-func (p Prefix) GetRandom() (string, error) {
+func (p *Prefix) GetRandom() (string, error) {
 	if p.order == nil {
-		rand.Seed(time.Now().Unix())
+		rand.Seed(time.Now().UnixNano())
 		max := p.bits - p.ones
 		maxVal := math.Pow(2, float64(max))
 		p.order = rand.Perm(int(maxVal))
@@ -128,10 +101,10 @@ func getPrefixes(limit int) (*list.List, error) {
 	for i := 0; i < limit; i++ {
 		ip, err := pr.ReadString('\n')
 		if err != nil && err != io.EOF {
-			fmt.Errorf("Failed to open %s: %v", dstPath, err)
+			return li, err
 		}
 		if err == io.EOF {
-			return li, nil
+			return li, io.EOF
 		}
 		_, cidr, err := net.ParseCIDR(strings.TrimSpace(ip))
 		if err != nil {
@@ -162,9 +135,103 @@ func openSource(src string) (io.ReadCloser, error) {
 func openDest(dst string) (io.ReadCloser, error) {
 	dstFile, err := os.Open(dst)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to open %s: %v", dstPath, err)
+		return nil, fmt.Errorf("Failed to open %s: %v", dst, err)
 	}
 	return dstFile, nil
+}
+
+func addrScan(ctx *cli.Context) {
+	if !(ctx.IsSet("src") && ctx.IsSet("dst")) {
+		fmt.Fprintf(os.Stderr, "Error: Missing argument from command prefix")
+		return
+	}
+	bs := ctx.GlobalInt("b")
+	if bs == 0 {
+		fmt.Fprintf(os.Stderr, "Error: Batch size must be > 0")
+		return
+	}
+	if ctx.GlobalString("id") == "" {
+		fmt.Fprintf(os.Stderr, "Error: id must be set")
+		return
+	}
+	var out string
+	if out = ctx.String("out"); out == "" {
+		fmt.Fprintf(os.Stderr, "Error: out must be set")
+		return
+	}
+	if err := makeOut(out); err != nil {
+		fmt.Fprintf(os.Stderr, "Got error: %v", err)
+		return
+	}
+	rr := ctx.GlobalBool("rr")
+	src, err := openSource(ctx.String("src"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Got error opening source, %s: %v", ctx.String("src"), err)
+		return
+	}
+	defer src.Close()
+	srcs := make([]string, 0)
+	scanner := bufio.NewScanner(src)
+	scanner.Split(bufio.ScanLines)
+	line := 1
+	for scanner.Scan() {
+		ip := scanner.Text()
+		ip1 := net.ParseIP(ip)
+		if ip1 == nil {
+			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s", line, ip)
+			return
+		}
+		srcs = append(srcs, ip1.String())
+		line++
+	}
+	dst, err := openDest(ctx.String("dst"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Got error: %v", err)
+		return
+	}
+
+	defer dst.Close()
+	read := bufio.NewReader(dst)
+	dsts := make([]string, 0)
+	for {
+		ip, err := read.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return
+		}
+		if err == io.EOF && line == 0 {
+			break
+		}
+		ip1 := net.ParseIP(strings.TrimSpace(ip))
+		if ip1 == nil {
+			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, ip)
+			return
+		}
+		dsts = append(dsts, ip1.String())
+		line++
+		if line == bs {
+			_, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error running measurements: %s\n", err)
+				return
+			}
+			line = 0
+			dsts = make([]string, 0)
+			<-time.After(time.Second)
+			continue
+		}
+		if err == io.EOF {
+			if len(dsts) == 0 {
+				break
+			}
+			_, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error running measurements: %s\n", err)
+				return
+			}
+			break
+		}
+
+	}
 }
 
 func prefixScan(ctx *cli.Context) {
@@ -219,22 +286,24 @@ func prefixScan(ctx *cli.Context) {
 	defer dst.Close()
 	pr = bufio.NewReader(dst)
 	prefixes, err := getPrefixes(bs)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		fmt.Fprintf(os.Stderr, "Got error: %v", err)
 		return
 	}
+	var npre *list.List
+	npre = prefixes
 	for {
+		prefixes = npre
+		npre = list.New()
 		if prefixes.Len() == 0 {
 			return
 		}
+
 		dsts := make([]string, 0)
 		for e := prefixes.Front(); e != nil; e = e.Next() {
 			pre := e.Value.(*Prefix)
 			ip, err := pre.GetRandom()
 			if err == done {
-				curr := e
-				e = e.Prev()
-				prefixes.Remove(curr)
 				px, err := getPrefixes(1)
 				if err != nil && err == io.EOF {
 					continue
@@ -242,23 +311,24 @@ func prefixScan(ctx *cli.Context) {
 				if err != io.EOF && err != nil {
 					return
 				}
-				prefixes.PushBackList(px)
+				npre.PushBackList(px)
 				continue
 			}
+			npre.PushBack(e.Value)
 			dsts = append(dsts, ip)
 		}
-		succ, err := runMeasurements(srcs, dsts, ctx.String("out"), rr, ctx.BoolT("db"), nil)
+		succ, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
 		if err != nil {
 			return
 		}
 		for _, s := range succ {
-			for e := prefixes.Front(); e != nil; e = e.Next() {
+			for e := npre.Front(); e != nil; e = e.Next() {
 				pre := e.Value.(*Prefix)
 				ip := net.ParseIP(s)
 				if pre.net.Contains(ip) {
 					curr := e
 					e = e.Prev()
-					prefixes.Remove(curr)
+					npre.Remove(curr)
 					px, err := getPrefixes(1)
 					if err != nil && err != io.EOF {
 						fmt.Fprintf(os.Stderr, "Failed to get prefix: %s", err)
@@ -267,15 +337,14 @@ func prefixScan(ctx *cli.Context) {
 					if err == io.EOF {
 						continue
 					}
-					prefixes.PushBackList(px)
-					continue
+					npre.PushBackList(px)
 				}
 			}
 		}
 	}
 }
 
-func runMeasurements(srcs, dsts []string, outDir string, rr, wdb bool, db *sql.DB) ([]string, error) {
+func runMeasurements(srcs, dsts []string, id, outDir string, rr, wdb bool, db *sql.DB) ([]string, error) {
 	pingReq := &dm.PingArg{
 		Pings: make([]*dm.PingMeasurement, 0),
 	}
@@ -326,7 +395,7 @@ func runMeasurements(srcs, dsts []string, outDir string, rr, wdb bool, db *sql.D
 			fmt.Fprintf(os.Stderr, "Could not write file: %v", err)
 		}
 		if wdb && db != nil {
-			err = storePing(pr, db)
+			err = storePing(pr, db, id)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error storing ping: %v", err)
 			}
@@ -390,11 +459,30 @@ func main() {
 			},
 			Action: prefixScan,
 		},
+		cli.Command{
+			Name:  "addr",
+			Usage: "Ping all IPs in file",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "src",
+					Usage: "File containing source addresses",
+				},
+				cli.StringFlag{
+					Name:  "dst",
+					Usage: "File containing list of prefixes",
+				},
+				cli.StringFlag{
+					Name:  "out",
+					Usage: "Directory to write results to",
+				},
+			},
+			Action: addrScan,
+		},
 	}
 	app.Run(os.Args)
 }
 
-func storePing(p *dm.Ping, db *sql.DB) error {
+func storePing(p *dm.Ping, db *sql.DB, runId string) error {
 	tran, err := db.Begin()
 	if err != nil {
 		return err
