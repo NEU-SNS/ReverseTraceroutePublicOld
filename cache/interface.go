@@ -26,9 +26,25 @@
 */
 package cache
 
+type Unmarshaler interface {
+	Unmarshal([]byte) error
+}
+
+type CacheItem interface {
+	Unmarshal(um Unmarshaler) error
+	Marshal() ([]byte, error)
+	Keyer
+}
+
 type Cache interface {
-	Get(string) (interface{}, error)
-	Set(string, interface{}) error
+	Get(Keyer) (CacheItem, error)
+	GetMulti([]Keyer) (map[string]CacheItem, error)
+	GetVal(Keyer, Unmarshaler) error
+	Set(CacheItem) error
+}
+
+type Keyer interface {
+	Key() string
 }
 
 type cache struct{}
@@ -37,10 +53,27 @@ func New() Cache {
 	return &cache{}
 }
 
-func (c *cache) Get(key string) (interface{}, error) {
+func (c *cache) Get(key Keyer) (CacheItem, error) {
 	return nil, nil
 }
 
-func (c *cache) Set(key string, data interface{}) error {
+func (c *cache) GetMulti(keys []Keyer) (map[string]CacheItem, error) {
+	return nil, nil
+}
+
+func (c *cache) GetVal(key Keyer, marsh Unmarshaler) error {
 	return nil
 }
+
+func (c *cache) Set(item CacheItem) error {
+	return nil
+}
+
+/*
+	Call Set -> Set calls item.CanCache()
+	if it can cache -> Marshal the item and cache the data
+
+	Call Get -> Call key.Key() try to get a key
+	if a key is obtained, fetch the item from the cache.
+	Otherwise return the CacheItem
+*/

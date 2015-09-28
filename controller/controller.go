@@ -158,22 +158,41 @@ func (c *controllerT) getMeasurementTool(serv dm.ServiceT) (MeasurementTool, err
 	return mt, nil
 }
 
-func checkPingCache(ctx con.Context, ->chan []*dm.PingMeasurement) <-chan *dm.Ping {
+type pingFunc func(con.Context, <-chan []*dm.PingMeasurement) <-chan *dm.Ping
+type pingStep func(pingFunc) pingFunc
+
+func pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 	ret := make(chan *dm.Ping)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				close(ret)
+				return
+			case <-pm:
+				/*
+					Do stuff to run the measurements
+					Return the results back
+				*/
+				close(ret)
+				return
+			}
+		}
+	}()
 	return ret
 }
 
-func processPingMeasurement(ctx con.Context, pa *dm.PingArg) <-chan *dm.Ping {
-	next := make([]*dm.PingMeasurement)
-	ret := make(chan *dm.Ping)
-	return ret
-}
-
-func (c *controllerT) doPing(ctx con.Context, pa *dm.PingArg) (pr *dm.PingReturn, err error) {
+func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *dm.Ping {
 	log.Infof("%s: Ping starting")
-	pr = new(dm.PingReturn)
-
-	return
+	do := pingCache{c: c.cache}.pingCacheStep(
+		pingDB{db: c.db}.pingDBStep(pingMeas))
+	next := make(chan []*dm.PingMeasurement)
+	res := do(ctx, next)
+	go func() {
+		next <- pm
+		close(next)
+	}()
+	return res
 }
 
 func makeMTraceroute(t *dm.Traceroute, s dm.ServiceT) *dm.MTraceroute {
