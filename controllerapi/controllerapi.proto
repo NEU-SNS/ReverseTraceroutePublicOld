@@ -9,8 +9,8 @@ import "github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto";
 
 service Controller {
-    rpc Ping(datamodel.PingArg) returns (datamodel.PingReturn) {}
-    rpc Traceroute(datamodel.TracerouteArg) returns (datamodel.TracerouteReturn) {}
+    rpc Ping(datamodel.PingArg) returns (stream datamodel.Ping) {}
+    rpc Traceroute(datamodel.TracerouteArg) returns (stream datamodel.Traceroute) {}
     rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
     rpc ReceiveSpoofedProbes(stream datamodel.Probe) returns (datamodel.ReceiveSpoofedProbesResponse) {}
 }

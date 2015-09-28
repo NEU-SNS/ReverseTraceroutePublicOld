@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,40 +24,74 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
 package controller
 
 import (
-	cont "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
+	con "golang.org/x/net/context"
+
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	con "golang.org/x/net/context"
 )
 
-func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) error {
-	log.Info("Handling Ping Request")
-	pms := pa.GetPings()
-	if pms == nil {
-		return nil
-	}
-	res := c.doPing(stream.Context(), pms)
-	for p := range res {
-		if err := stream.Send(p); err != nil {
-			return err
-		}
-	}
-	return nil
+type pingCache struct {
+	c cache.Cache
 }
 
-func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_TracerouteServer) error {
-	log.Info("Handling Traceroute Request")
-	return nil
-}
+func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 
-func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
-	log.Info("Handling VP Request")
-	vpr = new(dm.VPReturn)
-	vpr, err = c.doGetVPs(ctx, gvp)
-	return
+	return func(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
+		ret := make(chan *dm.Ping)
+		n := make(chan []*dm.PingMeasurement, 1)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					close(ret)
+					return
+				case m := <-pm:
+					check := make([]cache.Keyer, 0)
+					db := make([]*dm.PingMeasurement, 0)
+					checking := make(map[string]*dm.PingMeasurement)
+					for _, p := range m {
+						if p.CheckCache {
+							check = append(check, p)
+							checking[p.Key()] = p
+						} else {
+							db = append(db, p)
+						}
+					}
+					res := next(ctx, n)
+					n <- db
+					cached, err := pc.c.GetMulti(check)
+					if err != nil {
+						log.Errorf("Failed to check cache: %v", err)
+					}
+					db = make([]*dm.PingMeasurement, 0)
+					for _, item := range check {
+						p := &dm.Ping{}
+						if i, ok := cached[item.Key()]; ok {
+							err := i.Unmarshal(p)
+							if err != nil {
+								log.Errorf("Failed to unmarshal ping: %v", err)
+								db = append(db, checking[item.Key()])
+								continue
+							}
+							ret <- p
+						} else {
+							db = append(db, checking[item.Key()])
+						}
+					}
+					n <- db
+					close(n)
+					for p := range res {
+						ret <- p
+					}
+					close(ret)
+					return
+				}
+			}
+		}()
+		return ret
+	}
 }

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,40 +24,43 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
 package controller
 
 import (
-	cont "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
+	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
-	con "golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
-func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) error {
-	log.Info("Handling Ping Request")
-	pms := pa.GetPings()
-	if pms == nil {
-		return nil
-	}
-	res := c.doPing(stream.Context(), pms)
-	for p := range res {
-		if err := stream.Send(p); err != nil {
-			return err
-		}
-	}
-	return nil
+type pingDB struct {
+	db da.DataProvider
 }
 
-func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_TracerouteServer) error {
-	log.Info("Handling Traceroute Request")
-	return nil
-}
-
-func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
-	log.Info("Handling VP Request")
-	vpr = new(dm.VPReturn)
-	vpr, err = c.doGetVPs(ctx, gvp)
-	return
+func (db pingDB) pingDBStep(next pingFunc) pingFunc {
+	return func(ctx context.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
+		ret := make(chan *dm.Ping)
+		n := make(chan []*dm.PingMeasurement, 1)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					close(ret)
+					return
+				case <-pm:
+					/*
+						Do DB stuff here and pass the results back
+						then start the code the run the measurement
+					*/
+					res := next(ctx, n)
+					close(n)
+					for p := range res {
+						ret <- p
+					}
+					close(ret)
+					return
+				}
+			}
+		}()
+		return ret
+	}
 }
