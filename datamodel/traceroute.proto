@@ -36,6 +36,7 @@ message TracerouteMeasurement {
 	string lss_name       = 25;
      int64 timeout        = 26;
       bool check_cache    = 27;
+      bool check_db       = 28;
 
 }
 

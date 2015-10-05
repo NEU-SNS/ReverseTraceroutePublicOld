@@ -95,3 +95,65 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 		return ret
 	}
 }
+
+type traceCache struct {
+	c cache.Cache
+}
+
+func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
+
+	return func(ctx con.Context, pm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
+		ret := make(chan *dm.Traceroute)
+		n := make(chan []*dm.TracerouteMeasurement, 1)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					close(ret)
+					return
+				case m := <-pm:
+					check := make([]cache.Keyer, 0)
+					db := make([]*dm.TracerouteMeasurement, 0)
+					checking := make(map[string]*dm.TracerouteMeasurement)
+					for _, p := range m {
+						if p.CheckCache {
+							check = append(check, p)
+							checking[p.Key()] = p
+						} else {
+							db = append(db, p)
+						}
+					}
+					res := next(ctx, n)
+					n <- db
+					cached, err := tc.c.GetMulti(check)
+					if err != nil {
+						log.Errorf("Failed to check cache: %v", err)
+					}
+					db = make([]*dm.TracerouteMeasurement, 0)
+					for _, item := range check {
+						p := &dm.Traceroute{}
+						if i, ok := cached[item.Key()]; ok {
+							err := i.Unmarshal(p)
+							if err != nil {
+								log.Errorf("Failed to unmarshal ping: %v", err)
+								db = append(db, checking[item.Key()])
+								continue
+							}
+							ret <- p
+						} else {
+							db = append(db, checking[item.Key()])
+						}
+					}
+					n <- db
+					close(n)
+					for p := range res {
+						ret <- p
+					}
+					close(ret)
+					return
+				}
+			}
+		}()
+		return ret
+	}
+}

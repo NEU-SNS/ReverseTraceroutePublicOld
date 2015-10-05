@@ -51,6 +51,10 @@ func (pm *PingMeasurement) Key() string {
 	return ""
 }
 
+func (p *Ping) Key() string {
+	return ""
+}
+
 func ConvertPing(in warts.Ping) Ping {
 	p := Ping{}
 	p.Src = in.Flags.Src.String()

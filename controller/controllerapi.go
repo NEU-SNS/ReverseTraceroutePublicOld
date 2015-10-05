@@ -52,6 +52,16 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 
 func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_TracerouteServer) error {
 	log.Info("Handling Traceroute Request")
+	tms := ta.GetTraceroutes()
+	if tms == nil {
+		return nil
+	}
+	res := c.doTraceroute(stream.Context(), tms)
+	for t := range res {
+		if err := stream.Send(t); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

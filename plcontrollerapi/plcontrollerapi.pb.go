@@ -59,8 +59,8 @@ var _ = proto.Marshal
 // Client API for PLController service
 
 type PLControllerClient interface {
-	Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (PLController_PingClient, error)
-	Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (PLController_TracerouteClient, error)
+	Ping(ctx context.Context, opts ...grpc.CallOption) (PLController_PingClient, error)
+	Traceroute(ctx context.Context, opts ...grpc.CallOption) (PLController_TracerouteClient, error)
 	ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error)
 	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error)
 	AcceptProbes(ctx context.Context, in *datamodel6.SpoofedProbes, opts ...grpc.CallOption) (*datamodel6.SpoofedProbesResponse, error)
@@ -74,28 +74,27 @@ func NewPLControllerClient(cc *grpc.ClientConn) PLControllerClient {
 	return &pLControllerClient{cc}
 }
 
-func (c *pLControllerClient) Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (PLController_PingClient, error) {
+func (c *pLControllerClient) Ping(ctx context.Context, opts ...grpc.CallOption) (PLController_PingClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PLController_serviceDesc.Streams[0], c.cc, "/.PLController/Ping", opts...)
 	if err != nil {
 		return nil, err
 	}
 	x := &pLControllerPingClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
 	return x, nil
 }
 
 type PLController_PingClient interface {
+	Send(*datamodel2.PingArg) error
 	Recv() (*datamodel2.Ping, error)
 	grpc.ClientStream
 }
 
 type pLControllerPingClient struct {
 	grpc.ClientStream
+}
+
+func (x *pLControllerPingClient) Send(m *datamodel2.PingArg) error {
+	return x.ClientStream.SendMsg(m)
 }
 
 func (x *pLControllerPingClient) Recv() (*datamodel2.Ping, error) {
@@ -106,28 +105,27 @@ func (x *pLControllerPingClient) Recv() (*datamodel2.Ping, error) {
 	return m, nil
 }
 
-func (c *pLControllerClient) Traceroute(ctx context.Context, in *datamodel4.TracerouteArg, opts ...grpc.CallOption) (PLController_TracerouteClient, error) {
+func (c *pLControllerClient) Traceroute(ctx context.Context, opts ...grpc.CallOption) (PLController_TracerouteClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PLController_serviceDesc.Streams[1], c.cc, "/.PLController/Traceroute", opts...)
 	if err != nil {
 		return nil, err
 	}
 	x := &pLControllerTracerouteClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
 	return x, nil
 }
 
 type PLController_TracerouteClient interface {
+	Send(*datamodel4.TracerouteArg) error
 	Recv() (*datamodel4.Traceroute, error)
 	grpc.ClientStream
 }
 
 type pLControllerTracerouteClient struct {
 	grpc.ClientStream
+}
+
+func (x *pLControllerTracerouteClient) Send(m *datamodel4.TracerouteArg) error {
+	return x.ClientStream.SendMsg(m)
 }
 
 func (x *pLControllerTracerouteClient) Recv() (*datamodel4.Traceroute, error) {
@@ -214,8 +212,8 @@ func (c *pLControllerClient) AcceptProbes(ctx context.Context, in *datamodel6.Sp
 // Server API for PLController service
 
 type PLControllerServer interface {
-	Ping(*datamodel2.PingArg, PLController_PingServer) error
-	Traceroute(*datamodel4.TracerouteArg, PLController_TracerouteServer) error
+	Ping(PLController_PingServer) error
+	Traceroute(PLController_TracerouteServer) error
 	ReceiveSpoof(*datamodel6.RecSpoof, PLController_ReceiveSpoofServer) error
 	GetVPs(*datamodel5.VPRequest, PLController_GetVPsServer) error
 	AcceptProbes(context.Context, *datamodel6.SpoofedProbes) (*datamodel6.SpoofedProbesResponse, error)
@@ -226,15 +224,12 @@ func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
 }
 
 func _PLController_Ping_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel2.PingArg)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(PLControllerServer).Ping(m, &pLControllerPingServer{stream})
+	return srv.(PLControllerServer).Ping(&pLControllerPingServer{stream})
 }
 
 type PLController_PingServer interface {
 	Send(*datamodel2.Ping) error
+	Recv() (*datamodel2.PingArg, error)
 	grpc.ServerStream
 }
 
@@ -246,16 +241,21 @@ func (x *pLControllerPingServer) Send(m *datamodel2.Ping) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _PLController_Traceroute_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel4.TracerouteArg)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func (x *pLControllerPingServer) Recv() (*datamodel2.PingArg, error) {
+	m := new(datamodel2.PingArg)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
 	}
-	return srv.(PLControllerServer).Traceroute(m, &pLControllerTracerouteServer{stream})
+	return m, nil
+}
+
+func _PLController_Traceroute_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(PLControllerServer).Traceroute(&pLControllerTracerouteServer{stream})
 }
 
 type PLController_TracerouteServer interface {
 	Send(*datamodel4.Traceroute) error
+	Recv() (*datamodel4.TracerouteArg, error)
 	grpc.ServerStream
 }
 
@@ -265,6 +265,14 @@ type pLControllerTracerouteServer struct {
 
 func (x *pLControllerTracerouteServer) Send(m *datamodel4.Traceroute) error {
 	return x.ServerStream.SendMsg(m)
+}
+
+func (x *pLControllerTracerouteServer) Recv() (*datamodel4.TracerouteArg, error) {
+	m := new(datamodel4.TracerouteArg)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _PLController_ReceiveSpoof_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -335,11 +343,13 @@ var _PLController_serviceDesc = grpc.ServiceDesc{
 			StreamName:    "Ping",
 			Handler:       _PLController_Ping_Handler,
 			ServerStreams: true,
+			ClientStreams: true,
 		},
 		{
 			StreamName:    "Traceroute",
 			Handler:       _PLController_Traceroute_Handler,
 			ServerStreams: true,
+			ClientStreams: true,
 		},
 		{
 			StreamName:    "ReceiveSpoof",

@@ -63,6 +63,7 @@ type TracerouteMeasurement struct {
 	LssName      string `protobuf:"bytes,25,opt,name=lss_name" json:"lss_name,omitempty"`
 	Timeout      int64  `protobuf:"varint,26,opt,name=timeout" json:"timeout,omitempty"`
 	CheckCache   bool   `protobuf:"varint,27,opt,name=check_cache" json:"check_cache,omitempty"`
+	CheckDb      bool   `protobuf:"varint,28,opt,name=check_db" json:"check_db,omitempty"`
 }
 
 func (m *TracerouteMeasurement) Reset()         { *m = TracerouteMeasurement{} }

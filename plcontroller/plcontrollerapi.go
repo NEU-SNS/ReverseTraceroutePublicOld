@@ -30,6 +30,7 @@ package plcontroller
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -50,87 +51,98 @@ var (
 	ErrorTimeout = fmt.Errorf("Measurement timed out.")
 )
 
-func (c *plControllerT) Ping(pa *dm.PingArg, stream plc.PLController_PingServer) error {
-	log.Infof("Ping Request for %d pings", len(pa.Pings))
-	pings := pa.GetPings()
-	if pings == nil {
-		return ErrorNilArgList
-	}
-	if len(pings) == 0 {
-		return ErrorEmptyArgList
-	}
-	sendChan := make(chan *dm.Ping, len(pings))
-	var wg sync.WaitGroup
-	for _, ping := range pings {
-		wg.Add(1)
-		go func(p *dm.PingMeasurement) {
-			start := time.Now()
-			defer wg.Done()
-			pr, err := c.runPing(p)
-			if err != nil {
-				log.Infof("Got ping result: %v, with error %v", pr, err)
-				pr.Error = err.Error()
-				pr.Src = p.Src
-				pr.Dst = p.Dst
-				pr.Start = &dm.Time{
-					Sec:  int64(start.Second()),
-					Usec: int64(start.Nanosecond() / 1000),
-				}
-			}
-			sendChan <- &pr
-		}(ping)
-	}
-
-	go func() {
-		wg.Wait()
-		close(sendChan)
-	}()
-	for p := range sendChan {
-		if err := stream.Send(p); err != nil {
+func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
+	for {
+		pa, err := server.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
 			return err
+		}
+		pings := pa.GetPings()
+		if pings == nil {
+			return ErrorNilArgList
+		}
+		sendChan := make(chan *dm.Ping, len(pings))
+		var wg sync.WaitGroup
+		for _, ping := range pings {
+			wg.Add(1)
+			go func(p *dm.PingMeasurement) {
+				start := time.Now()
+				defer wg.Done()
+				pr, err := c.runPing(p)
+				if err != nil {
+					log.Infof("Got ping result: %v, with error %v", pr, err)
+					pr.Error = err.Error()
+					pr.Src = p.Src
+					pr.Dst = p.Dst
+					pr.Start = &dm.Time{
+						Sec:  int64(start.Second()),
+						Usec: int64(start.Nanosecond() / 1000),
+					}
+				}
+				sendChan <- &pr
+			}(ping)
+		}
+
+		go func() {
+			wg.Wait()
+			close(sendChan)
+		}()
+		for p := range sendChan {
+			if err := server.Send(p); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (c *plControllerT) Traceroute(ta *dm.TracerouteArg, stream plc.PLController_TracerouteServer) error {
-	traces := ta.GetTraceroutes()
-	if traces == nil {
-		return ErrorNilArgList
-	}
-	if len(traces) == 0 {
-		return ErrorEmptyArgList
-	}
-	sendChan := make(chan *dm.Traceroute, len(traces))
-	var wg sync.WaitGroup
-	for _, trace := range traces {
-		wg.Add(1)
-		go func(t *dm.TracerouteMeasurement) {
-			start := time.Now()
-			defer wg.Done()
-			tr, err := c.runTraceroute(t)
-			if err != nil {
-				log.Infof("Got tracerotue result: %v, with error %v", tr, err)
-				tr.Error = err.Error()
-				tr.Src = t.Src
-				tr.Dst = t.Dst
-				tr.Start = &dm.TracerouteTime{
-					Sec:   int64(start.Second()),
-					Usec:  int64(start.Nanosecond() / 1000),
-					Ftime: dm.TTime(start).String(),
-				}
-			}
-			sendChan <- &tr
-		}(trace)
-	}
-
-	go func() {
-		wg.Wait()
-		close(sendChan)
-	}()
-	for t := range sendChan {
-		if err := stream.Send(t); err != nil {
+func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) error {
+	for {
+		ta, err := server.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
 			return err
+		}
+		traces := ta.GetTraceroutes()
+		if traces == nil {
+			return ErrorNilArgList
+		}
+		sendChan := make(chan *dm.Traceroute, len(traces))
+		var wg sync.WaitGroup
+		for _, trace := range traces {
+			wg.Add(1)
+			go func(t *dm.TracerouteMeasurement) {
+				start := time.Now()
+				defer wg.Done()
+				tr, err := c.runTraceroute(t)
+				if err != nil {
+					log.Infof("Got tracerotue result: %v, with error %v", tr, err)
+					tr.Error = err.Error()
+					tr.Src = t.Src
+					tr.Dst = t.Dst
+					tr.Start = &dm.TracerouteTime{
+						Sec:   int64(start.Second()),
+						Usec:  int64(start.Nanosecond() / 1000),
+						Ftime: dm.TTime(start).String(),
+					}
+				}
+				sendChan <- &tr
+			}(trace)
+		}
+
+		go func() {
+			wg.Wait()
+			close(sendChan)
+		}()
+		for t := range sendChan {
+			if err := server.Send(t); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -36,7 +36,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
@@ -86,19 +85,20 @@ func main() {
 
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 
-	db, err := sql.NewDB(sql.DbConfig{
-		UName:    *conf.Db.UName,
-		Password: *conf.Db.Password,
-		Host:     *conf.Db.Host,
-		Port:     *conf.Db.Port,
-		Db:       *conf.Db.Db,
-	})
-	if err != nil {
-		log.Errorf("Failed to create db: %v", err)
-		exit(1)
-	}
-
-	err = <-controller.Start(conf, db, cache.New())
+	/*
+		db, err := sql.NewDB(sql.DbConfig{
+			UName:    *conf.Db.UName,
+			Password: *conf.Db.Password,
+			Host:     *conf.Db.Host,
+			Port:     *conf.Db.Port,
+			Db:       *conf.Db.Db,
+		})
+		if err != nil {
+			log.Errorf("Failed to create db: %v", err)
+			exit(1)
+		}
+	*/
+	err = <-controller.Start(conf, nil, cache.New())
 
 	if err != nil {
 		log.Errorf("Controller Start returned with error: %v", err)

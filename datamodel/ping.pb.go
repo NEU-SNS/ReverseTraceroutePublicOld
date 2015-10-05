@@ -59,6 +59,7 @@ type PingMeasurement struct {
 	TimeStamp  string `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
 	Timeout    int64  `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
 	CheckCache bool   `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
+	CheckDb    bool   `protobuf:"varint,24,opt,name=check_db" json:"check_db,omitempty"`
 }
 
 func (m *PingMeasurement) Reset()         { *m = PingMeasurement{} }

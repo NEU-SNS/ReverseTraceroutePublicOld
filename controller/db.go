@@ -29,14 +29,15 @@ package controller
 import (
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/prometheus/log"
 	"golang.org/x/net/context"
 )
 
 type pingDB struct {
-	db da.DataProvider
+	db da.PingProvider
 }
 
-func (db pingDB) pingDBStep(next pingFunc) pingFunc {
+func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 	return func(ctx context.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 		ret := make(chan *dm.Ping)
 		n := make(chan []*dm.PingMeasurement, 1)
@@ -46,12 +47,87 @@ func (db pingDB) pingDBStep(next pingFunc) pingFunc {
 				case <-ctx.Done():
 					close(ret)
 					return
-				case <-pm:
-					/*
-						Do DB stuff here and pass the results back
-						then start the code the run the measurement
-					*/
+				case m := <-pm:
+					check := make([]*dm.PingMeasurement, 0)
+					meas := make([]*dm.PingMeasurement, 0)
+					checking := make(map[string]*dm.PingMeasurement)
+					for _, p := range m {
+						if p.CheckDb {
+							check = append(check, p)
+							checking[p.Key()] = p
+						} else {
+							meas = append(meas, p)
+						}
+					}
 					res := next(ctx, n)
+					n <- meas
+					stored, err := pdb.db.GetPingsMulti(check)
+					if err != nil {
+						log.Errorf("Failed to check db: %v", err)
+					}
+					meas = make([]*dm.PingMeasurement, 0)
+					for item := range stored {
+						delete(checking, item.Key())
+						ret <- item
+					}
+					for _, left := range checking {
+						meas = append(meas, left)
+					}
+					n <- meas
+					close(n)
+					for p := range res {
+						ret <- p
+					}
+					close(ret)
+					return
+				}
+			}
+		}()
+		return ret
+	}
+}
+
+type traceDB struct {
+	db da.TracerouteProvider
+}
+
+func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
+	return func(ctx context.Context, pm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
+		ret := make(chan *dm.Traceroute)
+		n := make(chan []*dm.TracerouteMeasurement, 1)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					close(ret)
+					return
+				case m := <-pm:
+					check := make([]*dm.TracerouteMeasurement, 0)
+					meas := make([]*dm.TracerouteMeasurement, 0)
+					checking := make(map[string]*dm.TracerouteMeasurement)
+					for _, p := range m {
+						if p.CheckDb {
+							check = append(check, p)
+							checking[p.Key()] = p
+						} else {
+							meas = append(meas, p)
+						}
+					}
+					res := next(ctx, n)
+					n <- meas
+					stored, err := tdb.db.GetTraceMulti(check)
+					if err != nil {
+						log.Errorf("Failed to check db: %v", err)
+					}
+					meas = make([]*dm.TracerouteMeasurement, 0)
+					for item := range stored {
+						delete(checking, item.Key())
+						ret <- item
+					}
+					for _, left := range checking {
+						meas = append(meas, left)
+					}
+					n <- meas
 					close(n)
 					for p := range res {
 						ret <- p
