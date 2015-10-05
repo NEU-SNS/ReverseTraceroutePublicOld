@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
+	"github.com/gogo/protobuf/proto"
 )
 
 type TTime time.Time
@@ -54,6 +55,26 @@ func (t TTime) MarshalJSON() ([]byte, error) {
 func (t TTime) String() string {
 	tt := time.Time(t)
 	return tt.String()
+}
+
+func (t *Traceroute) Marshal() ([]byte, error) {
+	return proto.Marshal(t)
+}
+
+func (t *Traceroute) Unmarshal(data []byte) error {
+	return proto.Unmarshal(data, t)
+}
+
+func (t *Traceroute) Key() string {
+	return ""
+}
+
+func (tm *TracerouteMeasurement) Marshal() ([]byte, error) {
+	return proto.Marshal(tm)
+}
+
+func (tm *TracerouteMeasurement) Key() string {
+	return ""
 }
 
 func createTraceroute() interface{} {

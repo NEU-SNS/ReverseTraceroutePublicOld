@@ -55,13 +55,15 @@ type TracerouteProvider interface {
 	StoreTraceroute(*dm.Traceroute, dm.ServiceT) error
 	GetTRBySrcDst(string, string) (*dm.MTraceroute, error)
 	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.MTraceroute, error)
-	GetIntersectingTraceroute(string, string, Staleness) (*dm.MTraceroute, error)
+	GetTraceMulti([]*dm.TracerouteMeasurement) (<-chan *dm.Traceroute, error)
 }
 
 // PingProvider is the interface for getting pings
 type PingProvider interface {
 	GetPingBySrcDst(string, string) (*dm.Ping, error)
+	GetPingBySrcDstWithStaleness(string, string, Staleness) (*dm.Ping, error)
 	StorePing(*dm.Ping) error
+	GetPingsMulti([]*dm.PingMeasurement) (<-chan *dm.Ping, error)
 }
 
 type VPProvider interface {

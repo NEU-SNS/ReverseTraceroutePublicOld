@@ -31,6 +31,7 @@ message PingMeasurement {
     string time_stamp  = 21;
     int64 timeout      = 22;
     bool check_cache   = 23;
+    bool check_db      = 24;
 
 }
 
