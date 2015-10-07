@@ -28,25 +28,25 @@ package datamodel
 
 import (
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 func createPing() interface{} {
 	return new(Ping)
 }
-
-func (p *Ping) Marshal() ([]byte, error) {
-	return proto.Marshal(p)
+func (p *Ping) CUnmarshal(data []byte) error {
+	return proto.Unmarshal(data, p)
 }
 
-func (p *Ping) Unmarshal(data []byte) error {
-	return proto.Unmarshal(data, p)
+/*
+func (p *Ping) Marshal() ([]byte, error) {
+	return proto.Marshal(p)
 }
 
 func (pm *PingMeasurement) Marshal() ([]byte, error) {
 	return proto.Marshal(pm)
 }
-
+*/
 func (pm *PingMeasurement) Key() string {
 	return ""
 }

@@ -57,22 +57,25 @@ func (t TTime) String() string {
 	return tt.String()
 }
 
+/*
 func (t *Traceroute) Marshal() ([]byte, error) {
 	return proto.Marshal(t)
 }
 
-func (t *Traceroute) Unmarshal(data []byte) error {
-	return proto.Unmarshal(data, t)
-}
 
+*/
 func (t *Traceroute) Key() string {
 	return ""
 }
+func (t *Traceroute) CUnmarshal(data []byte) error {
+	return proto.Unmarshal(data, t)
+}
 
+/*
 func (tm *TracerouteMeasurement) Marshal() ([]byte, error) {
 	return proto.Marshal(tm)
 }
-
+*/
 func (tm *TracerouteMeasurement) Key() string {
 	return ""
 }
