@@ -193,17 +193,26 @@ func addrScan(ctx *cli.Context) {
 	defer dst.Close()
 	read := bufio.NewReader(dst)
 	dsts := make([]string, 0)
+	line = 0
 	for {
 		ip, err := read.ReadString('\n')
 		if err != nil && err != io.EOF {
 			return
 		}
-		if err == io.EOF && line == 0 {
-			break
+		if err == io.EOF {
+			if len(dsts) == 0 {
+				return
+			}
+			_, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error running measurements: %s\n", err)
+				return
+			}
+			return
 		}
 		ip1 := net.ParseIP(strings.TrimSpace(ip))
 		if ip1 == nil {
-			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line, ip)
+			fmt.Fprintf(os.Stderr, "Invalid ip at line: %d, %s\n", line+1, ip)
 			return
 		}
 		dsts = append(dsts, ip1.String())
@@ -216,19 +225,7 @@ func addrScan(ctx *cli.Context) {
 			}
 			line = 0
 			dsts = make([]string, 0)
-			<-time.After(time.Second)
 			continue
-		}
-		if err == io.EOF {
-			if len(dsts) == 0 {
-				break
-			}
-			_, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error running measurements: %s\n", err)
-				return
-			}
-			break
 		}
 
 	}
@@ -369,10 +366,12 @@ func runMeasurements(srcs, dsts []string, id, outDir string, rr, wdb bool, db *s
 	fmt.Println("Num of requests:", len(pingReq.Pings))
 	start := time.Now()
 	fmt.Println("Starting:", start)
-	st, err := cl.Ping(ctx.Background(), pingReq)
+	st, err := cl.Ping(ctx.Background())
 	if err != nil {
 		return nil, fmt.Errorf("Failed to run ping: %v", err)
 	}
+	st.Send(pingReq)
+	st.CloseSend()
 	ps := make([]*dm.Ping, 0)
 	succ := make([]string, 0)
 	for {

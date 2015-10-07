@@ -52,7 +52,7 @@ type Staleness time.Duration
 
 // TracerouteProvider is the interface for getting traceroutes
 type TracerouteProvider interface {
-	StoreTraceroute(*dm.Traceroute, dm.ServiceT) error
+	StoreTraceroute(*dm.Traceroute) error
 	GetTRBySrcDst(string, string) (*dm.MTraceroute, error)
 	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.MTraceroute, error)
 	GetTraceMulti([]*dm.TracerouteMeasurement) (<-chan *dm.Traceroute, error)

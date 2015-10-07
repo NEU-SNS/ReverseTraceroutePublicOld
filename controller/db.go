@@ -40,7 +40,7 @@ type pingDB struct {
 func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 	return func(ctx context.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 		ret := make(chan *dm.Ping)
-		n := make(chan []*dm.PingMeasurement, 1)
+		n := make(chan []*dm.PingMeasurement, 2)
 		go func() {
 			for {
 				select {
@@ -76,6 +76,9 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 					n <- meas
 					close(n)
 					for p := range res {
+						go func(ping *dm.Ping) {
+							pdb.db.StorePing(ping)
+						}(p)
 						ret <- p
 					}
 					close(ret)
@@ -94,7 +97,7 @@ type traceDB struct {
 func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
 	return func(ctx context.Context, pm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
 		ret := make(chan *dm.Traceroute)
-		n := make(chan []*dm.TracerouteMeasurement, 1)
+		n := make(chan []*dm.TracerouteMeasurement, 2)
 		go func() {
 			for {
 				select {
@@ -129,8 +132,11 @@ func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
 					}
 					n <- meas
 					close(n)
-					for p := range res {
-						ret <- p
+					for t := range res {
+						go func(trace *dm.Traceroute) {
+							tdb.db.StoreTraceroute(trace)
+						}(t)
+						ret <- t
 					}
 					close(ret)
 					return

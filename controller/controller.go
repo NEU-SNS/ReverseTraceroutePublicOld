@@ -160,15 +160,42 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 			case <-ctx.Done():
 				close(ret)
 				return
-			case <-pm:
-				/*
-					Do stuff to run the measurements
-					Return the results back
-				*/
-				close(ret)
-				return
+			case pms := <-pm:
+				if pms == nil || len(pms) == 0 {
+					break
+
+				}
+				r := router.New()
+				mts := make(map[router.MeasurementTool][]*dm.PingMeasurement)
+				for _, p := range pms {
+					mt, err := r.Get(p.Src)
+					if err != nil {
+						ret <- &dm.Ping{
+							Src:   p.Src,
+							Dst:   p.Dst,
+							Error: err.Error(),
+						}
+						continue
+					}
+					mts[mt] = append(mts[mt], p)
+				}
+				for mt, ms := range mts {
+					go func(tool router.MeasurementTool, targs []*dm.PingMeasurement) {
+						pings, err := mt.Ping(ctx, &dm.PingArg{
+							Pings: targs,
+						})
+						if err != nil {
+							log.Errorf("Failed running ping measurements: %v", err)
+							return
+						}
+						for x := range pings {
+							ret <- x
+						}
+					}(mt, ms)
+				}
 			}
 		}
+		close(ret)
 	}()
 	return ret
 }
@@ -194,15 +221,42 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 			case <-ctx.Done():
 				close(ret)
 				return
-			case <-tm:
-				/*
-					Do stuff to run the measurements
-					Return the results back
-				*/
-				close(ret)
-				return
+			case tms := <-tm:
+				if tms == nil || len(tms) == 0 {
+					break
+
+				}
+				r := router.New()
+				mts := make(map[router.MeasurementTool][]*dm.TracerouteMeasurement)
+				for _, t := range tms {
+					mt, err := r.Get(t.Src)
+					if err != nil {
+						ret <- &dm.Traceroute{
+							Src:   t.Src,
+							Dst:   t.Dst,
+							Error: err.Error(),
+						}
+						continue
+					}
+					mts[mt] = append(mts[mt], t)
+				}
+				for mt, ms := range mts {
+					go func(tool router.MeasurementTool, targs []*dm.TracerouteMeasurement) {
+						traceroutes, err := mt.Traceroute(ctx, &dm.TracerouteArg{
+							Traceroutes: targs,
+						})
+						if err != nil {
+							log.Errorf("Failed running ping measurements: %v", err)
+							return
+						}
+						for x := range traceroutes {
+							ret <- x
+						}
+					}(mt, ms)
+				}
 			}
 		}
+		close(ret)
 	}()
 	return ret
 }

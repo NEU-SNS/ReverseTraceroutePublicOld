@@ -26,12 +26,12 @@
 */
 package cache
 
-type Unmarshaler interface {
-	Unmarshal([]byte) error
+type CUnmarshaler interface {
+	CUnmarshal([]byte) error
 }
 
 type CacheItem interface {
-	Unmarshal(um Unmarshaler) error
+	Unmarshal(um CUnmarshaler) error
 	Marshal() ([]byte, error)
 	Keyer
 }
@@ -39,8 +39,8 @@ type CacheItem interface {
 type Cache interface {
 	Get(Keyer) (CacheItem, error)
 	GetMulti([]Keyer) (map[string]CacheItem, error)
-	GetVal(Keyer, Unmarshaler) error
-	Set(CacheItem) error
+	GetVal(Keyer, CUnmarshaler) error
+	Set(Keyer) error
 }
 
 type Keyer interface {
@@ -61,11 +61,11 @@ func (c *cache) GetMulti(keys []Keyer) (map[string]CacheItem, error) {
 	return nil, nil
 }
 
-func (c *cache) GetVal(key Keyer, marsh Unmarshaler) error {
+func (c *cache) GetVal(key Keyer, marsh CUnmarshaler) error {
 	return nil
 }
 
-func (c *cache) Set(item CacheItem) error {
+func (c *cache) Set(item Keyer) error {
 	return nil
 }
 

@@ -99,10 +99,12 @@ func main() {
 	//fmt.Println(pingreq)
 	fmt.Println("Num of requests: ", len(pingreq.Pings))
 	fmt.Println("Starting: ", time.Now())
-	st, err := cl.Ping(ctx.Background(), pingreq)
+	st, err := cl.Ping(ctx.Background())
 	if err != nil {
 		panic(err)
 	}
+	st.Send(pingreq)
+	st.CloseSend()
 	ps := make([]*dm.Ping, 0)
 	for {
 		pr, err := st.Recv()

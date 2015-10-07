@@ -58,6 +58,22 @@ type ServiceDef struct {
 	Service Service
 }
 
+type source struct{}
+
+func (s source) Get(dst string) (ServiceDef, error) {
+	return ServiceDef{
+		Addr: "plcontroller.revtr.ccs.neu.edu",
+		Port: "4380",
+	}, nil
+}
+
+func (s source) All() []ServiceDef {
+	return []ServiceDef{ServiceDef{
+		Addr: "plcontroller.revtr.ccs.neu.edu",
+		Port: "4380",
+	}}
+}
+
 type Source interface {
 	Get(string) (ServiceDef, error)
 	All() []ServiceDef
@@ -72,13 +88,14 @@ type Router interface {
 type mtCache map[ServiceDef]MeasurementTool
 
 type router struct {
-	source      Source
-	activeCache mtCache
+	source Source
+	cache  mtCache
 }
 
 func New() Router {
 	return &router{
-		activeCache: make(mtCache),
+		cache:  make(mtCache),
+		source: source{},
 	}
 }
 
@@ -91,9 +108,23 @@ func (r *router) Get(addr string) (MeasurementTool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return create(service)
+	if mt, ok := r.cache[service]; ok {
+		return mt, nil
+	}
+	mt, err := create(service)
+	if err != nil {
+		return nil, err
+	}
+	r.cache[service] = mt
+	return mt, nil
 }
 
 func (r *router) All() []MeasurementTool {
-	return nil
+	services := r.source.All()
+	ret := make([]MeasurementTool, len(services))
+	for i, s := range services {
+		mt, _ := create(s)
+		ret[i] = mt
+	}
+	return ret
 }

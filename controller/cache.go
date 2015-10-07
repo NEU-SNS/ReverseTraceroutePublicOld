@@ -42,7 +42,7 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 
 	return func(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 		ret := make(chan *dm.Ping)
-		n := make(chan []*dm.PingMeasurement, 1)
+		n := make(chan []*dm.PingMeasurement, 2)
 		go func() {
 			for {
 				select {
@@ -85,6 +85,9 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 					n <- db
 					close(n)
 					for p := range res {
+						go func(ping *dm.Ping) {
+							pc.c.Set(ping)
+						}(p)
 						ret <- p
 					}
 					close(ret)
@@ -104,7 +107,7 @@ func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
 
 	return func(ctx con.Context, pm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
 		ret := make(chan *dm.Traceroute)
-		n := make(chan []*dm.TracerouteMeasurement, 1)
+		n := make(chan []*dm.TracerouteMeasurement, 2)
 		go func() {
 			for {
 				select {
@@ -146,8 +149,11 @@ func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
 					}
 					n <- db
 					close(n)
-					for p := range res {
-						ret <- p
+					for t := range res {
+						go func(trace *dm.Traceroute) {
+							tc.c.Set(trace)
+						}(t)
+						ret <- t
 					}
 					close(ret)
 					return

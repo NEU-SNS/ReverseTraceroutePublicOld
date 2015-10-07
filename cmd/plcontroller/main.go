@@ -102,7 +102,7 @@ func main() {
 	var parseConf plcontroller.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
-		log.Errorf("Failed to parse config: %v", err)
+		log.Fatalf("Failed to parse config: %v", err)
 		exit(1)
 	}
 
@@ -117,14 +117,14 @@ func main() {
 	})
 
 	if err != nil {
-		log.Errorf("Failed to create db: %v", err)
+		log.Fatalf("Failed to create db: %v", err)
 		exit(1)
 	}
 
 	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{})
 
 	if err != nil {
-		log.Errorf("PLController Start returned with error: %v", err)
+		log.Fatalf("PLController Start returned with error: %v", err)
 		exit(1)
 	}
 }
@@ -134,7 +134,7 @@ func sigHandle() {
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
 		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
-		log.Infof("Got signal: %v", sig)
+		log.Fatalf("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)
 		exit(1)
 	}
