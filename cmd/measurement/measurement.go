@@ -197,6 +197,7 @@ func addrScan(ctx *cli.Context) {
 	for {
 		ip, err := read.ReadString('\n')
 		if err != nil && err != io.EOF {
+			fmt.Fprintf(os.Stderr, "Got error: %v", err)
 			return
 		}
 		if err == io.EOF {
@@ -316,6 +317,7 @@ func prefixScan(ctx *cli.Context) {
 		}
 		succ, err := runMeasurements(srcs, dsts, ctx.GlobalString("id"), ctx.String("out"), rr, ctx.BoolT("db"), nil)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v", err)
 			return
 		}
 		for _, s := range succ {
