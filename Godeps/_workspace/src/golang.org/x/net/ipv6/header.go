@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,58 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-// Package controller is the library for creating a central controller
-package controller
+package ipv6
 
 import (
 	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"fmt"
+	"net"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
+const (
+	Version   = 6  // protocol version
+	HeaderLen = 40 // header length
 )
 
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// A Header represents an IPv6 base header.
+type Header struct {
+	Version      int    // protocol version
+	TrafficClass int    // traffic class
+	FlowLabel    int    // flow label
+	PayloadLen   int    // payload length
+	NextHeader   int    // next header
+	HopLimit     int    // hop limit
+	Src          net.IP // source address
+	Dst          net.IP // destination address
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+func (h *Header) String() string {
+	if h == nil {
+		return "<nil>"
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+	return fmt.Sprintf("ver: %v, tclass: %#x, flowlbl: %#x, payloadlen: %v, nxthdr: %v, hoplim: %v, src: %v, dst: %v", h.Version, h.TrafficClass, h.FlowLabel, h.PayloadLen, h.NextHeader, h.HopLimit, h.Src, h.Dst)
+}
+
+// ParseHeader parses b as an IPv6 base header.
+func ParseHeader(b []byte) (*Header, error) {
+	if len(b) < HeaderLen {
+		return nil, errors.New("header too short")
 	}
-	return c
+	h := &Header{
+		Version:      int(b[0]) >> 4,
+		TrafficClass: int(b[0]&0x0f)<<4 | int(b[1])>>4,
+		FlowLabel:    int(b[1]&0x0f)<<16 | int(b[2])<<8 | int(b[3]),
+		PayloadLen:   int(b[4])<<8 | int(b[5]),
+		NextHeader:   int(b[6]),
+		HopLimit:     int(b[7]),
+	}
+	h.Src = make(net.IP, net.IPv6len)
+	copy(h.Src, b[8:24])
+	h.Dst = make(net.IP, net.IPv6len)
+	copy(h.Dst, b[24:40])
+	return h, nil
 }

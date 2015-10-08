@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,37 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+package logrus
 
-// Package controller is the library for creating a central controller
-package controller
-
-import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// A hook to be fired when logging on the logging levels returned from
+// `Levels()` on your implementation of the interface. Note that this is not
+// fired in a goroutine or a channel with workers, you should handle such
+// functionality yourself if your call is non-blocking and you don't wish for
+// the logging calls for levels returned from `Levels()` to block.
+type Hook interface {
+	Levels() []Level
+	Fire(*Entry) error
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
+// Internal type for storing the hooks on a logger instance.
+type LevelHooks map[Level][]Hook
 
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// Add a hook to an instance of logger. This is called with
+// `log.Hooks.Add(new(MyHook))` where `MyHook` implements the `Hook` interface.
+func (hooks LevelHooks) Add(hook Hook) {
+	for _, level := range hook.Levels() {
+		hooks[level] = append(hooks[level], hook)
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+}
+
+// Fire all the hooks for the passed level. Used by `entry.log` to fire
+// appropriate hooks for a log entry.
+func (hooks LevelHooks) Fire(level Level, entry *Entry) error {
+	for _, hook := range hooks[level] {
+		if err := hook.Fire(entry); err != nil {
+			return err
+		}
 	}
-	return c
+
+	return nil
 }

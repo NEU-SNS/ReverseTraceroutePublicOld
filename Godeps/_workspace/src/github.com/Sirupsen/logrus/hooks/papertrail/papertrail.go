@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,58 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
-package controller
+package logrus_papertrail
 
 import (
-	"errors"
+	"fmt"
+	"net"
+	"os"
 	"time"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"github.com/Sirupsen/logrus"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
+const (
+	format = "Jan 2 15:04:05"
 )
 
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// PapertrailHook to send logs to a logging service compatible with the Papertrail API.
+type PapertrailHook struct {
+	Host    string
+	Port    int
+	AppName string
+	UDPConn net.Conn
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
+// NewPapertrailHook creates a hook to be added to an instance of logger.
+func NewPapertrailHook(host string, port int, appName string) (*PapertrailHook, error) {
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", host, port))
+	return &PapertrailHook{host, port, appName, conn}, err
 }
 
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
+// Fire is called when a log event is fired.
+func (hook *PapertrailHook) Fire(entry *logrus.Entry) error {
+	date := time.Now().Format(format)
+	msg, _ := entry.String()
+	payload := fmt.Sprintf("<22> %s %s: %s", date, hook.AppName, msg)
 
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+	bytesWritten, err := hook.UDPConn.Write([]byte(payload))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to send log line to Papertrail via UDP. Wrote %d bytes before error: %v", bytesWritten, err)
+		return err
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+
+	return nil
+}
+
+// Levels returns the available logging levels.
+func (hook *PapertrailHook) Levels() []logrus.Level {
+	return []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
 	}
-	return c
 }

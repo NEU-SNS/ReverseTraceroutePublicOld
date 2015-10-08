@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,44 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-// Package controller is the library for creating a central controller
-package controller
+package icmp
 
-import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// A DstUnreach represents an ICMP destination unreachable message
+// body.
+type DstUnreach struct {
+	Data       []byte      // data, known as original datagram field
+	Extensions []Extension // extensions
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// Len implements the Len method of MessageBody interface.
+func (p *DstUnreach) Len(proto int) int {
+	if p == nil {
+		return 0
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+	l, _ := multipartMessageBodyDataLen(proto, p.Data, p.Extensions)
+	return l
+}
+
+// Marshal implements the Marshal method of MessageBody interface.
+func (p *DstUnreach) Marshal(proto int) ([]byte, error) {
+	return marshalMultipartMessageBody(proto, p.Data, p.Extensions)
+}
+
+// parseDstUnreach parses b as an ICMP destination unreachable message
+// body.
+func parseDstUnreach(proto int, b []byte) (MessageBody, error) {
+	if len(b) < 4 {
+		return nil, errMessageTooShort
 	}
-	return c
+	p := &DstUnreach{}
+	var err error
+	p.Data, p.Extensions, err = parseMultipartMessageBody(proto, b)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }

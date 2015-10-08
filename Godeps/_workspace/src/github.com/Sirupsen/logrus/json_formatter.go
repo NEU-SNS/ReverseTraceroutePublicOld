@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,44 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
-package controller
+package logrus
 
 import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"encoding/json"
+	"fmt"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+type JSONFormatter struct {
+	// TimestampFormat sets the format used for marshaling timestamps.
+	TimestampFormat string
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
+	data := make(Fields, len(entry.Data)+3)
+	for k, v := range entry.Data {
+		switch v := v.(type) {
+		case error:
+			// Otherwise errors are ignored by `encoding/json`
+			// https://github.com/Sirupsen/logrus/issues/137
+			data[k] = v.Error()
+		default:
+			data[k] = v
+		}
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+	prefixFieldClashes(data)
+
+	timestampFormat := f.TimestampFormat
+	if timestampFormat == "" {
+		timestampFormat = DefaultTimestampFormat
 	}
-	return c
+
+	data["time"] = entry.Time.Format(timestampFormat)
+	data["msg"] = entry.Message
+	data["level"] = entry.Level.String()
+
+	serialized, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to marshal fields to JSON, %v", err)
+	}
+	return append(serialized, '\n'), nil
 }

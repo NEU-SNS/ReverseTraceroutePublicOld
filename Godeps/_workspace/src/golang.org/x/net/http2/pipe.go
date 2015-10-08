@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,46 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2014 The Go Authors.
+// See https://code.google.com/p/go/source/browse/CONTRIBUTORS
+// Licensed under the same terms as Go itself:
+// https://code.google.com/p/go/source/browse/LICENSE
 
-// Package controller is the library for creating a central controller
-package controller
+package http2
 
 import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"sync"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+type pipe struct {
+	b buffer
+	c sync.Cond
+	m sync.Mutex
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// Read waits until data is available and copies bytes
+// from the buffer into p.
+func (r *pipe) Read(p []byte) (n int, err error) {
+	r.c.L.Lock()
+	defer r.c.L.Unlock()
+	for r.b.Len() == 0 && !r.b.closed {
+		r.c.Wait()
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
-	}
-	return c
+	return r.b.Read(p)
+}
+
+// Write copies bytes from p into the buffer and wakes a reader.
+// It is an error to write more data than the buffer can hold.
+func (w *pipe) Write(p []byte) (n int, err error) {
+	w.c.L.Lock()
+	defer w.c.L.Unlock()
+	defer w.c.Signal()
+	return w.b.Write(p)
+}
+
+func (c *pipe) Close(err error) {
+	c.c.L.Lock()
+	defer c.c.L.Unlock()
+	defer c.c.Signal()
+	c.b.Close(err)
 }

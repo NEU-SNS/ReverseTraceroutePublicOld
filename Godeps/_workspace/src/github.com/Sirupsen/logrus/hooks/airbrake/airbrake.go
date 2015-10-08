@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,57 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
-package controller
+package airbrake
 
 import (
 	"errors"
-	"time"
+	"fmt"
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"github.com/Sirupsen/logrus"
+	"github.com/tobi/airbrake-go"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// AirbrakeHook to send exceptions to an exception-tracking service compatible
+// with the Airbrake API.
+type airbrakeHook struct {
+	APIKey      string
+	Endpoint    string
+	Environment string
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+func NewHook(endpoint, apiKey, env string) *airbrakeHook {
+	return &airbrakeHook{
+		APIKey:      apiKey,
+		Endpoint:    endpoint,
+		Environment: env,
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+}
+
+func (hook *airbrakeHook) Fire(entry *logrus.Entry) error {
+	airbrake.ApiKey = hook.APIKey
+	airbrake.Endpoint = hook.Endpoint
+	airbrake.Environment = hook.Environment
+
+	var notifyErr error
+	err, ok := entry.Data["error"].(error)
+	if ok {
+		notifyErr = err
+	} else {
+		notifyErr = errors.New(entry.Message)
 	}
-	return c
+
+	airErr := airbrake.Notify(notifyErr)
+	if airErr != nil {
+		return fmt.Errorf("Failed to send error to Airbrake: %s", airErr)
+	}
+
+	return nil
+}
+
+func (hook *airbrakeHook) Levels() []logrus.Level {
+	return []logrus.Level{
+		logrus.ErrorLevel,
+		logrus.FatalLevel,
+		logrus.PanicLevel,
+	}
 }

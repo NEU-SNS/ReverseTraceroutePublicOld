@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,51 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+package logrus
 
-// Package controller is the library for creating a central controller
-package controller
+import "time"
 
-import (
-	"errors"
-	"time"
+const DefaultTimestampFormat = time.RFC3339
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// The Formatter interface is used to implement a custom Formatter. It takes an
+// `Entry`. It exposes all the fields, including the default ones:
+//
+// * `entry.Data["msg"]`. The message passed from Info, Warn, Error ..
+// * `entry.Data["time"]`. The timestamp.
+// * `entry.Data["level"]. The level the entry was logged at.
+//
+// Any additional fields added with `WithField` or `WithFields` are also in
+// `entry.Data`. Format is expected to return an array of bytes which are then
+// logged to `logger.Out`.
+type Formatter interface {
+	Format(*Entry) ([]byte, error)
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// This is to not silently overwrite `time`, `msg` and `level` fields when
+// dumping it. If this code wasn't there doing:
+//
+//  logrus.WithField("level", 1).Info("hello")
+//
+// Would just silently drop the user provided level. Instead with this code
+// it'll logged as:
+//
+//  {"level": "info", "fields.level": 1, "msg": "hello", "time": "..."}
+//
+// It's not exported because it's still using Data in an opinionated way. It's to
+// avoid code duplication between the two default formatters.
+func prefixFieldClashes(data Fields) {
+	_, ok := data["time"]
+	if ok {
+		data["fields.time"] = data["time"]
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+
+	_, ok = data["msg"]
+	if ok {
+		data["fields.msg"] = data["msg"]
 	}
-	return c
+
+	_, ok = data["level"]
+	if ok {
+		data["fields.level"] = data["level"]
+	}
 }

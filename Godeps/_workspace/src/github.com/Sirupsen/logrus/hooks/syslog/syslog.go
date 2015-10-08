@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,62 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
-package controller
+package logrus_syslog
 
 import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"fmt"
+	"github.com/Sirupsen/logrus"
+	"log/syslog"
+	"os"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// SyslogHook to send logs via syslog.
+type SyslogHook struct {
+	Writer        *syslog.Writer
+	SyslogNetwork string
+	SyslogRaddr   string
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
+// Creates a hook to be added to an instance of logger. This is called with
+// `hook, err := NewSyslogHook("udp", "localhost:514", syslog.LOG_DEBUG, "")`
+// `if err == nil { log.Hooks.Add(hook) }`
+func NewSyslogHook(network, raddr string, priority syslog.Priority, tag string) (*SyslogHook, error) {
+	w, err := syslog.Dial(network, raddr, priority, tag)
+	return &SyslogHook{w, network, raddr}, err
 }
 
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+func (hook *SyslogHook) Fire(entry *logrus.Entry) error {
+	line, err := entry.String()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to read entry, %v", err)
+		return err
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+
+	switch entry.Level {
+	case logrus.PanicLevel:
+		return hook.Writer.Crit(line)
+	case logrus.FatalLevel:
+		return hook.Writer.Crit(line)
+	case logrus.ErrorLevel:
+		return hook.Writer.Err(line)
+	case logrus.WarnLevel:
+		return hook.Writer.Warning(line)
+	case logrus.InfoLevel:
+		return hook.Writer.Info(line)
+	case logrus.DebugLevel:
+		return hook.Writer.Debug(line)
+	default:
+		return nil
 	}
-	return c
+}
+
+func (hook *SyslogHook) Levels() []logrus.Level {
+	return []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
+	}
 }
