@@ -1,13 +1,25 @@
 FROM golang
 
+RUN useradd -ms /bin/bash plcontroller
+
+ENV LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
+
+RUN mkdir scamper && cd scamper \
+    && wget http://www.ccs.neu.edu/home/rhansen2/scamper.tar.gz \
+    && tar xzf scamper.tar.gz && cd scamper-cvs-20150901 \
+    && ./configure && make && make install
+
 ADD . /go/src/github.com/NEU-SNS/ReverseTraceroute
 
 WORKDIR /go/src/github.com/NEU-SNS/ReverseTraceroute
 RUN go get github.com/tools/godep
 RUN godep restore ./...
-RUN go install github.com/NEU-SNS/ReverseTraceroute/cmd/plcontroller
+RUN go install -ldflags "-X main.configPath=/go/src/github.com/NEU-SNS/ReverseTraceroute/cmd/plcontroller/plcontroller.config" \
+    github.com/NEU-SNS/ReverseTraceroute/cmd/plcontroller
 
-ENTRYPOINT /go/bin/plcontroller -loglevel fatal
+USER plcontroller
+ENTRYPOINT ["/go/bin/plcontroller", "-loglevel", "fatal"]
+
 
 EXPOSE 4380
 EXPOSE 4381

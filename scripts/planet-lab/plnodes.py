@@ -87,7 +87,7 @@ def main(argv):
     auth['AuthMethod'] = 'password'
 
     auth['Username'] = 'rhansen2@ccs.neu.edu'
-    auth['AuthString'] = 'Allislost1.'
+    auth['AuthString'] = ''
 
     authorized = api_server.AuthCheck(auth)
 

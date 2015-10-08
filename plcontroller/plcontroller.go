@@ -354,7 +354,6 @@ func (c *plControllerT) stop() {
 	}
 	// Wait 5 seconds... I think sc_remoted needs time to properly clean-up
 	<-time.After(time.Second * 5)
-	cleanDir(*c.config.Scamper.SockDir)
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
