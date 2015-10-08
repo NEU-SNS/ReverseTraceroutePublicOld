@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,53 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package controller is the library for creating a central controller
-package controller
+package prometheus
 
 import (
-	"errors"
+	"runtime"
+	"runtime/debug"
 	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+type goCollector struct {
+	goroutines Gauge
+	gcDesc     *Desc
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// NewGoCollector returns a collector which exports metrics about the current
+// go process.
+func NewGoCollector() *goCollector {
+	return &goCollector{
+		goroutines: NewGauge(GaugeOpts{
+			Name: "go_goroutines",
+			Help: "Number of goroutines that currently exist.",
+		}),
+		gcDesc: NewDesc(
+			"go_gc_duration_seconds",
+			"A summary of the GC invocation durations.",
+			nil, nil),
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+}
+
+// Describe returns all descriptions of the collector.
+func (c *goCollector) Describe(ch chan<- *Desc) {
+	ch <- c.goroutines.Desc()
+	ch <- c.gcDesc
+}
+
+// Collect returns the current state of all metrics of the collector.
+func (c *goCollector) Collect(ch chan<- Metric) {
+	c.goroutines.Set(float64(runtime.NumGoroutine()))
+	ch <- c.goroutines
+
+	var stats debug.GCStats
+	stats.PauseQuantiles = make([]time.Duration, 5)
+	debug.ReadGCStats(&stats)
+
+	quantiles := make(map[float64]float64)
+	for idx, pq := range stats.PauseQuantiles[1:] {
+		quantiles[float64(idx+1)/float64(len(stats.PauseQuantiles)-1)] = pq.Seconds()
 	}
-	return c
+	quantiles[0.0] = stats.PauseQuantiles[0].Seconds()
+	ch <- MustNewConstSummary(c.gcDesc, uint64(stats.NumGC), float64(stats.PauseTotal.Seconds()), quantiles)
 }

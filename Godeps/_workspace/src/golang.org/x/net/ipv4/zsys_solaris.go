@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,63 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Created by cgo -godefs - DO NOT EDIT
+// cgo -godefs defs_solaris.go
 
-// Package controller is the library for creating a central controller
-package controller
+// +build solaris
 
-import (
-	"errors"
-	"time"
+package ipv4
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+const (
+	sysIP_OPTIONS       = 0x1
+	sysIP_HDRINCL       = 0x2
+	sysIP_TOS           = 0x3
+	sysIP_TTL           = 0x4
+	sysIP_RECVOPTS      = 0x5
+	sysIP_RECVRETOPTS   = 0x6
+	sysIP_RECVDSTADDR   = 0x7
+	sysIP_RETOPTS       = 0x8
+	sysIP_RECVIF        = 0x9
+	sysIP_RECVSLLA      = 0xa
+	sysIP_RECVTTL       = 0xb
+	sysIP_NEXTHOP       = 0x19
+	sysIP_PKTINFO       = 0x1a
+	sysIP_RECVPKTINFO   = 0x1a
+	sysIP_DONTFRAG      = 0x1b
+	sysIP_BOUND_IF      = 0x41
+	sysIP_UNSPEC_SRC    = 0x42
+	sysIP_BROADCAST_TTL = 0x43
+	sysIP_DHCPINIT_IF   = 0x45
+
+	sysIP_MULTICAST_IF           = 0x10
+	sysIP_MULTICAST_TTL          = 0x11
+	sysIP_MULTICAST_LOOP         = 0x12
+	sysIP_ADD_MEMBERSHIP         = 0x13
+	sysIP_DROP_MEMBERSHIP        = 0x14
+	sysIP_BLOCK_SOURCE           = 0x15
+	sysIP_UNBLOCK_SOURCE         = 0x16
+	sysIP_ADD_SOURCE_MEMBERSHIP  = 0x17
+	sysIP_DROP_SOURCE_MEMBERSHIP = 0x18
+
+	sysSizeofInetPktinfo = 0xc
+
+	sysSizeofIPMreq       = 0x8
+	sysSizeofIPMreqSource = 0xc
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+type sysInetPktinfo struct {
+	Ifindex  uint32
+	Spec_dst [4]byte /* in_addr */
+	Addr     [4]byte /* in_addr */
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
+type sysIPMreq struct {
+	Multiaddr [4]byte /* in_addr */
+	Interface [4]byte /* in_addr */
 }
 
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
-	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
-	}
-	return c
+type sysIPMreqSource struct {
+	Multiaddr  [4]byte /* in_addr */
+	Sourceaddr [4]byte /* in_addr */
+	Interface  [4]byte /* in_addr */
 }

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,62 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-// Package controller is the library for creating a central controller
-package controller
+// +build darwin freebsd linux
+
+package ipv6
 
 import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
+	"net"
+	"os"
+	"unsafe"
 )
 
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
+var freebsd32o64 bool
 
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
-}
-
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+func setsockoptGroupReq(fd int, opt *sockOpt, ifi *net.Interface, grp net.IP) error {
+	var gr sysGroupReq
+	if ifi != nil {
+		gr.Interface = uint32(ifi.Index)
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+	gr.setGroup(grp)
+	var p unsafe.Pointer
+	var l sysSockoptLen
+	if freebsd32o64 {
+		var d [sysSizeofGroupReq + 4]byte
+		s := (*[sysSizeofGroupReq]byte)(unsafe.Pointer(&gr))
+		copy(d[:4], s[:4])
+		copy(d[8:], s[4:])
+		p = unsafe.Pointer(&d[0])
+		l = sysSizeofGroupReq + 4
+	} else {
+		p = unsafe.Pointer(&gr)
+		l = sysSizeofGroupReq
 	}
-	return c
+	return os.NewSyscallError("setsockopt", setsockopt(fd, opt.level, opt.name, p, l))
+}
+
+func setsockoptGroupSourceReq(fd int, opt *sockOpt, ifi *net.Interface, grp, src net.IP) error {
+	var gsr sysGroupSourceReq
+	if ifi != nil {
+		gsr.Interface = uint32(ifi.Index)
+	}
+	gsr.setSourceGroup(grp, src)
+	var p unsafe.Pointer
+	var l sysSockoptLen
+	if freebsd32o64 {
+		var d [sysSizeofGroupSourceReq + 4]byte
+		s := (*[sysSizeofGroupSourceReq]byte)(unsafe.Pointer(&gsr))
+		copy(d[:4], s[:4])
+		copy(d[8:], s[4:])
+		p = unsafe.Pointer(&d[0])
+		l = sysSizeofGroupSourceReq + 4
+	} else {
+		p = unsafe.Pointer(&gsr)
+		l = sysSizeofGroupSourceReq
+	}
+	return os.NewSyscallError("setsockopt", setsockopt(fd, opt.level, opt.name, p, l))
 }

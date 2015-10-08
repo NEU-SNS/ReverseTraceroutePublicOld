@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,46 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2012 The Go Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-// Package controller is the library for creating a central controller
-package controller
+package icmp
 
-import (
-	"errors"
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
+// An Echo represents an ICMP echo request or reply message body.
+type Echo struct {
+	ID   int    // identifier
+	Seq  int    // sequence number
+	Data []byte // data
 }
 
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
+// Len implements the Len method of MessageBody interface.
+func (p *Echo) Len(proto int) int {
+	if p == nil {
+		return 0
 	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
+	return 4 + len(p.Data)
+}
+
+// Marshal implements the Marshal method of MessageBody interface.
+func (p *Echo) Marshal(proto int) ([]byte, error) {
+	b := make([]byte, 4+len(p.Data))
+	b[0], b[1] = byte(p.ID>>8), byte(p.ID)
+	b[2], b[3] = byte(p.Seq>>8), byte(p.Seq)
+	copy(b[4:], p.Data)
+	return b, nil
+}
+
+// parseEcho parses b as an ICMP echo request or reply message body.
+func parseEcho(proto int, b []byte) (MessageBody, error) {
+	bodyLen := len(b)
+	if bodyLen < 4 {
+		return nil, errMessageTooShort
 	}
-	return c
+	p := &Echo{ID: int(b[0])<<8 | int(b[1]), Seq: int(b[2])<<8 | int(b[3])}
+	if bodyLen > 4 {
+		p.Data = make([]byte, bodyLen-4)
+		copy(p.Data, b[4:])
+	}
+	return p, nil
 }

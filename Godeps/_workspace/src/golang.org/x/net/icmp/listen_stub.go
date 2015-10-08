@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,61 +24,36 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-// Package controller is the library for creating a central controller
-package controller
+// +build nacl plan9
 
-import (
-	"errors"
-	"time"
+package icmp
 
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
-)
-
-var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
-)
-
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
-}
-
-type Config struct {
-	Local LocalConfig
-	Db    dm.DbConfig
-}
-
-type LocalConfig struct {
-	Addr         *string `flag:"a"`
-	Port         *int    `flag:"p"`
-	CloseStdDesc *bool   `flag:"D"`
-	PProfAddr    *string `flag:"pprof"`
-	AutoConnect  *bool   `flag:"auto-connect"`
-	CertFile     *string `flag:"cert-file"`
-	KeyFile      *string `flag:"key-file"`
-	ConnTimeout  *int64  `flag:"conn-timeout"`
-}
-
-func NewConfig() Config {
-	lc := LocalConfig{
-		Addr:         new(string),
-		CloseStdDesc: new(bool),
-		PProfAddr:    new(string),
-		AutoConnect:  new(bool),
-		CertFile:     new(string),
-		KeyFile:      new(string),
-		ConnTimeout:  new(int64),
-		Port:         new(int),
-	}
-	c := Config{
-		Local: lc,
-		Db:    dm.NewDbConfig(),
-	}
-	return c
+// ListenPacket listens for incoming ICMP packets addressed to
+// address. See net.Dial for the syntax of address.
+//
+// For non-privileged datagram-oriented ICMP endpoints, network must
+// be "udp4" or "udp6". The endpoint allows to read, write a few
+// limited ICMP messages such as echo request and echo reply.
+// Currently only Darwin and Linux support this.
+//
+// Examples:
+//	ListenPacket("udp4", "192.168.0.1")
+//	ListenPacket("udp4", "0.0.0.0")
+//	ListenPacket("udp6", "fe80::1%en0")
+//	ListenPacket("udp6", "::")
+//
+// For privileged raw ICMP endpoints, network must be "ip4" or "ip6"
+// followed by a colon and an ICMP protocol number or name.
+//
+// Examples:
+//	ListenPacket("ip4:icmp", "192.168.0.1")
+//	ListenPacket("ip4:1", "0.0.0.0")
+//	ListenPacket("ip6:ipv6-icmp", "fe80::1%en0")
+//	ListenPacket("ip6:58", "::")
+func ListenPacket(network, address string) (*PacketConn, error) {
+	return nil, errOpNoSupport
 }
