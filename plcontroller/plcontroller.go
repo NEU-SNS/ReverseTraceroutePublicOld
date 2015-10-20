@@ -163,7 +163,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		c.client.RemoveMeasurement(pa.Src, id)
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	}
-	return dm.Ping{}, nil
+	panic("Should never get here plcontroller.go:166")
 }
 
 func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
@@ -260,36 +260,36 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	c.server = grpc.NewServer()
 	plc.RegisterPLControllerServer(plController.server, c)
 	go c.startRPC(ec)
-	/*
-		go func() {
-			log.Info("Starting VP monitoring")
-			for {
-				select {
-				case <-c.shutdown:
-					return
-				case <-time.After(time.Minute * 2):
-					log.Info("Checking VPs....")
-					vps, err := c.db.GetVPs()
-					if err != nil {
-						log.Errorf("Failed to get VPs: %v", err)
-						return
-					}
-					err = maintainVPs(
-						vps,
-						*c.config.Local.PLUName,
-						*c.config.Local.SSHKeyPath,
-						*c.config.Local.UpdateUrl,
-						c.db,
-						c.shutdown,
-					)
-					if err != nil {
-						log.Errorf("Failed to maintain VPS: %v", err)
-						return
-					}
-				}
+	go c.maintain()
+}
+
+func (c *plControllerT) maintain() {
+	log.Info("Starting VP monitoring")
+	for {
+		select {
+		case <-c.shutdown:
+			return
+		case <-time.After(time.Minute * 2):
+			log.Info("Checking VPs....")
+			vps, err := c.db.GetVPs()
+			if err != nil {
+				log.Errorf("Failed to get VPs: %v", err)
+				return
 			}
-		}()
-	*/
+			err = maintainVPs(
+				vps,
+				*c.config.Local.PLUName,
+				*c.config.Local.SSHKeyPath,
+				*c.config.Local.UpdateUrl,
+				c.db,
+				c.shutdown,
+			)
+			if err != nil {
+				log.Errorf("Failed to maintain VPS: %v", err)
+				return
+			}
+		}
+	}
 }
 
 func startHttp(addr string) {

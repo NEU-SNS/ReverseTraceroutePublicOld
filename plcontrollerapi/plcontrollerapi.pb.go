@@ -40,9 +40,9 @@ package plcontrollerapi
 
 import proto "github.com/golang/protobuf/proto"
 import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-import datamodel6 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -61,9 +61,9 @@ var _ = proto.Marshal
 type PLControllerClient interface {
 	Ping(ctx context.Context, opts ...grpc.CallOption) (PLController_PingClient, error)
 	Traceroute(ctx context.Context, opts ...grpc.CallOption) (PLController_TracerouteClient, error)
-	ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error)
-	GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error)
-	AcceptProbes(ctx context.Context, in *datamodel6.SpoofedProbes, opts ...grpc.CallOption) (*datamodel6.SpoofedProbesResponse, error)
+	ReceiveSpoof(ctx context.Context, in *datamodel5.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error)
+	GetVPs(ctx context.Context, in *datamodel4.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error)
+	AcceptProbes(ctx context.Context, in *datamodel5.SpoofedProbes, opts ...grpc.CallOption) (*datamodel5.SpoofedProbesResponse, error)
 }
 
 type pLControllerClient struct {
@@ -115,8 +115,8 @@ func (c *pLControllerClient) Traceroute(ctx context.Context, opts ...grpc.CallOp
 }
 
 type PLController_TracerouteClient interface {
-	Send(*datamodel4.TracerouteArg) error
-	Recv() (*datamodel4.Traceroute, error)
+	Send(*datamodel3.TracerouteArg) error
+	Recv() (*datamodel3.Traceroute, error)
 	grpc.ClientStream
 }
 
@@ -124,19 +124,19 @@ type pLControllerTracerouteClient struct {
 	grpc.ClientStream
 }
 
-func (x *pLControllerTracerouteClient) Send(m *datamodel4.TracerouteArg) error {
+func (x *pLControllerTracerouteClient) Send(m *datamodel3.TracerouteArg) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pLControllerTracerouteClient) Recv() (*datamodel4.Traceroute, error) {
-	m := new(datamodel4.Traceroute)
+func (x *pLControllerTracerouteClient) Recv() (*datamodel3.Traceroute, error) {
+	m := new(datamodel3.Traceroute)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *pLControllerClient) ReceiveSpoof(ctx context.Context, in *datamodel6.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error) {
+func (c *pLControllerClient) ReceiveSpoof(ctx context.Context, in *datamodel5.RecSpoof, opts ...grpc.CallOption) (PLController_ReceiveSpoofClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PLController_serviceDesc.Streams[2], c.cc, "/.PLController/ReceiveSpoof", opts...)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (c *pLControllerClient) ReceiveSpoof(ctx context.Context, in *datamodel6.Re
 }
 
 type PLController_ReceiveSpoofClient interface {
-	Recv() (*datamodel6.NotifyRecSpoofResponse, error)
+	Recv() (*datamodel5.NotifyRecSpoofResponse, error)
 	grpc.ClientStream
 }
 
@@ -160,15 +160,15 @@ type pLControllerReceiveSpoofClient struct {
 	grpc.ClientStream
 }
 
-func (x *pLControllerReceiveSpoofClient) Recv() (*datamodel6.NotifyRecSpoofResponse, error) {
-	m := new(datamodel6.NotifyRecSpoofResponse)
+func (x *pLControllerReceiveSpoofClient) Recv() (*datamodel5.NotifyRecSpoofResponse, error) {
+	m := new(datamodel5.NotifyRecSpoofResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *pLControllerClient) GetVPs(ctx context.Context, in *datamodel5.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error) {
+func (c *pLControllerClient) GetVPs(ctx context.Context, in *datamodel4.VPRequest, opts ...grpc.CallOption) (PLController_GetVPsClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_PLController_serviceDesc.Streams[3], c.cc, "/.PLController/GetVPs", opts...)
 	if err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func (c *pLControllerClient) GetVPs(ctx context.Context, in *datamodel5.VPReques
 }
 
 type PLController_GetVPsClient interface {
-	Recv() (*datamodel5.VPReturn, error)
+	Recv() (*datamodel4.VPReturn, error)
 	grpc.ClientStream
 }
 
@@ -192,16 +192,16 @@ type pLControllerGetVPsClient struct {
 	grpc.ClientStream
 }
 
-func (x *pLControllerGetVPsClient) Recv() (*datamodel5.VPReturn, error) {
-	m := new(datamodel5.VPReturn)
+func (x *pLControllerGetVPsClient) Recv() (*datamodel4.VPReturn, error) {
+	m := new(datamodel4.VPReturn)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *pLControllerClient) AcceptProbes(ctx context.Context, in *datamodel6.SpoofedProbes, opts ...grpc.CallOption) (*datamodel6.SpoofedProbesResponse, error) {
-	out := new(datamodel6.SpoofedProbesResponse)
+func (c *pLControllerClient) AcceptProbes(ctx context.Context, in *datamodel5.SpoofedProbes, opts ...grpc.CallOption) (*datamodel5.SpoofedProbesResponse, error) {
+	out := new(datamodel5.SpoofedProbesResponse)
 	err := grpc.Invoke(ctx, "/.PLController/AcceptProbes", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -214,9 +214,9 @@ func (c *pLControllerClient) AcceptProbes(ctx context.Context, in *datamodel6.Sp
 type PLControllerServer interface {
 	Ping(PLController_PingServer) error
 	Traceroute(PLController_TracerouteServer) error
-	ReceiveSpoof(*datamodel6.RecSpoof, PLController_ReceiveSpoofServer) error
-	GetVPs(*datamodel5.VPRequest, PLController_GetVPsServer) error
-	AcceptProbes(context.Context, *datamodel6.SpoofedProbes) (*datamodel6.SpoofedProbesResponse, error)
+	ReceiveSpoof(*datamodel5.RecSpoof, PLController_ReceiveSpoofServer) error
+	GetVPs(*datamodel4.VPRequest, PLController_GetVPsServer) error
+	AcceptProbes(context.Context, *datamodel5.SpoofedProbes) (*datamodel5.SpoofedProbesResponse, error)
 }
 
 func RegisterPLControllerServer(s *grpc.Server, srv PLControllerServer) {
@@ -254,8 +254,8 @@ func _PLController_Traceroute_Handler(srv interface{}, stream grpc.ServerStream)
 }
 
 type PLController_TracerouteServer interface {
-	Send(*datamodel4.Traceroute) error
-	Recv() (*datamodel4.TracerouteArg, error)
+	Send(*datamodel3.Traceroute) error
+	Recv() (*datamodel3.TracerouteArg, error)
 	grpc.ServerStream
 }
 
@@ -263,12 +263,12 @@ type pLControllerTracerouteServer struct {
 	grpc.ServerStream
 }
 
-func (x *pLControllerTracerouteServer) Send(m *datamodel4.Traceroute) error {
+func (x *pLControllerTracerouteServer) Send(m *datamodel3.Traceroute) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pLControllerTracerouteServer) Recv() (*datamodel4.TracerouteArg, error) {
-	m := new(datamodel4.TracerouteArg)
+func (x *pLControllerTracerouteServer) Recv() (*datamodel3.TracerouteArg, error) {
+	m := new(datamodel3.TracerouteArg)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func (x *pLControllerTracerouteServer) Recv() (*datamodel4.TracerouteArg, error)
 }
 
 func _PLController_ReceiveSpoof_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel6.RecSpoof)
+	m := new(datamodel5.RecSpoof)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func _PLController_ReceiveSpoof_Handler(srv interface{}, stream grpc.ServerStrea
 }
 
 type PLController_ReceiveSpoofServer interface {
-	Send(*datamodel6.NotifyRecSpoofResponse) error
+	Send(*datamodel5.NotifyRecSpoofResponse) error
 	grpc.ServerStream
 }
 
@@ -292,12 +292,12 @@ type pLControllerReceiveSpoofServer struct {
 	grpc.ServerStream
 }
 
-func (x *pLControllerReceiveSpoofServer) Send(m *datamodel6.NotifyRecSpoofResponse) error {
+func (x *pLControllerReceiveSpoofServer) Send(m *datamodel5.NotifyRecSpoofResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _PLController_GetVPs_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel5.VPRequest)
+	m := new(datamodel4.VPRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func _PLController_GetVPs_Handler(srv interface{}, stream grpc.ServerStream) err
 }
 
 type PLController_GetVPsServer interface {
-	Send(*datamodel5.VPReturn) error
+	Send(*datamodel4.VPReturn) error
 	grpc.ServerStream
 }
 
@@ -313,12 +313,12 @@ type pLControllerGetVPsServer struct {
 	grpc.ServerStream
 }
 
-func (x *pLControllerGetVPsServer) Send(m *datamodel5.VPReturn) error {
+func (x *pLControllerGetVPsServer) Send(m *datamodel4.VPReturn) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel6.SpoofedProbes)
+	in := new(datamodel5.SpoofedProbes)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}

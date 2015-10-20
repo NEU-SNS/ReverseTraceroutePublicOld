@@ -33,6 +33,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,8 +61,10 @@ const (
 		"mkdir %d\n" +
 		"cd %d\n" +
 		"/usr/bin/wget %s\n" +
-		"/usr/bin/yum install -y --nogpgcheck %s\n" +
+		"/usr/bin/yum install -y --nogpgcheck --disablerepo=\"fedora\" --disablerepo=\"updates\" %s\n" +
+		"/sbin/service plvp start\n" +
 		"EOF\n"
+
 	version string = "sudo /usr/local/bin/plvp --version"
 	update  string = "sudo bash << EOF\n" +
 		"/sbin/service plvp stop\n" +
@@ -71,6 +74,7 @@ const (
 		"cd %d\n" +
 		"/usr/bin/wget %s\n" +
 		"/usr/bin/yum install -y --nogpgcheck %s\n" +
+		"/sbin/service plvp start\n" +
 		"EOF\n"
 )
 
@@ -94,6 +98,7 @@ var (
 )
 
 func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db dataaccess.VPProvider, dc chan struct{}) error {
+	return nil
 	var wg sync.WaitGroup
 	for _, vp := range vps {
 		wg.Add(1)
@@ -180,32 +185,6 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
 	return nil
 }
 
-func getVersion(cmd *exec.Cmd) (string, error) {
-	ec := make(chan error, 1)
-	version := make(chan string, 1)
-	go func() {
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			ec <- err
-			return
-		}
-		version <- string(out)
-	}()
-	select {
-	case <-time.After(time.Second * 25):
-		err := cmd.Process.Kill()
-		if err != nil {
-			return "", nil
-		}
-		return "", errorVpTimeout
-	case err := <-ec:
-		return "", err
-	case v := <-version:
-		return v, nil
-	}
-	return "", nil
-}
-
 func handleStopped(cmd *exec.Cmd) error {
 	ec := make(chan error, 1)
 	dc := make(chan struct{})
@@ -270,6 +249,8 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateUrl string) error
 	}
 	v, err := checkVersion(getCmd(vp, uname, certPath, version))
 	if err != nil {
+		log.Info("Returning error from handleRunning")
+		log.Infof("Version: %v", v)
 		return err
 	}
 	update, err := httpupdate.CheckUpdate(updateUrl, v)
@@ -277,6 +258,7 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateUrl string) error
 		return err
 	}
 	if update {
+		log.Infof("Updating, got version: %v")
 		urlString := httpupdate.FetchUrl()
 		url, err := url.Parse(urlString)
 		if err != nil {
@@ -333,16 +315,19 @@ func checkVersion(cmd *exec.Cmd) (string, error) {
 		res <- string(out)
 	}()
 	select {
+	case err := <-ec:
+		return "", err
+	case v := <-res:
+		vlines := strings.Split(v, "\n")
+		vline := vlines[len(vlines)-2]
+		log.Infof("Got version: %v", vline)
+		return vline, nil
 	case <-time.After(time.Second * 25):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return "", err
 		}
 		return "", errorVpTimeout
-	case err := <-ec:
-		return "", err
-	case v := <-res:
-		return v, nil
 	}
 	return "0.0.0", nil
 }
@@ -358,29 +343,34 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 		}
 		switch {
 		case run.Match(out):
+			log.Debugf("Got response: %s", out)
 			ps <- running
 		case stop.Match(out):
+			log.Debugf("Got response: %s", out)
 			ps <- stopped
 		case nf.Match(out):
+			log.Debugf("Got response: %s", out)
 			ps <- notFound
 		case pidLeft.Match(out):
+			log.Debugf("Got response: %s", out)
 			ps <- pidExists
 		default:
+			log.Errorf("Got response: %s", out)
 			ec <- errorUnknownService
 		}
 	}()
 
 	select {
+	case err := <-ec:
+		return unknown, err
+	case stat := <-ps:
+		return stat, nil
 	case <-time.After(time.Second * 25):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return unknown, err
 		}
 		return unknown, errorVpTimeout
-	case err := <-ec:
-		return unknown, err
-	case stat := <-ps:
-		return stat, nil
 	}
 	return unknown, nil
 }
@@ -388,14 +378,16 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 func installService(cmd *exec.Cmd) error {
 	ec := make(chan error, 1)
 	go func() {
-		out, err := cmd.CombinedOutput()
+		_, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Errorf("Failed to install service: %s", out)
+			log.Errorf("Failed to install service: %s", err)
 		}
 		ec <- err
 		return
 	}()
 	select {
+	case err := <-ec:
+		return err
 	case <-time.After(time.Second * 25):
 		err := cmd.Process.Kill()
 		if err != nil {
@@ -403,8 +395,7 @@ func installService(cmd *exec.Cmd) error {
 			return err
 		}
 		return errorVpTimeout
-	case err := <-ec:
-		return err
+
 	}
 	return nil
 }

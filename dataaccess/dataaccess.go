@@ -43,11 +43,11 @@ func (d *dataAccess) StoreTraceroute(t *dm.Traceroute, s dm.ServiceT) error {
 	return nil
 }
 
-func (d *dataAccess) GetTRBySrcDst(src, dst string) (*dm.MTraceroute, error) {
+func (d *dataAccess) GetTRBySrcDst(src, dst string) (*dm.Traceroute, error) {
 	return nil, nil
 }
 
-func (d *dataAccess) GetTRBySrcDstWithStaleness(src, dst string, s Staleness) (*dm.MTraceroute, error) {
+func (d *dataAccess) GetTRBySrcDstWithStaleness(src, dst string, s Staleness) (*dm.Traceroute, error) {
 	return nil, nil
 }
 
