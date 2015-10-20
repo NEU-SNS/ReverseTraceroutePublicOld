@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel/returnt.proto";
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel/service.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto";
 
 option go_package = "datamodel";
@@ -62,27 +60,26 @@ message TracerouteHop {
 }
 
 message Traceroute {
-	string version              =  1;
-	string type                 =  2;
-	uint32 user_id              =  3;
-	string method               =  4;
-	string src                  =  5;
-	string dst                  =  6;
-	uint32 sport                =  7;
-    uint32 dport                =  8;
-	string stop_reason          =  9;
-	uint32 stop_data            = 10;
-	TracerouteTime start        = 11;
-	uint32 hop_count            = 12;
-	uint32 attempts             = 13;
-	uint32 hoplimit             = 14;
-	uint32 firsthop             = 15;
-	uint32 wait                 = 16;
-	uint32 wait_probe           = 17;
-	uint32 tos                  = 18;
-	uint32 probe_size           = 19;
-  repeated TracerouteHop hops   = 20;
-    string error                = 21;
+	string type                 =  1;
+	uint32 user_id              =  2;
+	string method               =  3;
+	string src                  =  4;
+	string dst                  =  5;
+	uint32 sport                =  6;
+    uint32 dport                =  7;
+	string stop_reason          =  8;
+	uint32 stop_data            =  9;
+	TracerouteTime start        = 10;
+	uint32 hop_count            = 11;
+	uint32 attempts             = 12;
+	uint32 hoplimit             = 13;
+	uint32 firsthop             = 14;
+	uint32 wait                 = 15;
+	uint32 wait_probe           = 16;
+	uint32 tos                  = 17;
+	uint32 probe_size           = 18;
+  repeated TracerouteHop hops   = 19;
+    string error                = 20;
 }
 
 message TracerouteTime {
@@ -91,17 +88,3 @@ message TracerouteTime {
     string ftime  = 3;
 }
 
-message MTraceroute {
-    int64 date           = 1;
-    string src           = 2;
-    string dst           = 3;
-    repeated uint32 hops = 4 [packed=true];
-    ServiceT service     = 5;
-    string hop           = 6;
-
-}
-
-message TracerouteReturn {
-    ReturnT ret            = 1;
-    MTraceroute traceroute = 2;
-}

@@ -57,13 +57,14 @@ func (t TTime) String() string {
 	return tt.String()
 }
 
-/*
-func (t *Traceroute) Marshal() ([]byte, error) {
-	return proto.Marshal(t)
+func (t *Traceroute) Marshal() []byte {
+	ret, err := proto.Marshal(t)
+	if err != nil {
+		return nil
+	}
+	return ret
 }
 
-
-*/
 func (t *Traceroute) Key() string {
 	return ""
 }
@@ -71,11 +72,22 @@ func (t *Traceroute) CUnmarshal(data []byte) error {
 	return proto.Unmarshal(data, t)
 }
 
-/*
-func (tm *TracerouteMeasurement) Marshal() ([]byte, error) {
-	return proto.Marshal(tm)
+func (t *Traceroute) CMarshal() []byte {
+	ret, err := proto.Marshal(t)
+	if err != nil {
+		return nil
+	}
+	return ret
 }
-*/
+
+func (tm *TracerouteMeasurement) CMarshal() []byte {
+	ret, err := proto.Marshal(tm)
+	if err != nil {
+		return nil
+	}
+	return ret
+}
+
 func (tm *TracerouteMeasurement) Key() string {
 	return ""
 }
@@ -86,7 +98,6 @@ func createTraceroute() interface{} {
 
 func ConvertTraceroute(in warts.Traceroute) Traceroute {
 	t := Traceroute{}
-	t.Version = "0.1"
 	t.Type = "trace"
 	t.UserId = in.Flags.UserID
 	t.Src = in.Flags.Src.String()

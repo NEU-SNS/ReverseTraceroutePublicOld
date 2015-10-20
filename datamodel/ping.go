@@ -38,6 +38,14 @@ func (p *Ping) CUnmarshal(data []byte) error {
 	return proto.Unmarshal(data, p)
 }
 
+func (p *Ping) CMarshal() []byte {
+	ret, err := proto.Marshal(p)
+	if err != nil {
+		return nil
+	}
+	return ret
+}
+
 /*
 func (p *Ping) Marshal() ([]byte, error) {
 	return proto.Marshal(p)
@@ -59,7 +67,6 @@ func ConvertPing(in warts.Ping) Ping {
 	p := Ping{}
 	p.Src = in.Flags.Src.String()
 	p.Dst = in.Flags.Dst.String()
-	p.Version = in.Version
 	p.Type = in.Type
 	p.Method = in.Flags.PingMethod.String()
 	dmt := &Time{}

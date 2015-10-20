@@ -109,11 +109,24 @@ func main() {
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 
 	db, err := sql.NewDB(sql.DbConfig{
-		UName:    *conf.Db.UName,
-		Password: *conf.Db.Password,
-		Host:     *conf.Db.Host,
-		Port:     *conf.Db.Port,
-		Db:       *conf.Db.Db,
+		WriteConfigs: []sql.Config{
+			sql.Config{
+				User:     *conf.Db.UName,
+				Password: *conf.Db.Password,
+				Host:     *conf.Db.Host,
+				Port:     *conf.Db.Port,
+				Db:       *conf.Db.Db,
+			},
+		},
+		ReadConfigs: []sql.Config{
+			sql.Config{
+				User:     *conf.Db.UName,
+				Password: *conf.Db.Password,
+				Host:     *conf.Db.Host,
+				Port:     *conf.Db.Port,
+				Db:       *conf.Db.Db,
+			},
+		},
 	})
 
 	if err != nil {

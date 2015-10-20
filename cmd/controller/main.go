@@ -72,6 +72,8 @@ func init() {
 		"The host of the database")
 	flag.StringVar(conf.Db.Port, "db-port", "3306",
 		"The port used for the database connection")
+	flag.Var(conf.Cache.Addrs, "cache-list",
+		"The list of cache servers.")
 }
 
 func main() {
@@ -98,7 +100,7 @@ func main() {
 			exit(1)
 		}
 	*/
-	err = <-controller.Start(conf, nil, cache.New())
+	err = <-controller.Start(conf, nil, cache.New(*conf.Cache.Addrs) /* need router */, nil)
 
 	if err != nil {
 		log.Errorf("Controller Start returned with error: %v", err)

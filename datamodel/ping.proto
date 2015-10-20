@@ -73,22 +73,21 @@ message TsAndAddr {
 }
 
 message Ping {
-	string version                  =  1;
-    string type                     =  2;
-	string method                   =  3;
-	string src                      =  4;
-	string dst                      =  5;
-	Time start                      =  6;
-	int32 ping_sent                 =  7;
-	int32 probe_size                =  8;
-	uint32 userid                   =  9;
-	int32 ttl                       = 10;
-	int32 wait                      = 11;
-	int32 timeout                   = 12;
-	repeated string flags           = 13;
-	repeated PingResponse responses = 14;
-	PingStats statistics            = 15;
-    string error                    = 16;
+    string type                     =  1;
+	string method                   =  2;
+	string src                      =  3;
+	string dst                      =  4;
+	Time start                      =  5;
+	int32 ping_sent                 =  6;
+	int32 probe_size                =  7;
+	uint32 userid                   =  8;
+	int32 ttl                       =  9;
+	int32 wait                      = 10;
+	int32 timeout                   = 11;
+	repeated string flags           = 12;
+	repeated PingResponse responses = 13;
+	PingStats statistics            = 14;
+    string error                    = 15;
 }
 
 message PingReturn {

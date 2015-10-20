@@ -15,3 +15,4 @@ CREATE TABLE `vantage_point` (
   UNIQUE KEY `ip_UNIQUE` (`ip`),
   UNIQUE KEY `hostname_UNIQUE` (`hostname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+

@@ -32,6 +32,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	con "golang.org/x/net/context"
 )
@@ -52,6 +53,7 @@ type MeasurementTool interface {
 type Config struct {
 	Local LocalConfig
 	Db    dm.DbConfig
+	Cache cache.Config
 }
 
 type LocalConfig struct {
@@ -79,6 +81,7 @@ func NewConfig() Config {
 	c := Config{
 		Local: lc,
 		Db:    dm.NewDbConfig(),
+		Cache: cache.NewConfig(),
 	}
 	return c
 }

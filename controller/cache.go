@@ -50,12 +50,12 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]cache.Keyer, 0)
+					check := make([]string, 0)
 					db := make([]*dm.PingMeasurement, 0)
 					checking := make(map[string]*dm.PingMeasurement)
 					for _, p := range m {
 						if p.CheckCache {
-							check = append(check, p)
+							check = append(check, p.Key())
 							checking[p.Key()] = p
 						} else {
 							db = append(db, p)
@@ -70,23 +70,23 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 					db = make([]*dm.PingMeasurement, 0)
 					for _, item := range check {
 						p := &dm.Ping{}
-						if i, ok := cached[item.Key()]; ok {
-							err := i.Unmarshal(p)
+						if i, ok := cached[item]; ok {
+							err := p.CUnmarshal(i.Value())
 							if err != nil {
 								log.Errorf("Failed to unmarshal ping: %v", err)
-								db = append(db, checking[item.Key()])
+								db = append(db, checking[item])
 								continue
 							}
 							ret <- p
 						} else {
-							db = append(db, checking[item.Key()])
+							db = append(db, checking[item])
 						}
 					}
 					n <- db
 					close(n)
 					for p := range res {
 						go func(ping *dm.Ping) {
-							pc.c.Set(ping)
+							pc.c.Set(ping.Key(), ping.CMarshal())
 						}(p)
 						ret <- p
 					}
@@ -115,12 +115,12 @@ func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]cache.Keyer, 0)
+					check := make([]string, 0)
 					db := make([]*dm.TracerouteMeasurement, 0)
 					checking := make(map[string]*dm.TracerouteMeasurement)
 					for _, p := range m {
 						if p.CheckCache {
-							check = append(check, p)
+							check = append(check, p.Key())
 							checking[p.Key()] = p
 						} else {
 							db = append(db, p)
@@ -134,24 +134,24 @@ func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
 					}
 					db = make([]*dm.TracerouteMeasurement, 0)
 					for _, item := range check {
-						p := &dm.Traceroute{}
-						if i, ok := cached[item.Key()]; ok {
-							err := i.Unmarshal(p)
+						t := &dm.Traceroute{}
+						if i, ok := cached[item]; ok {
+							err := t.CUnmarshal(i.Value())
 							if err != nil {
 								log.Errorf("Failed to unmarshal ping: %v", err)
-								db = append(db, checking[item.Key()])
+								db = append(db, checking[i.Key()])
 								continue
 							}
-							ret <- p
+							ret <- t
 						} else {
-							db = append(db, checking[item.Key()])
+							db = append(db, checking[item])
 						}
 					}
 					n <- db
 					close(n)
 					for t := range res {
 						go func(trace *dm.Traceroute) {
-							tc.c.Set(trace)
+							tc.c.Set(trace.Key(), trace.CMarshal())
 						}(t)
 						ret <- t
 					}

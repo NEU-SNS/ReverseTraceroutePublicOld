@@ -27,8 +27,6 @@
 package plcontroller
 
 import (
-	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -156,6 +154,7 @@ func TestStartPortOutOfRange(t *testing.T) {
 	}
 }
 */
+/*
 func TestInstallService(t *testing.T) {
 	vp := &datamodel.VantagePoint{
 		Hostname: "mlab1.prg01.measurement-lab.org",
@@ -165,5 +164,16 @@ func TestInstallService(t *testing.T) {
 	err := installService(getCmd(vp, "uw_geoloc4", "/home/rhansen2/.ssh/id_rsa_pl", fmt.Sprintf(install, random, random, "http://www.ccs.neu.edu/home/rhansen2/plvp-0.0.1-2.i386.rpm", "plvp-0.0.1-2.i386.rpm")))
 	if err != nil {
 		t.Fatalf("Failed to install service: %v", err)
+	}
+}
+*/
+func TestGetVersion(t *testing.T) {
+	vp := &datamodel.VantagePoint{
+		Hostname: "mlab1.prg01.measurement-lab.org",
+		Port:     806,
+	}
+	v, err := checkVersion(getCmd(vp, "uw_geoloc4", "/home/rhansen2/.ssh/id_rsa_pl", version))
+	if err != nil {
+		t.Fatalf("Failed to check version: %v", v)
 	}
 }

@@ -114,27 +114,26 @@ func (m *TracerouteHop) GetRtt() *RTT {
 }
 
 type Traceroute struct {
-	Version    string           `protobuf:"bytes,1,opt,name=version" json:"version,omitempty"`
-	Type       string           `protobuf:"bytes,2,opt,name=type" json:"type,omitempty"`
-	UserId     uint32           `protobuf:"varint,3,opt,name=user_id" json:"user_id,omitempty"`
-	Method     string           `protobuf:"bytes,4,opt,name=method" json:"method,omitempty"`
-	Src        string           `protobuf:"bytes,5,opt,name=src" json:"src,omitempty"`
-	Dst        string           `protobuf:"bytes,6,opt,name=dst" json:"dst,omitempty"`
-	Sport      uint32           `protobuf:"varint,7,opt,name=sport" json:"sport,omitempty"`
-	Dport      uint32           `protobuf:"varint,8,opt,name=dport" json:"dport,omitempty"`
-	StopReason string           `protobuf:"bytes,9,opt,name=stop_reason" json:"stop_reason,omitempty"`
-	StopData   uint32           `protobuf:"varint,10,opt,name=stop_data" json:"stop_data,omitempty"`
-	Start      *TracerouteTime  `protobuf:"bytes,11,opt,name=start" json:"start,omitempty"`
-	HopCount   uint32           `protobuf:"varint,12,opt,name=hop_count" json:"hop_count,omitempty"`
-	Attempts   uint32           `protobuf:"varint,13,opt,name=attempts" json:"attempts,omitempty"`
-	Hoplimit   uint32           `protobuf:"varint,14,opt,name=hoplimit" json:"hoplimit,omitempty"`
-	Firsthop   uint32           `protobuf:"varint,15,opt,name=firsthop" json:"firsthop,omitempty"`
-	Wait       uint32           `protobuf:"varint,16,opt,name=wait" json:"wait,omitempty"`
-	WaitProbe  uint32           `protobuf:"varint,17,opt,name=wait_probe" json:"wait_probe,omitempty"`
-	Tos        uint32           `protobuf:"varint,18,opt,name=tos" json:"tos,omitempty"`
-	ProbeSize  uint32           `protobuf:"varint,19,opt,name=probe_size" json:"probe_size,omitempty"`
-	Hops       []*TracerouteHop `protobuf:"bytes,20,rep,name=hops" json:"hops,omitempty"`
-	Error      string           `protobuf:"bytes,21,opt,name=error" json:"error,omitempty"`
+	Type       string           `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
+	UserId     uint32           `protobuf:"varint,2,opt,name=user_id" json:"user_id,omitempty"`
+	Method     string           `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
+	Src        string           `protobuf:"bytes,4,opt,name=src" json:"src,omitempty"`
+	Dst        string           `protobuf:"bytes,5,opt,name=dst" json:"dst,omitempty"`
+	Sport      uint32           `protobuf:"varint,6,opt,name=sport" json:"sport,omitempty"`
+	Dport      uint32           `protobuf:"varint,7,opt,name=dport" json:"dport,omitempty"`
+	StopReason string           `protobuf:"bytes,8,opt,name=stop_reason" json:"stop_reason,omitempty"`
+	StopData   uint32           `protobuf:"varint,9,opt,name=stop_data" json:"stop_data,omitempty"`
+	Start      *TracerouteTime  `protobuf:"bytes,10,opt,name=start" json:"start,omitempty"`
+	HopCount   uint32           `protobuf:"varint,11,opt,name=hop_count" json:"hop_count,omitempty"`
+	Attempts   uint32           `protobuf:"varint,12,opt,name=attempts" json:"attempts,omitempty"`
+	Hoplimit   uint32           `protobuf:"varint,13,opt,name=hoplimit" json:"hoplimit,omitempty"`
+	Firsthop   uint32           `protobuf:"varint,14,opt,name=firsthop" json:"firsthop,omitempty"`
+	Wait       uint32           `protobuf:"varint,15,opt,name=wait" json:"wait,omitempty"`
+	WaitProbe  uint32           `protobuf:"varint,16,opt,name=wait_probe" json:"wait_probe,omitempty"`
+	Tos        uint32           `protobuf:"varint,17,opt,name=tos" json:"tos,omitempty"`
+	ProbeSize  uint32           `protobuf:"varint,18,opt,name=probe_size" json:"probe_size,omitempty"`
+	Hops       []*TracerouteHop `protobuf:"bytes,19,rep,name=hops" json:"hops,omitempty"`
+	Error      string           `protobuf:"bytes,20,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *Traceroute) Reset()         { *m = Traceroute{} }
@@ -164,39 +163,3 @@ type TracerouteTime struct {
 func (m *TracerouteTime) Reset()         { *m = TracerouteTime{} }
 func (m *TracerouteTime) String() string { return proto.CompactTextString(m) }
 func (*TracerouteTime) ProtoMessage()    {}
-
-type MTraceroute struct {
-	Date    int64    `protobuf:"varint,1,opt,name=date" json:"date,omitempty"`
-	Src     string   `protobuf:"bytes,2,opt,name=src" json:"src,omitempty"`
-	Dst     string   `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
-	Hops    []uint32 `protobuf:"varint,4,rep,packed,name=hops" json:"hops,omitempty"`
-	Service ServiceT `protobuf:"varint,5,opt,name=service,enum=datamodel.ServiceT" json:"service,omitempty"`
-	Hop     string   `protobuf:"bytes,6,opt,name=hop" json:"hop,omitempty"`
-}
-
-func (m *MTraceroute) Reset()         { *m = MTraceroute{} }
-func (m *MTraceroute) String() string { return proto.CompactTextString(m) }
-func (*MTraceroute) ProtoMessage()    {}
-
-type TracerouteReturn struct {
-	Ret        *ReturnT     `protobuf:"bytes,1,opt,name=ret" json:"ret,omitempty"`
-	Traceroute *MTraceroute `protobuf:"bytes,2,opt,name=traceroute" json:"traceroute,omitempty"`
-}
-
-func (m *TracerouteReturn) Reset()         { *m = TracerouteReturn{} }
-func (m *TracerouteReturn) String() string { return proto.CompactTextString(m) }
-func (*TracerouteReturn) ProtoMessage()    {}
-
-func (m *TracerouteReturn) GetRet() *ReturnT {
-	if m != nil {
-		return m.Ret
-	}
-	return nil
-}
-
-func (m *TracerouteReturn) GetTraceroute() *MTraceroute {
-	if m != nil {
-		return m.Traceroute
-	}
-	return nil
-}

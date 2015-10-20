@@ -29,6 +29,7 @@ package sql
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -36,11 +37,19 @@ import (
 import "github.com/go-sql-driver/mysql"
 
 type DB struct {
-	db *sql.DB
+	wdb []*sql.DB
+	rdb []*sql.DB
+	rr  *rand.Rand
+	wr  *rand.Rand
 }
 
 type DbConfig struct {
-	UName    string
+	WriteConfigs []Config
+	ReadConfigs  []Config
+}
+
+type Config struct {
+	User     string
 	Password string
 	Host     string
 	Port     string
@@ -49,8 +58,8 @@ type DbConfig struct {
 
 var conFmt string = "%s:%s@tcp(%s:%s)/%s?parseTime=true"
 
-func NewDB(con DbConfig) (*DB, error) {
-	conString := fmt.Sprintf(conFmt, con.UName, con.Password, con.Host, con.Port, con.Db)
+func makeDb(conf Config) (*sql.DB, error) {
+	conString := fmt.Sprintf(conFmt, conf.User, conf.Password, conf.Host, conf.Port, conf.Db)
 	db, err := sql.Open("mysql", conString)
 	if err != nil {
 		return nil, err
@@ -59,7 +68,44 @@ func NewDB(con DbConfig) (*DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(24)
-	return &DB{db: db}, nil
+	return db, nil
+}
+
+func NewDB(con DbConfig) (*DB, error) {
+	ret := &DB{}
+	ret.rr = rand.New(rand.NewSource(time.Now().UnixNano()))
+	ret.wr = rand.New(rand.NewSource(time.Now().UnixNano()))
+	for _, conf := range con.WriteConfigs {
+		db, err := makeDb(conf)
+		if err != nil {
+			return nil, err
+		}
+		ret.wdb = append(ret.wdb, db)
+	}
+	for _, conf := range con.ReadConfigs {
+		db, err := makeDb(conf)
+		if err != nil {
+			return nil, err
+		}
+		ret.rdb = append(ret.rdb, db)
+	}
+	return ret, nil
+}
+
+func (db *DB) getReader() *sql.DB {
+	l := len(db.rdb)
+	if l == 1 {
+		return db.rdb[0]
+	}
+	return db.rdb[db.rr.Intn(len(db.rdb))]
+}
+
+func (db *DB) getWriter() *sql.DB {
+	l := len(db.wdb)
+	if l == 1 {
+		return db.wdb[0]
+	}
+	return db.wdb[db.wr.Intn(len(db.wdb))]
 }
 
 type VantagePoint struct {
@@ -109,7 +155,7 @@ FROM
 )
 
 func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
-	rows, err := db.db.Query(getVpsQuery)
+	rows, err := db.getReader().Query(getVpsQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +212,7 @@ func (db *DB) UpdateController(ip, newc, con uint32) error {
 		args = append(args, newc)
 	}
 	args = append(args, ip)
-	_, err := db.db.Exec(query, args...)
+	_, err := db.getWriter().Exec(query, args...)
 	return err
 }
 
@@ -182,7 +228,7 @@ WHERE
 )
 
 func (db *DB) UpdateActive(ip uint32, active bool) error {
-	_, err := db.db.Exec(updateActiveQuery, active, ip)
+	_, err := db.getWriter().Exec(updateActiveQuery, active, ip)
 	return err
 }
 
@@ -199,7 +245,7 @@ WHERE
 )
 
 func (db *DB) UpdateCanSpoof(ip uint32, canSpoof bool) error {
-	_, err := db.db.Exec(updateCanSpoofQuery, canSpoof, ip)
+	_, err := db.getWriter().Exec(updateCanSpoofQuery, canSpoof, ip)
 	return err
 }
 
@@ -215,10 +261,16 @@ WHERE
 )
 
 func (db *DB) UpdateCheckStatus(ip uint32, result string) error {
-	_, err := db.db.Exec(updateCheckStatus, result, ip)
+	_, err := db.getReader().Exec(updateCheckStatus, result, ip)
 	return err
 }
 
 func (db *DB) Close() error {
-	return db.db.Close()
+	for _, d := range db.wdb {
+		d.Close()
+	}
+	for _, d := range db.rdb {
+		d.Close()
+	}
+	return nil
 }

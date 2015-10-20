@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015, Northeastern University
+Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,53 +24,36 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-// Package dataaccess contains the access to the data
-package dataaccess
+package cache
 
 import (
-	"time"
-
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"fmt"
+	"strings"
 )
 
-// DataProvider is the interface for a data store than can access
-// both pings and traceroutes
-type DataProvider interface {
-	TracerouteProvider
-	PingProvider
-	Closer
+type ServerList []string
+
+func (sl *ServerList) String() string {
+	return fmt.Sprintf("%v", *sl)
 }
 
-// Closer are things that close
-type Closer interface {
-	Close() error
+func (sl *ServerList) Set(val string) error {
+	servs := strings.Split(val, ",")
+	vals := make(ServerList, len(servs))
+	for i, val := range servs {
+		vals[i] = strings.TrimSpace(val)
+	}
+	*sl = vals
+	return nil
 }
 
-// Staleness how old of a stored item to accept
-type Staleness time.Duration
-
-// TracerouteProvider is the interface for getting traceroutes
-type TracerouteProvider interface {
-	StoreTraceroute(*dm.Traceroute) error
-	GetTRBySrcDst(string, string) (*dm.Traceroute, error)
-	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.Traceroute, error)
-	GetTraceMulti([]*dm.TracerouteMeasurement) (<-chan *dm.Traceroute, error)
+type Config struct {
+	Addrs *ServerList `flag:"cache-list"`
 }
 
-// PingProvider is the interface for getting pings
-type PingProvider interface {
-	GetPingBySrcDst(string, string) (*dm.Ping, error)
-	GetPingBySrcDstWithStaleness(string, string, Staleness) (*dm.Ping, error)
-	StorePing(*dm.Ping) error
-	GetPingsMulti([]*dm.PingMeasurement) (<-chan *dm.Ping, error)
-}
-
-type VPProvider interface {
-	GetVPs() ([]*dm.VantagePoint, error)
-	UpdateController(uint32, uint32, uint32) error
-	UpdateActive(uint32, bool) error
-	UpdateCanSpoof(uint32, bool) error
-	UpdateCheckStatus(uint32, string) error
-	Closer
+func NewConfig() Config {
+	addrs := make(ServerList, 0)
+	return Config{
+		Addrs: &addrs,
+	}
 }
