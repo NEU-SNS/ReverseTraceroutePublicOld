@@ -8,8 +8,7 @@ package datamodel;
 
 message TracerouteMeasurement {
   int64 staleness         =  1;
-	string host           =  2;
-	string dst            =  3;
+	uint32 dst            =  3;
 	string confidence     =  4;
 	string dport          =  5;
 	string first_hop      =  6;
@@ -24,7 +23,7 @@ message TracerouteMeasurement {
 	string attempts       = 15;
 	  bool send_all       = 16;
 	string sport          = 17;
-	string src            = 18;
+	uint32 src            = 18;
 	string tos            = 19;
 	  bool time_exceeded  = 20;
 	string user_id        = 21;
@@ -43,7 +42,7 @@ message TracerouteArg {
 }
 
 message TracerouteHop {
-   string addr         =  1;
+    uint32 addr        =  1;
 	uint32 probe_ttl   =  2;
 	uint32 probe_id    =  3;
 	uint32 probe_size  =  4;
@@ -63,8 +62,8 @@ message Traceroute {
 	string type                 =  1;
 	uint32 user_id              =  2;
 	string method               =  3;
-	string src                  =  4;
-	string dst                  =  5;
+	uint32 src                  =  4;
+	uint32 dst                  =  5;
 	uint32 sport                =  6;
     uint32 dport                =  7;
 	string stop_reason          =  8;
@@ -80,6 +79,7 @@ message Traceroute {
 	uint32 probe_size           = 18;
   repeated TracerouteHop hops   = 19;
     string error                = 20;
+    string version              = 21;
 }
 
 message TracerouteTime {

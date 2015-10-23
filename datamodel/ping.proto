@@ -1,37 +1,36 @@
 syntax = "proto3";
 
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto";
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel/returnt.proto";
 
 option go_package = "datamodel";
 
 package datamodel;
 
 message PingMeasurement {
-    string src         =  1;
-    string dst         =  2;
-    string host        =  3;
-    bool spoof         =  4;
-    bool RR            =  5;
-    string s_addr      =  6;
-    string payload     =  7;
-    string count       =  8;
-    string icmp_sum    =  9;
-    string dport       = 10;
-    string sport       = 11;
-    string wait        = 12;
-    string ttl         = 13;
-    string mut         = 14;
-    string reply_count = 15;
-    string pattern     = 16;
-    string method      = 17;
-    string size        = 18;
-    string user_id     = 19;
-    string tos         = 20;
-    string time_stamp  = 21;
-    int64 timeout      = 22;
-    bool check_cache   = 23;
-    bool check_db      = 24;
+    uint32 src          =  1;
+    uint32 dst          =  2;
+    uint32 spoofer_addr =  3;
+    bool spoof          =  4;
+    bool RR             =  5;
+    string s_addr       =  6;
+    string payload      =  7;
+    string count        =  8;
+    string icmp_sum     =  9;
+    string dport        = 10;
+    string sport        = 11;
+    string wait         = 12;
+    string ttl          = 13;
+    string mut          = 14;
+    string reply_count  = 15;
+    string pattern      = 16;
+    string method       = 17;
+    string size         = 18;
+    string user_id      = 19;
+    string tos          = 20;
+    string time_stamp   = 21;
+    int64 timeout       = 22;
+    bool check_cache    = 23;
+    bool check_db       = 24;
 
 }
 
@@ -49,48 +48,45 @@ message PingStats {
 }
 
 message PingResponse {
-    string from                  =  1;
-    int32 seq                    =  2;
-    int32 reply_size             =  3;
-    int32 reply_ttl              =  4;
+    uint32 from                  =  1;
+    uint32 seq                   =  2;
+    uint32 reply_size            =  3;
+    uint32 reply_ttl             =  4;
     string reply_proto           =  5;
     Time tx                      =  6;
     Time rx                      =  7;
-    float rtt                    =  8;
-    int32 probe_ipid             =  9;
-    int32 reply_ipid             = 10;
-    int32 icmp_type              = 11;
-    int32 icmp_code              = 12;
-    repeated string RR           = 13;
-    repeated int64 tsonly        = 14;
+    uint32 rtt                   =  8;
+    uint32 probe_ipid            =  9;
+    uint32 reply_ipid            = 10;
+    uint32 icmp_type             = 11;
+    uint32 icmp_code             = 12;
+    repeated uint32 RR           = 13;
+    repeated uint32 tsonly       = 14;
     repeated TsAndAddr tsandaddr = 15;
 
 }
 
 message TsAndAddr {
-    string ip = 1;
-    int64 ts  = 2;
+    uint32 ip = 1;
+    uint32 ts  = 2;
 }
 
 message Ping {
     string type                     =  1;
 	string method                   =  2;
-	string src                      =  3;
-	string dst                      =  4;
+	uint32 src                      =  3;
+	uint32 dst                      =  4;
 	Time start                      =  5;
-	int32 ping_sent                 =  6;
-	int32 probe_size                =  7;
+	uint32 ping_sent                =  6;
+	uint32 probe_size               =  7;
 	uint32 userid                   =  8;
-	int32 ttl                       =  9;
-	int32 wait                      = 10;
-	int32 timeout                   = 11;
+	uint32 ttl                      =  9;
+	uint32 wait                     = 10;
+	uint32 timeout                  = 11;
 	repeated string flags           = 12;
 	repeated PingResponse responses = 13;
 	PingStats statistics            = 14;
     string error                    = 15;
-}
-
-message PingReturn {
-    ReturnT ret = 1;
-    Ping ping   = 2;
+    string version                  = 16;
+    uint32 spoofed_from             = 17;
 }
