@@ -53,15 +53,15 @@ type Staleness time.Duration
 // TracerouteProvider is the interface for getting traceroutes
 type TracerouteProvider interface {
 	StoreTraceroute(*dm.Traceroute) error
-	GetTRBySrcDst(string, string) (*dm.Traceroute, error)
-	GetTRBySrcDstWithStaleness(string, string, Staleness) (*dm.Traceroute, error)
+	GetTRBySrcDst(string, string) (<-chan *dm.Traceroute, error)
+	GetTRBySrcDstWithStaleness(string, string, Staleness) (<-chan *dm.Traceroute, error)
 	GetTraceMulti([]*dm.TracerouteMeasurement) (<-chan *dm.Traceroute, error)
 }
 
 // PingProvider is the interface for getting pings
 type PingProvider interface {
-	GetPingBySrcDst(string, string) (*dm.Ping, error)
-	GetPingBySrcDstWithStaleness(string, string, Staleness) (*dm.Ping, error)
+	GetPingBySrcDst(string, string) (<-chan *dm.Ping, error)
+	GetPingBySrcDstWithStaleness(string, string, Staleness) (<-chan *dm.Ping, error)
 	StorePing(*dm.Ping) error
 	GetPingsMulti([]*dm.PingMeasurement) (<-chan *dm.Ping, error)
 }

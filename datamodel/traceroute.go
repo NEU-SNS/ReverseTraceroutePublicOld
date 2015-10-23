@@ -100,8 +100,8 @@ func ConvertTraceroute(in warts.Traceroute) Traceroute {
 	t := Traceroute{}
 	t.Type = "trace"
 	t.UserId = in.Flags.UserID
-	t.Src = in.Flags.Src.String()
-	t.Dst = in.Flags.Dst.String()
+	t.Src = uint32(in.Flags.Src.Address)
+	t.Dst = uint32(in.Flags.Dst.Address)
 	t.Method = in.Flags.TraceType.String()
 	t.Sport = uint32(in.Flags.SourcePort)
 	t.Dport = uint32(in.Flags.DestPort)
@@ -130,7 +130,7 @@ func convertHops(in warts.Traceroute) []*TracerouteHop {
 	retHops := make([]*TracerouteHop, in.HopCount)
 	for i, hop := range hops {
 		h := &TracerouteHop{}
-		h.Addr = hop.Address.String()
+		h.Addr = uint32(hop.Address.Address)
 		h.ProbeTtl = uint32(hop.ProbeTTL)
 		h.ProbeId = uint32(hop.ProbeID)
 		h.ProbeSize = uint32(hop.ProbeSize)

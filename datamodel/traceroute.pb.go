@@ -37,8 +37,7 @@ var _ = proto.Marshal
 
 type TracerouteMeasurement struct {
 	Staleness    int64  `protobuf:"varint,1,opt,name=staleness" json:"staleness,omitempty"`
-	Host         string `protobuf:"bytes,2,opt,name=host" json:"host,omitempty"`
-	Dst          string `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
+	Dst          uint32 `protobuf:"varint,3,opt,name=dst" json:"dst,omitempty"`
 	Confidence   string `protobuf:"bytes,4,opt,name=confidence" json:"confidence,omitempty"`
 	Dport        string `protobuf:"bytes,5,opt,name=dport" json:"dport,omitempty"`
 	FirstHop     string `protobuf:"bytes,6,opt,name=first_hop" json:"first_hop,omitempty"`
@@ -53,7 +52,7 @@ type TracerouteMeasurement struct {
 	Attempts     string `protobuf:"bytes,15,opt,name=attempts" json:"attempts,omitempty"`
 	SendAll      bool   `protobuf:"varint,16,opt,name=send_all" json:"send_all,omitempty"`
 	Sport        string `protobuf:"bytes,17,opt,name=sport" json:"sport,omitempty"`
-	Src          string `protobuf:"bytes,18,opt,name=src" json:"src,omitempty"`
+	Src          uint32 `protobuf:"varint,18,opt,name=src" json:"src,omitempty"`
 	Tos          string `protobuf:"bytes,19,opt,name=tos" json:"tos,omitempty"`
 	TimeExceeded bool   `protobuf:"varint,20,opt,name=time_exceeded" json:"time_exceeded,omitempty"`
 	UserId       string `protobuf:"bytes,21,opt,name=user_id" json:"user_id,omitempty"`
@@ -86,7 +85,7 @@ func (m *TracerouteArg) GetTraceroutes() []*TracerouteMeasurement {
 }
 
 type TracerouteHop struct {
-	Addr      string `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`
+	Addr      uint32 `protobuf:"varint,1,opt,name=addr" json:"addr,omitempty"`
 	ProbeTtl  uint32 `protobuf:"varint,2,opt,name=probe_ttl" json:"probe_ttl,omitempty"`
 	ProbeId   uint32 `protobuf:"varint,3,opt,name=probe_id" json:"probe_id,omitempty"`
 	ProbeSize uint32 `protobuf:"varint,4,opt,name=probe_size" json:"probe_size,omitempty"`
@@ -117,8 +116,8 @@ type Traceroute struct {
 	Type       string           `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
 	UserId     uint32           `protobuf:"varint,2,opt,name=user_id" json:"user_id,omitempty"`
 	Method     string           `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
-	Src        string           `protobuf:"bytes,4,opt,name=src" json:"src,omitempty"`
-	Dst        string           `protobuf:"bytes,5,opt,name=dst" json:"dst,omitempty"`
+	Src        uint32           `protobuf:"varint,4,opt,name=src" json:"src,omitempty"`
+	Dst        uint32           `protobuf:"varint,5,opt,name=dst" json:"dst,omitempty"`
 	Sport      uint32           `protobuf:"varint,6,opt,name=sport" json:"sport,omitempty"`
 	Dport      uint32           `protobuf:"varint,7,opt,name=dport" json:"dport,omitempty"`
 	StopReason string           `protobuf:"bytes,8,opt,name=stop_reason" json:"stop_reason,omitempty"`
@@ -134,6 +133,7 @@ type Traceroute struct {
 	ProbeSize  uint32           `protobuf:"varint,18,opt,name=probe_size" json:"probe_size,omitempty"`
 	Hops       []*TracerouteHop `protobuf:"bytes,19,rep,name=hops" json:"hops,omitempty"`
 	Error      string           `protobuf:"bytes,20,opt,name=error" json:"error,omitempty"`
+	Version    string           `protobuf:"bytes,21,opt,name=version" json:"version,omitempty"`
 }
 
 func (m *Traceroute) Reset()         { *m = Traceroute{} }

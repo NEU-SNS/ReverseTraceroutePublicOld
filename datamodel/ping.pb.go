@@ -36,30 +36,30 @@ import proto "github.com/golang/protobuf/proto"
 var _ = proto.Marshal
 
 type PingMeasurement struct {
-	Src        string `protobuf:"bytes,1,opt,name=src" json:"src,omitempty"`
-	Dst        string `protobuf:"bytes,2,opt,name=dst" json:"dst,omitempty"`
-	Host       string `protobuf:"bytes,3,opt,name=host" json:"host,omitempty"`
-	Spoof      bool   `protobuf:"varint,4,opt,name=spoof" json:"spoof,omitempty"`
-	RR         bool   `protobuf:"varint,5,opt" json:"RR,omitempty"`
-	SAddr      string `protobuf:"bytes,6,opt,name=s_addr" json:"s_addr,omitempty"`
-	Payload    string `protobuf:"bytes,7,opt,name=payload" json:"payload,omitempty"`
-	Count      string `protobuf:"bytes,8,opt,name=count" json:"count,omitempty"`
-	IcmpSum    string `protobuf:"bytes,9,opt,name=icmp_sum" json:"icmp_sum,omitempty"`
-	Dport      string `protobuf:"bytes,10,opt,name=dport" json:"dport,omitempty"`
-	Sport      string `protobuf:"bytes,11,opt,name=sport" json:"sport,omitempty"`
-	Wait       string `protobuf:"bytes,12,opt,name=wait" json:"wait,omitempty"`
-	Ttl        string `protobuf:"bytes,13,opt,name=ttl" json:"ttl,omitempty"`
-	Mut        string `protobuf:"bytes,14,opt,name=mut" json:"mut,omitempty"`
-	ReplyCount string `protobuf:"bytes,15,opt,name=reply_count" json:"reply_count,omitempty"`
-	Pattern    string `protobuf:"bytes,16,opt,name=pattern" json:"pattern,omitempty"`
-	Method     string `protobuf:"bytes,17,opt,name=method" json:"method,omitempty"`
-	Size       string `protobuf:"bytes,18,opt,name=size" json:"size,omitempty"`
-	UserId     string `protobuf:"bytes,19,opt,name=user_id" json:"user_id,omitempty"`
-	Tos        string `protobuf:"bytes,20,opt,name=tos" json:"tos,omitempty"`
-	TimeStamp  string `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
-	Timeout    int64  `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
-	CheckCache bool   `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
-	CheckDb    bool   `protobuf:"varint,24,opt,name=check_db" json:"check_db,omitempty"`
+	Src         uint32 `protobuf:"varint,1,opt,name=src" json:"src,omitempty"`
+	Dst         uint32 `protobuf:"varint,2,opt,name=dst" json:"dst,omitempty"`
+	SpooferAddr uint32 `protobuf:"varint,3,opt,name=spoofer_addr" json:"spoofer_addr,omitempty"`
+	Spoof       bool   `protobuf:"varint,4,opt,name=spoof" json:"spoof,omitempty"`
+	RR          bool   `protobuf:"varint,5,opt" json:"RR,omitempty"`
+	SAddr       string `protobuf:"bytes,6,opt,name=s_addr" json:"s_addr,omitempty"`
+	Payload     string `protobuf:"bytes,7,opt,name=payload" json:"payload,omitempty"`
+	Count       string `protobuf:"bytes,8,opt,name=count" json:"count,omitempty"`
+	IcmpSum     string `protobuf:"bytes,9,opt,name=icmp_sum" json:"icmp_sum,omitempty"`
+	Dport       string `protobuf:"bytes,10,opt,name=dport" json:"dport,omitempty"`
+	Sport       string `protobuf:"bytes,11,opt,name=sport" json:"sport,omitempty"`
+	Wait        string `protobuf:"bytes,12,opt,name=wait" json:"wait,omitempty"`
+	Ttl         string `protobuf:"bytes,13,opt,name=ttl" json:"ttl,omitempty"`
+	Mut         string `protobuf:"bytes,14,opt,name=mut" json:"mut,omitempty"`
+	ReplyCount  string `protobuf:"bytes,15,opt,name=reply_count" json:"reply_count,omitempty"`
+	Pattern     string `protobuf:"bytes,16,opt,name=pattern" json:"pattern,omitempty"`
+	Method      string `protobuf:"bytes,17,opt,name=method" json:"method,omitempty"`
+	Size        string `protobuf:"bytes,18,opt,name=size" json:"size,omitempty"`
+	UserId      string `protobuf:"bytes,19,opt,name=user_id" json:"user_id,omitempty"`
+	Tos         string `protobuf:"bytes,20,opt,name=tos" json:"tos,omitempty"`
+	TimeStamp   string `protobuf:"bytes,21,opt,name=time_stamp" json:"time_stamp,omitempty"`
+	Timeout     int64  `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
+	CheckCache  bool   `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
+	CheckDb     bool   `protobuf:"varint,24,opt,name=check_db" json:"check_db,omitempty"`
 }
 
 func (m *PingMeasurement) Reset()         { *m = PingMeasurement{} }
@@ -95,20 +95,20 @@ func (m *PingStats) String() string { return proto.CompactTextString(m) }
 func (*PingStats) ProtoMessage()    {}
 
 type PingResponse struct {
-	From       string       `protobuf:"bytes,1,opt,name=from" json:"from,omitempty"`
-	Seq        int32        `protobuf:"varint,2,opt,name=seq" json:"seq,omitempty"`
-	ReplySize  int32        `protobuf:"varint,3,opt,name=reply_size" json:"reply_size,omitempty"`
-	ReplyTtl   int32        `protobuf:"varint,4,opt,name=reply_ttl" json:"reply_ttl,omitempty"`
+	From       uint32       `protobuf:"varint,1,opt,name=from" json:"from,omitempty"`
+	Seq        uint32       `protobuf:"varint,2,opt,name=seq" json:"seq,omitempty"`
+	ReplySize  uint32       `protobuf:"varint,3,opt,name=reply_size" json:"reply_size,omitempty"`
+	ReplyTtl   uint32       `protobuf:"varint,4,opt,name=reply_ttl" json:"reply_ttl,omitempty"`
 	ReplyProto string       `protobuf:"bytes,5,opt,name=reply_proto" json:"reply_proto,omitempty"`
 	Tx         *Time        `protobuf:"bytes,6,opt,name=tx" json:"tx,omitempty"`
 	Rx         *Time        `protobuf:"bytes,7,opt,name=rx" json:"rx,omitempty"`
-	Rtt        float32      `protobuf:"fixed32,8,opt,name=rtt" json:"rtt,omitempty"`
-	ProbeIpid  int32        `protobuf:"varint,9,opt,name=probe_ipid" json:"probe_ipid,omitempty"`
-	ReplyIpid  int32        `protobuf:"varint,10,opt,name=reply_ipid" json:"reply_ipid,omitempty"`
-	IcmpType   int32        `protobuf:"varint,11,opt,name=icmp_type" json:"icmp_type,omitempty"`
-	IcmpCode   int32        `protobuf:"varint,12,opt,name=icmp_code" json:"icmp_code,omitempty"`
-	RR         []string     `protobuf:"bytes,13,rep" json:"RR,omitempty"`
-	Tsonly     []int64      `protobuf:"varint,14,rep,name=tsonly" json:"tsonly,omitempty"`
+	Rtt        uint32       `protobuf:"varint,8,opt,name=rtt" json:"rtt,omitempty"`
+	ProbeIpid  uint32       `protobuf:"varint,9,opt,name=probe_ipid" json:"probe_ipid,omitempty"`
+	ReplyIpid  uint32       `protobuf:"varint,10,opt,name=reply_ipid" json:"reply_ipid,omitempty"`
+	IcmpType   uint32       `protobuf:"varint,11,opt,name=icmp_type" json:"icmp_type,omitempty"`
+	IcmpCode   uint32       `protobuf:"varint,12,opt,name=icmp_code" json:"icmp_code,omitempty"`
+	RR         []uint32     `protobuf:"varint,13,rep" json:"RR,omitempty"`
+	Tsonly     []uint32     `protobuf:"varint,14,rep,name=tsonly" json:"tsonly,omitempty"`
 	Tsandaddr  []*TsAndAddr `protobuf:"bytes,15,rep,name=tsandaddr" json:"tsandaddr,omitempty"`
 }
 
@@ -138,8 +138,8 @@ func (m *PingResponse) GetTsandaddr() []*TsAndAddr {
 }
 
 type TsAndAddr struct {
-	Ip string `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
-	Ts int64  `protobuf:"varint,2,opt,name=ts" json:"ts,omitempty"`
+	Ip uint32 `protobuf:"varint,1,opt,name=ip" json:"ip,omitempty"`
+	Ts uint32 `protobuf:"varint,2,opt,name=ts" json:"ts,omitempty"`
 }
 
 func (m *TsAndAddr) Reset()         { *m = TsAndAddr{} }
@@ -147,21 +147,23 @@ func (m *TsAndAddr) String() string { return proto.CompactTextString(m) }
 func (*TsAndAddr) ProtoMessage()    {}
 
 type Ping struct {
-	Type       string          `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
-	Method     string          `protobuf:"bytes,2,opt,name=method" json:"method,omitempty"`
-	Src        string          `protobuf:"bytes,3,opt,name=src" json:"src,omitempty"`
-	Dst        string          `protobuf:"bytes,4,opt,name=dst" json:"dst,omitempty"`
-	Start      *Time           `protobuf:"bytes,5,opt,name=start" json:"start,omitempty"`
-	PingSent   int32           `protobuf:"varint,6,opt,name=ping_sent" json:"ping_sent,omitempty"`
-	ProbeSize  int32           `protobuf:"varint,7,opt,name=probe_size" json:"probe_size,omitempty"`
-	Userid     uint32          `protobuf:"varint,8,opt,name=userid" json:"userid,omitempty"`
-	Ttl        int32           `protobuf:"varint,9,opt,name=ttl" json:"ttl,omitempty"`
-	Wait       int32           `protobuf:"varint,10,opt,name=wait" json:"wait,omitempty"`
-	Timeout    int32           `protobuf:"varint,11,opt,name=timeout" json:"timeout,omitempty"`
-	Flags      []string        `protobuf:"bytes,12,rep,name=flags" json:"flags,omitempty"`
-	Responses  []*PingResponse `protobuf:"bytes,13,rep,name=responses" json:"responses,omitempty"`
-	Statistics *PingStats      `protobuf:"bytes,14,opt,name=statistics" json:"statistics,omitempty"`
-	Error      string          `protobuf:"bytes,15,opt,name=error" json:"error,omitempty"`
+	Type        string          `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
+	Method      string          `protobuf:"bytes,2,opt,name=method" json:"method,omitempty"`
+	Src         uint32          `protobuf:"varint,3,opt,name=src" json:"src,omitempty"`
+	Dst         uint32          `protobuf:"varint,4,opt,name=dst" json:"dst,omitempty"`
+	Start       *Time           `protobuf:"bytes,5,opt,name=start" json:"start,omitempty"`
+	PingSent    uint32          `protobuf:"varint,6,opt,name=ping_sent" json:"ping_sent,omitempty"`
+	ProbeSize   uint32          `protobuf:"varint,7,opt,name=probe_size" json:"probe_size,omitempty"`
+	Userid      uint32          `protobuf:"varint,8,opt,name=userid" json:"userid,omitempty"`
+	Ttl         uint32          `protobuf:"varint,9,opt,name=ttl" json:"ttl,omitempty"`
+	Wait        uint32          `protobuf:"varint,10,opt,name=wait" json:"wait,omitempty"`
+	Timeout     uint32          `protobuf:"varint,11,opt,name=timeout" json:"timeout,omitempty"`
+	Flags       []string        `protobuf:"bytes,12,rep,name=flags" json:"flags,omitempty"`
+	Responses   []*PingResponse `protobuf:"bytes,13,rep,name=responses" json:"responses,omitempty"`
+	Statistics  *PingStats      `protobuf:"bytes,14,opt,name=statistics" json:"statistics,omitempty"`
+	Error       string          `protobuf:"bytes,15,opt,name=error" json:"error,omitempty"`
+	Version     string          `protobuf:"bytes,16,opt,name=version" json:"version,omitempty"`
+	SpoofedFrom uint32          `protobuf:"varint,17,opt,name=spoofed_from" json:"spoofed_from,omitempty"`
 }
 
 func (m *Ping) Reset()         { *m = Ping{} }
@@ -185,29 +187,6 @@ func (m *Ping) GetResponses() []*PingResponse {
 func (m *Ping) GetStatistics() *PingStats {
 	if m != nil {
 		return m.Statistics
-	}
-	return nil
-}
-
-type PingReturn struct {
-	Ret  *ReturnT `protobuf:"bytes,1,opt,name=ret" json:"ret,omitempty"`
-	Ping *Ping    `protobuf:"bytes,2,opt,name=ping" json:"ping,omitempty"`
-}
-
-func (m *PingReturn) Reset()         { *m = PingReturn{} }
-func (m *PingReturn) String() string { return proto.CompactTextString(m) }
-func (*PingReturn) ProtoMessage()    {}
-
-func (m *PingReturn) GetRet() *ReturnT {
-	if m != nil {
-		return m.Ret
-	}
-	return nil
-}
-
-func (m *PingReturn) GetPing() *Ping {
-	if m != nil {
-		return m.Ping
 	}
 	return nil
 }

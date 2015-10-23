@@ -39,10 +39,10 @@ It has these top-level messages:
 package controllerapi
 
 import proto "github.com/golang/protobuf/proto"
+import datamodel1 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel4 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-import datamodel5 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -59,9 +59,9 @@ var _ = proto.Marshal
 // Client API for Controller service
 
 type ControllerClient interface {
-	Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (Controller_PingClient, error)
-	Traceroute(ctx context.Context, in *datamodel3.TracerouteArg, opts ...grpc.CallOption) (Controller_TracerouteClient, error)
-	GetVPs(ctx context.Context, in *datamodel4.VPRequest, opts ...grpc.CallOption) (*datamodel4.VPReturn, error)
+	Ping(ctx context.Context, in *datamodel1.PingArg, opts ...grpc.CallOption) (Controller_PingClient, error)
+	Traceroute(ctx context.Context, in *datamodel2.TracerouteArg, opts ...grpc.CallOption) (Controller_TracerouteClient, error)
+	GetVPs(ctx context.Context, in *datamodel3.VPRequest, opts ...grpc.CallOption) (*datamodel3.VPReturn, error)
 	ReceiveSpoofedProbes(ctx context.Context, opts ...grpc.CallOption) (Controller_ReceiveSpoofedProbesClient, error)
 }
 
@@ -73,7 +73,7 @@ func NewControllerClient(cc *grpc.ClientConn) ControllerClient {
 	return &controllerClient{cc}
 }
 
-func (c *controllerClient) Ping(ctx context.Context, in *datamodel2.PingArg, opts ...grpc.CallOption) (Controller_PingClient, error) {
+func (c *controllerClient) Ping(ctx context.Context, in *datamodel1.PingArg, opts ...grpc.CallOption) (Controller_PingClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_Controller_serviceDesc.Streams[0], c.cc, "/.Controller/Ping", opts...)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (c *controllerClient) Ping(ctx context.Context, in *datamodel2.PingArg, opt
 }
 
 type Controller_PingClient interface {
-	Recv() (*datamodel2.Ping, error)
+	Recv() (*datamodel1.Ping, error)
 	grpc.ClientStream
 }
 
@@ -97,15 +97,15 @@ type controllerPingClient struct {
 	grpc.ClientStream
 }
 
-func (x *controllerPingClient) Recv() (*datamodel2.Ping, error) {
-	m := new(datamodel2.Ping)
+func (x *controllerPingClient) Recv() (*datamodel1.Ping, error) {
+	m := new(datamodel1.Ping)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel3.TracerouteArg, opts ...grpc.CallOption) (Controller_TracerouteClient, error) {
+func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel2.TracerouteArg, opts ...grpc.CallOption) (Controller_TracerouteClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_Controller_serviceDesc.Streams[1], c.cc, "/.Controller/Traceroute", opts...)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (c *controllerClient) Traceroute(ctx context.Context, in *datamodel3.Tracer
 }
 
 type Controller_TracerouteClient interface {
-	Recv() (*datamodel3.Traceroute, error)
+	Recv() (*datamodel2.Traceroute, error)
 	grpc.ClientStream
 }
 
@@ -129,16 +129,16 @@ type controllerTracerouteClient struct {
 	grpc.ClientStream
 }
 
-func (x *controllerTracerouteClient) Recv() (*datamodel3.Traceroute, error) {
-	m := new(datamodel3.Traceroute)
+func (x *controllerTracerouteClient) Recv() (*datamodel2.Traceroute, error) {
+	m := new(datamodel2.Traceroute)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *controllerClient) GetVPs(ctx context.Context, in *datamodel4.VPRequest, opts ...grpc.CallOption) (*datamodel4.VPReturn, error) {
-	out := new(datamodel4.VPReturn)
+func (c *controllerClient) GetVPs(ctx context.Context, in *datamodel3.VPRequest, opts ...grpc.CallOption) (*datamodel3.VPReturn, error) {
+	out := new(datamodel3.VPReturn)
 	err := grpc.Invoke(ctx, "/.Controller/GetVPs", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -156,8 +156,8 @@ func (c *controllerClient) ReceiveSpoofedProbes(ctx context.Context, opts ...grp
 }
 
 type Controller_ReceiveSpoofedProbesClient interface {
-	Send(*datamodel5.Probe) error
-	CloseAndRecv() (*datamodel5.ReceiveSpoofedProbesResponse, error)
+	Send(*datamodel4.Probe) error
+	CloseAndRecv() (*datamodel4.ReceiveSpoofedProbesResponse, error)
 	grpc.ClientStream
 }
 
@@ -165,15 +165,15 @@ type controllerReceiveSpoofedProbesClient struct {
 	grpc.ClientStream
 }
 
-func (x *controllerReceiveSpoofedProbesClient) Send(m *datamodel5.Probe) error {
+func (x *controllerReceiveSpoofedProbesClient) Send(m *datamodel4.Probe) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *controllerReceiveSpoofedProbesClient) CloseAndRecv() (*datamodel5.ReceiveSpoofedProbesResponse, error) {
+func (x *controllerReceiveSpoofedProbesClient) CloseAndRecv() (*datamodel4.ReceiveSpoofedProbesResponse, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(datamodel5.ReceiveSpoofedProbesResponse)
+	m := new(datamodel4.ReceiveSpoofedProbesResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -183,9 +183,9 @@ func (x *controllerReceiveSpoofedProbesClient) CloseAndRecv() (*datamodel5.Recei
 // Server API for Controller service
 
 type ControllerServer interface {
-	Ping(*datamodel2.PingArg, Controller_PingServer) error
-	Traceroute(*datamodel3.TracerouteArg, Controller_TracerouteServer) error
-	GetVPs(context.Context, *datamodel4.VPRequest) (*datamodel4.VPReturn, error)
+	Ping(*datamodel1.PingArg, Controller_PingServer) error
+	Traceroute(*datamodel2.TracerouteArg, Controller_TracerouteServer) error
+	GetVPs(context.Context, *datamodel3.VPRequest) (*datamodel3.VPReturn, error)
 	ReceiveSpoofedProbes(Controller_ReceiveSpoofedProbesServer) error
 }
 
@@ -194,7 +194,7 @@ func RegisterControllerServer(s *grpc.Server, srv ControllerServer) {
 }
 
 func _Controller_Ping_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel2.PingArg)
+	m := new(datamodel1.PingArg)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func _Controller_Ping_Handler(srv interface{}, stream grpc.ServerStream) error {
 }
 
 type Controller_PingServer interface {
-	Send(*datamodel2.Ping) error
+	Send(*datamodel1.Ping) error
 	grpc.ServerStream
 }
 
@@ -210,12 +210,12 @@ type controllerPingServer struct {
 	grpc.ServerStream
 }
 
-func (x *controllerPingServer) Send(m *datamodel2.Ping) error {
+func (x *controllerPingServer) Send(m *datamodel1.Ping) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _Controller_Traceroute_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(datamodel3.TracerouteArg)
+	m := new(datamodel2.TracerouteArg)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func _Controller_Traceroute_Handler(srv interface{}, stream grpc.ServerStream) e
 }
 
 type Controller_TracerouteServer interface {
-	Send(*datamodel3.Traceroute) error
+	Send(*datamodel2.Traceroute) error
 	grpc.ServerStream
 }
 
@@ -231,12 +231,12 @@ type controllerTracerouteServer struct {
 	grpc.ServerStream
 }
 
-func (x *controllerTracerouteServer) Send(m *datamodel3.Traceroute) error {
+func (x *controllerTracerouteServer) Send(m *datamodel2.Traceroute) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _Controller_GetVPs_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
-	in := new(datamodel4.VPRequest)
+	in := new(datamodel3.VPRequest)
 	if err := codec.Unmarshal(buf, in); err != nil {
 		return nil, err
 	}
@@ -252,8 +252,8 @@ func _Controller_ReceiveSpoofedProbes_Handler(srv interface{}, stream grpc.Serve
 }
 
 type Controller_ReceiveSpoofedProbesServer interface {
-	SendAndClose(*datamodel5.ReceiveSpoofedProbesResponse) error
-	Recv() (*datamodel5.Probe, error)
+	SendAndClose(*datamodel4.ReceiveSpoofedProbesResponse) error
+	Recv() (*datamodel4.Probe, error)
 	grpc.ServerStream
 }
 
@@ -261,12 +261,12 @@ type controllerReceiveSpoofedProbesServer struct {
 	grpc.ServerStream
 }
 
-func (x *controllerReceiveSpoofedProbesServer) SendAndClose(m *datamodel5.ReceiveSpoofedProbesResponse) error {
+func (x *controllerReceiveSpoofedProbesServer) SendAndClose(m *datamodel4.ReceiveSpoofedProbesResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *controllerReceiveSpoofedProbesServer) Recv() (*datamodel5.Probe, error) {
-	m := new(datamodel5.Probe)
+func (x *controllerReceiveSpoofedProbesServer) Recv() (*datamodel4.Probe, error) {
+	m := new(datamodel4.Probe)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

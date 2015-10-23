@@ -46,15 +46,6 @@ func (p *Ping) CMarshal() []byte {
 	return ret
 }
 
-/*
-func (p *Ping) Marshal() ([]byte, error) {
-	return proto.Marshal(p)
-}
-
-func (pm *PingMeasurement) Marshal() ([]byte, error) {
-	return proto.Marshal(pm)
-}
-*/
 func (pm *PingMeasurement) Key() string {
 	return ""
 }
@@ -65,28 +56,28 @@ func (p *Ping) Key() string {
 
 func ConvertPing(in warts.Ping) Ping {
 	p := Ping{}
-	p.Src = in.Flags.Src.String()
-	p.Dst = in.Flags.Dst.String()
+	p.Src = uint32(in.Flags.Src.Address)
+	p.Dst = uint32(in.Flags.Dst.Address)
 	p.Type = in.Type
 	p.Method = in.Flags.PingMethod.String()
 	dmt := &Time{}
 	dmt.Sec = in.Flags.StartTime.Sec
 	dmt.Usec = in.Flags.StartTime.Usec
 	p.Start = dmt
-	p.PingSent = int32(in.Flags.ProbeCount)
-	p.ProbeSize = int32(in.Flags.ProbeSize)
+	p.PingSent = uint32(in.Flags.ProbeCount)
+	p.ProbeSize = uint32(in.Flags.ProbeSize)
 	p.Userid = in.Flags.UserID
-	p.Ttl = int32(in.Flags.ProbeTTL)
-	p.Wait = int32(in.Flags.ProbeWaitS)
-	p.Timeout = int32(in.Flags.ProbeTimeout)
+	p.Ttl = uint32(in.Flags.ProbeTTL)
+	p.Wait = uint32(in.Flags.ProbeWaitS)
+	p.Timeout = uint32(in.Flags.ProbeTimeout)
 	p.Flags = in.Flags.PF.Strings()
 	replies := make([]*PingResponse, in.ReplyCount)
 	for i, resp := range in.PingReplies {
 		rep := &PingResponse{}
-		rep.From = resp.Addr.String()
-		rep.Seq = int32(resp.ProbeID)
-		rep.ReplySize = int32(resp.ReplySize)
-		rep.ReplyTtl = int32(resp.ReplyTTL)
+		rep.From = uint32(resp.Addr.Address)
+		rep.Seq = uint32(resp.ProbeID)
+		rep.ReplySize = uint32(resp.ReplySize)
+		rep.ReplyTtl = uint32(resp.ReplyTTL)
 		rep.ReplyProto = resp.ReplyProto.String()
 		txt := &Time{}
 		txt.Sec = resp.Tx.Sec
@@ -96,25 +87,27 @@ func ConvertPing(in warts.Ping) Ping {
 		rxt.Sec = txt.Sec + resp.RTT.Sec
 		rxt.Usec = txt.Usec + resp.RTT.Usec
 		rep.Rx = rxt
-		rep.ProbeIpid = int32(resp.ProbeIPID)
-		rep.ReplyIpid = int32(resp.ReplyIPID)
-		rep.IcmpType = int32((resp.ICMP & 0xFF00) >> 8)
-		rep.IcmpCode = int32(resp.ICMP & 0x00FF)
+		rep.ProbeIpid = uint32(resp.ProbeIPID)
+		rep.ReplyIpid = uint32(resp.ReplyIPID)
+		rep.IcmpType = uint32((resp.ICMP & 0xFF00) >> 8)
+		rep.IcmpCode = uint32(resp.ICMP & 0x00FF)
 		if resp.IsTsOnly() {
-			rep.Tsonly = make([]int64, 0)
+			rep.Tsonly = make([]uint32, 0)
 			for _, ts := range resp.V4TS.TimeStamps {
-				rep.Tsonly = append(rep.Tsonly, int64(ts))
+				rep.Tsonly = append(rep.Tsonly, uint32(ts))
 			}
 		} else if resp.IsTsAndAddr() {
 			rep.Tsandaddr = make([]*TsAndAddr, 0)
 			for i, ts := range resp.V4TS.TimeStamps {
 				tsa := &TsAndAddr{}
-				tsa.Ip = resp.V4TS.Addrs[i].String()
-				tsa.Ts = int64(ts)
+				tsa.Ip = uint32(resp.V4TS.Addrs[i].Address)
+				tsa.Ts = uint32(ts)
 				rep.Tsandaddr = append(rep.Tsandaddr, tsa)
 			}
 		}
-		rep.RR = resp.V4RR.Strings()
+		for _, addr := range resp.V4RR.Addrs {
+			rep.RR = append(rep.RR, uint32(addr.Address))
+		}
 		replies[i] = rep
 	}
 	p.Responses = replies

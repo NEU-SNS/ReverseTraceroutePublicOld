@@ -7,7 +7,7 @@ LICENSE='./LICENSE'
 RETURN=0
 FILES=""
 
-for i in `(find . -type f -name "*.go")` 
+for i in `(find . -type f -name "*.go" -not -path "./GoDeps/*")` 
 do
    if  ! grep -q "Copyright (c) 2015, Northeastern University" $i 
    then

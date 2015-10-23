@@ -36,9 +36,7 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/register.proto
-	github.com/NEU-SNS/ReverseTraceroute/datamodel/returnt.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/service.proto
-	github.com/NEU-SNS/ReverseTraceroute/datamodel/stats.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/update.proto
