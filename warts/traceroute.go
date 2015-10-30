@@ -32,6 +32,7 @@ import (
 	"syscall"
 )
 
+// Traceroute is a traceroute
 type Traceroute struct {
 	Flags      TracerouteFlags
 	PLength    uint16
@@ -40,6 +41,7 @@ type Traceroute struct {
 	EndOfTrace uint16
 }
 
+// TracerouteHop is a traceroute hop
 type TracerouteHop struct {
 	PLength        uint16
 	HopAddr        Address
@@ -62,6 +64,7 @@ type TracerouteHop struct {
 	Address        Address
 }
 
+// ICMPExtension is an icmp extension
 type ICMPExtension struct {
 	Length      uint16
 	ClassNumber uint8
@@ -94,6 +97,7 @@ func readICMPExtension(f io.Reader) (ICMPExtension, error) {
 	return ret, nil
 }
 
+// ICMPExtensionList is an list of icmp extensions
 type ICMPExtensionList struct {
 	Length     uint16
 	Extensions []ICMPExtension
@@ -118,6 +122,7 @@ func readICMPExtensionList(f io.Reader) (ICMPExtensionList, error) {
 	return ret, nil
 }
 
+// TracerouteFlags are the traceroute flags
 type TracerouteFlags struct {
 	ListID       uint32
 	CycleID      uint32
@@ -149,6 +154,7 @@ type TracerouteFlags struct {
 	UserID       uint32
 }
 
+// TraceType is the type of the traceroute
 type TraceType uint8
 
 func (tt TraceType) String() string {
@@ -164,6 +170,7 @@ func (tt TraceType) String() string {
 	return types[tt]
 }
 
+// StopReason is the reason the traceroute stopped
 type StopReason uint8
 
 func (sr StopReason) String() string {
@@ -323,8 +330,7 @@ func readTracerouteHop(f io.Reader, addrs *AddressRefs) (TracerouteHop, error) {
 			if err != nil {
 				return th, err
 			}
-			th.RTT.Sec = int64(val) / 1000000
-			th.RTT.Usec = int64(val) % 1000000
+			convertTimeval(&th.RTT, val)
 		case 7:
 			th.ICMPTypeCode, err = readUint16(f)
 			if err != nil {

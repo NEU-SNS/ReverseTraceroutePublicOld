@@ -43,13 +43,45 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto
 
 It has these top-level messages:
+	PingMeasurement
+	PingArg
+	PingStats
+	PingResponse
+	TsAndAddr
+	Ping
+	RecSpoof
+	Spoof
+	SpoofedProbes
+	SpoofedProbesResponse
+	Probe
+	RecordRoute
+	TimeStamp
+	Stamp
+	NotifyRecSpoofResponse
+	ReceiveSpoofedProbesResponse
+	RegisterResponse
+	Time
+	RTT
+	TracerouteMeasurement
+	TracerouteArg
+	TracerouteHop
+	Traceroute
+	TracerouteTime
+	UpdateResponse
+	VantagePoint
+	VPRequest
+	VPReturn
 */
 package datamodel
 
 import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 type MType int32
 

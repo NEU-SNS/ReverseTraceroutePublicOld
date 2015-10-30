@@ -24,14 +24,36 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package dataaccess provides database access
 package dataaccess
 
 import (
+	"time"
+
+	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
-type dataAccess struct {
-	conf dm.DbConfig
+// DbConfig is a database configuration
+type DbConfig struct {
+	WriteConfigs []Config
+	ReadConfigs  []Config
+}
+
+// Config is a DB server config
+type Config struct {
+	User     string
+	Password string
+	Host     string
+	Port     string
+	Db       string
+}
+
+// DataAccess represents data access
+type DataAccess struct {
+	conf DbConfig
+	db   *sql.DB
 }
 
 func uToNSec(u int64) int64 {
@@ -39,32 +61,60 @@ func uToNSec(u int64) int64 {
 	return u * 1000
 }
 
-func (d *dataAccess) StoreTraceroute(t *dm.Traceroute, s dm.ServiceT) error {
+// StoreTraceroute stores a traceroute
+func (d *DataAccess) StoreTraceroute(t *dm.Traceroute) error {
 	return nil
 }
 
-func (d *dataAccess) GetTRBySrcDst(src, dst string) (*dm.Traceroute, error) {
+// GetTRBySrcDst gets a trace by src and dst
+func (d *DataAccess) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 	return nil, nil
 }
 
-func (d *dataAccess) GetTRBySrcDstWithStaleness(src, dst string, s Staleness) (*dm.Traceroute, error) {
+// GetTRBySrcDstWithStaleness gets a trace with the src and dst no older than the give time
+func (d *DataAccess) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
 	return nil, nil
 }
 
-func (d *dataAccess) GetPingBySrcDst(src, dst string) (*dm.Ping, error) {
+// GetPingBySrcDst gets a ping
+func (d *DataAccess) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 	return nil, nil
 }
 
-func (d *dataAccess) StorePing(p *dm.Ping) error {
+// StorePing stores a ping
+func (d *DataAccess) StorePing(p *dm.Ping) error {
 	return nil
 }
 
-func (d *dataAccess) Close() error {
+// Close closes
+func (d *DataAccess) Close() error {
 	return nil
 }
 
-/*
-func New(c dm.DbConfig) (DataProvider, error) {
-	return &dataAccess{conf: c}, nil
+// New create a new dataAccess with the given config
+func New(c DbConfig) (*DataAccess, error) {
+	var conf sql.DbConfig
+	for _, cc := range c.ReadConfigs {
+		conf.ReadConfigs = append(conf.ReadConfigs, sql.Config{
+			User:     cc.User,
+			Password: cc.Password,
+			Host:     cc.Host,
+			Port:     cc.Port,
+			Db:       cc.Db,
+		})
+	}
+	for _, cc := range c.WriteConfigs {
+		conf.WriteConfigs = append(conf.WriteConfigs, sql.Config{
+			User:     cc.User,
+			Password: cc.Password,
+			Host:     cc.Host,
+			Port:     cc.Port,
+			Db:       cc.Db,
+		})
+	}
+	db, err := sql.NewDB(conf)
+	if err != nil {
+		return nil, err
+	}
+	return &DataAccess{conf: c, db: db}, nil
 }
-*/

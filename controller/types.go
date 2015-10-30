@@ -30,32 +30,25 @@ package controller
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
+	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	con "golang.org/x/net/context"
 )
 
 var (
-	ErrorServiceNotFound         = errors.New("service not found")
-	ErrorMeasurementToolNotFound = errors.New("measurement tool not found")
+	errorServiceNotFound         = errors.New("service not found")
+	errorMeasurementToolNotFound = errors.New("measurement tool not found")
 )
 
-type MeasurementTool interface {
-	Ping(con.Context, *dm.PingArg) (*dm.Ping, error)
-	Traceroute(con.Context, *dm.TracerouteArg) (*dm.Traceroute, error)
-	Stats(con.Context, *dm.StatsArg) (*dm.Stats, error)
-	GetVP(con.Context, *dm.VPRequest) (*dm.VPReturn, error)
-	Connect(string, time.Duration) error
-}
-
+// Config is the config struct for the controller
 type Config struct {
 	Local LocalConfig
-	Db    dm.DbConfig
+	Db    da.DbConfig
 	Cache cache.Config
 }
 
+// LocalConfig is the configuration options for the controller
 type LocalConfig struct {
 	Addr         *string `flag:"a"`
 	Port         *int    `flag:"p"`
@@ -67,6 +60,7 @@ type LocalConfig struct {
 	ConnTimeout  *int64  `flag:"conn-timeout"`
 }
 
+// NewConfig returns a new blank Config
 func NewConfig() Config {
 	lc := LocalConfig{
 		Addr:         new(string),

@@ -31,16 +31,20 @@ Copyright (c) 2015, Northeastern University
 package datamodel
 
 import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 type PingMeasurement struct {
 	Src         uint32 `protobuf:"varint,1,opt,name=src" json:"src,omitempty"`
 	Dst         uint32 `protobuf:"varint,2,opt,name=dst" json:"dst,omitempty"`
 	SpooferAddr uint32 `protobuf:"varint,3,opt,name=spoofer_addr" json:"spoofer_addr,omitempty"`
 	Spoof       bool   `protobuf:"varint,4,opt,name=spoof" json:"spoof,omitempty"`
-	RR          bool   `protobuf:"varint,5,opt" json:"RR,omitempty"`
+	RR          bool   `protobuf:"varint,5,opt,name=RR" json:"RR,omitempty"`
 	SAddr       string `protobuf:"bytes,6,opt,name=s_addr" json:"s_addr,omitempty"`
 	Payload     string `protobuf:"bytes,7,opt,name=payload" json:"payload,omitempty"`
 	Count       string `protobuf:"bytes,8,opt,name=count" json:"count,omitempty"`
@@ -107,7 +111,7 @@ type PingResponse struct {
 	ReplyIpid  uint32       `protobuf:"varint,10,opt,name=reply_ipid" json:"reply_ipid,omitempty"`
 	IcmpType   uint32       `protobuf:"varint,11,opt,name=icmp_type" json:"icmp_type,omitempty"`
 	IcmpCode   uint32       `protobuf:"varint,12,opt,name=icmp_code" json:"icmp_code,omitempty"`
-	RR         []uint32     `protobuf:"varint,13,rep" json:"RR,omitempty"`
+	RR         []uint32     `protobuf:"varint,13,rep,name=RR" json:"RR,omitempty"`
 	Tsonly     []uint32     `protobuf:"varint,14,rep,name=tsonly" json:"tsonly,omitempty"`
 	Tsandaddr  []*TsAndAddr `protobuf:"bytes,15,rep,name=tsandaddr" json:"tsandaddr,omitempty"`
 }
@@ -154,7 +158,7 @@ type Ping struct {
 	Start       *Time           `protobuf:"bytes,5,opt,name=start" json:"start,omitempty"`
 	PingSent    uint32          `protobuf:"varint,6,opt,name=ping_sent" json:"ping_sent,omitempty"`
 	ProbeSize   uint32          `protobuf:"varint,7,opt,name=probe_size" json:"probe_size,omitempty"`
-	Userid      uint32          `protobuf:"varint,8,opt,name=userid" json:"userid,omitempty"`
+	UserId      uint32          `protobuf:"varint,8,opt,name=user_id" json:"user_id,omitempty"`
 	Ttl         uint32          `protobuf:"varint,9,opt,name=ttl" json:"ttl,omitempty"`
 	Wait        uint32          `protobuf:"varint,10,opt,name=wait" json:"wait,omitempty"`
 	Timeout     uint32          `protobuf:"varint,11,opt,name=timeout" json:"timeout,omitempty"`
