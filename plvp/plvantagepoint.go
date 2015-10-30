@@ -49,7 +49,6 @@ import (
 	"google.golang.org/grpc"
 
 	"net/http"
-	_ "net/http/pprof"
 )
 
 var (
@@ -64,7 +63,7 @@ var (
 	})
 )
 
-var id uint32 = rand.Uint32()
+var id = rand.Uint32()
 
 func getName() string {
 	name, err := os.Hostname()
@@ -178,7 +177,7 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 	}
 }
 
-func startHttp(addr string) {
+func startHTTP(addr string) {
 	for {
 		log.Error(http.ListenAndServe(addr, nil))
 	}
@@ -188,7 +187,7 @@ func startHttp(addr string) {
 func Start(c Config) chan error {
 	log.Info("Starting plvp with config: %v", c)
 	http.Handle("/metrics", prometheus.Handler())
-	go startHttp(*c.Local.PProfAddr)
+	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 1)
 	go plVantagepoint.run(c, errChan)
 	return errChan
@@ -203,7 +202,7 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	vp.am.Lock()
 	ip := vp.addr
 	vp.am.Unlock()
-	addr := fmt.Sprintf("%s:%s", ip, vp.config.Local.Port)
+	addr := fmt.Sprintf("%s:%d", ip, vp.config.Local.Port)
 	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second))
 	if err != nil {
 		log.Errorf("Failed to send spoofs: %v", err)
@@ -217,7 +216,7 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 }
 
 func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {
-	sprobes := make([]*dm.Probe, 0)
+	var sprobes []*dm.Probe
 	go func() {
 		for {
 			select {

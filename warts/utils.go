@@ -100,12 +100,12 @@ func readTimeVal(f io.Reader) (syscall.Timeval, error) {
 	if err != nil {
 		return ret, err
 	}
-	ret.Sec = int64(sec)
+	setSecond(&ret, sec)
 	usec, err := readUint32(f)
 	if err != nil {
 		return ret, err
 	}
-	ret.Usec = int64(usec)
+	setUSecond(&ret, usec)
 	return ret, nil
 }
 

@@ -37,7 +37,6 @@ import (
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
-	"github.com/NEU-SNS/ReverseTraceroute/util"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -74,24 +73,14 @@ func main() {
 		Pings: make([]*dm.PingMeasurement, 0),
 	}
 	fmt.Println("Num of vps: ", len(vplist))
-	dst := new(string)
 	for i, vp := range vplist {
 		if i == 0 {
-			ip, err := util.Int32ToIPString(vp.Ip)
-			if err != nil {
-				panic(err)
-			}
-			dst = &ip
 			continue
 		}
 		if vp.Controller != 0 {
-			src, err := util.Int32ToIPString(vp.Ip)
-			if err != nil {
-				panic(err)
-			}
 			pingreq.Pings = append(pingreq.Pings, &dm.PingMeasurement{
-				Src: src,
-				Dst: *dst,
+				Src: vp.Ip,
+				Dst: vp.Ip,
 				RR:  true,
 			})
 		}

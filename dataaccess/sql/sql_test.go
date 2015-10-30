@@ -29,17 +29,32 @@ package sql_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
+	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 var conf = sql.DbConfig{
-	UName:    "revtr",
-	Password: "password",
-	Host:     "localhost",
-	Port:     "3306",
-	Db:       "plcontroller",
+	WriteConfigs: []sql.Config{
+		sql.Config{
+			User:     "revtr",
+			Password: "password",
+			Host:     "localhost",
+			Port:     "3306",
+			Db:       "ccontroller",
+		},
+	},
+	ReadConfigs: []sql.Config{
+		sql.Config{
+			User:     "revtr",
+			Password: "password",
+			Host:     "localhost",
+			Port:     "3306",
+			Db:       "ccontroller",
+		},
+	},
 }
 
 var db *sql.DB
@@ -56,6 +71,82 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
+func TestGetTracerouteBadIp(t *testing.T) {
+	_, err := db.GetTRBySrcDst(0, 0)
+	if err != nil {
+		t.Fatalf("TestGetTracerouteBadIp: %v", err)
+	}
+}
+
+func TestGetTraceroute(t *testing.T) {
+	_, err := db.GetTRBySrcDst(89, 90)
+	if err != nil {
+		t.Fatalf("TestGetTracerouteBadIp: %v", err)
+	}
+}
+
+func TestInsertTraceroute(t *testing.T) {
+	var tt dm.TracerouteTime
+	unix := time.Now().Unix()
+	tt.Sec = int64(unix)
+	test := dm.Traceroute{
+		Type:       "test",
+		Src:        89,
+		Dst:        90,
+		UserId:     111,
+		Method:     "testing",
+		Sport:      111,
+		Dport:      222,
+		StopReason: "test",
+		StopData:   12,
+		Start:      &tt,
+		HopCount:   2,
+		Attempts:   3,
+		Hoplimit:   4,
+		Firsthop:   1,
+		Wait:       88,
+		WaitProbe:  99,
+		Tos:        6,
+		Version:    "-1",
+	}
+	err := db.StoreTraceroute(&test)
+	if err != nil {
+		t.Fatalf("TestInsertTraceroute: %v", err)
+	}
+
+}
+
+func TestInsertPing(t *testing.T) {
+	var start dm.Time
+	start.Sec = time.Now().Unix()
+	ping := dm.Ping{
+		Type:      "test",
+		Src:       89,
+		Dst:       90,
+		UserId:    111,
+		Start:     &start,
+		PingSent:  4,
+		ProbeSize: 5,
+		Ttl:       90,
+		Wait:      20,
+		Timeout:   10,
+		Flags:     []string{"v4rr"},
+		Version:   "-1",
+	}
+	err := db.StorePing(&ping)
+	if err != nil {
+		t.Fatalf("TestInsertPing: %v", err)
+	}
+}
+
+func TestGetPing(t *testing.T) {
+	_, err := db.GetPingBySrcDst(89, 90)
+	if err != nil {
+		t.Fatalf("TestGetPing: %v", err)
+	}
+}
+
+/*
 func TestGetVps(t *testing.T) {
 	vps, err := db.GetVPs()
 	if err != nil {
@@ -103,3 +194,4 @@ func TestUpdateCanSpoof(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/

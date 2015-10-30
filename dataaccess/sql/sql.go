@@ -1,6 +1,5 @@
 /*
 Copyright (c) 2015, Northeastern University
- All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
@@ -34,7 +33,6 @@ import (
 	"math/rand"
 	"time"
 
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 import "github.com/go-sql-driver/mysql"
@@ -98,6 +96,11 @@ func NewDB(con DbConfig) (*DB, error) {
 	}
 	return ret, nil
 }
+
+/*
+	getReader and getWriter are fine because
+	we just get pointers to thread safe sql.DBs
+*/
 
 func (db *DB) getReader() *sql.DB {
 	l := len(db.rdb)
@@ -297,7 +300,7 @@ traceroutes(src, dst, type, user_id, method, sport,
 			dport, stop_reason, stop_data, start, 
 			version, hop_count, attempts, hop_limit, 
 			first_hop, wait, wait_probe, tos, probe_size)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 	insertTraceHop = `
 INSERT INTO
@@ -362,44 +365,358 @@ func (db *DB) StoreTraceroute(in *dm.Traceroute) error {
 	return tx.Commit()
 }
 
+const (
+	getTraceBySrcDst = `
+	SELECT 
+	t.id, src, dst, type, user_id, method, sport, dport, stop_reason, stop_data, start, version,
+	hop_count, attempts, hop_limit, first_hop, wait, wait_probe, tos, t.probe_size, traceroute_id, 
+	hop, addr, probe_ttl, probe_id, th.probe_size, rtt, reply_ttl, reply_tos, reply_size, 
+	reply_ipid, icmp_type, icmp_code, icmp_q_ttl, icmp_q_ipl, icmp_q_tos
+	FROM
+	(
+		SELECT 
+			*
+		FROM
+			traceroutes tt
+		WHERE
+			tt.src = ? and tt.dst = ?
+		ORDER BY
+			tt.start DESC
+		LIMIT 1
+	) t left outer join
+	traceroute_hops th on th.traceroute_id = t.id
+	ORDER BY
+	t.start DESC
+`
+	getTraceBySrcDstStale = `
+SELECT 
+	t.id, src, dst, type, user_id, method, sport, dport, stop_reason, stop_data, start, version,
+    hop_count, attempts, hop_limit, first_hop, wait, wait_probe, tos, t.probe_size, traceroute_id, 
+    hop, addr, probe_ttl, probe_id, th.probe_size, rtt, reply_ttl, reply_tos, reply_size, 
+	reply_ipid, icmp_type, icmp_code, icmp_q_ttl, icmp_q_ipl, icmp_q_tos
+FROM
+	(
+		SELECT 
+			*
+		FROM
+			traceroutes tt
+		WHERE
+			tt.src = ? and tt.dst = ?
+		ORDER BY
+			tt.start DESC
+		LIMIT 1
+	) t left outer join
+	traceroute_hops th on th.traceroute_id = t.id
+ORDER BY
+	t.start DESC
+`
+)
+
+func splitTraces(rows *sql.Rows) ([]*dm.Traceroute, error) {
+	currTraces := make(map[int64]*dm.Traceroute)
+	currHops := make(map[int64][]*dm.TracerouteHop)
+	for rows.Next() {
+		curr := &dm.Traceroute{}
+		hop := &dm.TracerouteHop{}
+		var start time.Time
+		var id int64
+		var tID sql.NullInt64
+		var hopNum, rtt sql.NullInt64
+		rows.Scan(&id, &curr.Src, &curr.Dst, &curr.Type, &curr.UserId, &curr.Method, &curr.Sport,
+			&curr.Dport, &curr.StopReason, &curr.StopData, &start, &curr.Version, &curr.HopCount,
+			&curr.Attempts, &curr.Hoplimit, &curr.Firsthop, &curr.Wait, &curr.WaitProbe, &curr.Tos,
+			&curr.ProbeSize, &tID, &hopNum, &hop.Addr, &hop.ProbeTtl, &hop.ProbeId, &hop.ProbeSize,
+			&rtt, &hop.IcmpCode, &hop.IcmpQTtl, &hop.IcmpQIpl, &hop.IcmpQTos)
+		if _, ok := currTraces[id]; !ok {
+			curr.Start = &dm.TracerouteTime{}
+			nano := start.UnixNano()
+			curr.Start.Sec = nano * 1000000000
+			curr.Start.Usec = (nano % 1000000000) / 1000
+			currTraces[id] = curr
+		}
+		if tID.Valid {
+			currHops[tID.Int64] = append(currHops[tID.Int64], hop)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var ret []*dm.Traceroute
+	for key, val := range currTraces {
+		if hops, ok := currHops[key]; ok {
+			val.Hops = hops
+		}
+		ret = append(ret, val)
+	}
+	return ret, nil
+}
+
 // GetTRBySrcDst gets traceroutes with the given src, dst
-func (db *DB) GetTRBySrcDst(src, dst uint32) (<-chan *dm.Traceroute, error) {
-	return nil, nil
+func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
+	rows, err := db.getReader().Query(getTraceBySrcDst, src, dst)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return splitTraces(rows)
 }
 
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
-func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s da.Staleness) (<-chan *dm.Traceroute, error) {
-	return nil, nil
+func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
+	minTime := time.Now().Add(s * time.Second)
+	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst, minTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return splitTraces(rows)
 }
 
 // GetTraceMulti gets traceroutes that match the given TracerouteMeasurements
-func (db *DB) GetTraceMulti(in []*dm.TracerouteMeasurement) (<-chan *dm.Traceroute, error) {
-	return nil, nil
-}
-
-// GetPingsMulti gets pings that match the given PingMeasurements
-func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) (<-chan *dm.Ping, error) {
-	return nil, nil
-}
-
-// GetPingBySrcDst gets pings with the given src/dst
-func (db *DB) GetPingBySrcDst(src, dst uint32) (<-chan *dm.Ping, error) {
-	return nil, nil
-}
-
-// GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
-func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s da.Staleness) (<-chan *dm.Ping, error) {
-	return nil, nil
+func (db *DB) GetTraceMulti(in []*dm.TracerouteMeasurement) ([]*dm.Traceroute, error) {
+	var ret []*dm.Traceroute
+	for _, tm := range in {
+		ts, err := db.GetTRBySrcDstWithStaleness(tm.Src, tm.Dst, time.Duration(tm.Staleness))
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, ts...)
+	}
+	return ret, nil
 }
 
 const (
-	insertPing = `
-INSERT INTO
-pings(src, dst, start, ping_sent, probe_size, 
-	  user_id, ttl, wait, spoofed_from, version, 
-	  spoofed, record_route, payload, tsonly, tsandaddr, icmpsum, dl, 8)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`
+	getPing = "SELECT " +
+		"p.id, p.src, p.dst, p.start, p.ping_sent, p.probe_size, " +
+		"p.user_id, p.ttl, p.wait, p.spoofed_from, p.version, p.spoofed," +
+		"p.record_route, p.payload, p.tsonly, p.tsandaddr, p.icmpsum, " +
+		"p.dl, p.`8`, pr.ping_id, pr.id, pr.`from`, pr.seq, pr.reply_size, " +
+		"pr.seq, pr.reply_size, pr.reply_ttl, pr.reply_proto, pr.rtt, " +
+		"pr.probe_ipid, pr.icmp_code, pr.icmp_type, pr.tx, pr.rx, ps.ping_id, ps.loss, " +
+		"ps.min, ps.max,ps.avg, ps.std_dev, rr.response_id, rr.hop, rr.ip, " +
+		"ts.response_id, ts.`order`, ts.ts, taa.response_id, taa.`order`, taa.ip, " +
+		"taa.ts " +
+		"FROM " +
+		"(SELECT * FROM pings WHERE src = ? and dst = ? ORDER BY start DESC LIMIT 1) p left outer join " +
+		"ping_responses pr on pr.ping_id = p.id " +
+		"left outer join ping_stats ps on ps.ping_id = p.id " +
+		"left outer join record_routes rr on rr.response_id = pr.id " +
+		"left outer join timestamps ts on ts.response_id = pr.id " +
+		"left outer join timestamp_addrs taa on taa.response_id = pr.id;"
+	getPingStaleness = "SELECT " +
+		"p.id, p.src, p.dst, p.start, p.ping_sent, p.probe_size," +
+		"p.user_id, p.ttl, p.wait, p.spoofed_from, p.version, p.spoofed, " +
+		"p.record_route, p.payload, p.tsonly, p.tsandaddr, p.icmpsum, " +
+		"p.dl, p.`8`, pr.ping_id, pr.id, pr.`from`, pr.seq, pr.reply_size, " +
+		"pr.seq, pr.reply_size, pr.reply_ttl, pr.reply_proto, pr.rtt, " +
+		"pr.probe_ipid, pr.icmp_code, pr.icmp_type, pr.tx, pr.rx, ps.ping_id, ps.loss, " +
+		"ps.min, ps.max,ps.avg, ps.std_dev, rr.response_id, rr.hop, rr.ip, " +
+		"ts.response_id, ts.`order`, ts.ts, taa.response_id, taa.`order`, taa.ip, " +
+		"taa.ts" +
+		"FROM " +
+		"(SELECT * FROM pings WHERE src = ? and dst = ? and start > ? ORDER BY start DESC LIMIT 1) p left outer join " +
+		"ping_responses pr on pr.ping_id = p.id " +
+		"left outer join ping_stats ps on ps.ping_id = p.id " +
+		"left outer join record_routes rr on rr.response_id = pr.id " +
+		"left outer join timestamps ts on ts.response_id = pr.id " +
+		"left outer join timestamp_addrs taa on taa.response_id = pr.id;"
+)
+
+type rrHop struct {
+	ResponseID sql.NullInt64
+	Hop        uint8
+	IP         uint32
+}
+
+type ts struct {
+	ResponseID sql.NullInt64
+	Order      uint8
+	Ts         time.Time
+}
+
+type tsAndAddr struct {
+	ResponseID sql.NullInt64
+	Order      uint8
+	Ts         time.Time
+	IP         uint32
+}
+
+func makeFlags(spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight bool) []string {
+	/*
+		These are the posible keys for the map
+
+		"v4rr"
+		"spoof"
+		"payload"
+		"tsonly"
+		"tsandaddr"
+		"icmpsum"
+		"dl"
+		"8"
+	*/
+	var ret []string
+	if spoofed {
+		ret = append(ret, "spoof")
+	}
+	if recordRoute {
+		ret = append(ret, "v4rr")
+	}
+	if payload {
+		ret = append(ret, "payload")
+	}
+	if tsonly {
+		ret = append(ret, "tsonly")
+	}
+	if tsandaddr {
+		ret = append(ret, "tsandaddr")
+	}
+	if icmpsum {
+		ret = append(ret, "icmpsum")
+	}
+	if dl {
+		ret = append(ret, "dl")
+	}
+	if eight {
+		ret = append(ret, "8")
+	}
+	return ret
+}
+
+func splitPings(rows *sql.Rows) ([]*dm.Ping, error) {
+	currPings := make(map[int64]*dm.Ping)
+	currResponses := make(map[int64]*dm.PingResponse)
+	currRR := make(map[int64][]uint32)
+	currTS := make(map[int64][]uint32)
+	currTSA := make(map[int64][]*dm.TsAndAddr)
+	currStats := make(map[int64]*dm.PingStats)
+	for rows.Next() {
+		p := &dm.Ping{}
+		ps := &dm.PingStats{}
+		pr := &dm.PingResponse{}
+		prr := &rrHop{}
+		pts := &ts{}
+		ptsa := &tsAndAddr{}
+		var pID, prpID, prID, statsID sql.NullInt64
+		var rtt uint32
+		var start, tx, rx time.Time
+		var spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight bool
+		rows.Scan(&pID, &p.Src, &p.Dst, &start, &p.PingSent, &p.ProbeSize,
+			&p.UserId, &p.Ttl, &p.Wait, &p.SpoofedFrom, &p.Version,
+			&spoofed, &recordRoute, &payload, &tsonly, &tsandaddr, &icmpsum, &dl,
+			&eight, &prpID, &prID, &pr.From, &pr.Seq, &pr.ReplySize, &pr.ReplyTtl,
+			&pr.ReplyProto, &rtt, &pr.ProbeIpid, &pr.IcmpCode, &pr.IcmpType,
+			&tx, &rx, &statsID, &ps.Loss, &ps.Min, &ps.Max, &ps.Avg, &ps.Stddev,
+			&prr.ResponseID, &prr.Hop, &prr.IP, &pts.ResponseID, &pts.Order, &pts.Ts,
+			&ptsa.ResponseID, &ptsa.Order, &ptsa.IP, &ptsa.Ts)
+		if _, ok := currPings[pID.Int64]; !ok && pID.Valid {
+			p.Start = &dm.Time{}
+			nano := start.UnixNano()
+			p.Start.Sec = nano * 1000000000
+			p.Start.Usec = (nano % 1000000000) / 1000
+			p.Flags = makeFlags(spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight)
+			currPings[prID.Int64] = p
+		}
+		if prpID.Valid {
+			var trx, ttx dm.Time
+			tnano := tx.UnixNano()
+			rnano := rx.UnixNano()
+			trx.Sec = rnano * 1000000000
+			trx.Usec = (rnano % 1000000000) / 1000
+			ttx.Sec = tnano * 1000000000
+			ttx.Usec = (tnano % 1000000000) / 1000
+			pr.Tx = &ttx
+			pr.Rx = &trx
+			currResponses[prID.Int64] = pr
+			currPings[prpID.Int64].Responses = append(currPings[prpID.Int64].Responses, pr)
+		}
+		if statsID.Valid {
+			if _, ok := currStats[statsID.Int64]; !ok {
+				currStats[statsID.Int64] = ps
+			}
+		}
+		if prr.ResponseID.Valid {
+			id := prr.ResponseID.Int64
+			currRR[id] = append(currRR[id], prr.IP)
+		}
+		if pts.ResponseID.Valid {
+			id := pts.ResponseID.Int64
+			midNightUtc := time.Date(pts.Ts.Year(), pts.Ts.Month(), pts.Ts.Day(), 0, 0, 0, 0, time.UTC)
+			timeSinceUtc := uint32(pts.Ts.Sub(midNightUtc).Seconds())
+			currTS[id] = append(currTS[id], timeSinceUtc)
+		}
+		if ptsa.ResponseID.Valid {
+			var use dm.TsAndAddr
+			id := pts.ResponseID.Int64
+			use.Ip = ptsa.IP
+			midNightUtc := time.Date(ptsa.Ts.Year(), ptsa.Ts.Month(), ptsa.Ts.Day(), 0, 0, 0, 0, time.UTC)
+			timeSinceUtc := uint32(pts.Ts.Sub(midNightUtc).Seconds())
+			use.Ts = timeSinceUtc
+			currTSA[id] = append(currTSA[id], &use)
+		}
+
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var ret []*dm.Ping
+	for id, stats := range currStats {
+		currPings[id].Statistics = stats
+	}
+	for id, rr := range currRR {
+		currResponses[id].RR = rr
+	}
+	for id, ts := range currTS {
+		currResponses[id].Tsonly = ts
+	}
+	for id, tsanda := range currTSA {
+		currResponses[id].Tsandaddr = tsanda
+	}
+	for _, p := range currPings {
+		ret = append(ret, p)
+	}
+	return ret, nil
+}
+
+// GetPingsMulti gets pings that match the given PingMeasurements
+func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
+	var ret []*dm.Ping
+	for _, pm := range in {
+		ps, err := db.GetPingBySrcDst(pm.Src, pm.Dst)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, ps...)
+	}
+	return ret, nil
+}
+
+// GetPingBySrcDst gets pings with the given src/dst
+func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
+	rows, err := db.getReader().Query(getPing, src, dst)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return splitPings(rows)
+}
+
+// GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
+func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
+	minTime := time.Now().Add(time.Duration(s) * time.Second)
+	rows, err := db.getReader().Query(getPing, src, dst, minTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return splitPings(rows)
+}
+
+const (
+	insertPing = "INSERT INTO" +
+		" pings(src, dst, start, ping_sent, probe_size," +
+		" user_id, ttl, wait, spoofed_from, version," +
+		" spoofed, record_route, payload, tsonly, tsandaddr, icmpsum, dl, `8`)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
 	insertPingResponse = `
 INSERT INTO
@@ -423,6 +740,11 @@ INSERT INTO
 timestamp_addrs(response_id, order, ip, ts)
 VALUES(?, ?, ?, ?)
 `
+	insertPingStats = `
+INSERT INTO
+ping_stats(ping_id, loss, min, max, avg, std_dev)
+VALUES(?, ?, ?, ?, ?, ?)
+`
 )
 
 func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
@@ -438,14 +760,13 @@ func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
 		"dl"
 		"8"
 	*/
-
 	start := time.Unix(in.Start.Sec, in.Start.Usec*1000)
 	flags := make(map[string]bool)
 	for _, flag := range in.Flags {
 		flags[flag] = true
 	}
 	res, err := tx.Exec(insertPing, in.Src, in.Dst, start, in.PingSent, in.ProbeSize,
-		in.Userid, in.Ttl, in.Wait, in.SpoofedFrom, in.Version,
+		in.UserId, in.Ttl, in.Wait, in.SpoofedFrom, in.Version,
 		flags["spoof"], flags["v4rr"], flags["payload"], flags["tsonly"],
 		flags["tsandaddr"], flags["icmpsum"], flags["dl"], flags["8"])
 
@@ -453,6 +774,14 @@ func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+func storePingStats(tx *sql.Tx, id int64, stat *dm.PingStats) error {
+	if stat == nil {
+		return nil
+	}
+	_, err := tx.Exec(insertPingStats, id, stat.Loss, stat.Min, stat.Max, stat.Avg, stat.Stddev)
+	return err
 }
 
 func storePingRR(tx *sql.Tx, id int64, rr uint32, hop int8) error {
@@ -529,5 +858,6 @@ func (db *DB) StorePing(in *dm.Ping) error {
 			return err
 		}
 	}
+	err = storePingStats(tx, id, in.GetStatistics())
 	return tx.Commit()
 }

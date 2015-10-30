@@ -42,6 +42,7 @@ const (
 	udp    = 17
 )
 
+// Ping is a ping
 type Ping struct {
 	Flags       PingFlags
 	PLength     uint16
@@ -55,6 +56,7 @@ func (p Ping) String() string {
 	return fmt.Sprintf("Ping: %s\n Replies: %d %s", p.Flags, p.ReplyCount, p.PingReplies)
 }
 
+// PingStats are ping stats
 type PingStats struct {
 	Replies uint16
 	Loss    uint16
@@ -64,18 +66,19 @@ type PingStats struct {
 	StdDev  float32
 }
 
+// GetStats calculates the stats for a ping
 func (p Ping) GetStats() PingStats {
 	var min, max syscall.Timeval
 	ret := PingStats{}
 	ret.Replies = p.ReplyCount
 	dups := 0
-	sum := int64(0)
+	var sum int64
 	for i, rep := range p.PingReplies {
 		if i == 0 {
 			min = rep.RTT
 			max = rep.RTT
 		}
-		sum += ((rep.RTT.Sec * 1000000) + rep.RTT.Usec)
+		sum += ((int64(rep.RTT.Sec) * 1000000) + int64(rep.RTT.Usec))
 		switch timevalComp(min, rep.RTT) {
 		case 1:
 			min = rep.RTT
@@ -115,12 +118,10 @@ func (p Ping) GetStats() PingStats {
 }
 
 func timevalComp(l, r syscall.Timeval) int {
-	var lsec, rsec int64
-	var lusec, rusec int64
-	lsec = l.Sec
-	rsec = r.Sec
-	lusec = l.Usec
-	rusec = r.Usec
+	lsec := l.Sec
+	rsec := r.Sec
+	lusec := l.Usec
+	rusec := r.Usec
 	if lsec < rsec {
 		return -1
 	}
@@ -473,8 +474,7 @@ func readPingReplyFlags(f io.Reader, addrs *AddressRefs) (PingReplyFlags, error)
 			if err != nil {
 				return pr, err
 			}
-			pr.RTT.Sec = int64(val / 1000000)
-			pr.RTT.Usec = int64(val % 1000000)
+			convertTimeval(&pr.RTT, val)
 		case 7:
 			pr.ProbeID, err = readUint16(f)
 			if err != nil {

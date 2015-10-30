@@ -50,13 +50,13 @@ func (t *testAccess) StorePing(*dm.Ping) error {
 func (t *testAccess) StoreTraceroute(*dm.Traceroute, dm.ServiceT) error {
 	return nil
 }
-func (t *testAccess) GetTRBySrcDst(string, string) (*dm.MTraceroute, error) {
+func (t *testAccess) GetTRBySrcDst(string, string) (*dm.Traceroute, error) {
 	return nil, nil
 }
-func (t *testAccess) GetTRBySrcDstWithStaleness(string, string, da.Staleness) (*dm.MTraceroute, error) {
+func (t *testAccess) GetTRBySrcDstWithStaleness(string, string, da.Staleness) (*dm.Traceroute, error) {
 	return nil, nil
 }
-func (t *testAccess) GetIntersectingTraceroute(string, string, da.Staleness) (*dm.MTraceroute, error) {
+func (t *testAccess) GetIntersectingTraceroute(string, string, da.Staleness) (*dm.Traceroute, error) {
 	return nil, nil
 }
 

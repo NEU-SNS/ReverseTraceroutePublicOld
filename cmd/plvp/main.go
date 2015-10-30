@@ -47,7 +47,7 @@ var (
 	vFlag         bool
 )
 
-var conf plvp.Config = plvp.NewConfig()
+var conf = plvp.NewConfig()
 
 func init() {
 	config.SetEnvPrefix("REVTR")

@@ -125,49 +125,40 @@ func (sm *socketMap) Get(addr string) (*Socket, error) {
 func (sm *socketMap) GetAll() []*Socket {
 	sm.Lock()
 	defer sm.Unlock()
-	socks := make([]*Socket, 0)
+	var socks []*Socket
 	for _, sock := range sm.socks {
 		socks = append(socks, sock)
 	}
 	return socks
 }
 
-// Client is the interface of the scamper client
-type Client interface {
-	AddSocket(*Socket)
-	RemoveSocket(string)
-	GetSocket(string) (*Socket, error)
-	RemoveMeasurement(addr string, id uint32) error
-	DoMeasurement(string, interface{}) (<-chan Response, uint32, error)
-	GetAllSockets() <-chan *Socket
-}
-
 // Client is the main object for interacting with scamper
-type client struct {
+type Client struct {
 	sockets *socketMap
 }
 
 // NewClient creates a new Client
-func NewClient() Client {
-	return &client{sockets: newSocketMap()}
+func NewClient() *Client {
+	return &Client{sockets: newSocketMap()}
 }
 
 // AddSocket adds a socket to the client
-func (c *client) AddSocket(s *Socket) {
+func (c *Client) AddSocket(s *Socket) {
 	c.sockets.Add(s)
 }
 
 // RemoveSocket removes a socket from the client
-func (c *client) RemoveSocket(addr string) {
+func (c *Client) RemoveSocket(addr string) {
 	c.sockets.Remove(addr)
 }
 
 // GetSocket gets a socket registered in the client
-func (c *client) GetSocket(addr string) (*Socket, error) {
+func (c *Client) GetSocket(addr string) (*Socket, error) {
 	return c.sockets.Get(addr)
 }
 
-func (c *client) GetAllSockets() <-chan *Socket {
+// GetAllSockets gets all the sockets
+func (c *Client) GetAllSockets() <-chan *Socket {
 	schan := make(chan *Socket)
 	go func() {
 		for _, sock := range c.sockets.GetAll() {
@@ -178,7 +169,8 @@ func (c *client) GetAllSockets() <-chan *Socket {
 	return schan
 }
 
-func (c *client) RemoveMeasurement(addr string, id uint32) error {
+// RemoveMeasurement removes a measurement
+func (c *Client) RemoveMeasurement(addr string, id uint32) error {
 	s, err := c.sockets.Get(addr)
 	if err != nil {
 		return nil
@@ -187,7 +179,7 @@ func (c *client) RemoveMeasurement(addr string, id uint32) error {
 }
 
 // DoMeasurement run the measurement described by arg from the address addr
-func (c *client) DoMeasurement(addr string, arg interface{}) (<-chan Response, uint32, error) {
+func (c *Client) DoMeasurement(addr string, arg interface{}) (<-chan Response, uint32, error) {
 	s, err := c.sockets.Get(addr)
 	if err != nil {
 		return nil, 0, err

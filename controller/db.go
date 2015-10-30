@@ -66,7 +66,7 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 						log.Errorf("Failed to check db: %v", err)
 					}
 					meas = make([]*dm.PingMeasurement, 0)
-					for item := range stored {
+					for _, item := range stored {
 						delete(checking, item.Key())
 						ret <- item
 					}
@@ -123,7 +123,7 @@ func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
 						log.Errorf("Failed to check db: %v", err)
 					}
 					meas = make([]*dm.TracerouteMeasurement, 0)
-					for item := range stored {
+					for _, item := range stored {
 						delete(checking, item.Key())
 						ret <- item
 					}

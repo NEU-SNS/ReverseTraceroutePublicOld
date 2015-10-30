@@ -28,6 +28,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -43,17 +44,20 @@ import (
 
 var (
 	defaultConfig = "./plcontroller.config"
-	configPath    string
+	ConfigPath    string
+	Build         string
+	Version       string
+	showVersion   bool
 )
 
 var conf = plcontroller.NewConfig()
 
 func init() {
 	config.SetEnvPrefix("REVTR")
-	if configPath == "" {
+	if ConfigPath == "" {
 		config.AddConfigPath(defaultConfig)
 	} else {
-		config.AddConfigPath(configPath)
+		config.AddConfigPath(ConfigPath)
 	}
 
 	flag.Int64Var(conf.Local.Timeout, "t", 60,
@@ -95,6 +99,8 @@ func init() {
 	flag.StringVar(conf.Local.UpdateUrl, "update-url",
 		"http://www.ccs.neu.edu/home/rhansen2/plvp.json",
 		"The path for the version info of the plvps")
+	flag.BoolVar(&showVersion, "version",
+		false, "Show version info")
 }
 
 func main() {
@@ -105,9 +111,11 @@ func main() {
 		log.Fatalf("Failed to parse config: %v", err)
 		exit(1)
 	}
-
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
-
+	if showVersion {
+		fmt.Printf("Build: %s\nVersion: %s\n", Build, Version)
+		exit(0)
+	}
 	db, err := sql.NewDB(sql.DbConfig{
 		WriteConfigs: []sql.Config{
 			sql.Config{

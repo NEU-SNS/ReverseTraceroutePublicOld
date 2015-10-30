@@ -50,7 +50,6 @@ import (
 	"gopkg.in/fsnotify.v1"
 
 	"net/http"
-	_ "net/http/pprof"
 )
 
 var (
@@ -76,7 +75,7 @@ var (
 		Help:      "Count of Rpc Errors",
 	})
 )
-var id uint32 = rand.Uint32()
+var id = rand.Uint32()
 
 func getName() string {
 	name, err := os.Hostname()
@@ -143,8 +142,11 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
 	}
-
-	resp, id, err := c.client.DoMeasurement(pa.Src, pa)
+	src, err := util.Int32ToIPString(pa.Src)
+	if err != nil {
+		return dm.Ping{}, err
+	}
+	resp, id, err := c.client.DoMeasurement(src, pa)
 	if err != nil {
 		return dm.Ping{}, err
 	}
@@ -160,7 +162,8 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
-		c.client.RemoveMeasurement(pa.Src, id)
+		src, _ := util.Int32ToIPString(pa.Src)
+		c.client.RemoveMeasurement(src, id)
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	}
 	panic("Should never get here plcontroller.go:166")
@@ -177,7 +180,11 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 		timeout = *c.config.Local.Timeout
 	}
 
-	resp, id, err := c.client.DoMeasurement(ta.Src, ta)
+	src, err := util.Int32ToIPString(ta.Src)
+	if err != nil {
+		return dm.Traceroute{}, err
+	}
+	resp, id, err := c.client.DoMeasurement(src, ta)
 	if err != nil {
 		return dm.Traceroute{}, err
 	}
@@ -193,7 +200,8 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
-		c.client.RemoveMeasurement(ta.Src, id)
+		src, _ := util.Int32ToIPString(ta.Src)
+		c.client.RemoveMeasurement(src, id)
 		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
 	}
 	return dm.Traceroute{}, nil
@@ -260,7 +268,7 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPPro
 	c.server = grpc.NewServer()
 	plc.RegisterPLControllerServer(plController.server, c)
 	go c.startRPC(ec)
-	go c.maintain()
+	//go c.maintain()
 }
 
 func (c *plControllerT) maintain() {
@@ -292,7 +300,7 @@ func (c *plControllerT) maintain() {
 	}
 }
 
-func startHttp(addr string) {
+func startHTTP(addr string) {
 	for {
 		log.Error(http.ListenAndServe(addr, nil))
 	}
@@ -302,7 +310,7 @@ func startHttp(addr string) {
 func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
 	log.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
-	go startHttp(*c.Local.PProfAddr)
+	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
 	go plController.run(errChan, c, noScamp, db, cl, s)
 	return errChan

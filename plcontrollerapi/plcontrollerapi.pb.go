@@ -39,6 +39,8 @@ It has these top-level messages:
 package plcontrollerapi
 
 import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 import datamodel1 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel2 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 import datamodel3 "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -50,11 +52,13 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
+var _ context.Context
+var _ grpc.ClientConn
 
 // Client API for PLController service
 
@@ -317,9 +321,9 @@ func (x *pLControllerGetVPsServer) Send(m *datamodel3.VPReturn) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, codec grpc.Codec, buf []byte) (interface{}, error) {
+func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
 	in := new(datamodel4.SpoofedProbes)
-	if err := codec.Unmarshal(buf, in); err != nil {
+	if err := dec(in); err != nil {
 		return nil, err
 	}
 	out, err := srv.(PLControllerServer).AcceptProbes(ctx, in)

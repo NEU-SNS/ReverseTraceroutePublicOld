@@ -48,8 +48,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
-
-	_ "net/http/pprof"
 )
 
 var (
@@ -75,7 +73,7 @@ var (
 		Help:      "Count of Rpc Errors",
 	})
 )
-var id uint32 = rand.Uint32()
+var id = rand.Uint32()
 
 func getName() string {
 	name, err := os.Hostname()
@@ -162,13 +160,14 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 				return
 			case pms := <-pm:
 				if pms == nil || len(pms) == 0 {
+					close(ret)
 					break
-
 				}
 				r := router.New()
 				mts := make(map[router.MeasurementTool][]*dm.PingMeasurement)
 				for _, p := range pms {
-					mt, err := r.Get(p.Src)
+					srcs, _ := util.Int32ToIPString(p.Src)
+					mt, err := r.Get(srcs)
 					if err != nil {
 						ret <- &dm.Ping{
 							Src:   p.Src,
@@ -181,7 +180,7 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 				}
 				for mt, ms := range mts {
 					go func(tool router.MeasurementTool, targs []*dm.PingMeasurement) {
-						pings, err := mt.Ping(ctx, &dm.PingArg{
+						pings, err := tool.Ping(ctx, &dm.PingArg{
 							Pings: targs,
 						})
 						if err != nil {
@@ -195,7 +194,6 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 				}
 			}
 		}
-		close(ret)
 	}()
 	return ret
 }
@@ -223,13 +221,15 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 				return
 			case tms := <-tm:
 				if tms == nil || len(tms) == 0 {
+					close(ret)
 					break
 
 				}
 				r := router.New()
 				mts := make(map[router.MeasurementTool][]*dm.TracerouteMeasurement)
 				for _, t := range tms {
-					mt, err := r.Get(t.Src)
+					srcs, _ := util.Int32ToIPString(t.Src)
+					mt, err := r.Get(srcs)
 					if err != nil {
 						ret <- &dm.Traceroute{
 							Src:   t.Src,
@@ -242,7 +242,7 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 				}
 				for mt, ms := range mts {
 					go func(tool router.MeasurementTool, targs []*dm.TracerouteMeasurement) {
-						traceroutes, err := mt.Traceroute(ctx, &dm.TracerouteArg{
+						traceroutes, err := tool.Traceroute(ctx, &dm.TracerouteArg{
 							Traceroutes: targs,
 						})
 						if err != nil {
@@ -256,7 +256,6 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 				}
 			}
 		}
-		close(ret)
 	}()
 	return ret
 }
@@ -277,21 +276,7 @@ func (c *controllerT) doGetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPRe
 	return new(dm.VPReturn), nil
 }
 
-func makeSuccessReturn(t time.Time) *dm.ReturnT {
-	mr := new(dm.ReturnT)
-	mr.Dur = time.Since(t).Nanoseconds()
-	mr.Status = dm.MRequestStatus_SUCCESS
-	return mr
-}
-
-func makeErrorReturn(t time.Time) *dm.ReturnT {
-	mr := new(dm.ReturnT)
-	mr.Dur = time.Since(t).Nanoseconds()
-	mr.Status = dm.MRequestStatus_ERROR
-	return mr
-}
-
-func startHttp(addr string) {
+func startHTTP(addr string) {
 	for {
 		log.Error(http.ListenAndServe(addr, nil))
 	}
@@ -336,7 +321,7 @@ func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache c
 func Start(c Config, db da.DataProvider, cache ca.Cache, r router.Router) chan error {
 	log.Info("Starting controller")
 	http.Handle("/metrics", prometheus.Handler())
-	go startHttp(*c.Local.PProfAddr)
+	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
 	go controller.run(errChan, c, db, cache, r)
 	return errChan
