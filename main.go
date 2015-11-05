@@ -32,95 +32,70 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"runtime"
 	"time"
 
+	"golang.org/x/net/context"
+
+	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
-	ctx "golang.org/x/net/context"
+	"github.com/prometheus/log"
+
 	"google.golang.org/grpc"
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
 	opts := make([]grpc.DialOption, 1)
 	opts[0] = grpc.WithInsecure()
-	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4380", opts...)
+	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4382", opts...)
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
-	cl := plc.NewPLControllerClient(conn)
-	vps, err := cl.GetVPs(ctx.Background(), &dm.VPRequest{})
+	c := controllerapi.NewControllerClient(conn)
+	vpr, err := c.GetVPs(context.Background(), &dm.VPRequest{})
 	if err != nil {
 		panic(err)
 	}
-
-	vplist := make([]*dm.VantagePoint, 0)
-	for {
-		vpp, err := vps.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		vplist = append(vplist, vpp.GetVps()...)
-	}
-	pingreq := &dm.PingArg{
-		Pings: make([]*dm.PingMeasurement, 0),
-	}
-	fmt.Println("Num of vps: ", len(vplist))
-	for i, vp := range vplist {
+	vps := vpr.GetVps()
+	var pa dm.PingArg
+	var pings []*dm.PingMeasurement
+	var dst uint32
+	for i, vp := range vps {
 		if i == 0 {
+			dst = vp.Ip
 			continue
 		}
-		if vp.Controller != 0 {
-			pingreq.Pings = append(pingreq.Pings, &dm.PingMeasurement{
-				Src: vp.Ip,
-				Dst: vp.Ip,
-				RR:  true,
-			})
-		}
+		pings = append(pings, &dm.PingMeasurement{
+			Src:        vp.Ip,
+			Dst:        dst,
+			Timeout:    60,
+			Count:      "1",
+			CheckCache: true,
+			CheckDb:    true,
+		})
+
 	}
-	//fmt.Println(pingreq)
-	fmt.Println("Num of requests: ", len(pingreq.Pings))
-	fmt.Println("Starting: ", time.Now())
-	st, err := cl.Ping(ctx.Background())
+	pa.Pings = pings
+	fmt.Println("Number of requests:", len(pings))
+	start := time.Now()
+	fmt.Println("Starting:", start)
+	st, err := c.Ping(context.Background(), &pa)
 	if err != nil {
 		panic(err)
 	}
-	st.Send(pingreq)
-	st.CloseSend()
-	ps := make([]*dm.Ping, 0)
 	for {
 		pr, err := st.Recv()
 		if err == io.EOF {
+			log.Info("EOF")
 			break
 		}
 		if err != nil {
 			panic(err)
 		}
-		//fmt.Println(pr)
-		ps = append(ps, pr)
+		fmt.Println(pr)
 	}
-	for _, p := range ps {
-		resp := p.GetResponses()
-		if resp == nil || len(resp) == 0 {
-			continue
-		}
-		for _, re := range resp {
-			if len(re.RR) > 0 {
-				fmt.Println(p.Src, "RR:", re.RR)
-				for i, r := range re.RR {
-					if r == p.Src {
-						fmt.Println(p.Src, "includes src in RR at addr:", i)
-					}
-				}
-			}
-		}
-	}
-	fmt.Println("Done: ", time.Now())
+	end := time.Now()
+	fmt.Println("Done:", end, "Took:", time.Since(start))
 }

@@ -33,6 +33,7 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 // DbConfig is a database configuration
@@ -63,32 +64,57 @@ func uToNSec(u int64) int64 {
 
 // StoreTraceroute stores a traceroute
 func (d *DataAccess) StoreTraceroute(t *dm.Traceroute) error {
-	return nil
+	return d.db.StoreTraceroute(t)
 }
 
 // GetTRBySrcDst gets a trace by src and dst
 func (d *DataAccess) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
-	return nil, nil
+	return d.db.GetTRBySrcDst(src, dst)
 }
 
 // GetTRBySrcDstWithStaleness gets a trace with the src and dst no older than the give time
 func (d *DataAccess) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
-	return nil, nil
+	return d.db.GetTRBySrcDstWithStaleness(src, dst, s)
+}
+
+// GetTraceMulti gets traceroutes that match the given TracerouteMeasurements
+func (d *DataAccess) GetTraceMulti(in []*dm.TracerouteMeasurement) ([]*dm.Traceroute, error) {
+	return d.db.GetTraceMulti(in)
 }
 
 // GetPingBySrcDst gets a ping
 func (d *DataAccess) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
-	return nil, nil
+	return d.db.GetPingBySrcDst(src, dst)
 }
 
 // StorePing stores a ping
 func (d *DataAccess) StorePing(p *dm.Ping) error {
-	return nil
+	return d.db.StorePing(p)
 }
 
 // Close closes
 func (d *DataAccess) Close() error {
-	return nil
+	return d.db.Close()
+}
+
+// GetPingsMulti gets pings that match the given PingMeasurements
+func (d *DataAccess) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
+	return d.db.GetPingsMulti(in)
+}
+
+// UpdateCheckStatus updates the health check status for a vp
+func (d *DataAccess) UpdateCheckStatus(ip uint32, stat string) error {
+	return d.db.UpdateCheckStatus(ip, stat)
+}
+
+// GetVPs get the VPs
+func (d *DataAccess) GetVPs() ([]*dm.VantagePoint, error) {
+	return d.db.GetVPs()
+}
+
+// UpdateController updates the controller for a VP
+func (d *DataAccess) UpdateController(ip, old, nc uint32) error {
+	return d.db.UpdateController(ip, old, nc)
 }
 
 // New create a new dataAccess with the given config
@@ -112,6 +138,7 @@ func New(c DbConfig) (*DataAccess, error) {
 			Db:       cc.Db,
 		})
 	}
+	log.Info("Creating DB with config: ", conf)
 	db, err := sql.NewDB(conf)
 	if err != nil {
 		return nil, err

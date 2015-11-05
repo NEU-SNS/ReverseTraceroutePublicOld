@@ -24,33 +24,68 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package cache
 
 import (
-	"fmt"
+	"bytes"
 	"strings"
 )
 
+// ServerList is a list of servers to use
 type ServerList []string
 
 func (sl *ServerList) String() string {
-	return fmt.Sprintf("%v", *sl)
+	var buf bytes.Buffer
+	for i, l := range *sl {
+		buf.WriteString(l)
+		if i != len(*sl)-1 {
+			buf.WriteString(",")
+		}
+	}
+	s := buf.String()
+	return s
 }
 
-func (sl *ServerList) Set(val string) error {
-	servs := strings.Split(val, ",")
-	vals := make(ServerList, len(servs))
-	for i, val := range servs {
-		vals[i] = strings.TrimSpace(val)
+// UnmarshalYAML is for the yaml library
+func (sl *ServerList) UnmarshalYAML(unm func(interface{}) error) error {
+	var list []string
+	err := unm(&list)
+	if err != nil {
+		return err
 	}
-	*sl = vals
+	for _, l := range list {
+		(*sl) = append(*sl, l)
+	}
 	return nil
 }
 
+// Set is for the flag package
+func (sl *ServerList) Set(val string) error {
+	if strings.Contains(val, "[") {
+		servs := strings.Split(strings.Trim(val, "[]"), " ")
+		vals := make(ServerList, len(servs))
+		for i, val := range servs {
+			vals[i] = strings.TrimSpace(val)
+		}
+		*sl = vals
+	} else {
+		servs := strings.Split(val, ",")
+		vals := make(ServerList, len(servs))
+		for i, val := range servs {
+			vals[i] = strings.TrimSpace(val)
+		}
+		*sl = vals
+	}
+	return nil
+}
+
+// Config is the config for a cache
 type Config struct {
 	Addrs *ServerList `flag:"cache-list"`
 }
 
+// NewConfig get a new config
 func NewConfig() Config {
 	addrs := make(ServerList, 0)
 	return Config{

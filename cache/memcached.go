@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package cache
 
 import (
@@ -94,10 +95,10 @@ type cache struct {
 	prefix string
 }
 
+// New creates a new cache
 func New(servers ServerList) Cache {
-
 	return &cache{
-		c:      memcache.New([]string(servers)...),
+		c:      memcache.New(servers...),
 		prefix: "DEFAULT",
 	}
 }
@@ -110,7 +111,7 @@ func makeKey(pre, val string) string {
 	return fmt.Sprintf("%s_%s", pre, val)
 }
 
-func (c *cache) Get(key string) (CacheItem, error) {
+func (c *cache) Get(key string) (Item, error) {
 	if c.c == nil {
 		return nil, ErrorNoClient
 	}
@@ -119,10 +120,9 @@ func (c *cache) Get(key string) (CacheItem, error) {
 		return nil, toError(err)
 	}
 	return toOutItem(item.Key, item.Value), nil
-	return nil, nil
 }
 
-func (c *cache) GetMulti(keys []string) (map[string]CacheItem, error) {
+func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	if c.c == nil {
 		return nil, ErrorNoClient
 	}
@@ -135,7 +135,7 @@ func (c *cache) GetMulti(keys []string) (map[string]CacheItem, error) {
 	if err != nil {
 		return nil, toError(err)
 	}
-	ret := make(map[string]CacheItem)
+	ret := make(map[string]Item)
 	for k, v := range multi {
 		ret[fixKey(k)] = toOutItem(v.Key, v.Value)
 	}
@@ -147,4 +147,15 @@ func (c *cache) Set(key string, val []byte) error {
 		return ErrorNoClient
 	}
 	return toError(c.c.Set(&memcache.Item{Key: makeKey(c.prefix, key), Value: val}))
+}
+
+func (c *cache) SetWithExpire(key string, val []byte, exp int32) error {
+	if c.c == nil {
+		return ErrorNoClient
+	}
+	return toError(c.c.Set(&memcache.Item{
+		Key:        makeKey(c.prefix, key),
+		Value:      val,
+		Expiration: exp,
+	}))
 }

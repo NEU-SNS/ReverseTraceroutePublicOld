@@ -26,14 +26,10 @@
 */
 package plcontroller
 
-import (
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-)
-
 type Config struct {
 	Local   LocalConfig
 	Scamper ScamperConfig
-	Db      dm.DbConfig
+	Db      DbConfig
 }
 
 type LocalConfig struct {
@@ -56,6 +52,14 @@ type ScamperConfig struct {
 	ConverterPath *string `flag:"converter-path"`
 }
 
+type DbConfig struct {
+	UName    *string `flag:"db-uname"`
+	Password *string `flag:"db-pass"`
+	Host     *string `flag:"db-host"`
+	Port     *string `flag:"db-port"`
+	Db       *string `flag:"db-name"`
+}
+
 func NewConfig() Config {
 	lc := LocalConfig{
 		Addr:         new(string),
@@ -75,10 +79,15 @@ func NewConfig() Config {
 		BinPath:       new(string),
 		ConverterPath: new(string),
 	}
-	db := dm.NewDbConfig()
 	return Config{
 		Local:   lc,
 		Scamper: sc,
-		Db:      db,
+		Db: DbConfig{
+			UName:    new(string),
+			Password: new(string),
+			Host:     new(string),
+			Port:     new(string),
+			Db:       new(string),
+		},
 	}
 }

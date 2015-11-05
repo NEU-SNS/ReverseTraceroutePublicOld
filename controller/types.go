@@ -33,7 +33,6 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
 var (
@@ -74,7 +73,7 @@ func NewConfig() Config {
 	}
 	c := Config{
 		Local: lc,
-		Db:    dm.NewDbConfig(),
+		Db:    da.DbConfig{},
 		Cache: cache.NewConfig(),
 	}
 	return c

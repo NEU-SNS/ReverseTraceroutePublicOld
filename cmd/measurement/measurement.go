@@ -61,7 +61,7 @@ func makeOut(outDir string) error {
 }
 
 func openOutFile(fname string) (*os.File, error) {
-	return os.Open(fname)
+	return os.Create(fname)
 }
 
 func openSource(src string) (io.ReadCloser, error) {
@@ -103,7 +103,7 @@ func addrScan(ctx *cli.Context) {
 		fmt.Fprintf(os.Stderr, "Got error: %v", err)
 		return
 	}
-	f, err := openOutFile(fmt.Sprintf("%s/%s", ctx.String("out"), ctx.GlobalString("id")))
+	f, err := openOutFile(fmt.Sprintf("%s/%s.txt", ctx.String("out"), ctx.GlobalString("id")))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Got error: %v", err)
 		return

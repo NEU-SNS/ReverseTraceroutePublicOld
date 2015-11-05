@@ -29,6 +29,7 @@ package main
 
 import (
 	"flag"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,7 +37,9 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/controller"
+	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
@@ -46,61 +49,50 @@ func init() {
 	config.SetEnvPrefix("REVTR")
 	config.AddConfigPath("./controller.config")
 
-	flag.StringVar(conf.Local.Addr, "a", ":35000",
+	flag.StringVar(conf.Local.Addr, "a", "0.0.0.0",
 		"The address that the controller will bind to.")
+	flag.IntVar(conf.Local.Port, "p", 4382,
+		"The port that the controller will use.")
 	flag.BoolVar(conf.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed")
 	flag.StringVar(conf.Local.PProfAddr, "pprof", "localhost:55555",
 		"The port for pprof")
-	flag.BoolVar(conf.Local.AutoConnect, "auto-connect", false,
-		"Autoconnect to 0.0.0.0 and will use port 35000")
 	flag.StringVar(conf.Local.CertFile, "cert-file", "cert.pem",
 		"The path the the cert file for the the server")
-	flag.IntVar(conf.Local.Port, "p", 4382,
-		"The port that the controller will use.")
 	flag.StringVar(conf.Local.KeyFile, "key-file", "key.pem",
 		"The path to the private key for the file")
 	flag.Int64Var(conf.Local.ConnTimeout, "conn-timeout", 60,
 		"How long to wait for an rpc connection to timeout")
-	flag.StringVar(conf.Db.UName, "db-uname", "",
-		"The username for the database")
-	flag.StringVar(conf.Db.Password, "db-pass", "",
-		"The password for the database")
-	flag.StringVar(conf.Db.Db, "db-name", "",
-		"The name of the database to use")
-	flag.StringVar(conf.Db.Host, "db-host", "localhost",
-		"The host of the database")
-	flag.StringVar(conf.Db.Port, "db-port", "3306",
-		"The port used for the database connection")
+	/*
+		flag.StringVar(conf.Db.UName, "db-uname", "",
+			"The username for the database")
+		flag.StringVar(conf.Db.Password, "db-pass", "",
+			"The password for the database")
+		flag.StringVar(conf.Db.Db, "db-name", "",
+			"The name of the database to use")
+		flag.StringVar(conf.Db.Host, "db-host", "localhost",
+			"The host of the database")
+		flag.StringVar(conf.Db.Port, "db-port", "3306",
+			"The port used for the database connection")
+	*/
 	flag.Var(conf.Cache.Addrs, "cache-list",
 		"The list of cache servers.")
 }
 
 func main() {
 	go sigHandle()
-	var parseConf controller.Config
-	err := config.Parse(flag.CommandLine, &parseConf)
+	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Errorf("Failed to parse config: %v", err)
 		exit(1)
 	}
-
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
-
-	/*
-		db, err := sql.NewDB(sql.DbConfig{
-			UName:    *conf.Db.UName,
-			Password: *conf.Db.Password,
-			Host:     *conf.Db.Host,
-			Port:     *conf.Db.Port,
-			Db:       *conf.Db.Db,
-		})
-		if err != nil {
-			log.Errorf("Failed to create db: %v", err)
-			exit(1)
-		}
-	*/
-	err = <-controller.Start(conf, nil, cache.New(*conf.Cache.Addrs) /* need router */, nil)
+	db, err := da.New(conf.Db)
+	if err != nil {
+		log.Errorf("Failed to create db: %v", err)
+		exit(1)
+	}
+	err = <-controller.Start(conf, db, cache.New(*conf.Cache.Addrs), router.New())
 
 	if err != nil {
 		log.Errorf("Controller Start returned with error: %v", err)

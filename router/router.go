@@ -24,63 +24,79 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package router
 
 import (
+	"fmt"
+
 	"golang.org/x/net/context"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
-type Service uint
+type service uint
 
 const (
-	PLANET_LAB Service = iota + 1
+	planetLab service = iota + 1
 )
 
+var (
+	errCantCreateMt = fmt.Errorf("No measurement tool found for the service")
+)
+
+// MeasurementTool is the interface for a measurement source the controller can use
 type MeasurementTool interface {
 	Ping(context.Context, *dm.PingArg) (<-chan *dm.Ping, error)
 	Traceroute(context.Context, *dm.TracerouteArg) (<-chan *dm.Traceroute, error)
 	GetVPs(context.Context, *dm.VPRequest) (<-chan *dm.VPReturn, error)
+	Close() error
 }
 
 func create(s ServiceDef) (MeasurementTool, error) {
 	switch s.Service {
-	case PLANET_LAB:
-		return nil, nil
+	case planetLab:
+		return createPLMT(s)
 	}
-	return nil, nil
+	return nil, errCantCreateMt
 }
 
+// ServiceDef is the definition of
 type ServiceDef struct {
 	Addr    string
 	Port    string
-	Service Service
+	Service service
 }
 
 type source struct{}
 
 func (s source) Get(dst string) (ServiceDef, error) {
 	return ServiceDef{
-		Addr: "plcontroller.revtr.ccs.neu.edu",
-		Port: "4380",
+		Addr:    "plcontroller.revtr.ccs.neu.edu",
+		Port:    "4380",
+		Service: planetLab,
 	}, nil
 }
 
 func (s source) All() []ServiceDef {
 	return []ServiceDef{ServiceDef{
-		Addr: "plcontroller.revtr.ccs.neu.edu",
-		Port: "4380",
+		Addr:    "plcontroller.revtr.ccs.neu.edu",
+		Port:    "4380",
+		Service: planetLab,
 	}}
 }
 
+// Source is a source of service defs from src addresses
 type Source interface {
 	Get(string) (ServiceDef, error)
 	All() []ServiceDef
 }
 
+// Router is the interface for something that routes srcs to measurement tools
 type Router interface {
-	Get(string) (MeasurementTool, error)
+	GetMT(ServiceDef) (MeasurementTool, error)
+	GetService(string) (ServiceDef, error)
 	All() []MeasurementTool
 	SetSource(Source)
 }
@@ -92,6 +108,7 @@ type router struct {
 	cache  mtCache
 }
 
+// New creates a new Router
 func New() Router {
 	return &router{
 		cache:  make(mtCache),
@@ -103,20 +120,17 @@ func (r *router) SetSource(s Source) {
 	r.source = s
 }
 
-func (r *router) Get(addr string) (MeasurementTool, error) {
-	service, err := r.source.Get(addr)
+func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
+	mt, err := create(s)
 	if err != nil {
+		log.Error(err, s)
 		return nil, err
 	}
-	if mt, ok := r.cache[service]; ok {
-		return mt, nil
-	}
-	mt, err := create(service)
-	if err != nil {
-		return nil, err
-	}
-	r.cache[service] = mt
 	return mt, nil
+}
+
+func (r *router) GetService(addr string) (ServiceDef, error) {
+	return r.source.Get(addr)
 }
 
 func (r *router) All() []MeasurementTool {

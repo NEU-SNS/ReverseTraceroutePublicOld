@@ -99,7 +99,7 @@ type plControllerT struct {
 	config   Config
 	sc       scamper.Config
 	mp       mproc.MProc
-	db       da.VPProvider
+	db       *da.DataAccess
 	w        *fsnotify.Watcher
 	client   Client
 	spoofs   *spoofMap
@@ -166,7 +166,6 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		c.client.RemoveMeasurement(src, id)
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	}
-	panic("Should never get here plcontroller.go:166")
 }
 
 func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
@@ -204,7 +203,6 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 		c.client.RemoveMeasurement(src, id)
 		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
 	}
-	return dm.Traceroute{}, nil
 }
 
 func convertWarts(path string, b []byte) ([]byte, error) {
@@ -219,7 +217,7 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 }
 
 // When this returns the server is essentially dead, so call stop before any return
-func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db da.VPProvider, cl Client, s Sender) {
+func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.DataAccess, cl Client, s Sender) {
 	if db == nil {
 		c.stop()
 		ec <- fmt.Errorf("Nil db in plController")
@@ -307,7 +305,7 @@ func startHTTP(addr string) {
 }
 
 // Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db da.VPProvider, cl Client, s Sender) chan error {
+func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s Sender) chan error {
 	log.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)

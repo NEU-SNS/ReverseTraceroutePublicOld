@@ -36,6 +36,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
+// Service represents a service
 type Service struct {
 	Url  string
 	Key  ServiceT
@@ -65,11 +66,12 @@ func (s *Service) GetIp() (string, error) {
 	return fmt.Sprintf("%s:%d", ip, s.Port), nil
 }
 
+// UnmarshalYAML is for the yaml library
 func (s *ServiceT) UnmarshalYAML(unm func(interface{}) error) error {
 	var text string
 	err := unm(&text)
 	if err != nil {
-		return nil
+		return err
 	}
 	if val, ok := ServiceT_value[text]; ok {
 		*s = ServiceT(val)
@@ -78,6 +80,7 @@ func (s *ServiceT) UnmarshalYAML(unm func(interface{}) error) error {
 	return fmt.Errorf("Invalid Value for ServiceT")
 }
 
+// MarshalYAML is for the yaml library
 func (s *ServiceT) MarshalYAML() (interface{}, error) {
 	text := ServiceT_name[int32(*s)]
 	return &text, nil

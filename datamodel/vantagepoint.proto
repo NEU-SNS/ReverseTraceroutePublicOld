@@ -21,8 +21,6 @@ message VantagePoint {
 }
 
 message VPRequest {
-    string hostname = 1;
-    int64 ip        = 2;
 }
 
 message VPReturn {

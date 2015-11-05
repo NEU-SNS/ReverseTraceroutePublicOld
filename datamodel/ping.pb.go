@@ -28,6 +28,49 @@ Copyright (c) 2015, Northeastern University
 // source: github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
 // DO NOT EDIT!
 
+/*
+Package datamodel is a generated protocol buffer package.
+
+It is generated from these files:
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/register.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/service.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/update.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto
+
+It has these top-level messages:
+	PingMeasurement
+	PingArg
+	PingStats
+	PingResponse
+	TsAndAddr
+	Ping
+	RecSpoof
+	Spoof
+	SpoofedProbes
+	SpoofedProbesResponse
+	Probe
+	RecordRoute
+	TimeStamp
+	Stamp
+	NotifyRecSpoofResponse
+	ReceiveSpoofedProbesResponse
+	RegisterResponse
+	Time
+	RTT
+	TracerouteMeasurement
+	TracerouteArg
+	TracerouteHop
+	Traceroute
+	TracerouteTime
+	UpdateResponse
+	VantagePoint
+	VPRequest
+	VPReturn
+*/
 package datamodel
 
 import proto "github.com/golang/protobuf/proto"

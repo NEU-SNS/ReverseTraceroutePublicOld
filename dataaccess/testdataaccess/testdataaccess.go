@@ -29,14 +29,15 @@
 package testdataaccess
 
 import (
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	"time"
+
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
 type testAccess struct{}
 
 // NewVP creates a test data access
-func NewVP() (da.VPProvider, error) {
+func NewVP() (*testAccess, error) {
 	return &testAccess{}, nil
 }
 
@@ -53,10 +54,10 @@ func (t *testAccess) StoreTraceroute(*dm.Traceroute, dm.ServiceT) error {
 func (t *testAccess) GetTRBySrcDst(string, string) (*dm.Traceroute, error) {
 	return nil, nil
 }
-func (t *testAccess) GetTRBySrcDstWithStaleness(string, string, da.Staleness) (*dm.Traceroute, error) {
+func (t *testAccess) GetTRBySrcDstWithStaleness(string, string, time.Duration) (*dm.Traceroute, error) {
 	return nil, nil
 }
-func (t *testAccess) GetIntersectingTraceroute(string, string, da.Staleness) (*dm.Traceroute, error) {
+func (t *testAccess) GetIntersectingTraceroute(string, string, time.Duration) (*dm.Traceroute, error) {
 	return nil, nil
 }
 

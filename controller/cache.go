@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package controller
 
 import (
@@ -50,8 +51,8 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]string, 0)
-					db := make([]*dm.PingMeasurement, 0)
+					var check []string
+					var db []*dm.PingMeasurement
 					checking := make(map[string]*dm.PingMeasurement)
 					for _, p := range m {
 						if p.CheckCache {
@@ -90,6 +91,7 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 						}(p)
 						ret <- p
 					}
+					log.Info("Closing ret")
 					close(ret)
 					return
 				}
@@ -115,8 +117,8 @@ func (tc traceCache) traceCacheStep(next traceFunc) traceFunc {
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]string, 0)
-					db := make([]*dm.TracerouteMeasurement, 0)
+					var check []string
+					var db []*dm.TracerouteMeasurement
 					checking := make(map[string]*dm.TracerouteMeasurement)
 					for _, p := range m {
 						if p.CheckCache {

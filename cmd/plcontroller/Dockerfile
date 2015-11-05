@@ -22,4 +22,4 @@ ENTRYPOINT ["cmd/plcontroller/plcontroller"]
 
 EXPOSE 4380
 EXPOSE 4381
-
+EXPOSE 55556

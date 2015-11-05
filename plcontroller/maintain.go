@@ -97,7 +97,7 @@ var (
 		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
-func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db dataaccess.VPProvider, dc chan struct{}) error {
+func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db *dataaccess.DataAccess, dc chan struct{}) error {
 	return nil
 	var wg sync.WaitGroup
 	for _, vp := range vps {

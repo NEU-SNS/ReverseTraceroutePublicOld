@@ -62,6 +62,13 @@ func intOpt(f string, arg interface{}) (string, error) {
 	return "", fmt.Errorf("Invalid arg type in intOpt: %v", arg)
 }
 
+func uint32Opt(f string, arg interface{}) (string, error) {
+	if sarg, ok := arg.(uint32); ok {
+		return fmt.Sprintf(f, sarg), nil
+	}
+	return "", fmt.Errorf("Invalid arg type in uint32Opt: %v", arg)
+}
+
 func boolOpt(f string, arg interface{}) (string, error) {
 	if barg, ok := arg.(bool); ok {
 		if barg {

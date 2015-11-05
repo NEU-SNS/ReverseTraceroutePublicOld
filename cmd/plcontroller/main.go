@@ -35,7 +35,7 @@ import (
 	"syscall"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
+	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
@@ -44,10 +44,13 @@ import (
 
 var (
 	defaultConfig = "./plcontroller.config"
-	ConfigPath    string
-	Build         string
-	Version       string
-	showVersion   bool
+	// ConfigPath is the path to the configuration file
+	ConfigPath string
+	// Build is the build number
+	Build string
+	// Version is the version number
+	Version     string
+	showVersion bool
 )
 
 var conf = plcontroller.NewConfig()
@@ -116,9 +119,9 @@ func main() {
 		fmt.Printf("Build: %s\nVersion: %s\n", Build, Version)
 		exit(0)
 	}
-	db, err := sql.NewDB(sql.DbConfig{
-		WriteConfigs: []sql.Config{
-			sql.Config{
+	db, err := da.New(da.DbConfig{
+		WriteConfigs: []da.Config{
+			da.Config{
 				User:     *conf.Db.UName,
 				Password: *conf.Db.Password,
 				Host:     *conf.Db.Host,
@@ -126,8 +129,8 @@ func main() {
 				Db:       *conf.Db.Db,
 			},
 		},
-		ReadConfigs: []sql.Config{
-			sql.Config{
+		ReadConfigs: []da.Config{
+			da.Config{
 				User:     *conf.Db.UName,
 				Password: *conf.Db.Password,
 				Host:     *conf.Db.Host,

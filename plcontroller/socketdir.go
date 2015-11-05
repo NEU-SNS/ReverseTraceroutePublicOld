@@ -99,12 +99,16 @@ func (c *plControllerT) handlEvents(ec chan error) {
 
 //This is only for use when a server is going down
 func (c *plControllerT) removeAllVps() {
+	log.Debug("Removing all vps")
 	for sock := range c.client.GetAllSockets() {
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
 			continue
 		}
-		c.db.UpdateController(ip, 0, c.ip)
+		err = c.db.UpdateController(ip, 0, c.ip)
+		if err != nil {
+			log.Error(err)
+		}
 	}
 }
 

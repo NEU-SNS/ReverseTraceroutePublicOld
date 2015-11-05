@@ -27,8 +27,6 @@
 
 package config
 
-import "testing"
-
 type SubConfig struct {
 	Name string `flag:"sub_name"`
 	Age  int    `flag:"sub_age"`
@@ -55,12 +53,4 @@ var testConfig = Config{
 		Name: "Rob",
 		Age:  25,
 	},
-}
-
-func TestBuildMap(t *testing.T) {
-	out, err := buildMap(testConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(out)
 }

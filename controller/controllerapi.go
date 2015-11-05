@@ -67,7 +67,10 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 
 func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
 	log.Info("Handling VP Request")
-	vpr = new(dm.VPReturn)
 	vpr, err = c.doGetVPs(ctx, gvp)
 	return
+}
+
+func (c *controllerT) ReceiveSpoofedProbes(cont.Controller_ReceiveSpoofedProbesServer) error {
+	return nil
 }
