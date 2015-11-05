@@ -24,6 +24,8 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package config is used to merge env file and command line config options
 package config
 
 import (
@@ -61,7 +63,6 @@ func parseYamlConfig(path string, opts interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -148,7 +149,8 @@ func buildMap(opts reflect.Value) (map[string]string, error) {
 		if opts.Elem().Field(i).IsNil() {
 			continue
 		}
-		res[name] = fmt.Sprintf("%v", opts.Elem().Field(i).Elem())
+		val := fmt.Sprintf("%v", opts.Elem().Field(i).Elem())
+		res[name] = val
 	}
 	return res, nil
 }

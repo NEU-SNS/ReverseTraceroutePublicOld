@@ -34,6 +34,7 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/prometheus/log"
 )
 import "github.com/go-sql-driver/mysql"
 
@@ -193,7 +194,10 @@ func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 		vps = append(vps, vp.ToDataModel())
 	}
 	err = rows.Err()
-	return vps, err
+	if err != nil {
+		return nil, err
+	}
+	return vps, nil
 }
 
 const (
@@ -718,13 +722,12 @@ const (
 		" spoofed, record_route, payload, tsonly, tsandaddr, icmpsum, dl, `8`)" +
 		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-	insertPingResponse = `
-INSERT INTO
-ping_responses(ping_id, from, seq, reply_size, reply_ttl, 
-			   reply_proto, rtt, probe_ipid, reply_ipid, 
-			   icmp_type, icmp_code, tx, rx)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`
+	insertPingResponse = "INSERT INTO " +
+		"ping_responses(ping_id, `from`, seq, reply_size, reply_ttl, " +
+		"			   reply_proto, rtt, probe_ipid, reply_ipid, " +
+		"icmp_type, icmp_code, tx, rx) " +
+		"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+
 	insertRR = `
 INSERT INTO
 record_routes(response_id, hop, ip)
@@ -760,6 +763,7 @@ func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
 		"dl"
 		"8"
 	*/
+	log.Info(in)
 	start := time.Unix(in.Start.Sec, in.Start.Usec*1000)
 	flags := make(map[string]bool)
 	for _, flag := range in.Flags {

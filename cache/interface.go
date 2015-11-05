@@ -24,24 +24,31 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package cache represents a cache
 package cache
 
-type CacheItem interface {
+// Item is an item from the cache
+type Item interface {
 	Valuer
 	Keyer
 }
 
+// Cache is the interface a cache implements
 type Cache interface {
-	Get(string) (CacheItem, error)
-	GetMulti([]string) (map[string]CacheItem, error)
+	Get(string) (Item, error)
+	GetMulti([]string) (map[string]Item, error)
 	Set(string, []byte) error
+	SetWithExpire(string, []byte, int32) error
 	SetPrefix(string)
 }
 
+// Keyer is anything that generates a key
 type Keyer interface {
 	Key() string
 }
 
+// Valuer is anything with a []byte value
 type Valuer interface {
 	Value() []byte
 }

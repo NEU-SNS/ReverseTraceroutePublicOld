@@ -59,8 +59,6 @@ func (m *VantagePoint) String() string { return proto.CompactTextString(m) }
 func (*VantagePoint) ProtoMessage()    {}
 
 type VPRequest struct {
-	Hostname string `protobuf:"bytes,1,opt,name=hostname" json:"hostname,omitempty"`
-	Ip       int64  `protobuf:"varint,2,opt,name=ip" json:"ip,omitempty"`
 }
 
 func (m *VPRequest) Reset()         { *m = VPRequest{} }

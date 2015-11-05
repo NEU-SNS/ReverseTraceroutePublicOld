@@ -40,11 +40,13 @@ import (
 	"time"
 
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
+	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -92,7 +94,7 @@ func init() {
 
 type controllerT struct {
 	config    Config
-	db        da.DataProvider
+	db        *da.DataAccess
 	cache     ca.Cache
 	router    router.Router
 	startTime time.Time
@@ -116,17 +118,8 @@ func (c *controllerT) handleSig(sig os.Signal) {
 }
 
 func (c *controllerT) startRPC(eChan chan error) {
-	var addr string
-	if *c.config.Local.AutoConnect {
-		saddr, err := util.GetBindAddr()
-		if err != nil {
-			eChan <- err
-			return
-		}
-		addr = fmt.Sprintf("%s:%d", saddr, 35000)
-	} else {
-		addr = *c.config.Local.Addr
-	}
+	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
+		*c.config.Local.Port)
 	log.Infof("Conecting to: %s", addr)
 	l, e := net.Listen("tcp", addr)
 	if e != nil {
@@ -152,22 +145,21 @@ type routed struct {
 
 func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 	ret := make(chan *dm.Ping)
+	var rec <-chan *dm.Ping
 	go func() {
+		defer close(ret)
 		for {
 			select {
 			case <-ctx.Done():
-				close(ret)
 				return
-			case pms := <-pm:
-				if pms == nil || len(pms) == 0 {
-					close(ret)
-					break
+			case pms, ok := <-pm:
+				if !ok {
+					return
 				}
-				r := router.New()
-				mts := make(map[router.MeasurementTool][]*dm.PingMeasurement)
+				mts := make(map[router.ServiceDef][]*dm.PingMeasurement)
 				for _, p := range pms {
 					srcs, _ := util.Int32ToIPString(p.Src)
-					mt, err := r.Get(srcs)
+					serv, err := r.r.GetService(srcs)
 					if err != nil {
 						ret <- &dm.Ping{
 							Src:   p.Src,
@@ -176,22 +168,34 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 						}
 						continue
 					}
-					mts[mt] = append(mts[mt], p)
+					mts[serv] = append(mts[serv], p)
 				}
-				for mt, ms := range mts {
-					go func(tool router.MeasurementTool, targs []*dm.PingMeasurement) {
-						pings, err := tool.Ping(ctx, &dm.PingArg{
-							Pings: targs,
-						})
-						if err != nil {
-							log.Errorf("Failed running ping measurements: %v", err)
-							return
+				for serv, meas := range mts {
+					mt, err := r.r.GetMT(serv)
+					if err != nil {
+						log.Error(err)
+						for _, m := range meas {
+							ret <- &dm.Ping{
+								Src:   m.Src,
+								Dst:   m.Dst,
+								Error: err.Error(),
+							}
 						}
-						for x := range pings {
-							ret <- x
+					}
+					ps, err := mt.Ping(ctx, &dm.PingArg{
+						Pings: meas})
+					if err != nil {
+						log.Error(err)
+						for _, m := range meas {
+							ret <- &dm.Ping{
+								Src:   m.Src,
+								Dst:   m.Dst,
+								Error: err.Error(),
+							}
 						}
-					}(mt, ms)
+					}
 				}
+			case ret <- <-rec:
 			}
 		}
 	}()
@@ -199,7 +203,6 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 }
 
 func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *dm.Ping {
-	log.Infof("%s: Ping starting")
 	do := pingCache{c: c.cache}.pingCacheStep(
 		pingDB{db: c.db}.pingDBStep(routed{r: c.router}.pingMeas))
 	next := make(chan []*dm.PingMeasurement)
@@ -212,24 +215,21 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 }
 
 func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
+	var wg sync.WaitGroup
 	ret := make(chan *dm.Traceroute)
+	exit := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
+				close(exit)
 				close(ret)
 				return
 			case tms := <-tm:
-				if tms == nil || len(tms) == 0 {
-					close(ret)
-					break
-
-				}
-				r := router.New()
 				mts := make(map[router.MeasurementTool][]*dm.TracerouteMeasurement)
 				for _, t := range tms {
 					srcs, _ := util.Int32ToIPString(t.Src)
-					mt, err := r.Get(srcs)
+					mt, err := r.r.Get(srcs)
 					if err != nil {
 						ret <- &dm.Traceroute{
 							Src:   t.Src,
@@ -241,7 +241,10 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 					mts[mt] = append(mts[mt], t)
 				}
 				for mt, ms := range mts {
+					wg.Add(1)
 					go func(tool router.MeasurementTool, targs []*dm.TracerouteMeasurement) {
+						defer tool.Close()
+						defer wg.Done()
 						traceroutes, err := tool.Traceroute(ctx, &dm.TracerouteArg{
 							Traceroutes: targs,
 						})
@@ -249,12 +252,24 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 							log.Errorf("Failed running ping measurements: %v", err)
 							return
 						}
-						for x := range traceroutes {
-							ret <- x
+						for {
+							select {
+							case <-exit:
+								return
+							case t := <-traceroutes:
+								if t == nil {
+									return
+								}
+								ret <- t
+							}
 						}
 					}(mt, ms)
 				}
 			}
+			go func() {
+				wg.Wait()
+				close(ret)
+			}()
 		}
 	}()
 	return ret
@@ -272,8 +287,49 @@ func (c *controllerT) doTraceroute(ctx con.Context, tm []*dm.TracerouteMeasureme
 	return res
 }
 
-func (c *controllerT) doGetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
-	return new(dm.VPReturn), nil
+func (c *controllerT) fetchVPs(ctx con.Context, gvp *dm.VPRequest) (*dm.VPReturn, error) {
+	mts := c.router.All()
+	var ret dm.VPReturn
+	for _, mt := range mts {
+		vpc, err := mt.GetVPs(ctx, gvp)
+		if err != nil {
+			return nil, err
+		}
+		for vp := range vpc {
+			ret.Vps = append(ret.Vps, vp.Vps...)
+		}
+		mt.Close()
+	}
+	go func() {
+		data, err := proto.Marshal(&ret)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		// Cache for 5 min
+		c.cache.SetWithExpire("all_vps", data, 5*60)
+	}()
+	return &ret, nil
+}
+
+func (c *controllerT) doGetVPs(ctx con.Context, gvp *dm.VPRequest) (*dm.VPReturn, error) {
+	res, err := c.cache.Get("all_vps")
+	if err != nil && err != ca.ErrorCacheMiss {
+		log.Error(err)
+		return nil, err
+	}
+	var ret dm.VPReturn
+	if err == ca.ErrorCacheMiss {
+		return c.fetchVPs(ctx, gvp)
+	}
+	err = proto.Unmarshal(res.Value(), &ret)
+	if err != nil {
+		return nil, err
+	}
+	if len(ret.Vps) == 0 {
+		return c.fetchVPs(ctx, gvp)
+	}
+	return &ret, nil
 }
 
 func startHTTP(addr string) {
@@ -288,7 +344,7 @@ func (c *controllerT) stop() {
 	}
 }
 
-func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache ca.Cache, r router.Router) {
+func (c *controllerT) run(ec chan error, con Config, db *da.DataAccess, cache ca.Cache, r router.Router) {
 	controller.config = con
 	controller.db = db
 	controller.cache = cache
@@ -311,14 +367,13 @@ func (c *controllerT) run(ec chan error, con Config, db da.DataProvider, cache c
 		ec <- errors.New("Controller Start, nil router")
 		return
 	}
-	controller.startTime = time.Now()
-	var opts []grpc.ServerOption
-	controller.server = grpc.NewServer(opts...)
+	controller.server = grpc.NewServer()
+	controllerapi.RegisterControllerServer(controller.server, c)
 	go controller.startRPC(ec)
 }
 
 // Start starts a central controller with the given configuration
-func Start(c Config, db da.DataProvider, cache ca.Cache, r router.Router) chan error {
+func Start(c Config, db *da.DataAccess, cache ca.Cache, r router.Router) chan error {
 	log.Info("Starting controller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)

@@ -95,8 +95,8 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 				return err
 			}
 		}
+		return nil
 	}
-	return nil
 }
 
 func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) error {
@@ -144,8 +144,8 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 				return err
 			}
 		}
+		return nil
 	}
-	return nil
 }
 
 func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {
@@ -183,7 +183,6 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 }
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
-	log.Info("Getting All VPs")
 	vps, err := c.db.GetVPs()
 	if err != nil {
 		return nil

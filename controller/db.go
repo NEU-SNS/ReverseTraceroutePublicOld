@@ -24,6 +24,10 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+/*
+Package controller is the package that is a controller
+*/
 package controller
 
 import (
@@ -34,22 +38,25 @@ import (
 )
 
 type pingDB struct {
-	db da.PingProvider
+	db *da.DataAccess
 }
 
 func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 	return func(ctx context.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 		ret := make(chan *dm.Ping)
+		exit := make(chan struct{})
 		n := make(chan []*dm.PingMeasurement, 2)
 		go func() {
 			for {
 				select {
 				case <-ctx.Done():
+					close(exit)
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]*dm.PingMeasurement, 0)
-					meas := make([]*dm.PingMeasurement, 0)
+					log.Info("Ping DB step")
+					var check []*dm.PingMeasurement
+					var meas []*dm.PingMeasurement
 					checking := make(map[string]*dm.PingMeasurement)
 					for _, p := range m {
 						if p.CheckDb {
@@ -60,7 +67,9 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 						}
 					}
 					res := next(ctx, n)
+					log.Info("sending to remote")
 					n <- meas
+					log.Info("done sending from remote")
 					stored, err := pdb.db.GetPingsMulti(check)
 					if err != nil {
 						log.Errorf("Failed to check db: %v", err)
@@ -77,10 +86,21 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 					close(n)
 					for p := range res {
 						go func(ping *dm.Ping) {
-							pdb.db.StorePing(ping)
+							if ping.Error != "" {
+								return
+							}
+							err := pdb.db.StorePing(ping)
+							if err != nil {
+								log.Error(err)
+							}
 						}(p)
-						ret <- p
+						select {
+						case <-exit:
+							continue
+						case ret <- p:
+						}
 					}
+					log.Info("Closing return")
 					close(ret)
 					return
 				}
@@ -91,22 +111,27 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 }
 
 type traceDB struct {
-	db da.TracerouteProvider
+	db *da.DataAccess
 }
 
 func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
 	return func(ctx context.Context, pm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
+		exit := make(chan struct{})
 		ret := make(chan *dm.Traceroute)
 		n := make(chan []*dm.TracerouteMeasurement, 2)
 		go func() {
 			for {
 				select {
 				case <-ctx.Done():
+					close(exit)
 					close(ret)
 					return
 				case m := <-pm:
-					check := make([]*dm.TracerouteMeasurement, 0)
-					meas := make([]*dm.TracerouteMeasurement, 0)
+					if len(m) == 0 {
+						return
+					}
+					var check []*dm.TracerouteMeasurement
+					var meas []*dm.TracerouteMeasurement
 					checking := make(map[string]*dm.TracerouteMeasurement)
 					for _, p := range m {
 						if p.CheckDb {
@@ -134,9 +159,16 @@ func (tdb traceDB) traceDBStep(next traceFunc) traceFunc {
 					close(n)
 					for t := range res {
 						go func(trace *dm.Traceroute) {
-							tdb.db.StoreTraceroute(trace)
+							err := tdb.db.StoreTraceroute(trace)
+							if err != nil {
+								log.Error(err)
+							}
 						}(t)
-						ret <- t
+						select {
+						case <-exit:
+							continue
+						case ret <- t:
+						}
 					}
 					close(ret)
 					return

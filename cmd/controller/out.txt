@@ -1,0 +1,8 @@
+time="2015-11-04T15:28:42-05:00" level=info msg="Creating DB with config: {[{revtr password plcontroller.revtr.ccs.neu.edu 3306 ccontroller}] [{revtr password plcontroller.revtr.ccs.neu.edu 3306 ccontroller}]}" file=dataaccess.go line=141 
+time="2015-11-04T15:28:42-05:00" level=info msg="Starting controller" file=controller.go line=374 
+time="2015-11-04T15:28:42-05:00" level=info msg="Conecting to: 0.0.0.0:4382" file=controller.go line=123 
+time="2015-11-04T15:28:42-05:00" level=info msg="Controller started, listening on: 0.0.0.0:4382" file=controller.go line=130 
+time="2015-11-04T15:28:46-05:00" level=info msg="Handling VP Request" file=controllerapi.go line=69 
+time="2015-11-04T15:28:46-05:00" level=info msg="Handling Ping Request" file=controllerapi.go line=39 
+time="2015-11-04T15:28:46-05:00" level=info msg=1 file=controller.go line=175 
+time="2015-11-04T15:28:46-05:00" level=error msg="Failed running ping measurements: rpc error: code = 1 desc = \"context canceled\"" file=controller.go line=184 
