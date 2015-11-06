@@ -143,18 +143,39 @@ type routed struct {
 	r router.Router
 }
 
+func errorAllPing(err error, out chan<- *dm.Ping, ps []*dm.PingMeasurement) {
+	for _, p := range ps {
+		out <- &dm.Ping{
+			Src:   p.Src,
+			Dst:   p.Dst,
+			Error: err.Error(),
+		}
+	}
+}
+
+func errorAllTrace(err error, out chan<- *dm.Traceroute, ts []*dm.TracerouteMeasurement) {
+	for _, t := range ts {
+		out <- &dm.Traceroute{
+			Src:   t.Src,
+			Dst:   t.Dst,
+			Error: err.Error(),
+		}
+	}
+}
+
 func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
 	ret := make(chan *dm.Ping)
-	var rec <-chan *dm.Ping
 	go func() {
-		defer close(ret)
+		var wg sync.WaitGroup
+	loop:
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				break loop
 			case pms, ok := <-pm:
 				if !ok {
-					return
+					// Our inbound channel is closed so break this loop
+					break loop
 				}
 				mts := make(map[router.ServiceDef][]*dm.PingMeasurement)
 				for _, p := range pms {
@@ -174,30 +195,30 @@ func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-cha
 					mt, err := r.r.GetMT(serv)
 					if err != nil {
 						log.Error(err)
-						for _, m := range meas {
-							ret <- &dm.Ping{
-								Src:   m.Src,
-								Dst:   m.Dst,
-								Error: err.Error(),
-							}
-						}
+						errorAllPing(err, ret, meas)
+						continue
 					}
-					ps, err := mt.Ping(ctx, &dm.PingArg{
-						Pings: meas})
-					if err != nil {
-						log.Error(err)
-						for _, m := range meas {
-							ret <- &dm.Ping{
-								Src:   m.Src,
-								Dst:   m.Dst,
-								Error: err.Error(),
-							}
+					wg.Add(1)
+					go func(t router.MeasurementTool, m []*dm.PingMeasurement) {
+						defer wg.Done()
+						ps, err := t.Ping(ctx, &dm.PingArg{
+							Pings: m})
+						if err != nil {
+							log.Error(err)
+							errorAllPing(err, ret, m)
+							return
 						}
-					}
+						for ping := range ps {
+							ret <- ping
+						}
+					}(mt, meas)
 				}
-			case ret <- <-rec:
 			}
 		}
+		// This waits when the inbound channel is closed
+		// The wg is increased every time a separate ping request is issued
+		wg.Wait()
+		close(ret)
 	}()
 	return ret
 }
@@ -215,21 +236,22 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 }
 
 func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
-	var wg sync.WaitGroup
 	ret := make(chan *dm.Traceroute)
-	exit := make(chan struct{})
 	go func() {
+		var wg sync.WaitGroup
+	loop:
 		for {
 			select {
 			case <-ctx.Done():
-				close(exit)
-				close(ret)
-				return
-			case tms := <-tm:
-				mts := make(map[router.MeasurementTool][]*dm.TracerouteMeasurement)
+				break loop
+			case tms, ok := <-tm:
+				if !ok {
+					break loop
+				}
+				sds := make(map[router.ServiceDef][]*dm.TracerouteMeasurement)
 				for _, t := range tms {
 					srcs, _ := util.Int32ToIPString(t.Src)
-					mt, err := r.r.Get(srcs)
+					serv, err := r.r.GetService(srcs)
 					if err != nil {
 						ret <- &dm.Traceroute{
 							Src:   t.Src,
@@ -238,42 +260,39 @@ func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement
 						}
 						continue
 					}
-					mts[mt] = append(mts[mt], t)
+					sds[serv] = append(sds[serv], t)
 				}
-				for mt, ms := range mts {
+				for serv, meas := range sds {
+					mt, err := r.r.GetMT(serv)
+					if err != nil {
+						log.Error(err)
+						errorAllTrace(err, ret, meas)
+						continue
+					}
 					wg.Add(1)
-					go func(tool router.MeasurementTool, targs []*dm.TracerouteMeasurement) {
-						defer tool.Close()
+					go func(t router.MeasurementTool, tt []*dm.TracerouteMeasurement) {
 						defer wg.Done()
-						traceroutes, err := tool.Traceroute(ctx, &dm.TracerouteArg{
-							Traceroutes: targs,
+						ts, err := t.Traceroute(ctx, &dm.TracerouteArg{
+							Traceroutes: tt,
 						})
 						if err != nil {
-							log.Errorf("Failed running ping measurements: %v", err)
+							log.Error(err)
+							errorAllTrace(err, ret, tt)
 							return
 						}
-						for {
-							select {
-							case <-exit:
-								return
-							case t := <-traceroutes:
-								if t == nil {
-									return
-								}
-								ret <- t
-							}
+						for trace := range ts {
+							ret <- trace
 						}
-					}(mt, ms)
+					}(mt, meas)
 				}
 			}
-			go func() {
-				wg.Wait()
-				close(ret)
-			}()
 		}
+		wg.Wait()
+		close(ret)
 	}()
 	return ret
 }
+
 func (c *controllerT) doTraceroute(ctx con.Context, tm []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
 	log.Infof("%s: Traceroute starting")
 	do := traceCache{c: c.cache}.traceCacheStep(

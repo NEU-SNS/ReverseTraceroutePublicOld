@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package router
 
 import (
@@ -94,6 +95,7 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 			ret <- in
 		}
 	}()
+	ps.CloseSend()
 	return ret, nil
 }
 
@@ -126,7 +128,6 @@ func (p plmt) Close() error {
 }
 
 func createPLMT(s ServiceDef) (plmt, error) {
-	log.Info("Creating plmt")
 	var ret plmt
 	opts := make([]grpc.DialOption, 1)
 	opts[0] = grpc.WithInsecure()

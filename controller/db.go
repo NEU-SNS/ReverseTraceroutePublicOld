@@ -54,7 +54,6 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 					close(ret)
 					return
 				case m := <-pm:
-					log.Info("Ping DB step")
 					var check []*dm.PingMeasurement
 					var meas []*dm.PingMeasurement
 					checking := make(map[string]*dm.PingMeasurement)
@@ -67,9 +66,7 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 						}
 					}
 					res := next(ctx, n)
-					log.Info("sending to remote")
 					n <- meas
-					log.Info("done sending from remote")
 					stored, err := pdb.db.GetPingsMulti(check)
 					if err != nil {
 						log.Errorf("Failed to check db: %v", err)
@@ -100,7 +97,6 @@ func (pdb pingDB) pingDBStep(next pingFunc) pingFunc {
 						case ret <- p:
 						}
 					}
-					log.Info("Closing return")
 					close(ret)
 					return
 				}
