@@ -68,12 +68,12 @@ func main() {
 			continue
 		}
 		pings = append(pings, &dm.PingMeasurement{
-			Src:        vp.Ip,
-			Dst:        dst,
-			Timeout:    60,
-			Count:      "1",
-			CheckCache: true,
-			CheckDb:    true,
+			Src:     vp.Ip,
+			Dst:     dst,
+			Timeout: 60,
+			Count:   "1",
+			//			CheckCache: true,
+			//			CheckDb:    true,
 		})
 
 	}

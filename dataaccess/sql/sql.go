@@ -34,7 +34,6 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/prometheus/log"
 )
 import "github.com/go-sql-driver/mysql"
 
@@ -763,7 +762,6 @@ func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
 		"dl"
 		"8"
 	*/
-	log.Info(in)
 	start := time.Unix(in.Start.Sec, in.Start.Usec*1000)
 	flags := make(map[string]bool)
 	for _, flag := range in.Flags {

@@ -91,7 +91,6 @@ func (pc pingCache) pingCacheStep(next pingFunc) pingFunc {
 						}(p)
 						ret <- p
 					}
-					log.Info("Closing ret")
 					close(ret)
 					return
 				}
