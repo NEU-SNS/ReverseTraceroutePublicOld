@@ -158,7 +158,7 @@ func sigHandle() {
 	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
 		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
-		log.Fatalf("Got signal: %v", sig)
+		log.Infof("Got signal: %v", sig)
 		plcontroller.HandleSig(sig)
 		exit(1)
 	}

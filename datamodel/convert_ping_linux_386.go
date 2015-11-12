@@ -24,10 +24,12 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package datamodel
 
 import "github.com/NEU-SNS/ReverseTraceroute/warts"
 
+// ConvertPing converts a warts ping to a DM ping
 func ConvertPing(in warts.Ping) Ping {
 	p := Ping{}
 	p.Src = uint32(in.Flags.Src.Address)

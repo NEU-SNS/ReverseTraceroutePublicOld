@@ -338,10 +338,12 @@ func (c *plControllerT) startScamperProc() {
 
 // HandleSig allows the plController to react appropriately to signals
 func HandleSig(s os.Signal) {
+	log.Info("Handle Sig")
 	plController.handleSig(s)
 }
 
 func (c *plControllerT) stop() {
+	log.Info("Stoping")
 	if c.shutdown != nil {
 		close(c.shutdown)
 	}
@@ -351,10 +353,8 @@ func (c *plControllerT) stop() {
 	if c.mp != nil {
 		c.mp.KillAll()
 	}
-	if c.db != nil {
-		c.removeAllVps()
-		c.db.Close()
-	}
+	c.removeAllVps()
+	c.db.Close()
 	if c.spoofs != nil {
 		c.spoofs.Quit()
 	}

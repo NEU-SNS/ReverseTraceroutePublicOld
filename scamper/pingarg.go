@@ -28,8 +28,8 @@ package scamper
 
 var pingArg = map[string]option{
 	"Dst": option{
-		format: "%d",
-		opt:    uint32Opt,
+		format: "%s",
+		opt:    ipOpt,
 	},
 	"Spoof": option{
 		format: "-O spoof",
@@ -55,11 +55,11 @@ var pingArg = map[string]option{
 		format: "-C %s",
 		opt:    stringOpt,
 	},
-	"DPort": option{
+	"Dport": option{
 		format: "-d %s",
 		opt:    stringOpt,
 	},
-	"SPort": option{
+	"Sport": option{
 		format: "-F %s",
 		opt:    stringOpt,
 	},

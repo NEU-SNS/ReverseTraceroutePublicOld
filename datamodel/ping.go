@@ -27,15 +27,18 @@
 
 package datamodel
 
-import "github.com/golang/protobuf/proto"
+import (
+	"fmt"
 
-func createPing() interface{} {
-	return new(Ping)
-}
+	"github.com/golang/protobuf/proto"
+)
+
+// CUnmarshal is the unmarshal for data coming from the cache
 func (p *Ping) CUnmarshal(data []byte) error {
 	return proto.Unmarshal(data, p)
 }
 
+// CMarshal marshals a ping for the cache
 func (p *Ping) CMarshal() []byte {
 	ret, err := proto.Marshal(p)
 	if err != nil {
@@ -44,10 +47,12 @@ func (p *Ping) CMarshal() []byte {
 	return ret
 }
 
+// Key gets the key for a PM
 func (pm *PingMeasurement) Key() string {
-	return ""
+	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", pm.Src, pm.Dst, pm.SpooferAddr)
 }
 
+// Key gets the key for a Ping
 func (p *Ping) Key() string {
-	return ""
+	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", p.Src, p.Dst, p.SpoofedFrom)
 }

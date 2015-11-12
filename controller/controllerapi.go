@@ -29,19 +29,21 @@
 package controller
 
 import (
+	"time"
+
 	cont "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 	con "golang.org/x/net/context"
 )
 
 func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) error {
-	log.Info("Handling Ping Request")
 	pms := pa.GetPings()
 	if pms == nil {
 		return nil
 	}
-	res := c.doPing(stream.Context(), pms)
+	ctx, cancel := con.WithTimeout(stream.Context(), time.Second*70)
+	defer cancel()
+	res := c.doPing(ctx, pms)
 	for p := range res {
 		if err := stream.Send(p); err != nil {
 			return err
@@ -51,7 +53,6 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 }
 
 func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_TracerouteServer) error {
-	log.Info("Handling Traceroute Request")
 	tms := ta.GetTraceroutes()
 	if tms == nil {
 		return nil
@@ -66,7 +67,6 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 }
 
 func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {
-	log.Info("Handling VP Request")
 	vpr, err = c.doGetVPs(ctx, gvp)
 	return
 }

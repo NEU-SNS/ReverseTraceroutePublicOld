@@ -57,6 +57,7 @@ type SpoofPingMonitor struct {
 	quit chan struct{}
 }
 
+// NewSpoofPingMonitor makes a SpoofPingMonitor
 func NewSpoofPingMonitor() *SpoofPingMonitor {
 	qc := make(chan struct{})
 	return &SpoofPingMonitor{quit: qc}
@@ -71,20 +72,29 @@ func reconnect(addr string) (*ipv4.RawConn, error) {
 }
 
 var (
-	ErrorNotICMPEcho           = fmt.Errorf("Received Non ICMP Probe")
-	ErrorNonSpoofedProbe       = fmt.Errorf("Received ICMP Probe that was not spoofed")
-	ErrorSpoofedProbeNoID      = fmt.Errorf("Received a spoofed probe with no id")
-	ErrorNoSpooferIP           = fmt.Errorf("No spoofer IP found in packet")
-	ErrorFailedToParseOptions  = fmt.Errorf("Failed to parse IPv4 options")
+	// ErrorNotICMPEcho is returned when the probe is not of the right type
+	ErrorNotICMPEcho = fmt.Errorf("Received Non ICMP Probe")
+	// ErrorNonSpoofedProbe is returned when the probe is not spoofed
+	ErrorNonSpoofedProbe = fmt.Errorf("Received ICMP Probe that was not spoofed")
+	// ErrorSpoofedProbeNoID is returned when the probe has no ID
+	ErrorSpoofedProbeNoID = fmt.Errorf("Received a spoofed probe with no id")
+	// ErrorNoSpooferIP is returned when there is no spoofer ip in the packet
+	ErrorNoSpooferIP = fmt.Errorf("No spoofer IP found in packet")
+	// ErrorFailedToParseOptions is returned when there was an error parsing options
+	ErrorFailedToParseOptions = fmt.Errorf("Failed to parse IPv4 options")
+	// ErrorFailedToConvertOption is returned when there is an issue converting an option
 	ErrorFailedToConvertOption = fmt.Errorf("Failed to convert IPv4 option")
-	ErrorSpooferIP             = fmt.Errorf("Failed to convert spoofer ip")
-	ErrorReadError             = fmt.Errorf("Failed to read from conn")
+	// ErrorSpooferIP is returned when the spoofer ip is invalid
+	ErrorSpooferIP = fmt.Errorf("Failed to convert spoofer ip")
+	// ErrorReadError is returned when there is an error reading from the icmp monitoring conn
+	ErrorReadError = fmt.Errorf("Failed to read from conn")
 )
 
-func makeId(a, b, c, d byte) uint32 {
+func makeID(a, b, c, d byte) uint32 {
 	var id uint32
 	id |= uint32(a) << 24
 	id |= uint32(b) << 16
+	// NewSpoofPingMonitor makes a SpoofPingMonitor
 	id |= uint32(c) << 8
 	id |= uint32(d)
 	return id
@@ -138,7 +148,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 			return nil, ErrorNoSpooferIP
 		}
 		// Get the Id out of the data
-		id := makeId(echo.Data[4], echo.Data[5], echo.Data[6], echo.Data[7])
+		id := makeID(echo.Data[4], echo.Data[5], echo.Data[6], echo.Data[7])
 		probe.ProbeId = id
 		probe.SpooferIp, err = util.IPtoInt32(ip)
 		if err != nil {
@@ -197,6 +207,7 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {
+				log.Info("Got probe", pr)
 				ec <- err
 				switch err {
 				case ErrorReadError:
@@ -220,6 +231,7 @@ func (sm *SpoofPingMonitor) Start(addr string, probes chan<- dm.Probe, ec chan e
 	go sm.poll(addr, probes, ec)
 }
 
-func (s *SpoofPingMonitor) Quit() {
-	close(s.quit)
+// Quit shuts down the monitor
+func (sm *SpoofPingMonitor) Quit() {
+	close(sm.quit)
 }

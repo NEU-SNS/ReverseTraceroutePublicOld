@@ -29,6 +29,7 @@ package router
 
 import (
 	"fmt"
+	"sync"
 
 	"golang.org/x/net/context"
 
@@ -51,6 +52,7 @@ type MeasurementTool interface {
 	Ping(context.Context, *dm.PingArg) (<-chan *dm.Ping, error)
 	Traceroute(context.Context, *dm.TracerouteArg) (<-chan *dm.Traceroute, error)
 	GetVPs(context.Context, *dm.VPRequest) (<-chan *dm.VPReturn, error)
+	ReceiveSpoof(context.Context, *dm.RecSpoof) (<-chan *dm.NotifyRecSpoofResponse, error)
 	Close() error
 }
 
@@ -93,15 +95,24 @@ type Source interface {
 	All() []ServiceDef
 }
 
+type mtCache struct {
+	mu    sync.Mutex
+	cache map[ServiceDef]*mtCacheItem
+}
+
+type mtCacheItem struct {
+	mt       MeasurementTool
+	refCount uint32
+}
+
 // Router is the interface for something that routes srcs to measurement tools
 type Router interface {
 	GetMT(ServiceDef) (MeasurementTool, error)
+	PutMT(ServiceDef)
 	GetService(string) (ServiceDef, error)
 	All() []MeasurementTool
 	SetSource(Source)
 }
-
-type mtCache map[ServiceDef]MeasurementTool
 
 type router struct {
 	source Source
@@ -111,7 +122,9 @@ type router struct {
 // New creates a new Router
 func New() Router {
 	return &router{
-		cache:  make(mtCache),
+		cache: mtCache{
+			cache: make(map[ServiceDef]*mtCacheItem),
+		},
 		source: source{},
 	}
 }
@@ -121,12 +134,36 @@ func (r *router) SetSource(s Source) {
 }
 
 func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
+	r.cache.mu.Lock()
+	defer r.cache.mu.Unlock()
+	if mt, ok := r.cache.cache[s]; ok {
+		mt.refCount++
+		return mt.mt, nil
+	}
 	mt, err := create(s)
 	if err != nil {
 		log.Error(err, s)
 		return nil, err
 	}
+	nc := &mtCacheItem{
+		mt:       mt,
+		refCount: 1,
+	}
+	r.cache.cache[s] = nc
 	return mt, nil
+}
+
+func (r *router) PutMT(s ServiceDef) {
+	r.cache.mu.Lock()
+	defer r.cache.mu.Unlock()
+	if mt, ok := r.cache.cache[s]; ok {
+		mt.refCount--
+		if mt.refCount == 0 {
+			delete(r.cache.cache, s)
+		}
+		return
+	}
+	panic("PutMT without GetMT first")
 }
 
 func (r *router) GetService(addr string) (ServiceDef, error) {

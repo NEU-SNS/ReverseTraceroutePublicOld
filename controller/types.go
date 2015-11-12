@@ -29,15 +29,8 @@
 package controller
 
 import (
-	"errors"
-
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
-)
-
-var (
-	errorServiceNotFound         = errors.New("service not found")
-	errorMeasurementToolNotFound = errors.New("measurement tool not found")
 )
 
 // Config is the config struct for the controller

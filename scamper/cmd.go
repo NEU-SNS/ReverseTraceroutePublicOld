@@ -36,6 +36,7 @@ import (
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
 const (
@@ -67,6 +68,17 @@ func uint32Opt(f string, arg interface{}) (string, error) {
 		return fmt.Sprintf(f, sarg), nil
 	}
 	return "", fmt.Errorf("Invalid arg type in uint32Opt: %v", arg)
+}
+
+func ipOpt(f string, arg interface{}) (string, error) {
+	if sarg, ok := arg.(uint32); ok {
+		ip, err := util.Int32ToIPString(sarg)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf(f, ip), nil
+	}
+	return "", fmt.Errorf("Invalid arg type in ipOpt: %v", arg)
 }
 
 func boolOpt(f string, arg interface{}) (string, error) {
@@ -133,6 +145,10 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 	switch arg.(type) {
 	case *dm.PingMeasurement:
 		if pa, ok := arg.(*dm.PingMeasurement); ok {
+			if pa.Spoof {
+				pa.Sport = "61681"
+				pa.Dport = "62195"
+			}
 			oID := pa.UserId
 			pa.UserId = fmt.Sprintf("%d", id)
 			c, err = createCmd(*pa, PING)
