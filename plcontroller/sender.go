@@ -35,20 +35,22 @@ import (
 	plc "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 const (
-	controllerPort int = 35000
+	controllerPort int = 4382
 )
 
 // ControllerSender Is a Sender which sends to the central controller received spoofs
 type ControllerSender struct{}
 
 // Send satisfies the Sender interface for a ControllerSender
-func (cs ControllerSender) Send(sps []dm.Probe, addr string) error {
-	saddr := fmt.Sprintf("%s:%d", addr, controllerPort)
+func (cs ControllerSender) Send(sps []dm.Probe, addr uint32) error {
+	ip, _ := util.Int32ToIPString(addr)
+	saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
 	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5))
 	if err != nil {
 		return err

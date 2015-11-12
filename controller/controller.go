@@ -37,11 +37,10 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/router"
@@ -92,20 +91,57 @@ func init() {
 	prometheus.MustRegister(errorCounter)
 }
 
+// DataAccess defines the interface needed by a DB
+type DataAccess interface {
+	GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error)
+	GetPingsMulti([]*dm.PingMeasurement) ([]*dm.Ping, error)
+	StorePing(*dm.Ping) error
+	GetTRBySrcDst(uint32, uint32) ([]*dm.Traceroute, error)
+	GetTraceMulti([]*dm.TracerouteMeasurement) ([]*dm.Traceroute, error)
+	StoreTraceroute(*dm.Traceroute) error
+	Close() error
+}
+
+type spoofMap struct {
+	sync.Mutex
+	sm map[uint32]chan *dm.Probe
+}
+
+func (sm *spoofMap) Add(notify chan *dm.Probe, ids ...uint32) {
+	sm.Lock()
+	defer sm.Unlock()
+	for _, id := range ids {
+		sm.sm[id] = notify
+	}
+}
+
+func (sm *spoofMap) Notify(probes ...*dm.Probe) {
+	sm.Lock()
+	defer sm.Unlock()
+	for _, probe := range probes {
+		if c, ok := sm.sm[probe.Id]; ok {
+			c <- probe
+			continue
+		}
+		log.Error("No channel found for probe: ", probe)
+	}
+}
+
 type controllerT struct {
-	config    Config
-	db        *da.DataAccess
-	cache     ca.Cache
-	router    router.Router
-	startTime time.Time
-	server    *grpc.Server
-	mu        sync.Mutex
-	//the mutex protects the following
-	requests int64
-	time     time.Duration
+	config  Config
+	db      DataAccess
+	cache   ca.Cache
+	router  router.Router
+	server  *grpc.Server
+	spoofID uint32
+	sm      *spoofMap
 }
 
 var controller controllerT
+
+func (c *controllerT) nextSpoofID() uint32 {
+	return atomic.AddUint32(&(c.spoofID), 1)
+}
 
 // HandleSig handles and signals received from the OS
 func HandleSig(sig os.Signal) {
@@ -134,15 +170,6 @@ func (c *controllerT) startRPC(eChan chan error) {
 	}
 }
 
-type pingFunc func(con.Context, <-chan []*dm.PingMeasurement) <-chan *dm.Ping
-type pingStep func(pingFunc) pingFunc
-type traceFunc func(con.Context, <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute
-type traceStep func(traceFunc) traceFunc
-
-type routed struct {
-	r router.Router
-}
-
 func errorAllPing(err error, out chan<- *dm.Ping, ps []*dm.PingMeasurement) {
 	for _, p := range ps {
 		out <- &dm.Ping{
@@ -163,147 +190,519 @@ func errorAllTrace(err error, out chan<- *dm.Traceroute, ts []*dm.TracerouteMeas
 	}
 }
 
-func (r routed) pingMeas(ctx con.Context, pm <-chan []*dm.PingMeasurement) <-chan *dm.Ping {
-	ret := make(chan *dm.Ping)
+var (
+	// ErrTimeout is used when the done channel on a context is received from
+	ErrTimeout = fmt.Errorf("Request timeout")
+)
+
+func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.Ping, error) {
+	out := make(chan map[string]*dm.Ping)
+	quit := make(chan struct{})
+	eout := make(chan error)
 	go func() {
-		var wg sync.WaitGroup
-	loop:
-		for {
-			select {
-			case <-ctx.Done():
-				break loop
-			case pms, ok := <-pm:
-				if !ok {
-					// Our inbound channel is closed so break this loop
-					break loop
-				}
-				mts := make(map[router.ServiceDef][]*dm.PingMeasurement)
-				for _, p := range pms {
-					srcs, _ := util.Int32ToIPString(p.Src)
-					serv, err := r.r.GetService(srcs)
-					if err != nil {
-						ret <- &dm.Ping{
-							Src:   p.Src,
-							Dst:   p.Dst,
-							Error: err.Error(),
-						}
-						continue
-					}
-					mts[serv] = append(mts[serv], p)
-				}
-				for serv, meas := range mts {
-					mt, err := r.r.GetMT(serv)
-					if err != nil {
-						log.Error(err)
-						errorAllPing(err, ret, meas)
-						continue
-					}
-					wg.Add(1)
-					go func(t router.MeasurementTool, m []*dm.PingMeasurement) {
-						defer wg.Done()
-						ps, err := t.Ping(ctx, &dm.PingArg{
-							Pings: m})
-						if err != nil {
-							log.Error(err)
-							errorAllPing(err, ret, m)
-							return
-						}
-						for ping := range ps {
-							ret <- ping
-						}
-					}(mt, meas)
-				}
-			}
+		found := make(map[string]*dm.Ping)
+		res, err := c.GetMulti(keys)
+		if err != nil {
+			log.Error(err)
+			eout <- err
+			return
 		}
-		// This waits when the inbound channel is closed
-		// The wg is increased every time a separate ping request is issued
-		wg.Wait()
-		close(ret)
+		for key, item := range res {
+			ping := &dm.Ping{}
+			err := ping.CUnmarshal(item.Value())
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			found[key] = ping
+		}
+		select {
+		case <-quit:
+			return
+		case out <- found:
+		}
 	}()
-	return ret
+	select {
+	case <-ctx.Done():
+		close(quit)
+		return nil, ErrTimeout
+	case ret := <-out:
+		return ret, nil
+	case err := <-eout:
+		return nil, err
+	}
+}
+
+func checkPingDb(ctx con.Context, check []*dm.PingMeasurement, db DataAccess) (map[string]*dm.Ping, error) {
+	out := make(chan map[string]*dm.Ping)
+	quit := make(chan struct{})
+	eout := make(chan error)
+	go func() {
+		foundMap := make(map[string]*dm.Ping)
+		found, err := db.GetPingsMulti(check)
+		if err != nil {
+			log.Error(err)
+			eout <- err
+		}
+		for _, p := range found {
+			foundMap[p.Key()] = p
+		}
+		select {
+		case <-quit:
+			return
+		case out <- foundMap:
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		close(quit)
+		return nil, ErrTimeout
+	case ret := <-out:
+		return ret, nil
+	case err := <-eout:
+		return nil, err
+	}
 }
 
 func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *dm.Ping {
-	do := pingCache{c: c.cache}.pingCacheStep(
-		pingDB{db: c.db}.pingDBStep(routed{r: c.router}.pingMeas))
-	next := make(chan []*dm.PingMeasurement)
-	res := do(ctx, next)
-	go func() {
-		next <- pm
-		close(next)
-	}()
-	return res
-}
+	ret := make(chan *dm.Ping)
 
-func (r routed) traceMeas(ctx con.Context, tm <-chan []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
-	ret := make(chan *dm.Traceroute)
 	go func() {
+		var checkCache = make(map[string]*dm.PingMeasurement)
+		var remaining []*dm.PingMeasurement
+		var cacheKeys []string
+		for _, pm := range pm {
+			if pm.CheckCache {
+				key := pm.Key()
+				checkCache[key] = pm
+				cacheKeys = append(cacheKeys, key)
+				continue
+			}
+			remaining = append(remaining, pm)
+		}
+		found, err := checkPingCache(ctx, cacheKeys, c.cache)
+		if err != nil {
+			log.Error(err)
+		}
+		// Figure out what we got vs what we asked for
+		for key, val := range checkCache {
+			// For each one that we looked for,
+			// If it was found, send it back,
+			// Otherwise, add it to the remaining list
+			if p, ok := found[key]; ok {
+				ret <- p
+			} else {
+				remaining = append(remaining, val)
+			}
+		}
+		var checkDb = make(map[string]*dm.PingMeasurement)
+		var checkDbArg []*dm.PingMeasurement
+		working := remaining
+		remaining = nil
+		for _, pm := range working {
+			if pm.CheckDb {
+				checkDb[pm.Key()] = pm
+				checkDbArg = append(checkDbArg, pm)
+				continue
+			}
+			remaining = append(remaining, pm)
+		}
+		dbs, err := checkPingDb(ctx, checkDbArg, c.db)
+		if err != nil {
+			log.Error(err)
+		}
+		// Again figure out what we got out of what we asked for
+		for key, val := range checkDb {
+			if p, ok := dbs[key]; ok {
+				//This should be stored in the cache
+				go func() {
+					var err = c.cache.Set(key, p.CMarshal())
+					if err != nil {
+						log.Info(err)
+					}
+				}()
+				ret <- p
+			} else {
+				remaining = append(remaining, val)
+			}
+		}
+		//Remaining are the measurements that need to be run
+		var spoofs []*dm.PingMeasurement
+		old := remaining
+		remaining = nil
+		for _, pm := range old {
+			if pm.Spoof {
+				spoofs = append(spoofs, pm)
+			} else {
+				remaining = append(remaining, pm)
+			}
+		}
+		mts := make(map[router.ServiceDef][]*dm.PingMeasurement)
+		for _, pm := range remaining {
+			ip, _ := util.Int32ToIPString(pm.Src)
+			sd, err := c.router.GetService(ip)
+			if err != nil {
+				log.Error(err)
+				ret <- &dm.Ping{
+					Src:   pm.Src,
+					Dst:   pm.Dst,
+					Error: err.Error(),
+				}
+				continue
+			}
+			mts[sd] = append(mts[sd], pm)
+		}
 		var wg sync.WaitGroup
-	loop:
-		for {
-			select {
-			case <-ctx.Done():
-				break loop
-			case tms, ok := <-tm:
-				if !ok {
-					break loop
+		for sd, pms := range mts {
+			wg.Add(1)
+			go func(s router.ServiceDef, meas []*dm.PingMeasurement) {
+				defer wg.Done()
+				mt, err := c.router.GetMT(s)
+				if err != nil {
+					log.Error(err)
+					errorAllPing(err, ret, meas)
+					return
 				}
-				sds := make(map[router.ServiceDef][]*dm.TracerouteMeasurement)
-				for _, t := range tms {
-					srcs, _ := util.Int32ToIPString(t.Src)
-					serv, err := r.r.GetService(srcs)
-					if err != nil {
-						ret <- &dm.Traceroute{
-							Src:   t.Src,
-							Dst:   t.Dst,
-							Error: err.Error(),
-						}
-						continue
-					}
-					sds[serv] = append(sds[serv], t)
+				defer c.router.PutMT(s)
+				pc, err := mt.Ping(ctx, &dm.PingArg{
+					Pings: meas,
+				})
+				if err != nil {
+					log.Error(err)
+					errorAllPing(err, ret, meas)
+					return
 				}
-				for serv, meas := range sds {
-					mt, err := r.r.GetMT(serv)
-					if err != nil {
-						log.Error(err)
-						errorAllTrace(err, ret, meas)
-						continue
-					}
-					wg.Add(1)
-					go func(t router.MeasurementTool, tt []*dm.TracerouteMeasurement) {
-						defer wg.Done()
-						ts, err := t.Traceroute(ctx, &dm.TracerouteArg{
-							Traceroutes: tt,
-						})
-						if err != nil {
-							log.Error(err)
-							errorAllTrace(err, ret, tt)
+				for {
+					select {
+					case pp, ok := <-pc:
+						if !ok {
 							return
 						}
-						for trace := range ts {
-							ret <- trace
-						}
-					}(mt, meas)
+						ret <- pp
+					}
+				}
+			}(sd, pms)
+		}
+		sdForSpoof := make(map[router.ServiceDef][]*dm.Spoof)
+		sdForSpoofP := make(map[router.ServiceDef][]*dm.PingMeasurement)
+		var spoofIds []uint32
+		for _, sp := range spoofs {
+			ip, _ := util.Int32ToIPString(sp.Src)
+			sd, err := c.router.GetService(ip)
+			if err != nil {
+				log.Error(err)
+				ret <- &dm.Ping{
+					Src:   sp.Src,
+					Dst:   sp.Dst,
+					Error: err.Error(),
+				}
+				continue
+			}
+			ips, _ := util.Int32ToIPString(sp.SpooferAddr)
+			sds, err := c.router.GetService(ips)
+			if err != nil {
+				log.Error(err)
+				ret <- &dm.Ping{
+					Src:   sp.Src,
+					Dst:   sp.Dst,
+					Error: err.Error(),
+				}
+				continue
+			}
+			sdForSpoofP[sd] = append(sdForSpoofP[sd], sp)
+			id := c.nextSpoofID()
+			sp.Payload = fmt.Sprintf("%08x", id)
+			spoofIds = append(spoofIds, id)
+			sdForSpoof[sds] = append(sdForSpoof[sds], &dm.Spoof{
+				Ip: sp.Src,
+				Id: id,
+			})
+
+		}
+		rChan := make(chan *dm.Probe, 20)
+		if len(spoofIds) != 0 {
+			c.sm.Add(rChan, spoofIds...)
+		} else {
+			// This is ugly but prevent waiting for no reason
+			close(rChan)
+		}
+		for sd, spoofs := range sdForSpoof {
+			wg.Add(1)
+			go func(s router.ServiceDef, sps []*dm.Spoof) {
+				defer wg.Done()
+				mt, err := c.router.GetMT(s)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer c.router.PutMT(s)
+				log.Info("Telling to spoof: ", sps)
+				mt.ReceiveSpoof(ctx, &dm.RecSpoof{
+					Spoofs: sps,
+				})
+			}(sd, spoofs)
+		}
+		for sd, spoofs := range sdForSpoofP {
+			wg.Add(1)
+			go func(s router.ServiceDef, sps []*dm.PingMeasurement) {
+				defer wg.Done()
+				mt, err := c.router.GetMT(s)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer c.router.PutMT(s)
+				mt.Ping(ctx, &dm.PingArg{
+					Pings: sps,
+				})
+			}(sd, spoofs)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case probe, ok := <-rChan:
+					if !ok {
+						return
+					}
+					ret <- toPing(probe)
 				}
 			}
+		}()
+		wg.Wait()
+		close(ret)
+	}()
+
+	return ret
+}
+
+func toPing(probe *dm.Probe) *dm.Ping {
+	var ping dm.Ping
+	ping.Src = probe.Src
+	ping.Dst = probe.Dst
+	ping.SpoofedFrom = probe.SpooferIp
+	var pr dm.PingResponse
+	rrs := probe.GetRR()
+	if rrs != nil {
+		pr.RR = rrs.Hops
+		ping.Responses = []*dm.PingResponse{
+			&pr}
+		return &ping
+	}
+	ts := probe.GetTs()
+	if ts != nil {
+		switch ts.Type {
+		case dm.TSType_TSOnly:
+			stamps := ts.GetStamps()
+			var ts []uint32
+			for _, stamp := range stamps {
+				ts = append(ts, stamp.Time)
+			}
+			pr.Tsonly = ts
+		default:
+			stamps := ts.GetStamps()
+			var ts []*dm.TsAndAddr
+			if stamps != nil {
+				for _, stamp := range stamps {
+					ts = append(ts, &dm.TsAndAddr{
+						Ip: stamp.Ip,
+						Ts: stamp.Time,
+					})
+				}
+				pr.Tsandaddr = ts
+			}
+		}
+		ping.Responses = []*dm.PingResponse{
+			&pr}
+		return &ping
+	}
+	return nil
+}
+
+func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*dm.Traceroute, error) {
+	out := make(chan map[string]*dm.Traceroute)
+	quit := make(chan struct{})
+	eout := make(chan error)
+	go func() {
+		found := make(map[string]*dm.Traceroute)
+		res, err := ca.GetMulti(keys)
+		if err != nil {
+			log.Error(err)
+			eout <- err
+			return
+		}
+		for key, item := range res {
+			trace := &dm.Traceroute{}
+			err := trace.CUnmarshal(item.Value())
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			found[key] = trace
+		}
+		select {
+		case <-quit:
+			return
+		case out <- found:
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		close(quit)
+		return nil, ErrTimeout
+	case ret := <-out:
+		return ret, nil
+	case err := <-eout:
+		return nil, err
+	}
+}
+
+func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAccess) (map[string]*dm.Traceroute, error) {
+	out := make(chan map[string]*dm.Traceroute)
+	quit := make(chan struct{})
+	eout := make(chan error)
+	go func() {
+		foundMap := make(map[string]*dm.Traceroute)
+		found, err := db.GetTraceMulti(check)
+		if err != nil {
+			log.Error(err)
+			eout <- err
+		}
+		for _, p := range found {
+			foundMap[p.Key()] = p
+		}
+		select {
+		case <-quit:
+			return
+		case out <- foundMap:
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		close(quit)
+		return nil, ErrTimeout
+	case ret := <-out:
+		return ret, nil
+	case err := <-eout:
+		return nil, err
+	}
+}
+func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
+	ret := make(chan *dm.Traceroute)
+
+	go func() {
+		var checkCache = make(map[string]*dm.TracerouteMeasurement)
+		var remaining []*dm.TracerouteMeasurement
+		var cacheKeys []string
+		for _, tm := range tms {
+			if tm.CheckCache {
+				key := tm.Key()
+				checkCache[key] = tm
+				cacheKeys = append(cacheKeys, key)
+				continue
+			}
+			remaining = append(remaining, tm)
+		}
+		found, err := checkTraceCache(ctx, cacheKeys, c.cache)
+		if err != nil {
+			log.Error(err)
+		}
+		// Figure out what we got vs what we asked for
+		for key, val := range checkCache {
+			// For each one that we looked for,
+			// If it was found, send it back,
+			// Otherwise, add it to the remaining list
+			if p, ok := found[key]; ok {
+				ret <- p
+			} else {
+				remaining = append(remaining, val)
+			}
+		}
+		var checkDb = make(map[string]*dm.TracerouteMeasurement)
+		var checkDbArg []*dm.TracerouteMeasurement
+		working := remaining
+		remaining = nil
+		for _, pm := range working {
+			if pm.CheckDb {
+				checkDb[pm.Key()] = pm
+				checkDbArg = append(checkDbArg, pm)
+				continue
+			}
+			remaining = append(remaining, pm)
+		}
+		dbs, err := checkTraceDb(ctx, checkDbArg, c.db)
+		if err != nil {
+			log.Error(err)
+		}
+		// Again figure out what we got out of what we asked for
+		for key, val := range checkDb {
+			if p, ok := dbs[key]; ok {
+				//This should be stored in the cache
+				go func() {
+					var err = c.cache.Set(key, p.CMarshal())
+					if err != nil {
+						log.Info(err)
+					}
+				}()
+				ret <- p
+			} else {
+				remaining = append(remaining, val)
+			}
+		}
+		mts := make(map[router.ServiceDef][]*dm.TracerouteMeasurement)
+		for _, tm := range remaining {
+			ip, _ := util.Int32ToIPString(tm.Src)
+			sd, err := c.router.GetService(ip)
+			if err != nil {
+				log.Error(err)
+				ret <- &dm.Traceroute{
+					Src:   tm.Src,
+					Dst:   tm.Dst,
+					Error: err.Error(),
+				}
+				continue
+			}
+			mts[sd] = append(mts[sd], tm)
+		}
+		var wg sync.WaitGroup
+		for sd, tms := range mts {
+			wg.Add(1)
+			go func(s router.ServiceDef, meas []*dm.TracerouteMeasurement) {
+				defer wg.Done()
+				mt, err := c.router.GetMT(s)
+				if err != nil {
+					log.Error(err)
+					errorAllTrace(err, ret, meas)
+					return
+				}
+				defer c.router.PutMT(s)
+				pc, err := mt.Traceroute(ctx, &dm.TracerouteArg{
+					Traceroutes: meas,
+				})
+				if err != nil {
+					log.Error(err)
+					errorAllTrace(err, ret, meas)
+					return
+				}
+				for {
+					select {
+					case pp, ok := <-pc:
+						if !ok {
+							return
+						}
+						ret <- pp
+					}
+				}
+			}(sd, tms)
 		}
 		wg.Wait()
 		close(ret)
 	}()
-	return ret
-}
 
-func (c *controllerT) doTraceroute(ctx con.Context, tm []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
-	log.Infof("%s: Traceroute starting")
-	do := traceCache{c: c.cache}.traceCacheStep(
-		traceDB{db: c.db}.traceDBStep(routed{r: c.router}.traceMeas))
-	next := make(chan []*dm.TracerouteMeasurement)
-	res := do(ctx, next)
-	go func() {
-		next <- tm
-		close(next)
-	}()
-	return res
+	return ret
 }
 
 func (c *controllerT) fetchVPs(ctx con.Context, gvp *dm.VPRequest) (*dm.VPReturn, error) {
@@ -363,7 +762,7 @@ func (c *controllerT) stop() {
 	}
 }
 
-func (c *controllerT) run(ec chan error, con Config, db *da.DataAccess, cache ca.Cache, r router.Router) {
+func (c *controllerT) run(ec chan error, con Config, db DataAccess, cache ca.Cache, r router.Router) {
 	controller.config = con
 	controller.db = db
 	controller.cache = cache
@@ -388,11 +787,14 @@ func (c *controllerT) run(ec chan error, con Config, db *da.DataAccess, cache ca
 	}
 	controller.server = grpc.NewServer()
 	controllerapi.RegisterControllerServer(controller.server, c)
+	controller.sm = &spoofMap{
+		sm: make(map[uint32]chan *dm.Probe),
+	}
 	go controller.startRPC(ec)
 }
 
 // Start starts a central controller with the given configuration
-func Start(c Config, db *da.DataAccess, cache ca.Cache, r router.Router) chan error {
+func Start(c Config, db DataAccess, cache ca.Cache, r router.Router) chan error {
 	log.Info("Starting controller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)

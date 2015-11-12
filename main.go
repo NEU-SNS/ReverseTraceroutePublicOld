@@ -54,26 +54,27 @@ func main() {
 	}
 	defer conn.Close()
 	c := controllerapi.NewControllerClient(conn)
-	vpr, err := c.GetVPs(context.Background(), &dm.VPRequest{})
+	ct := context.Background()
+	ctx, cancel := context.WithTimeout(ct, time.Second*70)
+	defer cancel()
+	vpr, err := c.GetVPs(ctx, &dm.VPRequest{})
 	if err != nil {
 		panic(err)
 	}
 	vps := vpr.GetVps()
 	var pa dm.PingArg
 	var pings []*dm.PingMeasurement
-	var dst uint32
-	for i, vp := range vps {
-		if i == 0 {
-			dst = vp.Ip
-			continue
-		}
+	var dst uint32 = 2164945295
+	for _, vp := range vps {
 		pings = append(pings, &dm.PingMeasurement{
 			Src:     vp.Ip,
 			Dst:     dst,
 			Timeout: 60,
 			Count:   "1",
-			//			CheckCache: true,
-			//			CheckDb:    true,
+			Spoof:   true,
+			SAddr:   "204.8.155.227",
+			//CheckCache: true,
+			//CheckDb: true,
 		})
 
 	}

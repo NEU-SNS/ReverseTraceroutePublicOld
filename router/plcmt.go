@@ -44,6 +44,30 @@ type plmt struct {
 	cl plcontrollerapi.PLControllerClient
 }
 
+func (p plmt) ReceiveSpoof(ctx con.Context, rs *dm.RecSpoof) (<-chan *dm.NotifyRecSpoofResponse, error) {
+	ret := make(chan *dm.NotifyRecSpoofResponse)
+	recsp, err := p.cl.ReceiveSpoof(ctx, rs)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	go func() {
+		for {
+			in, err := recsp.Recv()
+			if err == io.EOF {
+				close(ret)
+				return
+			}
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			ret <- in
+		}
+	}()
+	return ret, nil
+}
+
 func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 	ret := make(chan *dm.Ping)
 	ps, err := p.cl.Ping(ctx)

@@ -29,6 +29,7 @@ package datamodel
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -57,16 +58,8 @@ func (t TTime) String() string {
 	return tt.String()
 }
 
-func (t *Traceroute) Marshal() []byte {
-	ret, err := proto.Marshal(t)
-	if err != nil {
-		return nil
-	}
-	return ret
-}
-
 func (t *Traceroute) Key() string {
-	return ""
+	return fmt.Sprintf("%s_%d_%d", "XXTR", t.Src, t.Dst)
 }
 func (t *Traceroute) CUnmarshal(data []byte) error {
 	return proto.Unmarshal(data, t)
@@ -89,5 +82,5 @@ func (tm *TracerouteMeasurement) CMarshal() []byte {
 }
 
 func (tm *TracerouteMeasurement) Key() string {
-	return ""
+	return fmt.Sprintf("%s_%d_%d", "XXTR", tm.Src, tm.Dst)
 }

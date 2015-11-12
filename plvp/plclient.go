@@ -53,7 +53,7 @@ func (c *plClient) disconnect() error {
 
 func (c *plClient) connect(addr string, timeout time.Duration) error {
 	log.Infof("Trying to connect to: %s", addr)
-	cc, err := grpc.Dial(addr, grpc.WithTimeout(timeout))
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(timeout), grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("PlClient Failed to connect: %v", err)
 		return err

@@ -169,7 +169,7 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 		return
 	}
 	vp.monec = make(chan error, 1)
-	vp.monip = make(chan dm.Probe, 1)
+	vp.monip = make(chan dm.Probe, 100)
 	go vp.spoofmon.Start(monaddr, plVantagepoint.monip, plVantagepoint.monec)
 	go vp.monitorSpoofedPings(plVantagepoint.monip, plVantagepoint.monec)
 	if *c.Local.StartScamp {
@@ -196,23 +196,26 @@ func Start(c Config) chan error {
 
 func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
+		log.Info("Sending no spoofs")
 		return
 	}
 	log.Infof("Sending: %d spoofed probes", len(probes))
 	vp.am.Lock()
 	ip := vp.addr
 	vp.am.Unlock()
-	addr := fmt.Sprintf("%s:%d", ip, vp.config.Local.Port)
-	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second))
+	addr := fmt.Sprintf("%s:%d", ip, *vp.config.Local.Port)
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second), grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("Failed to send spoofs: %v", err)
 		return
 	}
+	defer cc.Close()
 	client := plc.NewPLControllerClient(cc)
 	_, err = client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
 	if err != nil {
 		log.Errorf("Error sending probes: %v", err)
 	}
+	log.Info("Done sending spoofs")
 }
 
 func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {

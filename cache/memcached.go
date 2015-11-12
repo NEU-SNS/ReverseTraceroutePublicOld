@@ -146,7 +146,10 @@ func (c *cache) Set(key string, val []byte) error {
 	if c.c == nil {
 		return ErrorNoClient
 	}
-	return toError(c.c.Set(&memcache.Item{Key: makeKey(c.prefix, key), Value: val}))
+	// Default to 15 minute expire. This is set
+	// based on the old system, may need to be
+	// updated in the future
+	return c.SetWithExpire(key, val, 15*60)
 }
 
 func (c *cache) SetWithExpire(key string, val []byte, exp int32) error {

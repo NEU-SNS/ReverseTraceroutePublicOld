@@ -15,7 +15,7 @@ message RecSpoof {
 }
 
 message Spoof {
-    string ip = 1;
+    uint32 ip = 1;
     uint32 id = 2;
 }
 
@@ -35,7 +35,7 @@ message Probe {
     uint32 seq_num    =  7; 
     RecordRoute r_r   =  8;
     TimeStamp ts      =  9; 
-    string sender_ip  = 10;
+    uint32 sender_ip  = 10;
 }
 
 message RecordRoute {

@@ -46,7 +46,7 @@ var (
 // Sender is the interface for something that can sent a slice of SpoofedProbes
 // to an address
 type Sender interface {
-	Send([]dm.Probe, string) error
+	Send([]dm.Probe, uint32) error
 }
 
 type spoof struct {
@@ -124,18 +124,18 @@ func (s *spoofMap) Receive(sp dm.Probe) error {
 }
 
 func (s *spoofMap) sendSpoofs() {
-	probes := make(map[string][]dm.Probe)
+	probes := make(map[uint32][]dm.Probe)
 	for {
 		select {
 		case <-s.quit:
 			return
 		case <-time.After(time.Second):
 			for ip := range probes {
-				go func(ps []dm.Probe, addr string) {
+				go func(ps []dm.Probe, addr uint32) {
 					s.transport.Send(ps, addr)
 				}(probes[ip], ip)
 			}
-			probes = make(map[string][]dm.Probe)
+			probes = make(map[uint32][]dm.Probe)
 		case sp := <-s.rec:
 			probes[sp.SenderIp] = append(probes[sp.SenderIp], sp)
 		}

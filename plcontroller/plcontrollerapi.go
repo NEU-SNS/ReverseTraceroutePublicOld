@@ -170,15 +170,21 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 
 func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
 	ps := probes.GetProbes()
+	log.Info("Accepting Probes: ", ps)
 	if ps == nil {
 		return nil, ErrorNilArgList
 	}
 	if len(ps) == 0 {
 		return nil, ErrorEmptyArgList
 	}
-	for _, p := range ps {
-		c.acceptProbe(p)
-	}
+	/*
+		for _, p := range ps {
+			err := c.acceptProbe(p)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	*/
 	return &dm.SpoofedProbesResponse{}, nil
 }
 

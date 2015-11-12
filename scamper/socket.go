@@ -243,17 +243,8 @@ func (s *Socket) readConn() {
 			s.wartsHeader[0].WriteTo(dec)
 			s.wartsHeader[1].WriteTo(dec)
 			resp.WriteTo(dec)
-			/* Return warts data
-			cwarts, err := convertWarts(s.converterPath, dec.Bytes())
-			if err != nil {
-				resp.Err = err
-				s.respChan <- resp
-				log.Error("Failed to convert warts")
-				return
-			}
-			*/
 			go func() {
-				filter := make([]warts.WartsT, 0)
+				var filter []warts.WartsT
 				filter = append(filter, warts.PingT, warts.TracerouteT)
 				res, err := warts.Parse(dec.Bytes(), filter)
 				if err != nil {
@@ -319,6 +310,7 @@ func (s *Socket) getID() uint32 {
 	return id
 }
 
+// RemoveMeasurement remove a measurment being run with id id
 func (s *Socket) RemoveMeasurement(id uint32) error {
 	s.cmds.rmCmd(id)
 	return nil
