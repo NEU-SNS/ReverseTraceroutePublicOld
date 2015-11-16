@@ -29,10 +29,12 @@
 package controller
 
 import (
+	"io"
 	"time"
 
 	cont "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	con "golang.org/x/net/context"
 )
 
@@ -45,6 +47,9 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 	defer cancel()
 	res := c.doPing(ctx, pms)
 	for p := range res {
+		if p == nil {
+			log.Info("Go nil ping")
+		}
 		if err := stream.Send(p); err != nil {
 			return err
 		}
@@ -71,6 +76,16 @@ func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPRetu
 	return
 }
 
-func (c *controllerT) ReceiveSpoofedProbes(cont.Controller_ReceiveSpoofedProbesServer) error {
-	return nil
+func (c *controllerT) ReceiveSpoofedProbes(probes cont.Controller_ReceiveSpoofedProbesServer) error {
+	log.Debug("ReceiveSpoofedProbes")
+	for {
+		pr, err := probes.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		c.doRecSpoof(probes.Context(), pr)
+	}
 }

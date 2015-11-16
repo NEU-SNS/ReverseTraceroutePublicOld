@@ -43,6 +43,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/spoofmap"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
 	"github.com/prometheus/client_golang/prometheus"
@@ -102,7 +103,7 @@ type plControllerT struct {
 	db       *da.DataAccess
 	w        *fsnotify.Watcher
 	client   Client
-	spoofs   *spoofMap
+	spoofs   *spoofmap.SpoofMap
 	ip       uint32
 	shutdown chan struct{}
 }
@@ -169,7 +170,7 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 }
 
 func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
-	return c.spoofs.Receive(*probe)
+	return c.spoofs.Receive(probe)
 }
 
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
@@ -217,7 +218,7 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 }
 
 // When this returns the server is essentially dead, so call stop before any return
-func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.DataAccess, cl Client, s Sender) {
+func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Sender) {
 	if db == nil {
 		c.stop()
 		ec <- fmt.Errorf("Nil db in plController")
@@ -254,7 +255,7 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.Data
 	c.db = db
 	c.ip = ip
 	c.shutdown = make(chan struct{})
-	c.spoofs = newSpoofMap(s)
+	c.spoofs = spoofmap.New(s)
 	c.config = con
 	c.mp = mproc.New()
 	c.sc = sc
@@ -305,7 +306,7 @@ func startHTTP(addr string) {
 }
 
 // Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s Sender) chan error {
+func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Sender) chan error {
 	log.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)

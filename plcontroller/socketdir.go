@@ -50,7 +50,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 			return
 		case e := <-c.w.Events:
 			if e.Op&fsnotify.Create == fsnotify.Create {
-				log.Infof("Received fs event: %v", e)
+				log.Debugf("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
 					e.Name,
 					*c.config.Scamper.ConverterPath,
@@ -76,7 +76,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				log.Infof("Received fs event: %v", e)
+				log.Debugf("Received fs event: %v", e)
 				ip := strings.Split(path.Base(e.Name), ":")[0]
 				nip, err := util.IPStringToInt32(ip)
 				if err != nil {
@@ -99,7 +99,7 @@ func (c *plControllerT) handlEvents(ec chan error) {
 
 //This is only for use when a server is going down
 func (c *plControllerT) removeAllVps() {
-	log.Info("Removing all vps")
+	log.Debug("Removing all vps")
 	for sock := range c.client.GetAllSockets() {
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
@@ -142,16 +142,16 @@ func cleanDir(dir string) error {
 }
 
 func (c *plControllerT) watchDir(dir string, ec chan error) {
-	log.Infof("Starting to watch dir: %s", dir)
+	log.Debugf("Starting to watch dir: %s", dir)
 	err := cleanDir(dir)
 	if err != nil {
-		log.Infof("Failed to clean watch directory: %v", err)
+		log.Errorf("Failed to clean watch directory: %v", err)
 		ec <- err
 		return
 	}
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Infof("Failed to create watcher: %v", err)
+		log.Errorf("Failed to create watcher: %v", err)
 		ec <- err
 		return
 	}
@@ -159,7 +159,7 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 	go c.handlEvents(ec)
 	err = w.Add(dir)
 	if err != nil {
-		log.Infof("Failed to add dir: %s, %v", dir, err)
+		log.Errorf("Failed to add dir: %s, %v", dir, err)
 		ec <- err
 		return
 	}

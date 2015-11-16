@@ -102,31 +102,6 @@ type DataAccess interface {
 	Close() error
 }
 
-type spoofMap struct {
-	sync.Mutex
-	sm map[uint32]chan *dm.Probe
-}
-
-func (sm *spoofMap) Add(notify chan *dm.Probe, ids ...uint32) {
-	sm.Lock()
-	defer sm.Unlock()
-	for _, id := range ids {
-		sm.sm[id] = notify
-	}
-}
-
-func (sm *spoofMap) Notify(probes ...*dm.Probe) {
-	sm.Lock()
-	defer sm.Unlock()
-	for _, probe := range probes {
-		if c, ok := sm.sm[probe.Id]; ok {
-			c <- probe
-			continue
-		}
-		log.Error("No channel found for probe: ", probe)
-	}
-}
-
 type controllerT struct {
 	config  Config
 	db      DataAccess
@@ -419,8 +394,9 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			})
 
 		}
-		rChan := make(chan *dm.Probe, 20)
+		rChan := make(chan *dm.Probe, len(spoofIds))
 		if len(spoofIds) != 0 {
+			log.Debug("Adding spoofs: ", spoofIds)
 			c.sm.Add(rChan, spoofIds...)
 		} else {
 			// This is ugly but prevent waiting for no reason
@@ -436,7 +412,6 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				}
 				defer c.router.PutMT(s)
-				log.Info("Telling to spoof: ", sps)
 				mt.ReceiveSpoof(ctx, &dm.RecSpoof{
 					Spoofs: sps,
 				})
@@ -466,6 +441,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				case probe, ok := <-rChan:
 					if !ok {
+						log.Debug("rChan closed")
 						return
 					}
 					ret <- toPing(probe)
@@ -490,7 +466,6 @@ func toPing(probe *dm.Probe) *dm.Ping {
 		pr.RR = rrs.Hops
 		ping.Responses = []*dm.PingResponse{
 			&pr}
-		return &ping
 	}
 	ts := probe.GetTs()
 	if ts != nil {
@@ -517,9 +492,12 @@ func toPing(probe *dm.Probe) *dm.Ping {
 		}
 		ping.Responses = []*dm.PingResponse{
 			&pr}
-		return &ping
 	}
-	return nil
+	return &ping
+}
+
+func (c *controllerT) doRecSpoof(ctx con.Context, pr *dm.Probe) {
+	c.sm.Notify(pr)
 }
 
 func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*dm.Traceroute, error) {
@@ -590,6 +568,7 @@ func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAcc
 		return nil, err
 	}
 }
+
 func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
 	ret := make(chan *dm.Traceroute)
 
