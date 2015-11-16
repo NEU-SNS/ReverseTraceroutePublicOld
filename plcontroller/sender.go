@@ -56,6 +56,7 @@ func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	if err != nil {
 		return err
 	}
+	defer cc.Close()
 	cl := plc.NewControllerClient(cc)
 	stream, err := cl.ReceiveSpoofedProbes(con.Background())
 	if err != nil {
