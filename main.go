@@ -83,6 +83,7 @@ func main() {
 	start := time.Now()
 	fmt.Println("Starting:", start)
 	st, err := c.Ping(context.Background(), &pa)
+	var ps []*dm.Ping
 	if err != nil {
 		panic(err)
 	}
@@ -95,8 +96,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(pr)
+		ps = append(ps, pr)
 	}
 	end := time.Now()
-	fmt.Println("Done:", end, "Took:", time.Since(start))
+	fmt.Println("Done:", end, "Took:", time.Since(start), "Got: ", len(ps), "spoofs")
 }

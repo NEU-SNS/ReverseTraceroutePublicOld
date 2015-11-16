@@ -196,10 +196,8 @@ func Start(c Config) chan error {
 
 func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
-		log.Info("Sending no spoofs")
 		return
 	}
-	log.Infof("Sending: %d spoofed probes", len(probes))
 	vp.am.Lock()
 	ip := vp.addr
 	vp.am.Unlock()

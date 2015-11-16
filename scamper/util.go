@@ -51,9 +51,10 @@ const (
 	// REMOTE Flag
 	REMOTE = "-R"
 	// SUDO the cmd must be run with sudo
-	SUDO      = "/usr/bin/sudo"
+	SUDO = "/usr/bin/sudo"
+	// ADDRINDEX is the index of the addr arg
 	ADDRINDEX = 2
-	//PPS
+	// PPS is the packet per second rate of the scamper process
 	PPS = "-p"
 )
 
