@@ -98,6 +98,7 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 		return nil, err
 	}
 	gotvps := ret.GetVps()
+	log.Debug(gotvps)
 	newVps := make(vpMap)
 	for _, vp := range gotvps {
 		newVps[vp.Ip] = vp
