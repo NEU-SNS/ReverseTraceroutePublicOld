@@ -31,73 +31,84 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
-	"time"
 
 	"golang.org/x/net/context"
 
-	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
-	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/prometheus/log"
-
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	flag.Parse()
+	/*
+		opts := make([]grpc.DialOption, 1)
+		opts[0] = grpc.WithInsecure()
+		conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4382", opts...)
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		c := controllerapi.NewControllerClient(conn)
+		ct := context.Background()
+		ctx, cancel := context.WithTimeout(ct, time.Second*70)
+		defer cancel()
+		vpr, err := c.GetVPs(ctx, &dm.VPRequest{})
+		if err != nil {
+			panic(err)
+		}
+		vps := vpr.GetVps()
+		var pa dm.PingArg
+		var pings []*dm.PingMeasurement
+		var dst uint32 = 2164945295
+		for _, vp := range vps {
+			pings = append(pings, &dm.PingMeasurement{
+				Src:     vp.Ip,
+				Dst:     dst,
+				Timeout: 60,
+				Count:   "1",
+				Spoof:   true,
+				SAddr:   "204.8.155.227",
+				RR:      true,
+				//CheckCache: true,
+				//CheckDb: true,
+			})
 
+		}
+		pa.Pings = pings
+		fmt.Println("Number of requests:", len(pings))
+		start := time.Now()
+		fmt.Println("Starting:", start)
+		st, err := c.Ping(context.Background(), &pa)
+		var ps []*dm.Ping
+		if err != nil {
+			panic(err)
+		}
+		for {
+			pr, err := st.Recv()
+			if err == io.EOF {
+				log.Info("EOF")
+				break
+			}
+			if err != nil {
+				panic(err)
+			}
+			ps = append(ps, pr)
+		}
+		end := time.Now()
+		fmt.Println("Done:", end, "Took:", time.Since(start), "Got: ", len(ps), "spoofs")
+		fmt.Print(ps)
+	*/
 	opts := make([]grpc.DialOption, 1)
 	opts[0] = grpc.WithInsecure()
-	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4382", opts...)
+	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:45000", opts...)
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
-	c := controllerapi.NewControllerClient(conn)
-	ct := context.Background()
-	ctx, cancel := context.WithTimeout(ct, time.Second*70)
-	defer cancel()
-	vpr, err := c.GetVPs(ctx, &dm.VPRequest{})
+	cl := client.New(context.Background(), conn)
+	vpr, err := cl.GetVPs()
 	if err != nil {
 		panic(err)
 	}
-	vps := vpr.GetVps()
-	var pa dm.PingArg
-	var pings []*dm.PingMeasurement
-	var dst uint32 = 2164945295
-	for _, vp := range vps {
-		pings = append(pings, &dm.PingMeasurement{
-			Src:     vp.Ip,
-			Dst:     dst,
-			Timeout: 60,
-			Count:   "1",
-			Spoof:   true,
-			SAddr:   "204.8.155.227",
-			//CheckCache: true,
-			//CheckDb: true,
-		})
-
-	}
-	pa.Pings = pings
-	fmt.Println("Number of requests:", len(pings))
-	start := time.Now()
-	fmt.Println("Starting:", start)
-	st, err := c.Ping(context.Background(), &pa)
-	var ps []*dm.Ping
-	if err != nil {
-		panic(err)
-	}
-	for {
-		pr, err := st.Recv()
-		if err == io.EOF {
-			log.Info("EOF")
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		ps = append(ps, pr)
-	}
-	end := time.Now()
-	fmt.Println("Done:", end, "Took:", time.Since(start), "Got: ", len(ps), "spoofs")
+	fmt.Print(vpr)
 }

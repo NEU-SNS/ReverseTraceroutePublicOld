@@ -396,7 +396,6 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 		}
 		rChan := make(chan *dm.Probe, len(spoofIds))
 		if len(spoofIds) != 0 {
-			log.Debug("Adding spoofs: ", spoofIds)
 			c.sm.Add(rChan, spoofIds...)
 		} else {
 			// This is ugly but prevent waiting for no reason
@@ -441,7 +440,6 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				case probe, ok := <-rChan:
 					if !ok {
-						log.Debug("rChan closed")
 						return
 					}
 					ret <- toPing(probe)

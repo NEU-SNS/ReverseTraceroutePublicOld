@@ -1,29 +1,3 @@
-/*
-Copyright (c) 2015, Northeastern University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-     * Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
-     * Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in the
-       documentation and/or other materials provided with the distribution.
-     * Neither the name of the Northeastern University nor the
-       names of its contributors may be used to endorse or promote products
-       derived from this software without specific prior written permission.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 package plcontroller
 
 import (
@@ -34,7 +8,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -97,35 +70,37 @@ var (
 		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
-func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateUrl string, db *dataaccess.DataAccess, dc chan struct{}) error {
+func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateURL string, db *dataaccess.DataAccess, dc chan struct{}) error {
 	return nil
-	var wg sync.WaitGroup
-	for _, vp := range vps {
-		wg.Add(1)
-		go func(v *dm.VantagePoint) {
-			defer wg.Done()
-			err := checkVP(v, uname, certpath, updateUrl)
-			var res string
-			if err != nil {
-				res = err.Error()
-			} else {
-				res = "Healthy"
-			}
-			select {
-			case <-dc:
-				return
-			default:
-				err = db.UpdateCheckStatus(v.Ip, res)
+	/*
+		var wg sync.WaitGroup
+		for _, vp := range vps {
+			wg.Add(1)
+			go func(v *dm.VantagePoint) {
+				defer wg.Done()
+				err := checkVP(v, uname, certpath, updateURL)
+				var res string
 				if err != nil {
-					log.Errorf("Failed to update Check Status: %v", err)
+					res = err.Error()
+				} else {
+					res = "Healthy"
 				}
-			}
+				select {
+				case <-dc:
+					return
+				default:
+					err = db.UpdateCheckStatus(v.Ip, res)
+					if err != nil {
+						log.Errorf("Failed to update Check Status: %v", err)
+					}
+				}
 
-		}(vp)
+			}(vp)
 
-	}
-	wg.Wait()
-	return nil
+		}
+		wg.Wait()
+		return nil
+	*/
 }
 
 func getCmd(vp *dm.VantagePoint, uname, certPath, cmds string) *exec.Cmd {
@@ -144,7 +119,7 @@ func getCmd(vp *dm.VantagePoint, uname, certPath, cmds string) *exec.Cmd {
 	return cmd
 }
 
-func checkVP(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
+func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 	if vp == nil {
 		return errorNilVP
 	}
@@ -154,11 +129,11 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
 	}
 	switch stat {
 	case running:
-		return handleRunning(vp, uname, certPath, updateUrl)
+		return handleRunning(vp, uname, certPath, updateURL)
 	case stopped:
 		return handleStopped(getCmd(vp, uname, certPath, start))
 	case notFound:
-		httpupdate.CheckUpdate(updateUrl, "0.0.0")
+		httpupdate.CheckUpdate(updateURL, "0.0.0")
 		urlString := httpupdate.FetchUrl()
 		url, err := url.Parse(urlString)
 		if err != nil {
@@ -243,7 +218,7 @@ func resetService(cmd *exec.Cmd) error {
 	return nil
 }
 
-func handleRunning(vp *dm.VantagePoint, uname, certPath, updateUrl string) error {
+func handleRunning(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 	if vp.Controller == 0 {
 		return resetService(getCmd(vp, uname, certPath, restart))
 	}
@@ -253,7 +228,7 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateUrl string) error
 		log.Infof("Version: %v", v)
 		return err
 	}
-	update, err := httpupdate.CheckUpdate(updateUrl, v)
+	update, err := httpupdate.CheckUpdate(updateURL, v)
 	if err != nil {
 		return err
 	}
@@ -300,7 +275,6 @@ func updateService(cmd *exec.Cmd) error {
 	case err := <-ec:
 		return err
 	}
-	return nil
 }
 
 func checkVersion(cmd *exec.Cmd) (string, error) {
@@ -329,7 +303,6 @@ func checkVersion(cmd *exec.Cmd) (string, error) {
 		}
 		return "", errorVpTimeout
 	}
-	return "0.0.0", nil
 }
 
 func checkRunning(cmd *exec.Cmd) (procStatus, error) {
@@ -372,7 +345,6 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 		}
 		return unknown, errorVpTimeout
 	}
-	return unknown, nil
 }
 
 func installService(cmd *exec.Cmd) error {
@@ -397,5 +369,4 @@ func installService(cmd *exec.Cmd) error {
 		return errorVpTimeout
 
 	}
-	return nil
 }

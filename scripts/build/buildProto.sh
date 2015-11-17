@@ -8,3 +8,5 @@ protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/controllerapi/*.pr
     --go_out=plugins=grpc:$GOSRC
 protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi/*.proto \
     --go_out=plugins=grpc:$GOSRC
+protoc  -I $GOSRC $GOSRC/github.com/NEU-SNS/ReverseTraceroute/vpservice/pb/*.proto \
+    --go_out=plugins=grpc:$GOSRC

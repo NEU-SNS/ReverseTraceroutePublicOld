@@ -164,11 +164,54 @@ SELECT
 FROM
 	vantage_point;
 `
+	getActiveVpsQuery string = `
+SELECT
+	ip, controller, hostname, timestamp,
+	record_route, can_spoof,
+    receive_spoof, last_updated, port
+FROM
+	vantage_poin
+WHERE
+	controller is not null;
+`
 )
 
 // GetVPs gets all the VPs in the database
 func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 	rows, err := db.getReader().Query(getVpsQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var vps []*dm.VantagePoint
+	for rows.Next() {
+		vp := &VantagePoint{}
+		err := rows.Scan(
+			&vp.IP,
+			&vp.Controller,
+			&vp.HostName,
+			&vp.TimeStamp,
+			&vp.RecordRoute,
+			&vp.CanSpoof,
+			&vp.ReceiveSpoof,
+			&vp.LastUpdated,
+			&vp.Port,
+		)
+		if err != nil {
+			return vps, err
+		}
+		vps = append(vps, vp.ToDataModel())
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return vps, nil
+}
+
+// GetActiveVPs gets all the VPs in the database that are connected
+func (db *DB) GetActiveVPs() ([]*dm.VantagePoint, error) {
+	rows, err := db.getReader().Query(getActiveVpsQuery)
 	if err != nil {
 		return nil, err
 	}
