@@ -170,7 +170,7 @@ SELECT
 	record_route, can_spoof,
     receive_spoof, last_updated, port
 FROM
-	vantage_poin
+	vantage_point
 WHERE
 	controller is not null;
 `
