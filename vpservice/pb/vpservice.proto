@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+import "github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto";
+
+package pb;
+
+service VPService {
+    rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
+}

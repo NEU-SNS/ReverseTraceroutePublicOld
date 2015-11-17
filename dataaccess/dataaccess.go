@@ -112,6 +112,11 @@ func (d *DataAccess) GetVPs() ([]*dm.VantagePoint, error) {
 	return d.db.GetVPs()
 }
 
+// GetActiveVPs get the vps which are currently connected to the controller
+func (d *DataAccess) GetActiveVPs() ([]*dm.VantagePoint, error) {
+	return d.db.GetActiveVPs()
+}
+
 // UpdateController updates the controller for a VP
 func (d *DataAccess) UpdateController(ip, old, nc uint32) error {
 	return d.db.UpdateController(ip, old, nc)

@@ -133,18 +133,18 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 				}
 				sendChan <- &tr
 			}(trace)
-		}
 
-		go func() {
-			wg.Wait()
-			close(sendChan)
-		}()
-		for t := range sendChan {
-			if err := server.Send(t); err != nil {
-				return err
+			go func() {
+				wg.Wait()
+				close(sendChan)
+			}()
+			for t := range sendChan {
+				if err := server.Send(t); err != nil {
+					return err
+				}
 			}
+			return nil
 		}
-		return nil
 	}
 }
 
@@ -186,7 +186,7 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 }
 
 func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
-	vps, err := c.db.GetVPs()
+	vps, err := c.db.GetActiveVPs()
 	if err != nil {
 		return nil
 	}
