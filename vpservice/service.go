@@ -112,7 +112,7 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 
 // runs in a go routine
 func (rvp *RVPService) checkCapabilities() {
-	t := time.NewTicker(time.Minute * 30)
+	t := time.NewTicker(time.Minute * 10)
 	dirty := make(chan struct{})
 	close(dirty)
 	for {
@@ -136,7 +136,7 @@ func (rvp *RVPService) checkCapabilities() {
 		case <-dirty:
 			log.Info("Doing it dirty")
 			rvp.GetVPs(context.Background(), &dm.VPRequest{})
-			// Gets us an initial check without waiting 30 min
+			// Gets us an initial check without waiting 10 min
 			rvp.rw.Lock()
 			// Copy so we don't block everything while this is happening
 			vps := rvp.vps.DeepCopy()
@@ -165,14 +165,21 @@ func testSpoofs(vpm vpMap) {
 	lenvpm := len(vpm)
 	var first bool
 	var target uint32
+	var count, count2 int
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
 	for _, vps := range vpm {
+		if count == 50 {
+			break
+		}
 		if !first {
 			first = true
 			target = vps.Ip
 		}
 		for _, vpd := range vpm {
+			if count2 == 50 {
+				break
+			}
 			if vps.Ip == vpd.Ip {
 				continue
 			}
@@ -184,7 +191,10 @@ func testSpoofs(vpm vpMap) {
 				Spoof: true,
 				SAddr: ip,
 			})
+			count2++
 		}
+		count++
+		count2 = 0
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {
@@ -221,10 +231,17 @@ func testRR(vpm vpMap) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
+	var count, count2 int
 	for _, vps := range vpm {
+		if count == 50 {
+			break
+		}
 		for _, vpd := range vpm {
 			if vps.Ip == vpd.Ip {
 				continue
+			}
+			if count2 == 50 {
+				break
 			}
 			tests = append(tests, &dm.PingMeasurement{
 				Count: "1",
@@ -232,7 +249,10 @@ func testRR(vpm vpMap) {
 				Dst:   vpd.Ip,
 				RR:    true,
 			})
+			count2++
 		}
+		count2 = 0
+		count++
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {
@@ -266,10 +286,17 @@ func testTS(vpm vpMap) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
+	var count, count2 int
 	for _, vps := range vpm {
+		if count == 50 {
+			break
+		}
 		for _, vpd := range vpm {
 			if vps.Ip == vpd.Ip {
 				continue
+			}
+			if count2 == 50 {
+				break
 			}
 			tests = append(tests, &dm.PingMeasurement{
 				Count:     "1",
@@ -277,7 +304,10 @@ func testTS(vpm vpMap) {
 				Dst:       vpd.Ip,
 				TimeStamp: "tsonly",
 			})
+			count2++
 		}
+		count++
+		count2 = 0
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {

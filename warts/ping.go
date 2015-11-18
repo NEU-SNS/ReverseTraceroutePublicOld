@@ -1,29 +1,3 @@
-/*
-Copyright (c) 2015, Northeastern University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-     * Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
-     * Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in the
-       documentation and/or other materials provided with the distribution.
-     * Neither the name of the Northeastern University nor the
-       names of its contributors may be used to endorse or promote products
-       derived from this software without specific prior written permission.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 package warts
 
 import (
@@ -181,6 +155,7 @@ func (pf PingFlags) String() string {
 	)
 }
 
+// PingMethod is the method type of the ping
 type PingMethod uint8
 
 func (pm PingMethod) String() string {
@@ -196,6 +171,7 @@ func (pm PingMethod) String() string {
 	return methods[pm]
 }
 
+// PingFlags are the flags set in the ping
 type PingFlags struct {
 	ListID       uint32
 	CycleID      uint32
@@ -228,9 +204,13 @@ type PingFlags struct {
 	PF           PingFlag
 }
 
+// PingFlag is a flag set in a ping
 type PingFlag uint8
+
+// PFlags is a slice of PingFlags
 type PFlags []PingFlag
 
+// Strings returns a string representation of a pingflag
 func (pf PingFlag) Strings() []string {
 	flags := []string{
 		"v4rr",
@@ -242,7 +222,7 @@ func (pf PingFlag) Strings() []string {
 		"dl",
 		"8",
 	}
-	ret := make([]string, 0)
+	var ret []string
 	as8 := uint8(pf)
 	for i := uint8(0); i < 8; i++ {
 		if as8&(0x1<<i) != 0 {
@@ -252,6 +232,7 @@ func (pf PingFlag) Strings() []string {
 	return ret
 }
 
+// PingReplyFlags are the flags for a ping reply
 type PingReplyFlags struct {
 	DstID       uint32
 	Flags       uint8
@@ -273,13 +254,17 @@ type PingReplyFlags struct {
 	ReplyFlags  PRFlags
 }
 
+// IsTsOnly returns true if the ping is tsonly ts option
 func (prf PingReplyFlags) IsTsOnly() bool {
 	return prf.Flags&0x08 > 0
 }
+
+// IsTsAndAddr returns true of the ping is tsandaddr
 func (prf PingReplyFlags) IsTsAndAddr() bool {
 	return prf.Flags&0x10 > 0
 }
 
+// RProto is the proto of the reply
 type RProto uint8
 
 func (rp RProto) String() string {
@@ -294,10 +279,12 @@ func (rp RProto) String() string {
 	default:
 		return "icmp"
 	}
-	return ""
 }
 
+// ReplyFlag is a flag in the reply
 type ReplyFlag uint8
+
+// PRFlags is an array of ReplyFlags
 type PRFlags []ReplyFlag
 
 func (prf PingReplyFlags) String() string {
@@ -314,9 +301,9 @@ func (prf PingReplyFlags) String() string {
 			"RR: %s\n"+
 			"TS: %s\n"+
 			"Reply IpId: %d\n"+
-			"Tx: %s\n"+
+			"Tx: %v\n"+
 			"TS Reply: %s\n"+
-			"RTT: %t\n",
+			"RTT: %v\n",
 		prf.ReplyTTL,
 		prf.ReplySize,
 		prf.ProbeID,
@@ -334,12 +321,14 @@ func (prf PingReplyFlags) String() string {
 	)
 }
 
+// V4RR is the RR option
 type V4RR struct {
 	Addrs []Address
 }
 
+// Strings stringifies a V4RR
 func (v V4RR) Strings() []string {
-	ret := make([]string, 0)
+	var ret []string
 	for _, addr := range v.Addrs {
 		ret = append(ret, addr.String())
 	}
@@ -350,6 +339,7 @@ func (v V4RR) String() string {
 	return fmt.Sprintf("%v", v.Addrs)
 }
 
+// V4TS is a timestamp option
 type V4TS struct {
 	Addrs      []Address
 	TimeStamps []uint32
@@ -368,6 +358,7 @@ func (v V4TS) String() string {
 	return buf.String()
 }
 
+// TSReply is the reply to a timestamp probe
 type TSReply struct {
 	OTimestamp uint32
 	RTimestamp uint32
@@ -569,8 +560,8 @@ func readV4TS(f io.Reader, addrs *AddressRefs) (V4TS, error) {
 	if err != nil {
 		return ts, err
 	}
-	ts.Addrs = make([]Address, tsc)
-	ts.TimeStamps = make([]uint32, ipc)
+	ts.Addrs = make([]Address, ipc)
+	ts.TimeStamps = make([]uint32, tsc)
 	for i := uint8(0); i < tsc; i++ {
 		addr, err := readUint32(f)
 		if err != nil {
