@@ -25,8 +25,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// Package util contains utilities uses throughout the packages
-package util
+package uuencode
 
 import (
 	"bytes"

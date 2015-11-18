@@ -67,7 +67,7 @@ message PingResponse {
 }
 
 message TsAndAddr {
-    uint32 ip = 1;
+    uint32 ip  = 1;
     uint32 ts  = 2;
 }
 

@@ -45,7 +45,7 @@ func (v vpMap) Update(n vpMap) {
 		if vp, ok := v[key]; ok {
 			vp.CanSpoof = val.CanSpoof
 			vp.Timestamp = val.Timestamp
-			vp.RecordRoute = val.Timestamp
+			vp.RecordRoute = val.RecordRoute
 			vp.ReceiveSpoof = val.ReceiveSpoof
 		}
 	}
