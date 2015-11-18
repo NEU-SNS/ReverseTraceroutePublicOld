@@ -279,7 +279,7 @@ func (s *Socket) monitorConn() {
 	for {
 		select {
 		case c := <-s.cmdChan:
-			log.Infof("Issuing cmd: %v", c)
+			log.Debugf("Issuing cmd: %v", c)
 			err := c.issueCommand(s.con)
 			if err != nil {
 				log.Errorf("Error issuing command %s", c.Marshal())

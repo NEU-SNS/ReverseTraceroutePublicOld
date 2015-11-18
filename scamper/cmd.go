@@ -124,7 +124,7 @@ func (c *Cmd) marshal() []byte {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	log.Infof("Cmd as string: %s", buf.String())
+	log.Debugf("Cmd as string: %s", buf.String())
 	return buf.Bytes()
 }
 
@@ -136,7 +136,7 @@ func (c *Cmd) Marshal() []byte {
 // IssueCommand marshals the Cmd and writes it to the provided writer
 func (c *Cmd) issueCommand(w io.Writer) error {
 	cmd := c.marshal()
-	log.Infof("Writing cmd: %s", cmd)
+	log.Debugf("Writing cmd: %s", cmd)
 	_, err := w.Write(cmd)
 	return err
 }
