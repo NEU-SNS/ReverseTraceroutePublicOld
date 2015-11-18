@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package datamodel;
+
+message Path {
+    repeated uint32 hops = 1 [packed = true];
+}
+
+enum IResponseType {
+    NONE_FOUND = 0;
+    TOKEN      = 1;
+    PATH       = 2;
+}
+
+message IntersectionRequest {
+    uint32 address    = 1;
+    uint32 dest       = 2;
+    int64 staleness   = 3;
+    bool  use_aliases = 4;
+}
+
+message IntersectionResponse {
+    IResponseType   type = 1;
+    uint32         token = 2;
+    Path            path = 3;
+}
+
+message TokenRequest {
+    uint32 token = 1;
+}
+
+message TokenResponse {
+    uint32 token       = 1;
+    IResponseType type = 2; 
+    Path path          = 3;
+}

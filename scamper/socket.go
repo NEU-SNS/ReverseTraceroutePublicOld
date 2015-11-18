@@ -40,6 +40,7 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/uuencode"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
 )
 
@@ -239,7 +240,7 @@ func (s *Socket) readConn() {
 				s.rc++
 				continue
 			}
-			dec := &util.UUDecodingWriter{}
+			dec := &uuencode.UUDecodingWriter{}
 			s.wartsHeader[0].WriteTo(dec)
 			s.wartsHeader[1].WriteTo(dec)
 			resp.WriteTo(dec)

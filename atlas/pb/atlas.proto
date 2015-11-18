@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+import "github.com/NEU-SNS/ReverseTraceroute/datamodel/intersectrequest.proto";
+
+package pb;
+
+
+service Atlas {
+    rpc GetIntersectingPath(stream datamodel.IntersectionRequest) returns (stream datamodel.IntersectionResponse) {}
+    rpc GetPathsWithToken(stream datamodel.TokenRequest) returns (stream datamodel.TokenResponse) {}
+}
