@@ -134,25 +134,20 @@ func (rvp *RVPService) checkCapabilities() {
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
 		case <-dirty:
-			log.Info("Doing it dirty")
 			rvp.GetVPs(context.Background(), &dm.VPRequest{})
 			// Gets us an initial check without waiting 10 min
 			rvp.rw.Lock()
 			// Copy so we don't block everything while this is happening
 			vps := rvp.vps.DeepCopy()
 			rvp.rw.Unlock()
-			log.Info("Made copy")
 			// First check spoofing
 			// Send a spoof from everyone to everyone else
 			// Results determine who can spoof and who can receive spoofs
 			testSpoofs(vps)
-			log.Info("Tested spoofs")
 			// Test RR, just try to RR everyone
 			testRR(vps)
-			log.Info("Tested rr")
 			// Test TS, just try to prespec everyone
 			testTS(vps)
-			log.Info("Tested ts")
 			rvp.rw.Lock()
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()

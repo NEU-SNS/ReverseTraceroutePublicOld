@@ -110,5 +110,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Print(vpr)
+	vps := vpr.GetVps()
+	for _, vp := range vps {
+		if vp.CanSpoof {
+			fmt.Println(vp.Hostname)
+		}
+	}
 }

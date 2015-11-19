@@ -132,16 +132,16 @@ func (*TokenRequest) ProtoMessage()    {}
 type TokenResponse struct {
 	Token uint32        `protobuf:"varint,1,opt,name=token" json:"token,omitempty"`
 	Type  IResponseType `protobuf:"varint,2,opt,name=type,enum=datamodel.IResponseType" json:"type,omitempty"`
-	Path  *Path         `protobuf:"bytes,3,opt,name=path" json:"path,omitempty"`
+	Paths []*Path       `protobuf:"bytes,3,rep,name=paths" json:"paths,omitempty"`
 }
 
 func (m *TokenResponse) Reset()         { *m = TokenResponse{} }
 func (m *TokenResponse) String() string { return proto.CompactTextString(m) }
 func (*TokenResponse) ProtoMessage()    {}
 
-func (m *TokenResponse) GetPath() *Path {
+func (m *TokenResponse) GetPaths() []*Path {
 	if m != nil {
-		return m.Path
+		return m.Paths
 	}
 	return nil
 }
