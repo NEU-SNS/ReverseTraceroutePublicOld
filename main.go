@@ -28,15 +28,7 @@
 // Package main is a dummy for testing
 package main
 
-import (
-	"flag"
-	"fmt"
-
-	"golang.org/x/net/context"
-
-	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
-	"google.golang.org/grpc"
-)
+import "flag"
 
 func main() {
 	flag.Parse()
@@ -98,22 +90,55 @@ func main() {
 		fmt.Println("Done:", end, "Took:", time.Since(start), "Got: ", len(ps), "spoofs")
 		fmt.Print(ps)
 	*/
-	opts := make([]grpc.DialOption, 1)
-	opts[0] = grpc.WithInsecure()
-	conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:45000", opts...)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-	cl := client.New(context.Background(), conn)
-	vpr, err := cl.GetVPs()
-	if err != nil {
-		panic(err)
-	}
-	vps := vpr.GetVps()
-	for _, vp := range vps {
-		if vp.CanSpoof {
-			fmt.Println(vp.Hostname)
+	/*
+		opts := make([]grpc.DialOption, 1)
+		opts[0] = grpc.WithInsecure()
+		conn, err := grpc.Dial("rhansen2.revtr.ccs.neu.edu:4382", opts...)
+		if err != nil {
+			panic(err)
 		}
-	}
+		defer conn.Close()
+		cl := controllerapi.NewControllerClient(conn)
+		var pa dm.PingArg
+		var pings []*dm.PingMeasurement
+		var dst uint32 = 2164945295
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			addr := scanner.Text()
+			ip, err := util.IPStringToInt32(addr)
+			if err != nil {
+				panic(err)
+			}
+			pings = append(pings, &dm.PingMeasurement{
+				Src:     ip,
+				Dst:     dst,
+				Timeout: 60,
+				Count:   "1",
+				Spoof:   true,
+				SAddr:   "204.8.155.227",
+				//CheckCache: true,
+				//CheckDb: true,
+			})
+		}
+		pa.Pings = pings
+		s, err := cl.Ping(context.Background(), &pa)
+		if err != nil {
+			panic(err)
+		}
+		var ps []*dm.Ping
+		for {
+			pr, err := s.Recv()
+			if err == io.EOF {
+				log.Info("EOF")
+				break
+			}
+			if err != nil {
+				panic(err)
+			}
+			ps = append(ps, pr)
+		}
+		for _, p := range ps {
+			fmt.Println(p.SpoofedFrom)
+		}
+	*/
 }

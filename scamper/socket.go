@@ -297,7 +297,7 @@ func (s *Socket) monitorConn() {
 func convertWarts(path string, b []byte) ([]byte, error) {
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
-		log.Errorf("Failed to converte bytes: %v, %s", err, b)
+		log.Errorf("Failed to convert bytes: %v, %s", err, b)
 		return []byte{}, err
 	}
 	return res, err

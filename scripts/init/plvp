@@ -26,8 +26,8 @@ log_dir="/var/log/$prog"
 log_file="$log_dir/$prog"
 lock_file="/var/lock/subsys/$prog"
 pid_file="/var/run/$prog.pid"
-exec="/usr/local/bin/$prog"
-addit_args="-log_dir=$log_dir --logtostderr=false --alsologtostderr=false"
+exec="/home/uw_geoloc4/plvp/$prog"
+addit_args="-loglevel error"
 
 start() {
     if ! [ -f $pid_file ]; then
@@ -37,7 +37,11 @@ start() {
         $exec $addit_args >> $log_file 2>&1 &
         RETVAL=$?
         PID=$!
-        [ $RETVAL -eq 0 ] && touch $lock_file && echo "$PID" > ${pid_file}
+        if [ $RETVAL -eq 0 ]; then
+            touch $lock_file && echo "$PID" > ${pid_file}
+        else 
+            failure
+        fi
         RETVAL=$?
         if [ $RETVAL -eq 0 ]; then
            success
