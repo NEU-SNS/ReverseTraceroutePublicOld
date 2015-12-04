@@ -353,6 +353,15 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						if !ok {
 							return
 						}
+						if pp == nil {
+							return
+						}
+						go func() {
+							err := c.db.StorePing(pp)
+							if err != nil {
+								log.Error(err)
+							}
+						}()
 						ret <- pp
 					}
 				}
@@ -442,7 +451,11 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					if !ok {
 						return
 					}
-					ret <- toPing(probe)
+					if probe == nil {
+						return
+					}
+					px := toPing(probe)
+					ret <- px
 				}
 			}
 		}()
@@ -670,6 +683,12 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 						if !ok {
 							return
 						}
+						go func() {
+							err := c.db.StoreTraceroute(pp)
+							if err != nil {
+								log.Error(err)
+							}
+						}()
 						ret <- pp
 					}
 				}

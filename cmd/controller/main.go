@@ -63,18 +63,6 @@ func init() {
 		"The path to the private key for the file")
 	flag.Int64Var(conf.Local.ConnTimeout, "conn-timeout", 60,
 		"How long to wait for an rpc connection to timeout")
-	/*
-		flag.StringVar(conf.Db.UName, "db-uname", "",
-			"The username for the database")
-		flag.StringVar(conf.Db.Password, "db-pass", "",
-			"The password for the database")
-		flag.StringVar(conf.Db.Db, "db-name", "",
-			"The name of the database to use")
-		flag.StringVar(conf.Db.Host, "db-host", "localhost",
-			"The host of the database")
-		flag.StringVar(conf.Db.Port, "db-port", "3306",
-			"The port used for the database connection")
-	*/
 	flag.Var(conf.Cache.Addrs, "cache-list",
 		"The list of cache servers.")
 }

@@ -3,13 +3,16 @@ syntax = "proto3";
 package datamodel;
 
 message Path {
-    repeated uint32 hops = 1 [packed = true];
+    uint32 address       = 1;
+    uint32 dest          = 2;
+    repeated uint32 hops = 3 [packed = true];
 }
 
 enum IResponseType {
     NONE_FOUND     = 0;
     TOKEN          = 1;
     PATH           = 2;
+    ERROR          = 3;
 }
 
 message IntersectionRequest {
@@ -23,6 +26,7 @@ message IntersectionResponse {
     IResponseType   type = 1;
     uint32         token = 2;
     Path            path = 3;
+    string         error = 4; 
 }
 
 message TokenRequest {
@@ -33,4 +37,5 @@ message TokenResponse {
     uint32 token        = 1;
     IResponseType type  = 2; 
     repeated Path paths = 3;
+    string error        = 4;
 }

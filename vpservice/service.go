@@ -212,6 +212,7 @@ func testSpoofs(vpm vpMap) {
 		}
 		if err != nil {
 			log.Error(err)
+			return
 		}
 		if vp, ok := vpm[p.SpoofedFrom]; ok {
 			vp.CanSpoof = true
@@ -270,6 +271,7 @@ func testRR(vpm vpMap) {
 		}
 		if err != nil {
 			log.Error(err)
+			return
 		}
 		if vp, ok := vpm[p.Src]; ok {
 			vp.RecordRoute = true

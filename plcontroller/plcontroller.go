@@ -95,7 +95,6 @@ func init() {
 }
 
 type plControllerT struct {
-	spid     int
 	server   *grpc.Server
 	config   Config
 	sc       scamper.Config
@@ -138,7 +137,7 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 }
 
 func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
-	log.Infof("Running ping for: %v", pa)
+	log.Debugf("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -174,7 +173,6 @@ func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
 }
 
 func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
-	log.Infof("Running traceroute for: %v", ta)
 	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -207,13 +205,11 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 }
 
 func convertWarts(path string, b []byte) ([]byte, error) {
-	log.Info("Converting Warts")
 	res, err := util.ConvertBytes(path, b)
 	if err != nil {
 		log.Errorf("Failed to converte bytes: %v", err)
 		return []byte{}, err
 	}
-	log.Infof("Results of converting: %s", res)
 	return res, err
 }
 
@@ -271,13 +267,11 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.Data
 }
 
 func (c *plControllerT) maintain() {
-	log.Info("Starting VP monitoring")
 	for {
 		select {
 		case <-c.shutdown:
 			return
 		case <-time.After(time.Minute * 2):
-			log.Info("Checking VPs....")
 			vps, err := c.db.GetVPs()
 			if err != nil {
 				log.Errorf("Failed to get VPs: %v", err)
@@ -307,7 +301,6 @@ func startHTTP(addr string) {
 
 // Start starts a plcontroller with the given configuration
 func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Sender) chan error {
-	log.Info("Starting plcontroller")
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
@@ -318,14 +311,12 @@ func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Send
 func (c *plControllerT) startRPC(eChan chan error) {
 	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
 		*c.config.Local.Port)
-	log.Infof("Conecting to: %s", addr)
 	l, e := net.Listen("tcp", addr)
 	if e != nil {
 		log.Errorf("Failed to listen: %v", e)
 		eChan <- e
 		return
 	}
-	log.Infof("PLController started, listening on: %s", addr)
 	err := c.server.Serve(l)
 	if err != nil {
 		eChan <- err
@@ -339,12 +330,10 @@ func (c *plControllerT) startScamperProc() {
 
 // HandleSig allows the plController to react appropriately to signals
 func HandleSig(s os.Signal) {
-	log.Info("Handle Sig")
 	plController.handleSig(s)
 }
 
 func (c *plControllerT) stop() {
-	log.Info("Stoping")
 	if c.shutdown != nil {
 		close(c.shutdown)
 	}
@@ -364,6 +353,5 @@ func (c *plControllerT) stop() {
 }
 
 func (c *plControllerT) handleSig(s os.Signal) {
-	log.Infof("Got signal: %v", s)
 	c.stop()
 }

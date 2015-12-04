@@ -73,7 +73,7 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 				defer wg.Done()
 				pr, err := c.runPing(p)
 				if err != nil {
-					log.Infof("Got ping result: %v, with error %v", pr, err)
+					log.Debugf("Got ping result: %v, with error %v", pr, err)
 					pr.Error = err.Error()
 					pr.Src = p.Src
 					pr.Dst = p.Dst
@@ -121,7 +121,7 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 				defer wg.Done()
 				tr, err := c.runTraceroute(t)
 				if err != nil {
-					log.Infof("Got tracerotue result: %v, with error %v", tr, err)
+					log.Debugf("Got tracerotue result: %v, with error %v", tr, err)
 					tr.Error = err.Error()
 					tr.Src = t.Src
 					tr.Dst = t.Dst
@@ -134,17 +134,17 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 				sendChan <- &tr
 			}(trace)
 
-			go func() {
-				wg.Wait()
-				close(sendChan)
-			}()
-			for t := range sendChan {
-				if err := server.Send(t); err != nil {
-					return err
-				}
-			}
-			return nil
 		}
+		go func() {
+			wg.Wait()
+			close(sendChan)
+		}()
+		for t := range sendChan {
+			if err := server.Send(t); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }
 

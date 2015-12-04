@@ -122,6 +122,16 @@ func (d *DataAccess) UpdateController(ip, old, nc uint32) error {
 	return d.db.UpdateController(ip, old, nc)
 }
 
+// FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
+func (d *DataAccess) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
+	return d.db.FindIntersectingTraceroute(pairs, alias, stale)
+}
+
+// StoreAtlasTraceroute stores a traceroute in a form that the Atlas requires
+func (d *DataAccess) StoreAtlasTraceroute(trace *dm.Traceroute) error {
+	return d.db.StoreAtlasTraceroute(trace)
+}
+
 // New create a new dataAccess with the given config
 func New(c DbConfig) (*DataAccess, error) {
 	var conf sql.DbConfig
