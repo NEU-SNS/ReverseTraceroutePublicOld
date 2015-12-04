@@ -22,6 +22,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer ln.Close()
 	serv := grpc.NewServer()
 	pb.RegisterVPServiceServer(serv, vpservice.GRPCServ{svc})
 	serv.Serve(ln)

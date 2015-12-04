@@ -160,7 +160,7 @@ const (
 SELECT
 	ip, controller, hostname, timestamp,
 	record_route, can_spoof,
-    receive_spoof, last_updated, port
+    receive_spoof, last_updated, port, site
 FROM
 	vantage_point;
 `
@@ -168,7 +168,7 @@ FROM
 SELECT
 	ip, controller, hostname, timestamp,
 	record_route, can_spoof,
-    receive_spoof, last_updated, port
+    receive_spoof, last_updated, port, site
 FROM
 	vantage_point
 WHERE
@@ -196,6 +196,7 @@ func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 			&vp.ReceiveSpoof,
 			&vp.LastUpdated,
 			&vp.Port,
+			&vp.Site,
 		)
 		if err != nil {
 			return vps, err
@@ -229,6 +230,7 @@ func (db *DB) GetActiveVPs() ([]*dm.VantagePoint, error) {
 			&vp.ReceiveSpoof,
 			&vp.LastUpdated,
 			&vp.Port,
+			&vp.Site,
 		)
 		if err != nil {
 			return vps, err
@@ -353,7 +355,7 @@ INSERT INTO
 traceroute_hops(traceroute_id, hop, addr, probe_ttl, probe_id, 
 				probe_size, rtt, reply_ttl, reply_tos, reply_size, 
 				reply_ipid, icmp_type, icmp_code, icmp_q_ttl, icmp_q_ipl, icmp_q_tos)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 )
 
@@ -904,5 +906,119 @@ func (db *DB) StorePing(in *dm.Ping) error {
 		}
 	}
 	err = storePingStats(tx, id, in.GetStatistics())
+	return tx.Commit()
+}
+
+const (
+	findIntersecting = `
+SELECT 
+	? as src, X.dest, hops.hop, hops.ttl
+FROM 
+(
+(SELECT atr.Id, atr.dest FROM
+	(SELECT
+		b.ip_address
+	FROM
+		ip_aliases a INNER JOIN ip_aliases b on a.cluster_id = b.cluster_id
+	WHERE
+		a.ip_address = ? 
+	) alias
+INNER JOIN atlas_traceroutes atr on atr.dest = alias.ip_address
+WHERE atr.date > DATE(NOW() - interval 15  minute)
+ORDER BY atr.date desc)
+
+UNION
+
+(SELECT atr.Id, atr.dest FROM
+atlas_traceroutes atr 
+WHERE atr.dest = ? AND atr.date > DATE(NOW() - interval 15  minute) 
+ORDER BY atr.date desc)
+) X 
+INNER JOIN atlas_traceroute_hops ath on ath.trace_id = X.Id
+INNER JOIN
+(
+SELECT ? IP
+UNION
+SELECT
+		b.ip_address
+	FROM
+		ip_aliases a INNER JOIN ip_aliases b on a.cluster_id = b.cluster_id
+	WHERE
+		a.ip_address = ?	
+) Z ON ath.hop = Z.IP
+INNER JOIN atlas_traceroute_hops hops on hops.trace_id = X.Id
+ORDER BY hops.ttl
+`
+)
+
+type hopRow struct {
+	src  uint32
+	dest uint32
+	hop  uint32
+	ttl  uint32
+}
+
+// FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
+func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
+	pair := pairs[0]
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Src, pair.Src, pair.Dst, pair.Dst)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ret := dm.Path{}
+	for rows.Next() {
+		row := &hopRow{}
+		rows.Scan(&row.src, &row.dest, &row.hop, &row.ttl)
+		ret.Hops = append(ret.Hops, row.hop)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return []*dm.Path{&ret}, nil
+}
+
+const (
+	insertAtlasTrace = `INSERT INTO atlas_traceroutes(dest) VALUES(?)`
+	insertAtlasHop   = `
+	INSERT INTO atlas_traceroute_hops(trace_id, hop, ttl) 
+	VALUES (?, ?, ?)`
+)
+
+// StoreAtlasTraceroute stores a traceroute in a form that the Atlas requires
+func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
+	conn := db.getWriter()
+	tx, err := conn.Begin()
+	if err != nil {
+		return err
+	}
+	res, err := tx.Exec(insertAtlasTrace, trace.Dst)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	stmt, err := tx.Prepare(insertAtlasHop)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, hop := range trace.GetHops() {
+		_, err := stmt.Exec(int32(id), hop.Addr, hop.ProbeTtl)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	err = stmt.Close()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 	return tx.Commit()
 }

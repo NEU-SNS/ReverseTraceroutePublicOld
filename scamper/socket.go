@@ -329,7 +329,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 	if err != nil {
 		return nil, 0, err
 	}
-	log.Infof("Running cmd: %v", cmd)
+	log.Debugf("Running cmd: %v", cmd)
 	s.cmdChan <- &cmd
 	return cr.done, id, err
 }

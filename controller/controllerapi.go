@@ -47,9 +47,6 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 	defer cancel()
 	res := c.doPing(ctx, pms)
 	for p := range res {
-		if p == nil {
-			log.Info("Go nil ping")
-		}
 		if err := stream.Send(p); err != nil {
 			return err
 		}

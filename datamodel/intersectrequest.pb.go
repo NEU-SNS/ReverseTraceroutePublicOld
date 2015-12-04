@@ -68,17 +68,20 @@ const (
 	IResponseType_NONE_FOUND IResponseType = 0
 	IResponseType_TOKEN      IResponseType = 1
 	IResponseType_PATH       IResponseType = 2
+	IResponseType_ERROR      IResponseType = 3
 )
 
 var IResponseType_name = map[int32]string{
 	0: "NONE_FOUND",
 	1: "TOKEN",
 	2: "PATH",
+	3: "ERROR",
 }
 var IResponseType_value = map[string]int32{
 	"NONE_FOUND": 0,
 	"TOKEN":      1,
 	"PATH":       2,
+	"ERROR":      3,
 }
 
 func (x IResponseType) String() string {
@@ -108,6 +111,7 @@ type IntersectionResponse struct {
 	Type  IResponseType `protobuf:"varint,1,opt,name=type,enum=datamodel.IResponseType" json:"type,omitempty"`
 	Token uint32        `protobuf:"varint,2,opt,name=token" json:"token,omitempty"`
 	Path  *Path         `protobuf:"bytes,3,opt,name=path" json:"path,omitempty"`
+	Error string        `protobuf:"bytes,4,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *IntersectionResponse) Reset()         { *m = IntersectionResponse{} }
@@ -133,6 +137,7 @@ type TokenResponse struct {
 	Token uint32        `protobuf:"varint,1,opt,name=token" json:"token,omitempty"`
 	Type  IResponseType `protobuf:"varint,2,opt,name=type,enum=datamodel.IResponseType" json:"type,omitempty"`
 	Paths []*Path       `protobuf:"bytes,3,rep,name=paths" json:"paths,omitempty"`
+	Error string        `protobuf:"bytes,4,opt,name=error" json:"error,omitempty"`
 }
 
 func (m *TokenResponse) Reset()         { *m = TokenResponse{} }
