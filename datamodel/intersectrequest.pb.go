@@ -17,6 +17,7 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto
 
 It has these top-level messages:
+	Hop
 	Path
 	IntersectionRequest
 	IntersectionResponse
@@ -88,13 +89,31 @@ func (x IResponseType) String() string {
 	return proto.EnumName(IResponseType_name, int32(x))
 }
 
+type Hop struct {
+	Ip  uint32 `protobuf:"varint,1,opt,name=Ip" json:"Ip,omitempty"`
+	Ttl uint32 `protobuf:"varint,2,opt,name=ttl" json:"ttl,omitempty"`
+}
+
+func (m *Hop) Reset()         { *m = Hop{} }
+func (m *Hop) String() string { return proto.CompactTextString(m) }
+func (*Hop) ProtoMessage()    {}
+
 type Path struct {
-	Hops []uint32 `protobuf:"varint,1,rep,packed,name=hops" json:"hops,omitempty"`
+	Address uint32 `protobuf:"varint,1,opt,name=address" json:"address,omitempty"`
+	Dest    uint32 `protobuf:"varint,2,opt,name=dest" json:"dest,omitempty"`
+	Hops    []*Hop `protobuf:"bytes,3,rep,name=hops" json:"hops,omitempty"`
 }
 
 func (m *Path) Reset()         { *m = Path{} }
 func (m *Path) String() string { return proto.CompactTextString(m) }
 func (*Path) ProtoMessage()    {}
+
+func (m *Path) GetHops() []*Hop {
+	if m != nil {
+		return m.Hops
+	}
+	return nil
+}
 
 type IntersectionRequest struct {
 	Address    uint32 `protobuf:"varint,1,opt,name=address" json:"address,omitempty"`

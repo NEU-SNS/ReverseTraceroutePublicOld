@@ -71,6 +71,7 @@ func makeDb(conf Config) (*sql.DB, error) {
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
+	db.SetMaxIdleConns(2)
 	db.SetMaxOpenConns(24)
 	return db, nil
 }
@@ -958,10 +959,15 @@ type hopRow struct {
 	ttl  uint32
 }
 
+var (
+	// ErrNoIntFound is returned when no intersection is found
+	ErrNoIntFound = fmt.Errorf("No Intersection Found")
+)
+
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
 func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Src, pair.Src, pair.Dst, pair.Dst)
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, pair.Dst, pair.Src, pair.Src)
 	if err != nil {
 		return nil, err
 	}
@@ -970,11 +976,16 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 	for rows.Next() {
 		row := &hopRow{}
 		rows.Scan(&row.src, &row.dest, &row.hop, &row.ttl)
-		ret.Hops = append(ret.Hops, row.hop)
+		ret.Hops = append(ret.Hops, &dm.Hop{
+			Ip:  row.hop,
+			Ttl: row.ttl,
+		})
 	}
-
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+	if len(ret.Hops) == 0 {
+		return nil, ErrNoIntFound
 	}
 	return []*dm.Path{&ret}, nil
 }

@@ -2,10 +2,15 @@ syntax = "proto3";
 
 package datamodel;
 
+message Hop {
+    uint32 Ip  = 1;
+    uint32 ttl = 2;
+}
+
 message Path {
     uint32 address       = 1;
     uint32 dest          = 2;
-    repeated uint32 hops = 3 [packed = true];
+    repeated Hop hops    = 3 ;
 }
 
 enum IResponseType {
