@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
+	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

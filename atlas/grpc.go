@@ -3,6 +3,8 @@ package atlas
 import (
 	"io"
 
+	"golang.org/x/net/context"
+
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -19,38 +21,46 @@ func (gs GRPCServ) GetIntersectingPath(stream pb.Atlas_GetIntersectingPathServer
 	in := make(chan *dm.IntersectionRequest)
 	ec := make(chan error)
 	inc := make(chan *dm.IntersectionRequest)
-	ret, err := gs.AtlasService.GetIntersectingPath(stream.Context(), in)
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+	rets, err := gs.AtlasService.GetIntersectingPath(ctx, in)
 	if err != nil {
 		log.Error(err)
 		return err
 	}
 	go func() {
-		req, err := stream.Recv()
-		if err == io.EOF {
-			// set inc to nil to close off that par tof the select loop
-			inc = nil
-			close(in)
-			return
+		for {
+			req, err := stream.Recv()
+			if err == io.EOF {
+				close(inc)
+				return
+			}
+			if err != nil {
+				log.Error(err)
+				ec <- err
+				return
+			}
+			inc <- req
 		}
-		if err != nil {
-			ec <- err
-			return
-		}
-		inc <- req
 	}()
 	for {
 		select {
 		case err = <-ec:
-			close(in)
+			log.Error(err)
 			return err
-		case in <- <-inc:
-		case ir, ok := <-ret:
+		case r, ok := <-inc:
+			if !ok {
+				inc = nil
+				close(in)
+				continue
+			}
+			in <- r
+		case ir, ok := <-rets:
 			if !ok {
 				return nil
 			}
 			if err = stream.Send(ir); err != nil {
 				log.Error(err)
-				close(in)
 				return err
 			}
 		}

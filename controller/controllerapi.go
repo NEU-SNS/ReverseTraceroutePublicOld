@@ -32,7 +32,7 @@ import (
 	"io"
 	"time"
 
-	cont "github.com/NEU-SNS/ReverseTraceroute/controllerapi"
+	cont "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	con "golang.org/x/net/context"

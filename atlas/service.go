@@ -44,6 +44,7 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, in <-chan *dm.Intersect
 				}
 				res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, time.Duration(ir.Staleness))
 				if err != nil {
+					log.Error(err)
 					ret <- &dm.IntersectionResponse{
 						Type:  dm.IResponseType_ERROR,
 						Error: err.Error(),
@@ -141,7 +142,7 @@ func (a *Atlas) updateTraceroutes() {
 	if err != nil {
 		log.Error(err)
 	}
-	tick := time.NewTicker(time.Hour * 12)
+	tick := time.NewTicker(time.Minute * 10)
 	for {
 		select {
 		case <-a.donec:

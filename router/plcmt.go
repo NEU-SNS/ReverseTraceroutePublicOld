@@ -33,7 +33,7 @@ import (
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
+	"github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

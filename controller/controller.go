@@ -40,7 +40,7 @@ import (
 	"sync/atomic"
 
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
-	"github.com/NEU-SNS/ReverseTraceroute/controllerapi"
+	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/router"
