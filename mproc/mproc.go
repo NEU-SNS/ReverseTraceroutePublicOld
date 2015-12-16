@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -52,6 +53,7 @@ var id uint32
 type MProc interface {
 	ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error)
 	KillAll()
+	IntAll()
 	EndKeepAlive(id uint32) error
 	SignalProc(id uint32, sig os.Signal) error
 	WaitProc(id uint32) chan error
@@ -93,6 +95,17 @@ func (mp *mProc) KillAll() {
 		v.endKeepAlive()
 		v.mu.Lock()
 		v.p.Kill()
+		v.mu.Unlock()
+	}
+}
+
+func (mp *mProc) IntAll() {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	for _, v := range mp.managedProcs {
+		v.endKeepAlive()
+		v.mu.Lock()
+		v.p.Signal(syscall.SIGINT)
 		v.mu.Unlock()
 	}
 }
@@ -154,7 +167,7 @@ func (mp *mProc) keepAlive(id uint32) {
 					}
 				}
 				log.Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
-				p.remRetry -= 1
+				p.remRetry--
 				mp.keepAlive(id)
 			}
 			return
@@ -173,8 +186,7 @@ func (mp *managedP) endKeepAlive() {
 func (mp *mProc) EndKeepAlive(id uint32) error {
 	p := mp.getMp(id)
 	if p == nil {
-		return errors.New(
-			fmt.Sprintf("Error: Process with ID: %d does not exist", id))
+		return fmt.Errorf("Error: Process with ID: %d does not exist", id)
 	}
 
 	pid, _ := p.p.Pid()
@@ -192,8 +204,7 @@ func (mp *mProc) getMp(id uint32) *managedP {
 func (mp *mProc) SignalProc(id uint32, sig os.Signal) error {
 	pro := mp.GetProc(id)
 	if pro == nil {
-		return errors.New(
-			fmt.Sprintf("Error: No proc with Id: %d", id))
+		return fmt.Errorf("Error: No proc with Id: %d", id)
 	}
 	return pro.Signal(sig)
 }
@@ -216,8 +227,7 @@ func (mp *mProc) GetProc(id uint32) *proc.Process {
 func (mp *mProc) KillProc(id uint32) error {
 	proc := mp.GetProc(id)
 	if proc == nil {
-		return errors.New(
-			fmt.Sprintf("Error: No proc with Id: %d", id))
+		return fmt.Errorf("Error: No proc with Id: %d", id)
 	}
 	return proc.Kill()
 }
