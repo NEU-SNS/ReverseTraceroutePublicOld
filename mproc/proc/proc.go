@@ -24,6 +24,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+// Package proc represents a process
 package proc
 
 import (
@@ -35,6 +37,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
+// Process represents a process
 type Process struct {
 	proc      *os.Process
 	procAttr  *os.ProcAttr
@@ -45,10 +48,12 @@ type Process struct {
 	started   bool
 }
 
+// New creates a new process
 func New(p string, pA *os.ProcAttr, argv ...string) *Process {
 	return &Process{prog: p, procAttr: pA, argv: argv}
 }
 
+// SetArg sets an argument
 func (p *Process) SetArg(i int, arg string) error {
 	if i > len(p.argv)-1 || i < 0 {
 		return fmt.Errorf("Arg index out of range")
@@ -62,25 +67,25 @@ func (p *Process) String() string {
 	return s
 }
 
+// Prog gets the program name
 func (p *Process) Prog() string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.prog
 }
 
+// Pid get the pid of the process
 func (p *Process) Pid() (int, error) {
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.proc != nil {
-		log.Infoln("Getting Pid for process: %d", p.proc.Pid)
 		return p.proc.Pid, nil
 	}
-	log.Errorln("Attempted to get Pid for unstarted process: %v", p)
-
 	return 0, errors.New("The Process is not yet started")
 }
 
+// Start starts a process
 func (p *Process) Start() (int, error) {
 
 	p.mu.Lock()
@@ -113,13 +118,15 @@ func (p *Process) Start() (int, error) {
 	return p.proc.Pid, nil
 }
 
+// HasProc returns weather or not there is an os process associated
+// with the process
 func (p *Process) HasProc() bool {
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.proc != nil
 }
 
+// Signal signals the process
 func (p *Process) Signal(sig os.Signal) error {
 
 	p.mu.Lock()
@@ -133,6 +140,7 @@ func (p *Process) Signal(sig os.Signal) error {
 	return errors.New("Cannot Signal a process that hasn't started)")
 }
 
+// Kill kills the process
 func (p *Process) Kill() error {
 
 	p.mu.Lock()
@@ -146,6 +154,7 @@ func (p *Process) Kill() error {
 	return errors.New("Cannot Kill a process that hasn't started)")
 }
 
+// Wait waits on the process
 func (p *Process) Wait() chan error {
 
 	p.mu.Lock()
@@ -169,6 +178,7 @@ func (p *Process) Wait() chan error {
 	return done
 }
 
+// GetWaitStatus gets the result of the OS wait syscall
 func (p *Process) GetWaitStatus() *os.ProcessState {
 
 	p.mu.Lock()

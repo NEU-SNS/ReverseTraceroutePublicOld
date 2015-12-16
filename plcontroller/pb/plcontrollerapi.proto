@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "plcontrollerapi";
+option go_package = "pb";
 
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto";
 import "github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto";

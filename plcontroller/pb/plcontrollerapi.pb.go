@@ -3,14 +3,14 @@
 // DO NOT EDIT!
 
 /*
-Package plcontrollerapi is a generated protocol buffer package.
+Package pb is a generated protocol buffer package.
 
 It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb/plcontrollerapi.proto
 
 It has these top-level messages:
 */
-package plcontrollerapi
+package pb
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"

@@ -41,7 +41,7 @@ import (
 type plmt struct {
 	s  ServiceDef
 	c  *grpc.ClientConn
-	cl plcontrollerapi.PLControllerClient
+	cl pb.PLControllerClient
 }
 
 func (p plmt) ReceiveSpoof(ctx con.Context, rs *dm.RecSpoof) (<-chan *dm.NotifyRecSpoofResponse, error) {
@@ -160,7 +160,7 @@ func createPLMT(s ServiceDef) (plmt, error) {
 		log.Error(err)
 		return ret, err
 	}
-	cl := plcontrollerapi.NewPLControllerClient(conn)
+	cl := pb.NewPLControllerClient(conn)
 	ret.c = conn
 	ret.cl = cl
 	ret.s = s

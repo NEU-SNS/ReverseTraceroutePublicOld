@@ -341,7 +341,7 @@ func (c *plControllerT) stop() {
 		c.w.Close()
 	}
 	if c.mp != nil {
-		c.mp.KillAll()
+		c.mp.IntAll()
 	}
 	c.removeAllVps()
 	c.db.Close()
