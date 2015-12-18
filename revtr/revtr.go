@@ -3,12 +3,20 @@ package revtr
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"sync"
 
+	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
 var plHost2IP map[string]string
-var ipToCluster map[string]int
+var ipToCluster map[string]string
+var tsAdjsByCluster bool
+var vps []*datamodel.VantagePoint
+var rrVPsByCluster bool
 
 // Adjacency are adjacencies
 type Adjacency struct {
@@ -120,9 +128,9 @@ type ReverseTraceroute struct {
 	Paths           []*ReversePath
 	DeadEnd         map[string]bool
 	RRHop2RateLimit map[string]int
-	RRHop2VPSLeft   map[string][]*datamodel.VantagePoint
+	RRHop2VPSLeft   map[string][]string
 	TSHop2RateLimit map[string]int
-	TSHop2AdjsLeft  map[string][]Adjacency
+	TSHop2AdjsLeft  map[string][]string
 	Src, Dst        string
 }
 
@@ -156,7 +164,7 @@ func (rt *ReverseTraceroute) rrVPSInitializedForHop(hop string) bool {
 	return ok
 }
 
-func (rt *ReverseTraceroute) setRRVPSForHop(hop string, vps []*datamodel.VantagePoint) {
+func (rt *ReverseTraceroute) setRRVPSForHop(hop string, vps []string) {
 	rt.RRHop2VPSLeft[hop] = vps
 }
 
@@ -193,8 +201,14 @@ func (rt *ReverseTraceroute) Failed(backoffEndhost bool) bool {
 // FailCurrPath fails the current path
 func (rt *ReverseTraceroute) FailCurrPath() {
 	rt.DeadEnd[rt.LastHop()] = true
-	// Original code has a whole lot of logic here just to print some logs
-	// For now i'm going to ignore
+	// keep popping until we find something that is either on a path
+	// we are assuming symmetric (we know it started at src so goes to whole way)
+	// or is not known to be a deadend
+	for !rt.Failed(false) && rt.DeadEnd[rt.LastHop()] && reflect.TypeOf(rt.CurrPath().LastSeg()) !=
+		reflect.TypeOf(&DstSymRevSegment{}) {
+		// Pop
+		rt.Paths = rt.Paths[:len(rt.Paths)-1]
+	}
 }
 
 // AddAndReplaceSegment adds a new path, equal to the current one but with the last
@@ -204,5 +218,375 @@ func (rt *ReverseTraceroute) FailCurrPath() {
 func (rt *ReverseTraceroute) AddAndReplaceSegment(s Segment) bool {
 	if rt.DeadEnd[s.LastHop()] {
 		return false
+	}
+	basePath := rt.CurrPath()
+	basePath.Pop()
+	basePath.Add(s)
+	rt.Paths = append(rt.Paths, basePath)
+	return true
+}
+
+/*
+TODO
+I'm not entirely sure that this sort will match  the ruby one
+It will need to be tested and verified
+*/
+type magicSort []Segment
+
+func (ms magicSort) Len() int           { return len(ms) }
+func (ms magicSort) Swap(i, j int)      { ms[i], ms[j] = ms[j], ms[i] }
+func (ms magicSort) Less(i, j int) bool { return ms[i].Order(ms[j]) < 0 }
+
+// AddSegments returns a bool of whether any were added
+// might not be added if they are deadends
+// or if all hops would cause loops
+func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
+	var added *bool
+	added = new(bool)
+	// sort based on the magic compare
+	// or how long the path is?
+	sort.Sort(magicSort(segs))
+	basePath := rt.CurrPath()
+	for _, s := range segs {
+		if !rt.DeadEnd[s.LastHop()] {
+			// add loop removal here
+			s.RemoveHops(basePath.Hops())
+			if s.Length(false) == 0 {
+				log.Debug("Skipping loop-causing segment ", s)
+				continue
+			}
+			*added = true
+			basePath.Add(s)
+			rt.Paths = append(rt.Paths, basePath)
+		}
+	}
+	return *added
+}
+
+type adjSettings struct {
+	timeout      int
+	maxnum       int
+	maxalert     string
+	retryCommand bool
+}
+
+func getAdjacenciesForIPToSrc(cls string, src string, settings adjSettings) ([]string, error) {
+	return nil, nil
+}
+
+// InitializeTSAdjacents ...
+func (rt *ReverseTraceroute) InitializeTSAdjacents(cls string) error {
+	adjs, err := getAdjacenciesForIPToSrc(cls, rt.Src, adjSettings{})
+	if err != nil {
+		return err
+	}
+	var cleaned []string
+	for _, ip := range adjs {
+		if cls != ipToCluster[ip] {
+			cleaned = append(cleaned, ip)
+		}
+	}
+	rt.TSHop2AdjsLeft[cls] = cleaned
+	return nil
+}
+
+// GetTSAdjacents get the set of adjacents to try for a hop
+// for revtr:s,d,r, the set of R' left to consider, or if there are none
+// will return the number that we want to probe at a time
+func (rt *ReverseTraceroute) GetTSAdjacents(hop string) []string {
+	var cls string
+	if tsAdjsByCluster {
+		cls = ipToCluster[hop]
+	} else {
+		cls = hop
+	}
+	if _, ok := rt.TSHop2AdjsLeft[cls]; !ok {
+		rt.InitializeTSAdjacents(cls)
+	}
+	log.Debug(rt.Src, rt.Dst, rt.LastHop(), len(rt.TSHop2AdjsLeft[cls]), "TS adjacents left to try")
+
+	// CASES:
+	// 1. no adjacents left return nil
+	if len(rt.TSHop2AdjsLeft[cls]) == 0 {
+		return nil
+	}
+	// CAN EVENTUALLY MOVE TO REUSSING PROBES TO THIS DST FROM ANOTHER
+	// REVTR, BUT NOT FOR NOW
+	// 2. For now, we just take the next batch and send them
+	var min int
+	var rate int
+	if val, ok := rt.TSHop2RateLimit[cls]; ok {
+		rate = val
+	} else {
+		rate = 1
+	}
+	if rate > len(rt.TSHop2AdjsLeft[cls]) {
+		min = len(rt.TSHop2AdjsLeft[cls])
+	} else {
+		min = rate
+	}
+	adjacents := rt.TSHop2AdjsLeft[cls][:min]
+	rt.TSHop2AdjsLeft[cls] = rt.TSHop2AdjsLeft[cls][min:]
+	return adjacents
+}
+
+func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
+	ret := make(map[string]*datamodel.VantagePoint)
+	for _, vp := range vps {
+		if vp.CanSpoof {
+			ret[vp.Site] = vp
+		}
+	}
+	return ret
+}
+
+// for now we're just ignoring the src dst and choosing randomly
+func getTimestampSpoofers(src, dst string) []*datamodel.VantagePoint {
+	siteToSpoofer := chooseOneSpooferPerSite()
+	var spoofers []*datamodel.VantagePoint
+	for _, val := range siteToSpoofer {
+		if val.Timestamp {
+			spoofers = append(spoofers, val)
+		}
+	}
+	return spoofers
+}
+
+// InitializeRRVPs initializes the rr vps for a cls
+func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
+	log.Debug("Initializing RR VPs individually for spoofers for ", cls)
+	rt.RRHop2RateLimit[cls] = RateLimit
+	siteToSpoofer := chooseOneSpooferPerSite()
+	var sitesForTarget []*datamodel.VantagePoint
+	sitesForTarget = nil
+	spoofersForTarget := []string{"non_spoofed"}
+
+	if sitesForTarget == nil {
+		// This should be the same as sorting the values randomly
+		// since iterating over a map is randomized by the runtime
+		for _, val := range siteToSpoofer {
+			ipsrc, _ := util.Int32ToIPString(val.Ip)
+			if ipsrc == rt.Src {
+				continue
+			}
+			spoofersForTarget = append(spoofersForTarget, ipsrc)
+		}
+	} else {
+		// TODO
+		// This is the case for using smarter results for vp selection
+		// currently we don't have this so nothing is gunna happen
+	}
+	rt.RRHop2VPSLeft[cls] = spoofersForTarget
+	return nil
+}
+
+func cloneStringSlice(ss []string) []string {
+	var ret []string
+	for _, s := range ss {
+		ret = append(ret, s)
+	}
+	return ret
+}
+
+var batchInitRRVPs = true
+var rrsSrcToDstToVPToRevHops = make(map[string]map[string]map[string][]string)
+var maxUnresponsive = 10
+
+func stringSliceMinus(l, r []string) []string {
+	old := make(map[string]bool)
+	var ret []string
+	for _, s := range l {
+		old[s] = true
+	}
+	for _, s := range r {
+		if _, ok := old[s]; ok {
+			delete(old, s)
+		}
+	}
+	for key := range old {
+		ret = append(ret, key)
+	}
+	return ret
+}
+
+// GetRRVPs returns the next set to probe from, plus the next destination to probe
+// nil means none left, already probed from anywhere
+// the first time, initialize the set of VPs
+// if any exist that have already probed the dst but haven't been used in
+// this reverse traceroute, return them, otherwise return [:non_spoofed] first
+// then set of spoofing VPs on subsequent calls
+func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
+	// we either use destination or cluster, depending on how flag is set
+	if !batchInitRRVPs {
+		hops := rt.CurrPath().LastSeg().Hops()
+		for _, hop := range hops {
+			cls := &hop
+			if rrVPsByCluster {
+				*cls = ipToCluster[dst]
+			}
+			if _, ok := rt.RRHop2VPSLeft[*cls]; !ok {
+				rt.InitializeRRVPs(*cls)
+			}
+		}
+	}
+	// CASES:
+	segHops := cloneStringSlice(rt.CurrPath().LastSeg().Hops())
+	var target, cls *string
+	target = new(string)
+	cls = new(string)
+	var foundVPs bool
+	for !foundVPs && len(segHops) > 0 {
+		*target, segHops = segHops[len(segHops)-1], segHops[:len(segHops)-1]
+		*cls = *target
+		if rrVPsByCluster {
+			*cls = ipToCluster[*target]
+		}
+		var vals [][]string
+		for _, val := range rrsSrcToDstToVPToRevHops[rt.Src][*cls] {
+			if len(val) > 0 {
+				vals = append(vals, val)
+			}
+		}
+		// 0. destination seems to be unresponsive
+		if len(rrsSrcToDstToVPToRevHops[rt.Src][*cls]) >= maxUnresponsive &&
+			// this may not match exactly but I think it does
+			len(vals) == 0 {
+			continue
+		}
+		// 1. no VPs left, return nil
+		if len(rt.RRHop2VPSLeft[*cls]) == 0 {
+			continue
+		}
+		foundVPs = true
+	}
+	if !foundVPs {
+		return nil, ""
+	}
+	log.Debug(rt.Src, rt.Dst, *target, len(rt.RRHop2VPSLeft[*cls]), "RR VPs left to try")
+	// 2. probes to this dst that were already issues for other reverse
+	// traceroutes, but not in this reverse traceroute
+	var keys []string
+	tmp := rrsSrcToDstToVPToRevHops[rt.Src][*cls]
+	for k := range tmp {
+		keys = append(keys, k)
+	}
+	usedVps := stringSet(keys).union(stringSet(rt.RRHop2VPSLeft[*cls]))
+	rt.RRHop2VPSLeft[*cls] = stringSliceMinus(rt.RRHop2VPSLeft[*cls], usedVps)
+	var finalUsedVPs []string
+	for _, uvp := range usedVps {
+		idk, ok := rrsSrcToDstToVPToRevHops[rt.Src][*cls][uvp]
+		if ok && len(idk) > 0 {
+			continue
+		}
+		finalUsedVPs = append(finalUsedVPs, uvp)
+	}
+	if len(finalUsedVPs) > 0 {
+		return finalUsedVPs, *target
+	}
+
+	// 3. send non-spoofed version if it is in the next batch
+	min := rt.RRHop2RateLimit[*cls]
+	if len(rt.RRHop2VPSLeft[*cls]) < min {
+		min = len(rt.RRHop2VPSLeft[*cls])
+	}
+	if rt.RRHop2VPSLeft[*cls][0:min][0] == "non_spoofed" {
+		rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][1:]
+		return []string{"non_spoofed"}, *target
+	}
+
+	// 4. use unused spoofing VPs
+	// if the current last hop was discovered with spoofed, and it
+	// hasn't been used yet, use it
+	notEmpty := len(rt.Paths) > 0
+	var isRRRev, containsKey *bool
+	isRRRev = new(bool)
+	containsKey = new(bool)
+	spoofer := new(string)
+	if rrev, ok := rt.CurrPath().LastSeg().(*SpoofRRRevSegment); ok {
+		*isRRRev = true
+		*spoofer = rrev.SpoofSource
+		if _, ok := rrsSrcToDstToVPToRevHops[rt.Src][*cls][rrev.SpoofSource]; ok {
+			*containsKey = true
+		}
+	}
+	if notEmpty && *isRRRev && !*containsKey {
+		log.Debug("Found recent spoofer to use ", *spoofer)
+		var newleft []string
+		for _, s := range rt.RRHop2VPSLeft[*cls] {
+			if s == *spoofer {
+				continue
+			}
+			newleft = append(newleft, s)
+		}
+		rt.RRHop2VPSLeft[*cls] = newleft
+		min := rt.RRHop2RateLimit[*cls] - 1
+		if len(rt.RRHop2VPSLeft[*cls]) < min {
+			min = len(rt.RRHop2VPSLeft[*cls])
+		}
+		vps := append([]string{*spoofer}, rt.RRHop2VPSLeft[*cls][:min]...)
+		rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][min:]
+		return vps, *target
+	}
+	min = rt.RRHop2RateLimit[*cls]
+	if len(rt.RRHop2VPSLeft[*cls]) < min {
+		min = len(rt.RRHop2VPSLeft[*cls])
+	}
+	vps := rt.RRHop2VPSLeft[*cls][:min]
+	rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][min:]
+	return vps, *target
+}
+
+var dstMustBeReachable = true
+
+// ReverseTracerouteReq isa revtr req
+type ReverseTracerouteReq struct {
+	Src, Dst string
+}
+
+func reverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client) (*ReverseTraceroute, string, map[string]int, error) {
+	probeCount := make(map[string]int)
+	//rt := NewReverseTraceroute(revtr.Src, revtr.Dst)
+	return nil, "", probeCount, nil
+}
+
+var trsSrcToDstToPath = make(map[string]map[string]string)
+var trsMu sync.Mutex
+
+func issueTraceroute(revtr *ReverseTraceroute, cl client.Client, deleteUnresponsive bool) {
+	src, _ := util.IPStringToInt32(revtr.Src)
+	dst, _ := util.IPStringToInt32(revtr.LastHop())
+	tr := datamodel.TracerouteMeasurement{
+		Src: src,
+		Dst: dst,
+	}
+	st, err := cl.Traceroute(&datamodel.TracerouteArg{
+		Traceroutes: []*datamodel.TracerouteMeasurement{&tr},
+	})
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func reverseHopsAssumeSymmetric(revtr *ReverseTraceroute, cl client.Client, probeCounts map[string]int) {
+	// if last hop is assumed, add one more from that tr
+	if reflect.TypeOf(revtr.CurrPath().LastSeg()) == reflect.TypeOf(&DstSymRevSegment{}) {
+		log.Debug("Backing off along current path for ", revtr.Src, revtr.Dst)
+		// need to not ignore the hops in the last segment, so can't just
+		// call add_hops(revtr.hops + revtr.deadends)
+		newSeg := revtr.CurrPath().LastSeg().(*DstSymRevSegment)
+		var allHops []string
+		for _, seg := range revtr.CurrPath().Path {
+			allHops = append(allHops, seg.Hops()...)
+		}
+		allHops = append(allHops, revtr.Deadends()...)
+		newSeg.AddHop(allHops)
+		added := revtr.AddAndReplaceSegment(newSeg)
+		if added {
+			return
+		}
+	}
+	trsMu.Lock()
+	_, ok := trsSrcToDstToPath[revtr.Src][ipToCluster[revtr.LastHop()]]
+	if !ok {
 	}
 }
