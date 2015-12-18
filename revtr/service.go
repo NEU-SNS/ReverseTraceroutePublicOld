@@ -58,18 +58,35 @@ func (ss stringSet) union(s stringSet) []string {
 	return ret
 }
 
+// Segment is the interface for a segment
 type Segment interface {
 	Hops() []string
 	LastHop() string
 	Length(bool) int
 	Reaches() bool
 	SymmetricAssumptions() int
+	Order(Segment) int
+	RemoveHops([]string) error
+	Clone() Segment
 }
 
 // RevSegment is a...
 type RevSegment struct {
 	Segment  []string
 	Src, Hop string
+}
+
+func (rv *RevSegment) clone() *RevSegment {
+	ret := RevSegment{
+		Src: rv.Src,
+		Hop: rv.Hop,
+	}
+	ret.Segment = append(ret.Segment, ret.Segment...)
+	return &ret
+}
+
+func (rv *RevSegment) Clone() Segment {
+	return rv.clone()
 }
 
 func (rv *RevSegment) String() string {
@@ -230,9 +247,8 @@ func (rv *RevSegment) Order(b Segment) int {
 				return 0
 			}
 			return 1
-		} else {
-			return orderStringArray(rv.Segment, b.Hops())
 		}
+		return orderStringArray(rv.Segment, b.Hops())
 	} else if rv.Reaches() {
 		return 1
 	} else if b.Reaches() {
@@ -288,6 +304,19 @@ type DstSymRevSegment struct {
 	*RevSegment
 	tr      []string
 	numHops int
+}
+
+func (d *DstSymRevSegment) clone() *DstSymRevSegment {
+	ret := DstSymRevSegment{
+		RevSegment: d.RevSegment.clone(),
+		numHops:    d.numHops,
+	}
+	ret.tr = append(ret.tr, d.tr...)
+	return &ret
+}
+
+func (d *DstSymRevSegment) Clone() Segment {
+	return d.clone()
 }
 
 func (d *DstSymRevSegment) String() string {
@@ -393,6 +422,17 @@ func NewRRRevSegment(segment []string, src, hop string) *RRRevSegment {
 	return &ret
 }
 
+func (d *RRRevSegment) clone() *RRRevSegment {
+	ret := RRRevSegment{
+		RevSegment: d.RevSegment.clone(),
+	}
+	return &ret
+}
+
+func (d *RRRevSegment) Clone() Segment {
+	return d.clone()
+}
+
 func (d *RRRevSegment) String() string {
 	return fmt.Sprintf("%s_RR", d.RevSegment.String())
 }
@@ -401,6 +441,18 @@ func (d *RRRevSegment) String() string {
 type SpoofRRRevSegment struct {
 	*RRRevSegment
 	SpoofSource string
+}
+
+func (d *SpoofRRRevSegment) clone() *SpoofRRRevSegment {
+	ret := SpoofRRRevSegment{
+		RRRevSegment: d.RRRevSegment.clone(),
+		SpoofSource:  d.SpoofSource,
+	}
+	return &ret
+}
+
+func (d *SpoofRRRevSegment) Clone() Segment {
+	return d.clone()
 }
 
 func (d *SpoofRRRevSegment) String() string {
@@ -423,6 +475,18 @@ type TSAdjRevSegment struct {
 	LinuxBug bool
 }
 
+func (d *TSAdjRevSegment) clone() *TSAdjRevSegment {
+	ret := TSAdjRevSegment{
+		RevSegment: d.RevSegment.clone(),
+		LinuxBug:   d.LinuxBug,
+	}
+	return &ret
+}
+
+func (d *TSAdjRevSegment) Clone() Segment {
+	return d.clone()
+}
+
 func (d *TSAdjRevSegment) String() string {
 	if d.LinuxBug {
 		return fmt.Sprintf("%s_TSAdj_LinuxBug", d.RevSegment.String())
@@ -430,7 +494,7 @@ func (d *TSAdjRevSegment) String() string {
 	return fmt.Sprintf("%s_TSAdj", d.RevSegment.String())
 }
 
-// NewTsAdjRevSegment creates a new TSAdjRevSegment
+// NewTSAdjRevSegment creates a new TSAdjRevSegment
 func NewTSAdjRevSegment(segment []string, src, hop string, linuxbug bool) *TSAdjRevSegment {
 	ret := TSAdjRevSegment{
 		LinuxBug:   linuxbug,
@@ -443,6 +507,18 @@ func NewTSAdjRevSegment(segment []string, src, hop string, linuxbug bool) *TSAdj
 type SpoofTSAdjRevSegment struct {
 	*TSAdjRevSegment
 	SpoofSource string
+}
+
+func (d *SpoofTSAdjRevSegment) clone() *SpoofTSAdjRevSegment {
+	ret := SpoofTSAdjRevSegment{
+		TSAdjRevSegment: d.TSAdjRevSegment.clone(),
+		SpoofSource:     d.SpoofSource,
+	}
+	return &ret
+}
+
+func (d *SpoofTSAdjRevSegment) Clone() Segment {
+	return d.clone()
 }
 
 func (d *SpoofTSAdjRevSegment) String() string {
@@ -467,6 +543,17 @@ type SpoofTSAdjRevSegmentTSZero struct {
 	*SpoofTSAdjRevSegment
 }
 
+func (d *SpoofTSAdjRevSegmentTSZero) clone() *SpoofTSAdjRevSegmentTSZero {
+	ret := SpoofTSAdjRevSegmentTSZero{
+		SpoofTSAdjRevSegment: d.SpoofTSAdjRevSegment.clone(),
+	}
+	return &ret
+}
+
+func (d *SpoofTSAdjRevSegmentTSZero) Clone() Segment {
+	return d.clone()
+}
+
 func (d *SpoofTSAdjRevSegmentTSZero) String() string {
 	return fmt.Sprintf("%s_Dst0", d.SpoofTSAdjRevSegment.String())
 }
@@ -485,6 +572,17 @@ func NewSpoofTSAdjRevSegmentTSZero(segment []string, src, hop, spfsrc string, li
 // and we assume one was fwd, one rev
 type SpoofTSAdjRevSegmentTSZeroDoubleStamp struct {
 	*SpoofTSAdjRevSegmentTSZero
+}
+
+func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) clone() *SpoofTSAdjRevSegmentTSZeroDoubleStamp {
+	ret := SpoofTSAdjRevSegmentTSZeroDoubleStamp{
+		SpoofTSAdjRevSegmentTSZero: d.SpoofTSAdjRevSegmentTSZero.clone(),
+	}
+	return &ret
+}
+
+func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) Clone() Segment {
+	return d.clone()
 }
 
 func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) String() string {
