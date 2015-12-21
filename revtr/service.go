@@ -85,6 +85,7 @@ func (rv *RevSegment) clone() *RevSegment {
 	return &ret
 }
 
+// Clone is for the interface
 func (rv *RevSegment) Clone() Segment {
 	return rv.clone()
 }
@@ -315,6 +316,7 @@ func (d *DstSymRevSegment) clone() *DstSymRevSegment {
 	return &ret
 }
 
+// Clone is for the interface
 func (d *DstSymRevSegment) Clone() Segment {
 	return d.clone()
 }
@@ -429,6 +431,7 @@ func (d *RRRevSegment) clone() *RRRevSegment {
 	return &ret
 }
 
+// Clone is for the interface
 func (d *RRRevSegment) Clone() Segment {
 	return d.clone()
 }
@@ -451,6 +454,7 @@ func (d *SpoofRRRevSegment) clone() *SpoofRRRevSegment {
 	return &ret
 }
 
+// Clone is for the interface
 func (d *SpoofRRRevSegment) Clone() Segment {
 	return d.clone()
 }
@@ -483,6 +487,7 @@ func (d *TSAdjRevSegment) clone() *TSAdjRevSegment {
 	return &ret
 }
 
+// Clone is for the interface
 func (d *TSAdjRevSegment) Clone() Segment {
 	return d.clone()
 }
@@ -517,6 +522,7 @@ func (d *SpoofTSAdjRevSegment) clone() *SpoofTSAdjRevSegment {
 	return &ret
 }
 
+// Clone is for the iterface
 func (d *SpoofTSAdjRevSegment) Clone() Segment {
 	return d.clone()
 }
@@ -550,6 +556,7 @@ func (d *SpoofTSAdjRevSegmentTSZero) clone() *SpoofTSAdjRevSegmentTSZero {
 	return &ret
 }
 
+// Clone is for the interface
 func (d *SpoofTSAdjRevSegmentTSZero) Clone() Segment {
 	return d.clone()
 }
@@ -581,6 +588,7 @@ func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) clone() *SpoofTSAdjRevSegmentTSZ
 	return &ret
 }
 
+// Clone is for the interface
 func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) Clone() Segment {
 	return d.clone()
 }
