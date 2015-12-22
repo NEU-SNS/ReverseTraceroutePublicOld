@@ -1088,7 +1088,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 	type tripletTs struct {
 		src, dst, tsip string
 	}
-	var revHopsSrcDstToRevSeg = make(map[pair]Segment)
+	var revHopsSrcDstToRevSeg = make(map[pair][]Segment)
 	var linuxBugToCheckSrcDstVpToRevHops = make(map[triplet][]string)
 	var destDoesNotStamp []tripletTs
 
@@ -1113,7 +1113,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 				} else {
 					seg = NewTSAdjRevSegment([]string{ss}, src, dsts, false)
 				}
-				revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = seg
+				revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []Segment{seg}
 			} else if ts2.Ts != 0 {
 				if ts2.Ts-ts1.Ts > 3 || ts2.Ts < ts1.Ts {
 					// if 2nd slot is stamped with an increment from 1st, rev hop
@@ -1202,7 +1202,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 					} else {
 						seg = NewSpoofTSAdjRevSegment([]string{revhop}, src, dsts, vp, false)
 					}
-					revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = seg
+					revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []Segment{seg}
 				}
 			}
 		}
@@ -1238,7 +1238,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 		if ts2.Ts != 0 && ts4.Ts == 0 {
 			// declare reverse hop
 			ts2ips, _ := util.Int32ToIPString(ts2.Ts)
-			revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{ts2ips}, src, dsts, vp, false)
+			revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []Segment{NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{ts2ips}, src, dsts, vp, false)}
 			log.Debug("TS Probe is ", vp, p, "reverse hop from dst that stamps 0!")
 		} else if ts1.Ts != 0 {
 			log.Debug("TS probe is ", vp, p, "dst does not stamp, but spoofer ", vp, "got a stamp")
@@ -1252,6 +1252,59 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 	}
 	if len(destDoesNotStamp) > 0 {
 		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSDestDoesNotStamp)
+	}
+
+	// if you don't get a response, add it with false
+	// then at the end
+	if len(destDoesNotStampToVerifySpooferToProbe) > 0 {
+		for vp, probes := range destDoesNotStampToVerifySpooferToProbe {
+			probes = append(probes, probes...)
+			probes = append(probes, probes...)
+			destDoesNotStampToVerifySpooferToProbe[vp] = probes
+		}
+		maybeRevhopVPDstAdjToBool := make(map[tripletTs]bool)
+		revHopsVPDstToRevSeg := make(map[pair][]Segment)
+		processTSDestDoesNotStampToVerify := func(src, vp string, p *datamodel.Ping) {
+			dsts, _ := util.Int32ToIPString(p.Dst)
+			rps := p.GetResponses()
+			ts1 := rps[0].Tsandaddr[0]
+			ts1ips, _ := util.Int32ToIPString(ts1.Ip)
+			if ts1.Ts == 0 {
+				log.Debug("Reverse hop! TS probe is ", vp, p, "dst does not stamp, but spoofer", vp, "got a stamp and didn't direclty")
+				maybeRevhopVPDstAdjToBool[tripletTs{src: src, dst: dsts, tsip: ts1ips}] = true
+			} else {
+				del := tripletTs{src: src, dst: dsts, tsip: ts1ips}
+				for key := range vpDstAdjToInterestedSrcs {
+					if key == del {
+						delete(vpDstAdjToInterestedSrcs, key)
+					}
+				}
+				log.Debug("Can't verify reverse hop! TS probe is ", vp, p, "potential hop stamped on non-spoofed path for VP")
+			}
+		}
+		log.Debug("Issuing to verify for dest does not stamp")
+		issueTimestamps(destDoesNotStampToVerifySpooferToProbe, cl, probeCount, processTSDestDoesNotStampToVerify)
+		for k := range maybeRevhopVPDstAdjToBool {
+			for _, origsrc := range vpDstAdjToInterestedSrcs[tripletTs{src: k.src, dst: k.dst, tsip: k.tsip}] {
+				revHopsVPDstToRevSeg[pair{src: origsrc, dst: k.dst}] = append(revHopsVPDstToRevSeg[pair{src: origsrc, dst: k.dst}], NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{k.tsip}, origsrc, k.dst, k.src, false))
+			}
+
+		}
+	}
+
+	// Ping V/S->R:R',R',R',R'
+	// (i think, but justine has it nested differently) if stamp twice,
+	// declare rev hop, # else if i get one:
+	// if i get responses:
+	// n? times: Ping V/V->R:R',R',R',R'
+	// if (never stamps) // could be a false positive, maybe R' just didn't
+	// feel like stamping this time
+	// return R'
+	// if stamps more thane once, decl,
+	if segments, ok := revHopsSrcDstToRevSeg[pair{src: revtr.Src, dst: revtr.LastHop()}]; ok {
+		if revtr.AddSegments(segments) {
+			return nil
+		}
 	}
 	return nil
 }
