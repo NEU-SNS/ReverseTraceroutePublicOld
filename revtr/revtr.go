@@ -355,12 +355,13 @@ func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
 }
 
 // for now we're just ignoring the src dst and choosing randomly
-func getTimestampSpoofers(src, dst string) []*datamodel.VantagePoint {
+func getTimestampSpoofers(src, dst string) []string {
 	siteToSpoofer := chooseOneSpooferPerSite()
-	var spoofers []*datamodel.VantagePoint
+	var spoofers []string
 	for _, val := range siteToSpoofer {
 		if val.Timestamp {
-			spoofers = append(spoofers, val)
+			ips, _ := util.Int32ToIPString(val.Ip)
+			spoofers = append(spoofers, ips)
 		}
 	}
 	return spoofers
@@ -1019,5 +1020,262 @@ func reverseHopsAssumeSymmetric(revtr *ReverseTraceroute, cl client.Client, prob
 		}
 		return fmt.Errorf("No Hops Added")
 	}
+	return nil
+}
+
+// give a partial reverse traceroute, try to find reverse hops using TS option
+// get the ranked se of adjacents, for each, the set of sources to try (self, spoofers)
+// if you get a reply, try different source.
+// mark info per destination (current hop), then reuse with other adjacents as needed
+//
+// each time we call this, it will try one potential adjacency per revtr
+// (assuming one exists for that revtr). at the end of execution, it shoulod
+// either have found that adjacency, is a rev hop or found that it will not be able
+// to determine that it is (either it isn't, or our techniques weon't be able to
+// tell us if it is)
+//
+// info I need for each:
+// for revtr: s,d,r, the set of R left to consider, or if there are none
+// for a given s,d pair, the set of VPs to try using-- start it at self +
+// the good spoofers
+// whether d is an overstamper
+// whether d doesn't stamp
+// whether d doesn't stamp but will respond
+const (
+	dummyIP = "128.208.3.77"
+)
+
+func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[string]int) error {
+
+	var tsToIssueSrcToProbe = make(map[string][][]string)
+	var receiverToSpooferToProbe = make(map[string]map[string][][]string)
+	var dstsDoNotStamp [][]string
+	if tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()] != 0 {
+		return fmt.Errorf("No VPS")
+	}
+	adjacents := revtr.GetTSAdjacents(ipToCluster[revtr.LastHop()])
+	if len(adjacents) == 0 {
+		return fmt.Errorf("No Adjacents found")
+	}
+	if tsDstToStampsZero[revtr.LastHop()] {
+		for _, adj := range adjacents {
+			dstsDoNotStamp = append(dstsDoNotStamp, []string{revtr.Src, revtr.LastHop(), adj})
+		}
+	} else if tsSrcToHopToSendSpoofed[revtr.Src][revtr.LastHop()] {
+		for _, adj := range adjacents {
+			tsToIssueSrcToProbe[revtr.Src] = append(tsToIssueSrcToProbe[revtr.Src], []string{revtr.LastHop(), revtr.LastHop(), adj, adj, dummyIP})
+		}
+	} else {
+		spfs := getTimestampSpoofers(revtr.Src, revtr.LastHop())
+		for _, adj := range adjacents {
+			for _, spf := range spfs {
+				receiverToSpooferToProbe[revtr.Src][spf] = append(receiverToSpooferToProbe[revtr.Src][spf], []string{revtr.LastHop(), revtr.LastHop(), adj, adj, dummyIP})
+			}
+		}
+		// if we haven't already decided whether it is responsive,
+		// we'll set it to false, then change to true if we get one
+		if _, ok := tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()]; !ok {
+			tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()] = 1
+		}
+	}
+
+	type pair struct {
+		src, dst string
+	}
+	type triplet struct {
+		src, dst, vp string
+	}
+	type tripletTs struct {
+		src, dst, tsip string
+	}
+	var revHopsSrcDstToRevSeg = make(map[pair]Segment)
+	var linuxBugToCheckSrcDstVpToRevHops = make(map[triplet][]string)
+	var destDoesNotStamp []tripletTs
+
+	processTSCheckForRevHop := func(src, vp string, p *datamodel.Ping) {
+		dsts, _ := util.Int32ToIPString(p.Dst)
+		segClass := "SpoofTSAdjRevSegment"
+		if vp == "non_spoofed" {
+			tsSrcToHopToSendSpoofed[src][dsts] = false
+			segClass = "TSAdjRevSegment"
+		}
+		tsSrcToHopToResponsive[src][dsts] = 1
+		rps := p.GetResponses()
+		if len(rps) > 0 && len(rps[0].Tsandaddr) > 2 {
+			ts1 := rps[0].Tsandaddr[0]
+			ts2 := rps[0].Tsandaddr[1]
+			ts3 := rps[0].Tsandaddr[2]
+			if ts3.Ts != 0 {
+				ss, _ := util.Int32ToIPString(rps[0].Tsandaddr[2].Ip)
+				var seg Segment
+				if segClass == "SpoofTSAdjRevSegment" {
+					seg = NewSpoofTSAdjRevSegment([]string{ss}, src, dsts, vp, false)
+				} else {
+					seg = NewTSAdjRevSegment([]string{ss}, src, dsts, false)
+				}
+				revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = seg
+			} else if ts2.Ts != 0 {
+				if ts2.Ts-ts1.Ts > 3 || ts2.Ts < ts1.Ts {
+					// if 2nd slot is stamped with an increment from 1st, rev hop
+					ts2ips, _ := util.Int32ToIPString(ts2.Ip)
+					linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}] = append(linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}], ts2ips)
+				}
+			} else if ts1.Ts == 0 {
+				// if dst responds, does not stamp, can try advanced techniques
+				ts2ips, _ := util.Int32ToIPString(ts2.Ip)
+				tsDstToStampsZero[dsts] = true
+				destDoesNotStamp = append(destDoesNotStamp, tripletTs{src: src, dst: dsts, tsip: ts2ips})
+			} else {
+				log.Debug("TS probe is ", vp, p, "no reverse hop found")
+			}
+		}
+	}
+	if len(tsToIssueSrcToProbe) > 0 {
+		// there should be a uniq thing here but I need to figure out how to do it
+		for src, probes := range tsToIssueSrcToProbe {
+			for _, probe := range probes {
+				if _, ok := tsSrcToHopToSendSpoofed[src][probe[0]]; ok {
+					continue
+				}
+				tsSrcToHopToSendSpoofed[src][probe[0]] = true
+			}
+		}
+		issueTimestamps(tsToIssueSrcToProbe, cl, probeCount, processTSCheckForRevHop)
+		for src, probes := range tsToIssueSrcToProbe {
+			for _, probe := range probes {
+				// if we got a reply, would have set sendspoofed to false
+				// so it is still true, we need to try to find a spoofer
+				if tsSrcToHopToSendSpoofed[src][probe[0]] {
+					mySpoofers := getTimestampSpoofers(src, probe[0])
+					for _, sp := range mySpoofers {
+						receiverToSpooferToProbe[src][sp] = append(receiverToSpooferToProbe[src][sp], probe)
+					}
+					// if we haven't already decided whether it is responsive
+					// we'll set it to false, then change to true if we get one
+					if _, ok := tsSrcToHopToResponsive[src][probe[0]]; !ok {
+						tsSrcToHopToResponsive[src][probe[0]] = 1
+					}
+				}
+			}
+		}
+	}
+	if len(receiverToSpooferToProbe) > 0 {
+		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSCheckForRevHop)
+	}
+	if len(linuxBugToCheckSrcDstVpToRevHops) > 0 {
+		var linuxChecksSrcToProbe = make(map[string][][]string)
+		var linuxChecksSpoofedReceiverToSpooferToProbe = make(map[string]map[string][][]string)
+		for sdvp := range linuxBugToCheckSrcDstVpToRevHops {
+			p := []string{sdvp.dst, sdvp.dst, dummyIP, dummyIP}
+			if sdvp.vp == "non_spoofed" {
+				linuxChecksSrcToProbe[sdvp.src] = append(linuxChecksSrcToProbe[sdvp.src], p)
+			} else {
+				linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp] = append(linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp], p)
+			}
+		}
+		// once again leaving out a check for uniqness
+		processTSCheckForLinuxBug := func(src, vp string, p *datamodel.Ping) {
+			dsts, _ := util.Int32ToIPString(p.Dst)
+			rps := p.GetResponses()
+			ts2 := rps[0].Tsandaddr[1]
+
+			segClass := "SpoofTSAdjRevSegment"
+			// if I got a response, must not be filtering, so dont need to use spoofing
+			if vp == "non_spoofed" {
+				tsSrcToHopToSendSpoofed[src][dsts] = false
+				segClass = "TSAdjRevSegment"
+			}
+			if ts2.Ts != 0 {
+				log.Debug("TS probe is ", vp, p, "linux bug")
+				// TODO keep track of linux bugs
+				// at least once, i observed a bug not stamp one probe, so
+				// this is important, probably then want to do the checks
+				// for revhops after all spoofers that are trying have tested
+				// for linux bugs
+			} else {
+				log.Debug("TS probe is ", vp, p, "not linux bug")
+				for _, revhop := range linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}] {
+
+					var seg Segment
+					if segClass == "TSAdjRevSegment" {
+						seg = NewTSAdjRevSegment([]string{revhop}, src, dsts, false)
+					} else {
+						seg = NewSpoofTSAdjRevSegment([]string{revhop}, src, dsts, vp, false)
+					}
+					revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = seg
+				}
+			}
+		}
+		issueTimestamps(linuxChecksSrcToProbe, cl, probeCount, processTSCheckForLinuxBug)
+		issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe, cl, probeCount, processTSCheckForLinuxBug)
+	}
+	receiverToSpooferToProbe = make(map[string]map[string][][]string)
+	for _, probe := range destDoesNotStamp {
+		spoofers := getTimestampSpoofers(probe.src, probe.dst)
+		for _, s := range spoofers {
+			receiverToSpooferToProbe[probe.src][s] = append(receiverToSpooferToProbe[probe.src][s], []string{probe.dst, probe.tsip, probe.tsip, probe.tsip, probe.tsip})
+		}
+	}
+	// if I get the response, need to then do the non-spoofed version
+	// for that, I can get everything I need to know from the probe
+	// send the duplicates
+	// then, for each of those that get responses but don't stamp
+	// I can delcare it a revhop-- I just need to know which src to declare it
+	// for
+	// so really what I ened is a  map from VP,dst,adj to the list of
+	// sources/revtrs waiting for it
+	destDoesNotStampToVerifySpooferToProbe := make(map[string][][]string)
+	vpDstAdjToInterestedSrcs := make(map[tripletTs][]string)
+	processTSDestDoesNotStamp := func(src, vp string, p *datamodel.Ping) {
+		dsts, _ := util.Int32ToIPString(p.Dst)
+		rps := p.GetResponses()
+		ts1 := rps[0].Tsandaddr[0]
+		ts2 := rps[0].Tsandaddr[1]
+		ts4 := rps[0].Tsandaddr[3]
+		// if 2 stamps, we assume one was forward, one was reverse
+		// if 1 or 4, we need to verify it was reverse
+		// 3 should not happend according to justine?
+		if ts2.Ts != 0 && ts4.Ts == 0 {
+			// declare reverse hop
+			ts2ips, _ := util.Int32ToIPString(ts2.Ts)
+			revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{ts2ips}, src, dsts, vp, false)
+			log.Debug("TS Probe is ", vp, p, "reverse hop from dst that stamps 0!")
+		} else if ts1.Ts != 0 {
+			log.Debug("TS probe is ", vp, p, "dst does not stamp, but spoofer ", vp, "got a stamp")
+			ts1ips, _ := util.Int32ToIPString(ts1.Ip)
+			destDoesNotStampToVerifySpooferToProbe[vp] = append(destDoesNotStampToVerifySpooferToProbe[vp], []string{dsts, ts1ips, ts1ips, ts1ips, ts1ips})
+			// store something
+			vpDstAdjToInterestedSrcs[tripletTs{src: vp, dst: dsts, tsip: ts1ips}] = append(vpDstAdjToInterestedSrcs[tripletTs{src: vp, dst: dsts, tsip: ts1ips}], src)
+		} else {
+			log.Debug("TS probe is ", vp, p, "no reverse hop for dst that stamps 0")
+		}
+	}
+	if len(destDoesNotStamp) > 0 {
+		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSDestDoesNotStamp)
+	}
+	return nil
+}
+
+// whether this destination is repsonsive but with ts=0
+var tsDstToStampsZero = make(map[string]bool)
+
+// whether this particular src should use spoofed ts to that hop
+var tsSrcToHopToSendSpoofed = make(map[string]map[string]bool)
+
+// whether this hop is thought to be responsive at all to this src
+// Since I can't intialize to true, I'm going to use an int and say 0 is true
+// anythign else will be false
+var tsSrcToHopToResponsive = make(map[string]map[string]int)
+
+// nil means we issued the probe, did not get a response
+var tsSrcToProbeToVPToResult = make(map[string]map[string]map[string][]string)
+
+func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+
+	return nil
+}
+
+func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+
 	return nil
 }
