@@ -1,6 +1,7 @@
 package revtr
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -1324,11 +1325,83 @@ var tsSrcToHopToResponsive = make(map[string]map[string]int)
 var tsSrcToProbeToVPToResult = make(map[string]map[string]map[string][]string)
 
 func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
-
+	var pings []*datamodel.PingMeasurement
+	for src, probes := range issue {
+		srcip, _ := util.IPStringToInt32(src)
+		for _, probe := range probes {
+			dstip, _ := util.IPStringToInt32(probe[0])
+			var tsString bytes.Buffer
+			tsString.WriteString("tsprespec=")
+			for _, p := range probe {
+				tsString.WriteString(p + ",")
+			}
+			p := &datamodel.PingMeasurement{
+				Src:       srcip,
+				Dst:       dstip,
+				TimeStamp: tsString.String(),
+			}
+			pings = append(pings, p)
+		}
+	}
+	st, err := cl.Ping(&datamodel.PingArg{Pings: pings})
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	for {
+		pr, err := st.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		srcs, _ := util.Int32ToIPString(pr.Src)
+		fn(srcs, "non_spoofed", pr)
+	}
 	return nil
 }
 
 func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
-
+	var pings []*datamodel.PingMeasurement
+	for reciever, spooferToProbes := range issue {
+		recip, _ := util.IPStringToInt32(reciever)
+		for spoofer, probes := range spooferToProbes {
+			spoofip, _ := util.IPStringToInt32(spoofer)
+			for _, probe := range probes {
+				dstip, _ := util.IPStringToInt32(probe[0])
+				var tsString bytes.Buffer
+				for _, p := range probe {
+					tsString.WriteString(p + ",")
+				}
+				p := &datamodel.PingMeasurement{
+					Src:         spoofip,
+					Spoof:       true,
+					Dst:         dstip,
+					SpooferAddr: recip,
+				}
+				pings = append(pings, p)
+			}
+		}
+	}
+	st, err := cl.Ping(&datamodel.PingArg{Pings: pings})
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	for {
+		pr, err := st.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		srcs, _ := util.Int32ToIPString(pr.Src)
+		vp, _ := util.Int32ToIPString(pr.SpoofedFrom)
+		fn(srcs, vp, pr)
+	}
 	return nil
 }
