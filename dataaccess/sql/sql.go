@@ -31,9 +31,11 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"net"
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 import "github.com/go-sql-driver/mysql"
 
@@ -1032,4 +1034,27 @@ func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+const (
+	insertAdjQuery = `INSERT INTO adjacencies(ip1, ip2) VALUES (?, ?)
+	ON DUPLICATE KEY UPDATE cnt = cnt+1`
+)
+
+// StoreAdjacency stores an adjacency
+func (db *DB) StoreAdjacency(l, r net.IP) error {
+	con := db.getWriter()
+	ip1, err := util.IPtoInt32(l)
+	if err != nil {
+		return err
+	}
+	ip2, err := util.IPtoInt32(r)
+	if err != nil {
+		return err
+	}
+	_, err = con.Exec(insertAdjQuery, ip1, ip2)
+	if err != nil {
+		return err
+	}
+	return nil
 }

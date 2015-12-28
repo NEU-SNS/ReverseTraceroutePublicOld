@@ -29,6 +29,7 @@
 package dataaccess
 
 import (
+	"net"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
@@ -130,6 +131,11 @@ func (d *DataAccess) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, s
 // StoreAtlasTraceroute stores a traceroute in a form that the Atlas requires
 func (d *DataAccess) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 	return d.db.StoreAtlasTraceroute(trace)
+}
+
+// StoreAdjacency stores an ajacienty
+func (d *DataAccess) StoreAdjacency(l, r net.IP) error {
+	return d.db.StoreAdjacency(l, r)
 }
 
 // New create a new dataAccess with the given config

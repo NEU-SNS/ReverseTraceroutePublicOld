@@ -222,6 +222,16 @@ func IPtoInt32(ip net.IP) (uint32, error) {
 	return res, nil
 }
 
+// Int32ToIP converts an uint32 into a net.IP
+func Int32ToIP(ip uint32) net.IP {
+	var a, b, c, d byte
+	a = byte(ip)
+	b = byte(ip >> 8)
+	c = byte(ip >> 16)
+	d = byte(ip >> 24)
+	return net.IPv4(a, b, c, d)
+}
+
 // MicroToNanoSec convers microseconds to nanoseconds
 func MicroToNanoSec(usec int64) int64 {
 	return usec * 1000
