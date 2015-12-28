@@ -1,11 +1,14 @@
 package revtr
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	atlas "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
@@ -13,10 +16,12 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 )
 
 var plHost2IP map[string]string
 var ipToCluster map[string]string
+var clusterToIps map[string][]string
 var tsAdjsByCluster bool
 var vps []*datamodel.VantagePoint
 var rrVPsByCluster bool
@@ -638,8 +643,42 @@ type ReverseTracerouteReq struct {
 	Src, Dst string
 }
 
-func reverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas) (*ReverseTraceroute, string, map[string]int, error) {
+type stringInt int
+
+func (si stringInt) String() string {
+	return fmt.Sprintf("%d", int(si))
+}
+
+func initialize(cl vpservice.VPSource, clusterfile string) {
+	ipToCluster = make(map[string]string)
+	clusterToIps = make(map[string][]string)
+	vpr, err := cl.GetVPs()
+	if err != nil {
+		panic(err)
+	}
+	vps = vpr.GetVps()
+	var cls stringInt
+	cls++
+	f, err := os.Open(clusterfile)
+	if err != nil {
+		panic(err)
+	}
+	scan := bufio.NewScanner(f)
+	for scan.Scan() {
+		ln := scan.Text()
+		ips := strings.Split(ln, " ")
+		clusterToIps[cls.String()] = ips
+		for _, ip := range ips {
+			ipToCluster[ip] = cls.String()
+		}
+		cls++
+	}
+}
+
+// RunReverseTraceroute runs a reverse traceroute
+func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas, vpserv vpservice.VPSource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
 	probeCount := make(map[string]int)
+	initialize(vpserv, clusterFile)
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst)
 	if backoffEndhost || dstMustBeReachable {
 		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
@@ -660,6 +699,13 @@ func reverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl clien
 			continue
 		}
 		err = reverseHopsRR(rt, cl)
+		if rt.Reaches() {
+			return rt, "REACHES", probeCount, nil
+		}
+		if err == nil {
+			continue
+		}
+		err = reverseHopsTS(rt, cl, probeCount)
 		if rt.Reaches() {
 			return rt, "REACHES", probeCount, nil
 		}
