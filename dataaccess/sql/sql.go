@@ -1039,6 +1039,10 @@ func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 const (
 	insertAdjQuery = `INSERT INTO adjacencies(ip1, ip2) VALUES (?, ?)
 	ON DUPLICATE KEY UPDATE cnt = cnt+1`
+	selectByIP1AdjQuery = `SELECT ip1, ip2, cnt from adjacencies WHERE ip1 = ?
+							ORDER BY cnt DESC LIMIT 500`
+	selectByIP2AdjQuery = `SELECT ip1, ip2, cnt from adjacencies WHERE ip2 = ?
+							ORDER BY cnt DESC LIMIT 500`
 )
 
 // StoreAdjacency stores an adjacency
@@ -1057,4 +1061,96 @@ func (db *DB) StoreAdjacency(l, r net.IP) error {
 		return err
 	}
 	return nil
+}
+
+// GetAdjacenciesByIP1 gets ajds by ip1
+func (db *DB) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
+	con := db.getReader()
+	res, err := con.Query(selectByIP1AdjQuery, ip)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+	var adjs []dm.Adjacency
+	for res.Next() {
+		var adj dm.Adjacency
+		err := res.Scan(&adj.IP1, &adj.IP2, &adj.Cnt)
+		if err != nil {
+			return nil, err
+		}
+		adjs = append(adjs, adj)
+	}
+	if err = res.Err(); err != nil {
+		return nil, err
+	}
+	return adjs, nil
+}
+
+// GetAdjacenciesByIP2 gets ajds by ip2
+func (db *DB) GetAdjacenciesByIP2(ip uint32) ([]dm.Adjacency, error) {
+	con := db.getReader()
+	res, err := con.Query(selectByIP2AdjQuery, ip)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+	var adjs []dm.Adjacency
+	for res.Next() {
+		var adj dm.Adjacency
+		err := res.Scan(&adj.IP1, &adj.IP2, &adj.Cnt)
+		if err != nil {
+			return nil, err
+		}
+		adjs = append(adjs, adj)
+	}
+	if err = res.Err(); err != nil {
+		return nil, err
+	}
+	return adjs, nil
+}
+
+const (
+	insertAdjDstQuery = `
+	INSERT INTO adjacencies_to_dest(dest24, address, adjacent) VALUES(?, ?, ?)
+	ON DUPLICATE KEY UPDATE cnt = cnt + 1
+	`
+	selectByAddressAndDest24AdjDstQuery = `
+	SELECT dest24, address, adjacent, cnt
+	FROM adjacencies_to_dest 
+	WHERE address = ? AND dest24 = ?
+	ORDER BY cnt DESC LIMIT 500`
+)
+
+// StoreAdjacencyToDest stores an adjacencies to dest
+func (db *DB) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
+	con := db.getWriter()
+	destip, _ := util.IPtoInt32(dest24)
+	destip = destip >> 8
+	addrip, _ := util.IPtoInt32(addr)
+	adjip, _ := util.IPtoInt32(adj)
+	_, err := con.Exec(insertAdjDstQuery, destip, addrip, adjip)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetAdjacencyToDestByAddrAndDest24 does what it says
+func (db *DB) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.AdjacencyToDest, error) {
+	con := db.getReader()
+	res, err := con.Query(selectByAddressAndDest24AdjDstQuery, addr, dest24)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+	var adjs []dm.AdjacencyToDest
+	for res.Next() {
+		var adj dm.AdjacencyToDest
+		err = res.Scan(&adj.Dest24, &adj.Address, &adj.Adjacent, &adj.Cnt)
+		if err != nil {
+			return nil, err
+		}
+		adjs = append(adjs, adj)
+	}
+	return adjs, nil
 }
