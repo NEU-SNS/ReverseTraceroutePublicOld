@@ -89,7 +89,7 @@ func (rp *ReversePath) Length() int {
 
 // LastHop gets the last hop of the last segment
 func (rp *ReversePath) LastHop() string {
-	return rp.Path[len(rp.Path)-1].LastHop()
+	return rp.LastSeg().LastHop()
 }
 
 // LastSeg gets the last segment
@@ -152,6 +152,7 @@ type ReverseTraceroute struct {
 	TSHop2RateLimit map[string]int
 	TSHop2AdjsLeft  map[string][]string
 	Src, Dst        string
+	as              AdjacencySource
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -290,13 +291,73 @@ type adjSettings struct {
 	retryCommand bool
 }
 
-func getAdjacenciesForIPToSrc(cls string, src string, settings adjSettings) ([]string, error) {
-	return nil, nil
+func defaultAdjSettings() *adjSettings {
+	ret := adjSettings{
+		maxnum: 30,
+	}
+	return &ret
+}
+
+type byCount []datamodel.AdjacencyToDest
+
+func (b byCount) Len() int           { return len(b) }
+func (b byCount) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b byCount) Less(i, j int) bool { return b[i].Cnt < b[j].Cnt }
+
+type aByCount []datamodel.Adjacency
+
+func (b aByCount) Len() int           { return len(b) }
+func (b aByCount) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b aByCount) Less(i, j int) bool { return b[i].Cnt < b[j].Cnt }
+
+func getAdjacenciesForIPToSrc(ip string, src string, as AdjacencySource, settings *adjSettings) ([]string, error) {
+	if settings == nil {
+		settings = defaultAdjSettings()
+	}
+	ipint, _ := util.IPStringToInt32(ip)
+	srcint, _ := util.IPStringToInt32(src)
+	dest24 := srcint >> 8
+
+	ips1, err := as.GetAdjacenciesByIP1(ipint)
+	if err != nil {
+		return nil, err
+	}
+	ips2, err := as.GetAdjacenciesByIP2(ipint)
+	if err != nil {
+		return nil, err
+	}
+	adjstodst, err := as.GetAdjacencyToDestByAddrAndDest24(dest24, ipint)
+	if err != nil {
+		return nil, err
+	}
+	// Sort in descending order
+	sort.Sort(sort.Reverse(byCount(adjstodst)))
+	var atjs []string
+	for _, adj := range adjstodst {
+		ip, _ := util.Int32ToIPString(adj.Adjacent)
+		atjs = append(atjs, ip)
+	}
+	combined := append(ips1, ips2...)
+	sort.Sort(sort.Reverse(aByCount(combined)))
+	var combinedIps []string
+	for _, a := range combined {
+		if a.IP1 == ipint {
+			ips, _ := util.Int32ToIPString(a.IP2)
+			combinedIps = append(combinedIps, ips)
+		} else {
+			ips, _ := util.Int32ToIPString(a.IP1)
+			combinedIps = append(combinedIps, ips)
+		}
+	}
+	ss := stringSliceMinus(combinedIps, atjs)
+	ss = stringSliceMinus(ss, []string{ip})
+	ret := append(atjs, ss...)
+	return ret[:settings.maxnum], nil
 }
 
 // InitializeTSAdjacents ...
 func (rt *ReverseTraceroute) InitializeTSAdjacents(cls string) error {
-	adjs, err := getAdjacenciesForIPToSrc(cls, rt.Src, adjSettings{})
+	adjs, err := getAdjacenciesForIPToSrc(cls, rt.Src, rt.as, nil)
 	if err != nil {
 		return err
 	}
@@ -675,8 +736,15 @@ func initialize(cl vpservice.VPSource, clusterfile string) {
 	}
 }
 
+// AdjacencySource is the interface for something that provides adjacnecies
+type AdjacencySource interface {
+	GetAdjacenciesByIP1(uint32) ([]datamodel.Adjacency, error)
+	GetAdjacenciesByIP2(uint32) ([]datamodel.Adjacency, error)
+	GetAdjacencyToDestByAddrAndDest24(uint32, uint32) ([]datamodel.AdjacencyToDest, error)
+}
+
 // RunReverseTraceroute runs a reverse traceroute
-func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas, vpserv vpservice.VPSource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
+func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas, vpserv vpservice.VPSource, as AdjacencySource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
 	probeCount := make(map[string]int)
 	initialize(vpserv, clusterFile)
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst)

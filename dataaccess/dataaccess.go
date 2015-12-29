@@ -138,6 +138,26 @@ func (d *DataAccess) StoreAdjacency(l, r net.IP) error {
 	return d.db.StoreAdjacency(l, r)
 }
 
+// StoreAdjacencyToDest stores and adjacency to dest
+func (d *DataAccess) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
+	return d.db.StoreAdjacencyToDest(dest24, addr, adj)
+}
+
+// GetAdjacenciesByIP1 gets ajd by ip1
+func (d *DataAccess) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
+	return d.db.GetAdjacenciesByIP1(ip)
+}
+
+// GetAdjacenciesByIP2 gets ajd by ip2
+func (d *DataAccess) GetAdjacenciesByIP2(ip uint32) ([]dm.Adjacency, error) {
+	return d.db.GetAdjacenciesByIP2(ip)
+}
+
+// GetAdjacencyToDestByAddrAndDest24 returns adjstodest based on dest24 and addr
+func (d *DataAccess) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.AdjacencyToDest, error) {
+	return d.db.GetAdjacencyToDestByAddrAndDest24(dest24, addr)
+}
+
 // New create a new dataAccess with the given config
 func New(c DbConfig) (*DataAccess, error) {
 	var conf sql.DbConfig
