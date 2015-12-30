@@ -43,17 +43,29 @@ type stringSet []string
 
 func (ss stringSet) union(s stringSet) []string {
 	var mm map[string]bool
+	mm = make(map[string]bool)
 	var ret []string
 	for _, c := range ss {
 		mm[c] = false
 	}
 	for _, c := range s {
-		mm[c] = true
+		if _, ok := mm[c]; ok {
+			mm[c] = true
+		}
 	}
+	var foundNonSpoofed *bool
+	foundNonSpoofed = new(bool)
 	for k, v := range mm {
+		if k == "non_spoofed" {
+			*foundNonSpoofed = true
+			continue
+		}
 		if v {
 			ret = append(ret, k)
 		}
+	}
+	if *foundNonSpoofed {
+		ret = append([]string{"non_spoofed"}, ret...)
 	}
 	return ret
 }
@@ -68,6 +80,7 @@ type Segment interface {
 	Order(Segment) int
 	RemoveHops([]string) error
 	Clone() Segment
+	RemoveAt(int)
 }
 
 // RevSegment is a...
@@ -76,12 +89,16 @@ type RevSegment struct {
 	Src, Hop string
 }
 
+func (rv *RevSegment) RemoveAt(idx int) {
+	rv.Segment, rv.Segment[len(rv.Segment)-1] = append(rv.Segment[:idx], rv.Segment[idx+1:]...), ""
+}
+
 func (rv *RevSegment) clone() *RevSegment {
 	ret := RevSegment{
 		Src: rv.Src,
 		Hop: rv.Hop,
 	}
-	ret.Segment = append(ret.Segment, ret.Segment...)
+	ret.Segment = append(ret.Segment, rv.Segment...)
 	return &ret
 }
 
@@ -298,6 +315,18 @@ func NewDstRevSegment(segment []string, src, hop string) *DstRevSegment {
 
 func (d *DstRevSegment) String() string {
 	return fmt.Sprintf("%s_Dst", d.RevSegment.String())
+}
+
+// Clone is for the Segment interface
+func (d *DstRevSegment) Clone() Segment {
+	return d.clone()
+}
+
+func (d *DstRevSegment) clone() *DstRevSegment {
+	ret := &DstRevSegment{
+		RevSegment: d.RevSegment.clone(),
+	}
+	return ret
 }
 
 // DstSymRevSegment when the reverse hop is

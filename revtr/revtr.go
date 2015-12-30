@@ -26,11 +26,6 @@ var tsAdjsByCluster bool
 var vps []*datamodel.VantagePoint
 var rrVPsByCluster bool
 
-// Adjacency are adjacencies
-type Adjacency struct {
-	IP1, IP2, Cnt uint32
-}
-
 // ReversePath is a reverse path
 type ReversePath struct {
 	Src, Dst string
@@ -156,11 +151,17 @@ type ReverseTraceroute struct {
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
-func NewReverseTraceroute(src, dst string) *ReverseTraceroute {
+func NewReverseTraceroute(src, dst string, as AdjacencySource) *ReverseTraceroute {
 	ret := ReverseTraceroute{
-		Src:   src,
-		Dst:   dst,
-		Paths: []*ReversePath{NewReversePath(src, dst, nil)},
+		Src:             src,
+		Dst:             dst,
+		Paths:           []*ReversePath{NewReversePath(src, dst, nil)},
+		DeadEnd:         make(map[string]bool),
+		RRHop2RateLimit: make(map[string]int),
+		RRHop2VPSLeft:   make(map[string][]string),
+		TSHop2RateLimit: make(map[string]int),
+		TSHop2AdjsLeft:  make(map[string][]string),
+		as:              as,
 	}
 	return &ret
 }
@@ -240,7 +241,7 @@ func (rt *ReverseTraceroute) AddAndReplaceSegment(s Segment) bool {
 	if rt.DeadEnd[s.LastHop()] {
 		return false
 	}
-	basePath := rt.CurrPath()
+	basePath := rt.CurrPath().Clone()
 	basePath.Pop()
 	basePath.Add(s)
 	rt.Paths = append(rt.Paths, basePath)
@@ -352,7 +353,11 @@ func getAdjacenciesForIPToSrc(ip string, src string, as AdjacencySource, setting
 	ss := stringSliceMinus(combinedIps, atjs)
 	ss = stringSliceMinus(ss, []string{ip})
 	ret := append(atjs, ss...)
-	return ret[:settings.maxnum], nil
+	var mi = &settings.maxnum
+	if len(ret) < settings.maxnum {
+		*mi = len(ret)
+	}
+	return ret[:*mi], nil
 }
 
 // InitializeTSAdjacents ...
@@ -486,8 +491,16 @@ func stringSliceMinus(l, r []string) []string {
 			delete(old, s)
 		}
 	}
+	foundSpoofed := new(bool)
 	for key := range old {
+		if key == "non_spoofed" {
+			*foundSpoofed = true
+			continue
+		}
 		ret = append(ret, key)
+	}
+	if *foundSpoofed {
+		ret = append([]string{"non_spoofed"}, ret...)
 	}
 	return ret
 }
@@ -511,14 +524,15 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 	// intersection point
 	for _, chunk := range rt.Paths {
 		c := chunk
-		found = chunk
 		var ch *ReversePath
 		var foundOne bool
-		for i := range chunk.Hops() {
-			if trSeg.Hops()[0] == chunk.Hops()[i] {
+		for i, val := range chunk.Hops() {
+			if trSeg.Hops()[0] == val {
 				foundOne = true
-				index = 1
+				fmt.Println("found index", i)
+				index = i
 				ch = c.Clone()
+				found = ch
 			}
 		}
 		if foundOne {
@@ -538,7 +552,7 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 				} else if k+len(seg.Hops())-1 > index {
 					l := stringSliceIndex(seg.Hops(), trSeg.Hops()[0]) + 1
 					for k+len(seg.Hops())-1 > index {
-						ch.Path, ch.Path[len(ch.Path)-1] = append(ch.Path[:l], ch.Path[l+1:]...), nil
+						seg.RemoveAt(l)
 					}
 				} else {
 					j++
@@ -548,7 +562,7 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 			break
 		}
 	}
-	if found != nil {
+	if found == nil {
 		return false
 	}
 	rt.Paths = append(rt.Paths, found)
@@ -578,16 +592,14 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 // then set of spoofing VPs on subsequent calls
 func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	// we either use destination or cluster, depending on how flag is set
-	if !batchInitRRVPs {
-		hops := rt.CurrPath().LastSeg().Hops()
-		for _, hop := range hops {
-			cls := &hop
-			if rrVPsByCluster {
-				*cls = ipToCluster[dst]
-			}
-			if _, ok := rt.RRHop2VPSLeft[*cls]; !ok {
-				rt.InitializeRRVPs(*cls)
-			}
+	hops := rt.CurrPath().LastSeg().Hops()
+	for _, hop := range hops {
+		cls := &hop
+		if rrVPsByCluster {
+			*cls = ipToCluster[hop]
+		}
+		if _, ok := rt.RRHop2VPSLeft[*cls]; !ok {
+			rt.InitializeRRVPs(*cls)
 		}
 	}
 	// CASES:
@@ -747,7 +759,7 @@ type AdjacencySource interface {
 func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas, vpserv vpservice.VPSource, as AdjacencySource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
 	probeCount := make(map[string]int)
 	initialize(vpserv, clusterFile)
-	rt := NewReverseTraceroute(revtr.Src, revtr.Dst)
+	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, as)
 	if backoffEndhost || dstMustBeReachable {
 		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
 		if err != nil {
