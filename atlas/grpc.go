@@ -18,48 +18,45 @@ type GRPCServ struct {
 
 // GetIntersectingPath gets an intersecting path the the request
 func (gs GRPCServ) GetIntersectingPath(stream pb.Atlas_GetIntersectingPathServer) error {
-	in := make(chan *dm.IntersectionRequest)
-	ec := make(chan error)
-	inc := make(chan *dm.IntersectionRequest)
+	ec := make(chan error, 1)
+	rec := make(chan *dm.IntersectionResponse, 1)
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
-	rets, err := gs.AtlasService.GetIntersectingPath(ctx, in)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
 	go func() {
 		for {
 			req, err := stream.Recv()
 			if err == io.EOF {
-				close(inc)
+				close(rec)
 				return
 			}
+			log.Debug("Recv request: ", req)
 			if err != nil {
 				log.Error(err)
 				ec <- err
 				return
 			}
-			inc <- req
+			rets, err := gs.AtlasService.GetIntersectingPath(ctx, req)
+			if err != nil {
+				log.Error(err)
+				ec <- err
+				return
+			}
+			for _, ret := range rets {
+				rec <- ret
+			}
 		}
 	}()
 	for {
 		select {
-		case err = <-ec:
+		case err := <-ec:
 			log.Error(err)
 			return err
-		case r, ok := <-inc:
-			if !ok {
-				inc = nil
-				close(in)
-				continue
-			}
-			in <- r
-		case ir, ok := <-rets:
+		case ir, ok := <-rec:
+			log.Debug("Got from rest: ", ir, " ", ok)
 			if !ok {
 				return nil
 			}
-			if err = stream.Send(ir); err != nil {
+			if err := stream.Send(ir); err != nil {
 				log.Error(err)
 				return err
 			}

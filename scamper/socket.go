@@ -189,7 +189,7 @@ func (s *Socket) monitorResponses() {
 		case resp := <-s.respChan:
 			cmdmap, err := s.cmds.getCmd(resp.UserID)
 			if err != nil {
-				log.Errorf("Failed to get command for id: %d, err: %s", resp.UserID, err)
+				log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
 				continue
 			}
 			s.cmds.rmCmd(resp.UserID)

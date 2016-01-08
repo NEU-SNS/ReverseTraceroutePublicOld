@@ -1,9 +1,15 @@
 package revtr
 
 import (
+	"io"
 	"log"
 	"testing"
 
+	"google.golang.org/grpc/metadata"
+
+	"golang.org/x/net/context"
+
+	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 )
 
@@ -111,9 +117,6 @@ var myIP = "129.10.113.189"
 
 func TestInitialize(t *testing.T) {
 	initialize(vpSourceMock{}, "./alias_lists.txt")
-	if len(ipToCluster) == 0 || len(clusterToIps) == 0 {
-		t.Errorf("Failed to initialize")
-	}
 }
 
 func TestNewReverseTraceroute(t *testing.T) {
@@ -175,6 +178,7 @@ func TestCurrPath(t *testing.T) {
 }
 
 func TestAddSegments(t *testing.T) {
+	t.Skip()
 	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
@@ -191,14 +195,17 @@ func TestReaches(t *testing.T) {
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	segs := []Segment{NewTrtoSrcRevSegment([]string{myIP, "8.8.8.8"}, myIP, "8.8.8.8")}
+	if revtr.Reaches() {
+		t.Fatal("Reaches, reaches on creation of ReverseTraceroute")
+	}
+	segs := []Segment{NewTrtoSrcRevSegment([]string{"8.8.8.8", "10.0.0.2", myIP}, myIP, "8.8.8.8")}
 	added := revtr.AddSegments(segs)
 	if !added {
 		t.Fatal("Failed to add Segments")
 	}
 	reaches := revtr.Reaches()
 	if !reaches {
-		t.Fatal("Failed to reach after adding reaching segment")
+		t.Fatal("Failed to reach after adding reaching segment LastHop: ", revtr.LastHop(), " Got ", revtr.CurrPath().LastSeg())
 	}
 	t.Log(revtr)
 }
@@ -398,9 +405,9 @@ func TestPop(t *testing.T) {
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	length := len(revtr.CurrPath().Path)
+	length := revtr.CurrPath().len()
 	revtr.CurrPath().Pop()
-	if length != len(revtr.CurrPath().Path)+1 {
+	if length != revtr.CurrPath().len()+1 {
 		t.Fatal("Failed to pop an item")
 	}
 	t.Log(length)
@@ -451,18 +458,18 @@ func TestAddAndReplaceSegment(t *testing.T) {
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	startLen := len(revtr.Paths)
+	startLen := revtr.len()
 	seg := NewTrtoSrcRevSegment([]string{"8.8.8.8", "10.0.0.1", "10.0.0.2"}, "8.8.8.8", myIP)
 	res := revtr.AddAndReplaceSegment(seg)
 	if !res {
 		t.Fatalf("Failed to add Seg")
 	}
-	endLen := len(revtr.Paths)
+	endLen := revtr.len()
 	if startLen >= endLen {
 		t.Fatal("Failed to add path")
 	}
-	if len(revtr.CurrPath().Path) != 1 {
-		t.Fatal("Failed replacement ", len(revtr.CurrPath().Path))
+	if revtr.CurrPath().len() != 1 {
+		t.Fatal("Failed replacement ", revtr.CurrPath().len())
 	}
 }
 
@@ -483,4 +490,163 @@ func TestAddBackgroundTRSegment(t *testing.T) {
 		t.Fatal("Adding reaching trsegment didn't reach")
 	}
 	t.Log(revtr.CurrPath())
+}
+
+func TestReverseHopsAssumeSymmetric(t *testing.T) {
+	initialize(vpSourceMock{}, "./alias_lists.txt")
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	if revtr == nil {
+		t.Fatalf("Failed to create ReverseTraceroute")
+	}
+	counts := make(map[string]int)
+	err := reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReverseHopsAssumeSymmetricWithPreviousSymmetric(t *testing.T) {
+	initialize(vpSourceMock{}, "./alias_lists.txt")
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	if revtr == nil {
+		t.Fatalf("Failed to create ReverseTraceroute")
+	}
+	counts := make(map[string]int)
+	err := reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type clientMock struct{}
+
+type clientPingClientStreamFake struct {
+	last  int
+	pings []*datamodel.Ping
+	clientStreamFake
+}
+
+type clientStreamFake struct {
+	ctx context.Context
+}
+
+func (c clientStreamFake) CloseSend() error {
+	return nil
+}
+
+func (c clientStreamFake) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (c clientStreamFake) Trailer() metadata.MD {
+	return nil
+}
+
+func (c clientPingClientStreamFake) Recv() (*datamodel.Ping, error) {
+	if c.last >= len(c.pings) {
+		return nil, io.EOF
+	}
+	idx := c.last
+	c.last++
+	return c.pings[idx], nil
+}
+
+func (c clientStreamFake) Context() context.Context {
+	return c.ctx
+}
+
+func (c clientStreamFake) SendMsg(m interface{}) error {
+	return nil
+}
+
+func (c clientStreamFake) RecvMsg(m interface{}) error {
+	return nil
+}
+
+type clientTracerouteClientStreamFake struct {
+	last   int
+	traces []*datamodel.Traceroute
+	clientMock
+	clientStreamFake
+}
+
+func (c *clientTracerouteClientStreamFake) Recv() (*datamodel.Traceroute, error) {
+	if c.last >= len(c.traces) {
+		return nil, io.EOF
+	}
+	idx := c.last
+	c.last++
+	return c.traces[idx], nil
+}
+
+func (c clientMock) Traceroute(arg *datamodel.TracerouteArg) (controllerapi.Controller_TracerouteClient, error) {
+	var traces []*datamodel.Traceroute
+	meas := arg.GetTraceroutes()
+	for _, trace := range meas {
+		var t datamodel.Traceroute
+		t.Dst = trace.Dst
+		t.Src = trace.Src
+		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+			Addr: 167772162,
+		})
+		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+			Addr: 167772163,
+		})
+		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+			Addr: 167772164,
+		})
+		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+			Addr: trace.Dst,
+		})
+		traces = append(traces, &t)
+	}
+	return &clientTracerouteClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, traces: traces}, nil
+}
+
+func (c clientMock) Ping(arg *datamodel.PingArg) (controllerapi.Controller_PingClient, error) {
+	var pings []*datamodel.Ping
+	meas := arg.GetPings()
+	for _, ping := range meas {
+		p := datamodel.Ping{}
+		p.Dst = ping.Dst
+		p.Src = ping.Src
+		pr := datamodel.PingResponse{}
+		pr.From = p.Dst
+		if ping.RR {
+			pr.RR = []uint32{
+				3232235777,
+				3232235777,
+				3232235777,
+				3232235777,
+				3232235777,
+				3232235777,
+				134744072,
+				167772162,
+				167772163,
+			}
+		}
+		pings = append(pings, &p)
+	}
+	return clientPingClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, pings: pings}, nil
+}
+
+func (c clientMock) GetVps(args *datamodel.VPRequest) (*datamodel.VPReturn, error) {
+	return nil, nil
+}
+
+func (c clientMock) ReceiveSpoofedProbes() (controllerapi.Controller_ReceiveSpoofedProbesClient, error) {
+	return nil, nil
+}
+
+func TestStringSetUnion(t *testing.T) {
+	one := []string{"non_spoofed"}
+	two := []string{"173.205.3.15", "213.244.128.172"}
+	res := stringSet(one).union(stringSet(two))
+	if len(res) != 0 {
+		t.Fatal("Union should be empty ", res)
+	}
 }

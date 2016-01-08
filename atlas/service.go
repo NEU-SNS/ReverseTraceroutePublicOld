@@ -23,45 +23,57 @@ type Atlas struct {
 }
 
 // GetIntersectingPath satisfies the server interface
-func (a *Atlas) GetIntersectingPath(ctx context.Context, in <-chan *dm.IntersectionRequest) (<-chan *dm.IntersectionResponse, error) {
-	ret := make(chan *dm.IntersectionResponse)
+func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequest) ([]*dm.IntersectionResponse, error) {
+	in := make(chan *dm.IntersectionResponse)
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				close(ret)
-				return
-			case ir, ok := <-in:
-				if !ok {
-					close(ret)
-					return
-				}
-				req := []dm.SrcDst{
-					dm.SrcDst{
-						Src: ir.Address,
-						Dst: ir.Dest,
-					},
-				}
-				res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, time.Duration(ir.Staleness))
-				if err != nil {
-					log.Error(err)
-					ret <- &dm.IntersectionResponse{
-						Type:  dm.IResponseType_ERROR,
-						Error: err.Error(),
-					}
-					continue
-				}
-				for _, resp := range res {
-					intr := &dm.IntersectionResponse{
-						Type: dm.IResponseType_PATH,
-						Path: resp,
-					}
-					ret <- intr
-				}
-			}
+		log.Debug("Looing for intersect for ", ir)
+		req := []dm.SrcDst{
+			dm.SrcDst{
+				Src: ir.Address,
+				Dst: ir.Dest,
+			},
 		}
+		res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, time.Duration(ir.Staleness))
+		log.Debug("FindIntersectingTraceroute resp ", res)
+		if err != nil {
+			log.Error(err)
+			in <- &dm.IntersectionResponse{
+				Type:  dm.IResponseType_ERROR,
+				Error: err.Error(),
+			}
+			close(in)
+			return
+		}
+		if len(res) == 0 {
+			intr := &dm.IntersectionResponse{
+				Type: dm.IResponseType_NONE_FOUND,
+			}
+			in <- intr
+			close(in)
+			return
+		}
+		for _, resp := range res {
+			intr := &dm.IntersectionResponse{
+				Type: dm.IResponseType_PATH,
+				Path: resp,
+			}
+			in <- intr
+		}
+		close(in)
+		return
 	}()
-	return ret, nil
+	var ret []*dm.IntersectionResponse
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("Find IntersectionRequest timed out")
+		case ir, ok := <-in:
+			if !ok {
+				return ret, nil
+			}
+			ret = append(ret, ir)
+		}
+	}
 }
 
 // GetPathsWithToken satisfies the server interface
@@ -137,10 +149,6 @@ func (a *Atlas) updateTraceroutes() {
 	if err != nil {
 		log.Error(err)
 		return
-	}
-	err = a.runTraces(srv, srvs[0])
-	if err != nil {
-		log.Error(err)
 	}
 	tick := time.NewTicker(time.Minute * 10)
 	for {

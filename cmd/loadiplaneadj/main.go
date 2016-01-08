@@ -33,7 +33,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer da.Close()
 	for _, file := range files {
+		fmt.Println(file)
 		if file.IsDir() {
 			continue
 		}
@@ -50,6 +52,7 @@ func processFile(file os.FileInfo, da *dataaccess.DataAccess) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	scan := iplane.NewTracerouteScanner(f)
 	for scan.Scan() {
 		trace := scan.Traceroute()

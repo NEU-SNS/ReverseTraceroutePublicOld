@@ -49,13 +49,15 @@ func TestParsePing(t *testing.T) {
 }
 
 func TestParsePingTSPreSpec(t *testing.T) {
-	content, err := ioutil.ReadFile("../doc/ts_prespec.warts")
+	content, err := ioutil.ReadFile("../doc/test_tsprespec2.warts")
 	if err != nil {
 		t.Fatal("ParsePing could not read file")
 	}
 	pingFilter := make([]warts.WartsT, 1)
 	pingFilter[0] = warts.PingT
-	_, err = warts.Parse(content, pingFilter)
+	p, err := warts.Parse(content, pingFilter)
+	t.Log(p[0].(warts.Ping).PingReplies[0].IsTsAndAddr())
+	t.Log(p[0].(warts.Ping).PingReplies[0].Flags)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
