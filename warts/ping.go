@@ -264,6 +264,12 @@ func (prf PingReplyFlags) IsTsAndAddr() bool {
 	return prf.Flags&0x10 > 0
 }
 
+// HasTsAndAddr returns true if there are ts and addrs present
+func (prf PingReplyFlags) HasTsAndAddr() bool {
+	return len(prf.V4TS.Addrs) > 0 &&
+		len(prf.V4TS.TimeStamps) > 0
+}
+
 // RProto is the proto of the reply
 type RProto uint8
 
@@ -375,8 +381,8 @@ func (tsr TSReply) String() string {
 func timeSinceMidnight(in uint32) string {
 	now := time.Now()
 	midn := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	midn.Add(time.Millisecond * time.Duration(in))
-	return midn.String()
+	newtime := midn.Add(time.Millisecond * time.Duration(in))
+	return newtime.String()
 }
 
 func readPing(f io.Reader) (Ping, error) {

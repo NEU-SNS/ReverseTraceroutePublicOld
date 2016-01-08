@@ -582,7 +582,7 @@ func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAcc
 
 func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurement) <-chan *dm.Traceroute {
 	ret := make(chan *dm.Traceroute)
-
+	log.Debug("Running traceroutes: ", tms)
 	go func() {
 		var checkCache = make(map[string]*dm.TracerouteMeasurement)
 		var remaining []*dm.TracerouteMeasurement
@@ -683,6 +683,7 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 						if !ok {
 							return
 						}
+						log.Debug("Got TR ", pp)
 						go func() {
 							err := c.db.StoreTraceroute(pp)
 							if err != nil {

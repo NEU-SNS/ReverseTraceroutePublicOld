@@ -56,7 +56,7 @@ func (ss stringSet) union(s stringSet) []string {
 	var foundNonSpoofed *bool
 	foundNonSpoofed = new(bool)
 	for k, v := range mm {
-		if k == "non_spoofed" {
+		if k == "non_spoofed" && v {
 			*foundNonSpoofed = true
 			continue
 		}
@@ -89,6 +89,7 @@ type RevSegment struct {
 	Src, Hop string
 }
 
+// RemoveAt removes a hop at a given index
 func (rv *RevSegment) RemoveAt(idx int) {
 	rv.Segment, rv.Segment[len(rv.Segment)-1] = append(rv.Segment[:idx], rv.Segment[idx+1:]...), ""
 }
@@ -134,7 +135,6 @@ func rIndex(ss []string, s string) int {
 // RemoveHops ...
 func (rv *RevSegment) RemoveHops(toDel []string) error {
 	var noZeros []string
-
 	segAsSet := stringSet(rv.Segment)
 	for _, ip := range toDel {
 		if ip != "0.0.0.0" {
@@ -146,7 +146,7 @@ func (rv *RevSegment) RemoveHops(toDel []string) error {
 	if len(common) > 0 {
 		mapIndex := -1
 		for _, h := range common {
-			tmp := rIndex(common, h)
+			tmp := rIndex(rv.Segment, h)
 			if tmp > mapIndex {
 				// This is in the original code but isn't used at any point
 				*hop = h
@@ -215,7 +215,7 @@ func (rv *RevSegment) LastHop() string {
 // Reaches ...
 func (rv *RevSegment) Reaches() bool {
 
-	return plHost2IP[rv.LastHop()] == plHost2IP[rv.Src] || ipToCluster[rv.LastHop()] == ipToCluster[rv.Src]
+	return rv.LastHop() == rv.Src || ipToCluster.Get(rv.LastHop()) == ipToCluster.Get(rv.Src)
 }
 
 func stringArrayEquals(left, right []string) bool {
@@ -370,20 +370,28 @@ func ndsrsSelectNonzeroHops(tr []string, hops int, hopsToIgnore []string) []stri
 		if tr[i] != "0.0.0.0" && (!inArray(hopsToIgnore, tr[i])) {
 			found++
 		} else if inArray(hopsToIgnore, tr[i]) {
-			log.Debug("Skipping Deadend", tr[i])
+			log.Debug("Skipping Deadend ", tr[i])
 		}
 		i++
 	}
 	if found == hops {
-		log.Debug("Rev Seg is ", tr[:i+1])
-		return tr[:i+1]
+		log.Debug("Rev Seg is ", tr[:i])
+		return tr[:i]
 	}
-	log.Debug("Only able to find", found)
+	log.Debug("Only able to find ", found)
 	lastValidHop := len(tr) - 1
 	for tr[lastValidHop] == "0.0.0.0" {
 		lastValidHop--
 	}
 	return tr[:lastValidHop+1]
+}
+
+func stringSliceReverse(ss []string) []string {
+	ret := make([]string, len(ss))
+	for i, s := range ss {
+		ret[len(ss)-i-1] = s
+	}
+	return ret
 }
 
 //NewDstSymRevSegment creates a new NewDstSymRevSegment
@@ -393,12 +401,9 @@ func ndsrsSelectNonzeroHops(tr []string, hops int, hopsToIgnore []string) []stri
 // still need to include numhops, since we don't know how many of those are being ignored
 // hop to ignore does no persist
 func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore []string) *DstSymRevSegment {
-	var reversed []string
-	for i := len(tr) - 1; i >= 0; i-- {
-		reversed = append(reversed, tr[i])
-	}
-	reversed = append(reversed, src)
-	segment := ndsrsSelectNonzeroHops(reversed, numhops, hopsToIgnore)
+	tr = append([]string{src}, tr...)
+	rev := stringSliceReverse(tr)
+	segment := ndsrsSelectNonzeroHops(rev, numhops, hopsToIgnore)
 	ret := DstSymRevSegment{
 		tr:         tr,
 		numHops:    numhops,
@@ -413,13 +418,9 @@ func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore
 // note: right now, this starts from scratch every time and counts hops,
 // replacing the curring segments with a new one.
 func (d *DstSymRevSegment) AddHop(hopsToIgnore []string) error {
-	var reversed []string
-	for i := len(d.tr) - 1; i >= 0; i-- {
-		reversed = append(reversed, d.tr[i])
-	}
-	reversed = append(reversed, d.Src)
+	rev := stringSliceReverse(d.tr)
 	d.numHops++
-	d.Segment = ndsrsSelectNonzeroHops(reversed, d.numHops, hopsToIgnore)
+	d.Segment = ndsrsSelectNonzeroHops(rev, d.numHops, hopsToIgnore)
 	return nil
 }
 

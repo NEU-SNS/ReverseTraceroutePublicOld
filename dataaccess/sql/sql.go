@@ -514,8 +514,8 @@ func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
 func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
-	minTime := time.Now().Add(s * time.Second)
-	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst, minTime)
+	//minTime := time.Now().Add(s * time.Second)
+	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -915,10 +915,15 @@ func (db *DB) StorePing(in *dm.Ping) error {
 const (
 	findIntersecting = `
 SELECT 
-	? as src, X.dest, hops.hop, hops.ttl
+	? as src, A.dest, hops.hop, hops.ttl
 FROM 
 (
-(SELECT atr.Id, atr.dest FROM
+SELECT
+	*
+FROM
+(
+
+(SELECT atr.Id, atr.date, atr.dest FROM
 	(SELECT
 		b.ip_address
 	FROM
@@ -932,7 +937,7 @@ ORDER BY atr.date desc)
 
 UNION
 
-(SELECT atr.Id, atr.dest FROM
+(SELECT atr.Id, atr.date, atr.dest FROM
 atlas_traceroutes atr 
 WHERE atr.dest = ? AND atr.date > DATE(NOW() - interval 15  minute) 
 ORDER BY atr.date desc)
@@ -949,7 +954,10 @@ SELECT
 	WHERE
 		a.ip_address = ?	
 ) Z ON ath.hop = Z.IP
-INNER JOIN atlas_traceroute_hops hops on hops.trace_id = X.Id
+ORDER BY date desc
+limit 1
+) A
+INNER JOIN atlas_traceroute_hops hops on hops.trace_id = A.Id
 ORDER BY hops.ttl
 `
 )
@@ -982,6 +990,7 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 			Ip:  row.hop,
 			Ttl: row.ttl,
 		})
+		ret.Address = row.src
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err

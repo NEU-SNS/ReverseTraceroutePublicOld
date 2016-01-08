@@ -5,13 +5,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 
-	atlas "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
+	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -20,7 +21,30 @@ import (
 )
 
 var plHost2IP map[string]string
-var ipToCluster map[string]string
+
+type clusterMap struct {
+	ipc map[string]string
+}
+
+func (cm clusterMap) Get(s string) string {
+	if cl, ok := cm.ipc[s]; ok {
+		return cl
+	}
+	return s
+}
+
+func (cm clusterMap) Set(key, val string) {
+	cm.ipc[key] = val
+}
+
+func newClusterMap() clusterMap {
+	i := make(map[string]string)
+	return clusterMap{
+		ipc: i,
+	}
+}
+
+var ipToCluster = newClusterMap()
 var clusterToIps map[string][]string
 var tsAdjsByCluster bool
 var vps []*datamodel.VantagePoint
@@ -29,7 +53,11 @@ var rrVPsByCluster bool
 // ReversePath is a reverse path
 type ReversePath struct {
 	Src, Dst string
-	Path     []Segment
+	Path     *[]Segment
+}
+
+func (rp *ReversePath) len() int {
+	return len(*rp.Path)
 }
 
 // NewReversePath creates a reverse path
@@ -39,9 +67,9 @@ func NewReversePath(src, dst string, path []Segment) *ReversePath {
 		Dst: dst,
 	}
 	if len(path) == 0 {
-		ret.Path = []Segment{NewDstRevSegment([]string{dst}, src, dst)}
+		ret.Path = &[]Segment{NewDstRevSegment([]string{dst}, src, dst)}
 	} else {
-		ret.Path = path
+		ret.Path = &path
 	}
 	return &ret
 }
@@ -49,11 +77,12 @@ func NewReversePath(src, dst string, path []Segment) *ReversePath {
 // Clone clones a ReversePath
 func (rp *ReversePath) Clone() *ReversePath {
 	ret := ReversePath{
-		Src: rp.Src,
-		Dst: rp.Dst,
+		Src:  rp.Src,
+		Dst:  rp.Dst,
+		Path: new([]Segment),
 	}
-	for _, seg := range rp.Path {
-		ret.Path = append(ret.Path, seg.Clone())
+	for _, seg := range *rp.Path {
+		*ret.Path = append(*ret.Path, seg.Clone())
 	}
 	return &ret
 }
@@ -61,7 +90,7 @@ func (rp *ReversePath) Clone() *ReversePath {
 // Hops gets the hops from each segment
 func (rp *ReversePath) Hops() []string {
 	var segs [][]string
-	for _, p := range rp.Path {
+	for _, p := range *rp.Path {
 		segs = append(segs, p.Hops())
 	}
 	var hops []string
@@ -76,7 +105,7 @@ func (rp *ReversePath) Hops() []string {
 // Length returns the length of all the segments
 func (rp *ReversePath) Length() int {
 	var length int
-	for _, seg := range rp.Path {
+	for _, seg := range *rp.Path {
 		length += seg.Length(false)
 	}
 	return length
@@ -89,14 +118,14 @@ func (rp *ReversePath) LastHop() string {
 
 // LastSeg gets the last segment
 func (rp *ReversePath) LastSeg() Segment {
-	return rp.Path[len(rp.Path)-1]
+	return (*rp.Path)[rp.len()-1]
 }
 
 // Pop pops a segment off of the path
 func (rp *ReversePath) Pop() Segment {
-	length := len(rp.Path)
-	last := rp.Path[length-1]
-	rp.Path = rp.Path[:length-1]
+	length := rp.len()
+	last := (*rp.Path)[length-1]
+	*rp.Path = (*rp.Path)[:length-1]
 	return last
 }
 
@@ -108,7 +137,7 @@ func (rp *ReversePath) Reaches() bool {
 // SymmetricAssumptions returns the number of symmetric assumptions
 func (rp *ReversePath) SymmetricAssumptions() int {
 	var total int
-	for _, seg := range rp.Path {
+	for _, seg := range *rp.Path {
 		total += seg.SymmetricAssumptions()
 	}
 	return total
@@ -116,7 +145,7 @@ func (rp *ReversePath) SymmetricAssumptions() int {
 
 // Add adds a segment to the path
 func (rp *ReversePath) Add(s Segment) {
-	rp.Path = append(rp.Path, s)
+	*rp.Path = append(*rp.Path, s)
 }
 
 func (rp *ReversePath) String() string {
@@ -125,7 +154,7 @@ func (rp *ReversePath) String() string {
 
 const (
 	// RateLimit is the ReverseTraceroute Rate Limit
-	RateLimit int = 3
+	RateLimit int = 10
 )
 
 // ReverseTraceroute is a reverse traceroute
@@ -140,7 +169,7 @@ const (
 // [] means we've tried them all. if it is missing the key, that means we still need to
 // initialize it
 type ReverseTraceroute struct {
-	Paths           []*ReversePath
+	Paths           *[]*ReversePath
 	DeadEnd         map[string]bool
 	RRHop2RateLimit map[string]int
 	RRHop2VPSLeft   map[string][]string
@@ -155,7 +184,7 @@ func NewReverseTraceroute(src, dst string, as AdjacencySource) *ReverseTracerout
 	ret := ReverseTraceroute{
 		Src:             src,
 		Dst:             dst,
-		Paths:           []*ReversePath{NewReversePath(src, dst, nil)},
+		Paths:           &[]*ReversePath{NewReversePath(src, dst, nil)},
 		DeadEnd:         make(map[string]bool),
 		RRHop2RateLimit: make(map[string]int),
 		RRHop2VPSLeft:   make(map[string][]string),
@@ -166,10 +195,14 @@ func NewReverseTraceroute(src, dst string, as AdjacencySource) *ReverseTracerout
 	return &ret
 }
 
+func (rt *ReverseTraceroute) len() int {
+	return len(*(rt.Paths))
+}
+
 // SymmetricAssumptions returns the number of symmetric
 // assumptions of the last path
 func (rt *ReverseTraceroute) SymmetricAssumptions() int {
-	return rt.Paths[len(rt.Paths)-1].SymmetricAssumptions()
+	return (*rt.Paths)[rt.len()-1].SymmetricAssumptions()
 }
 
 // Deadends returns the ips of all the deadends
@@ -192,32 +225,32 @@ func (rt *ReverseTraceroute) setRRVPSForHop(hop string, vps []string) {
 
 // CurrPath gets the last Path in the Paths "stack"
 func (rt *ReverseTraceroute) CurrPath() *ReversePath {
-	return rt.Paths[len(rt.Paths)-1]
+	return (*rt.Paths)[rt.len()-1]
 }
 
 // Hops gets the hops from the last path
 func (rt *ReverseTraceroute) Hops() []string {
-	if len(rt.Paths) == 0 {
+	if rt.len() == 0 {
 		return []string{}
 	}
-	return rt.Paths[len(rt.Paths)-1].Hops()
+	return (*rt.Paths)[rt.len()-1].Hops()
 }
 
 // LastHop gets the last hop from the last path
 func (rt *ReverseTraceroute) LastHop() string {
-	return rt.Paths[len(rt.Paths)-1].LastHop()
+	return (*rt.Paths)[rt.len()-1].LastHop()
 }
 
 // Reaches checks if the last path reaches
 func (rt *ReverseTraceroute) Reaches() bool {
 	// Assume that any path reaches if and only if the last one reaches
-	return rt.Paths[len(rt.Paths)-1].Reaches()
+	return (*rt.Paths)[rt.len()-1].Reaches()
 }
 
 // Failed returns whether we have any options lefts to explore
 func (rt *ReverseTraceroute) Failed(backoffEndhost bool) bool {
-	return len(rt.Paths) == 0 || (backoffEndhost && len(rt.Paths) == 1 &&
-		len(rt.Paths[0].Path) == 1 && reflect.TypeOf(rt.Paths[0].Path[0]) == reflect.TypeOf(&DstRevSegment{}))
+	return rt.len() == 0 || (backoffEndhost && rt.len() == 1 &&
+		(*rt.Paths)[0].len() == 1 && reflect.TypeOf((*(*rt.Paths)[0].Path)[0]) == reflect.TypeOf(&DstRevSegment{}))
 }
 
 // FailCurrPath fails the current path
@@ -229,7 +262,7 @@ func (rt *ReverseTraceroute) FailCurrPath() {
 	for !rt.Failed(false) && rt.DeadEnd[rt.LastHop()] && reflect.TypeOf(rt.CurrPath().LastSeg()) !=
 		reflect.TypeOf(&DstSymRevSegment{}) {
 		// Pop
-		rt.Paths = rt.Paths[:len(rt.Paths)-1]
+		*rt.Paths = (*rt.Paths)[:rt.len()-1]
 	}
 }
 
@@ -244,7 +277,7 @@ func (rt *ReverseTraceroute) AddAndReplaceSegment(s Segment) bool {
 	basePath := rt.CurrPath().Clone()
 	basePath.Pop()
 	basePath.Add(s)
-	rt.Paths = append(rt.Paths, basePath)
+	*rt.Paths = append(*rt.Paths, basePath)
 	return true
 }
 
@@ -268,21 +301,81 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
 	// sort based on the magic compare
 	// or how long the path is?
 	sort.Sort(magicSort(segs))
-	basePath := rt.CurrPath()
+	basePath := rt.CurrPath().Clone()
 	for _, s := range segs {
 		if !rt.DeadEnd[s.LastHop()] {
 			// add loop removal here
-			s.RemoveHops(basePath.Hops())
+			err := s.RemoveHops(basePath.Hops())
+			if err != nil {
+				log.Error(err)
+				return false
+			}
 			if s.Length(false) == 0 {
 				log.Debug("Skipping loop-causing segment ", s)
 				continue
 			}
 			*added = true
-			basePath.Add(s)
-			rt.Paths = append(rt.Paths, basePath)
+			cl := basePath.Clone()
+			cl.Add(s)
+			*rt.Paths = append(*rt.Paths, cl)
 		}
 	}
 	return *added
+}
+
+func (rt *ReverseTraceroute) String() string {
+	hopsSeen := make(map[string]bool)
+	var out bytes.Buffer
+	out.WriteString("Reverse Traceroute from ")
+	out.WriteString(rt.Hops()[0])
+	out.WriteString(" back to ")
+	out.WriteString(rt.LastHop())
+	out.WriteString("\n")
+	first := true
+	var i int
+	for _, segment := range *rt.CurrPath().Path {
+		symbol := new(string)
+		switch segment.(type) {
+		case *DstSymRevSegment:
+			*symbol = "sym"
+		case *DstRevSegment:
+			*symbol = "dst"
+		case *TRtoSrcRevSegment:
+			*symbol = "tr"
+		case *SpoofRRRevSegment:
+			*symbol = "rr"
+		case *RRRevSegment:
+			*symbol = "rr"
+		case *SpoofTSAdjRevSegmentTSZeroDoubleStamp:
+			*symbol = "ts"
+		case *SpoofTSAdjRevSegmentTSZero:
+			*symbol = "ts"
+		case *SpoofTSAdjRevSegment:
+			*symbol = "ts"
+		case *TSAdjRevSegment:
+			*symbol = "ts"
+		}
+		for _, hop := range segment.Hops() {
+			if hopsSeen[hop] {
+				continue
+			}
+			hopsSeen[hop] = true
+			tech := new(string)
+			if first {
+				*tech = *symbol
+				first = false
+			} else {
+				*tech = "-" + *symbol
+			}
+			if hop == "0.0.0.0" || hop == "*" {
+				out.WriteString(fmt.Sprintf("%-2d %-120s %s\n", i, "* * *", *tech))
+			} else {
+				out.WriteString(fmt.Sprintf("%-2d %-120s %s\n", i, hop, *tech))
+			}
+			i++
+		}
+	}
+	return out.String()
 }
 
 type adjSettings struct {
@@ -368,7 +461,7 @@ func (rt *ReverseTraceroute) InitializeTSAdjacents(cls string) error {
 	}
 	var cleaned []string
 	for _, ip := range adjs {
-		if cls != ipToCluster[ip] {
+		if cls != ipToCluster.Get(ip) {
 			cleaned = append(cleaned, ip)
 		}
 	}
@@ -382,14 +475,14 @@ func (rt *ReverseTraceroute) InitializeTSAdjacents(cls string) error {
 func (rt *ReverseTraceroute) GetTSAdjacents(hop string) []string {
 	var cls string
 	if tsAdjsByCluster {
-		cls = ipToCluster[hop]
+		cls = ipToCluster.Get(hop)
 	} else {
 		cls = hop
 	}
 	if _, ok := rt.TSHop2AdjsLeft[cls]; !ok {
 		rt.InitializeTSAdjacents(cls)
 	}
-	log.Debug(rt.Src, rt.Dst, rt.LastHop(), len(rt.TSHop2AdjsLeft[cls]), "TS adjacents left to try")
+	log.Debug(rt.Src, " ", rt.Dst, " ", rt.LastHop(), " ", len(rt.TSHop2AdjsLeft[cls]), " TS adjacents left to try")
 
 	// CASES:
 	// 1. no adjacents left return nil
@@ -408,6 +501,7 @@ func (rt *ReverseTraceroute) GetTSAdjacents(hop string) []string {
 	}
 	if rate > len(rt.TSHop2AdjsLeft[cls]) {
 		min = len(rt.TSHop2AdjsLeft[cls])
+		log.Debug("vps: ", vps)
 	} else {
 		min = rate
 	}
@@ -431,7 +525,7 @@ func getTimestampSpoofers(src, dst string) []string {
 	siteToSpoofer := chooseOneSpooferPerSite()
 	var spoofers []string
 	for _, val := range siteToSpoofer {
-		if val.Timestamp {
+		if val.Timestamp && val.CanSpoof {
 			ips, _ := util.Int32ToIPString(val.Ip)
 			spoofers = append(spoofers, ips)
 		}
@@ -447,16 +541,18 @@ func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
 	var sitesForTarget []*datamodel.VantagePoint
 	sitesForTarget = nil
 	spoofersForTarget := []string{"non_spoofed"}
-
+	var tempSpoofers []string
 	if sitesForTarget == nil {
-		// This should be the same as sorting the values randomly
-		// since iterating over a map is randomized by the runtime
 		for _, val := range siteToSpoofer {
 			ipsrc, _ := util.Int32ToIPString(val.Ip)
 			if ipsrc == rt.Src {
 				continue
 			}
-			spoofersForTarget = append(spoofersForTarget, ipsrc)
+			tempSpoofers = append(tempSpoofers, ipsrc)
+		}
+		random := rand.Perm(len(tempSpoofers))
+		for _, r := range random {
+			spoofersForTarget = append(spoofersForTarget, tempSpoofers[r])
 		}
 	} else {
 		// TODO
@@ -518,37 +614,29 @@ func stringSliceIndex(segs []string, seg string) int {
 // at an IP back up the TR chain, want to delete anything that has been added along the way
 // THIS IS ALMOST DEFINITLY WRONG AND WILL NEED DEBUGGING
 func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
+	log.Debug("Adding Background trSegment ", trSeg)
 	var found *ReversePath
-	var index int
 	// iterate through the paths, trying to find one that contains
-	// intersection point
-	for _, chunk := range rt.Paths {
-		c := chunk
-		var ch *ReversePath
-		var foundOne bool
-		for i, val := range chunk.Hops() {
-			if trSeg.Hops()[0] == val {
-				foundOne = true
-				fmt.Println("found index", i)
-				index = i
-				ch = c.Clone()
-				found = ch
-			}
-		}
-		if foundOne {
-			// Iterate through all the segments until you find the
-			// hop where they intersect. After reaching the hop
-			// where they intersect, delete any subsequent hops
-			// within the same segment.
-			// Then delete any segments after.
-			var k int // Which IP Hop we're at
+	// intersection point, chunk is a ReversePath
+	for _, chunk := range *rt.Paths {
+		var index int
+		log.Debug("Looking for ", trSeg.Hops()[0], " in ", chunk.Hops())
+		if index = stringSliceIndex(chunk.Hops(), trSeg.Hops()[0]); index != -1 {
+			log.Debug("Intersected: ", trSeg.Hops()[0], " in ", chunk)
+			chunk = chunk.Clone()
+			found = chunk
+			// Iterate through all the segments until you find the hop
+			// where they intersect. After reaching the hop where
+			// they intersect, delete any subsequent hops within
+			// the same segment. Then delete any segments after.
+			var k int // Which IP hop we're at
 			var j int // Which segment we're at
-			for len(ch.Hops())-1 > index {
+			for len(chunk.Hops())-1 > index {
 				// get current segment
-				seg := ch.Path[j]
+				seg := (*chunk.Path)[j]
 				// if we're past the intersection point then delete the whole segment
 				if k > index {
-					ch.Path, ch.Path[len(ch.Path)-1] = append(ch.Path[:j], ch.Path[j+1:]...), nil
+					*chunk.Path, (*chunk.Path)[j] = append((*chunk.Path)[:j], (*chunk.Path)[j+1:]...), nil
 				} else if k+len(seg.Hops())-1 > index {
 					l := stringSliceIndex(seg.Hops(), trSeg.Hops()[0]) + 1
 					for k+len(seg.Hops())-1 > index {
@@ -563,9 +651,11 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 		}
 	}
 	if found == nil {
+		log.Debug(trSeg)
+		log.Debug("Tried to add traceroute to Reverse Traceroute that didn't share an IP... what happened?!")
 		return false
 	}
-	rt.Paths = append(rt.Paths, found)
+	*rt.Paths = append(*rt.Paths, found)
 	// Now that the traceroute is cleaned up, add the new segment
 	// this sequence slightly breaks how add_segment normally works here
 	// we append a cloned path (with any hops past the intersection trimmed).
@@ -575,9 +665,9 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 	// but something to be aware of
 	success := rt.AddSegments([]Segment{trSeg})
 	if !success {
-		for i, s := range rt.Paths {
+		for i, s := range *rt.Paths {
 			if found == s {
-				rt.Paths, rt.Paths[len(rt.Paths)-1] = append(rt.Paths[:i], rt.Paths[i+1:]...), nil
+				*rt.Paths, (*rt.Paths)[rt.len()-1] = append((*rt.Paths)[:i], (*rt.Paths)[i+1:]...), nil
 			}
 		}
 	}
@@ -591,12 +681,13 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 // this reverse traceroute, return them, otherwise return [:non_spoofed] first
 // then set of spoofing VPs on subsequent calls
 func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
+	log.Debug("GettingRRVPs for ", dst)
 	// we either use destination or cluster, depending on how flag is set
 	hops := rt.CurrPath().LastSeg().Hops()
 	for _, hop := range hops {
 		cls := &hop
 		if rrVPsByCluster {
-			*cls = ipToCluster[hop]
+			*cls = ipToCluster.Get(hop)
 		}
 		if _, ok := rt.RRHop2VPSLeft[*cls]; !ok {
 			rt.InitializeRRVPs(*cls)
@@ -612,8 +703,10 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 		*target, segHops = segHops[len(segHops)-1], segHops[:len(segHops)-1]
 		*cls = *target
 		if rrVPsByCluster {
-			*cls = ipToCluster[*target]
+			*cls = ipToCluster.Get(*target)
 		}
+		log.Debug("Sending RR probes to: ", *cls)
+		log.Debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
 		var vals [][]string
 		for _, val := range rrsSrcToDstToVPToRevHops[rt.Src][*cls] {
 			if len(val) > 0 {
@@ -624,10 +717,12 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 		if len(rrsSrcToDstToVPToRevHops[rt.Src][*cls]) >= maxUnresponsive &&
 			// this may not match exactly but I think it does
 			len(vals) == 0 {
+			log.Debug("GetRRVPs: unresponsive for: ", *cls)
 			continue
 		}
 		// 1. no VPs left, return nil
 		if len(rt.RRHop2VPSLeft[*cls]) == 0 {
+			log.Debug("GetRRVPs: No VPs left for: ", *cls)
 			continue
 		}
 		foundVPs = true
@@ -635,7 +730,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	if !foundVPs {
 		return nil, ""
 	}
-	log.Debug(rt.Src, rt.Dst, *target, len(rt.RRHop2VPSLeft[*cls]), "RR VPs left to try")
+	log.Debug(rt.Src, " ", rt.Dst, " ", *target, " ", len(rt.RRHop2VPSLeft[*cls]), " RR VPs left to try")
 	// 2. probes to this dst that were already issues for other reverse
 	// traceroutes, but not in this reverse traceroute
 	var keys []string
@@ -643,6 +738,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	for k := range tmp {
 		keys = append(keys, k)
 	}
+	log.Debug("Keys: ", keys, " vpsleft: ", rt.RRHop2VPSLeft[*cls])
 	usedVps := stringSet(keys).union(stringSet(rt.RRHop2VPSLeft[*cls]))
 	rt.RRHop2VPSLeft[*cls] = stringSliceMinus(rt.RRHop2VPSLeft[*cls], usedVps)
 	var finalUsedVPs []string
@@ -670,7 +766,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	// 4. use unused spoofing VPs
 	// if the current last hop was discovered with spoofed, and it
 	// hasn't been used yet, use it
-	notEmpty := len(rt.Paths) > 0
+	notEmpty := rt.len() > 0
 	var isRRRev, containsKey *bool
 	isRRRev = new(bool)
 	containsKey = new(bool)
@@ -706,6 +802,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	}
 	vps := rt.RRHop2VPSLeft[*cls][:min]
 	rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][min:]
+	log.Debug("Returning VPS for spoofing: ", vps)
 	return vps, *target
 }
 
@@ -722,8 +819,9 @@ func (si stringInt) String() string {
 	return fmt.Sprintf("%d", int(si))
 }
 
+var trsSrcToDstToPath = make(map[string]map[string][]string)
+
 func initialize(cl vpservice.VPSource, clusterfile string) {
-	ipToCluster = make(map[string]string)
 	clusterToIps = make(map[string][]string)
 	vpr, err := cl.GetVPs()
 	if err != nil {
@@ -742,7 +840,7 @@ func initialize(cl vpservice.VPSource, clusterfile string) {
 		ips := strings.Split(ln, " ")
 		clusterToIps[cls.String()] = ips
 		for _, ip := range ips {
-			ipToCluster[ip] = cls.String()
+			ipToCluster.Set(ip, cls.String())
 		}
 		cls++
 	}
@@ -756,21 +854,24 @@ type AdjacencySource interface {
 }
 
 // RunReverseTraceroute runs a reverse traceroute
-func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at atlas.Atlas, vpserv vpservice.VPSource, as AdjacencySource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
+func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, clusterFile string) (*ReverseTraceroute, string, map[string]int, error) {
 	probeCount := make(map[string]int)
 	initialize(vpserv, clusterFile)
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, as)
 	if backoffEndhost || dstMustBeReachable {
 		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
 		if err != nil {
+			log.Debug("Backoff Endhost failed")
 			return rt, "NO_HOPS", probeCount, err
 		}
 		if rt.Reaches() {
 			return rt, "TRIVIAL", probeCount, nil
 		}
-
+		log.Debug("Done backing off")
 	}
 	for {
+		log.Debug(rt.CurrPath())
+		log.Debug("Attempting to find TR")
 		err := reverseHopsTRToSrc(rt, at)
 		if rt.Reaches() {
 			return rt, "REACHES", probeCount, nil
@@ -778,20 +879,35 @@ func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl cl
 		if err == nil {
 			continue
 		}
-		err = reverseHopsRR(rt, cl)
-		if rt.Reaches() {
-			return rt, "REACHES", probeCount, nil
+		log.Debug("Attempting RR")
+		err = nil
+		for err != ErrNoVPs {
+			err = reverseHopsRR(rt, cl)
+			if rt.Reaches() {
+				return rt, "REACHES", probeCount, nil
+			}
+			if err == nil {
+				break
+			}
 		}
 		if err == nil {
 			continue
 		}
-		err = reverseHopsTS(rt, cl, probeCount)
-		if rt.Reaches() {
-			return rt, "REACHES", probeCount, nil
+		log.Debug("Attempting TS")
+		err = nil
+		for err != ErrNoVPs && err != ErrNoAdj {
+			err = reverseHopsTS(rt, cl, probeCount)
+			if rt.Reaches() {
+				return rt, "REACHES", probeCount, nil
+			}
+			if err == nil {
+				break
+			}
 		}
 		if err == nil {
 			continue
 		}
+		log.Debug("Assuming Symmetric")
 		err = reverseHopsAssumeSymmetric(rt, cl, probeCount)
 		if rt.Reaches() {
 			return rt, "REACHES", probeCount, nil
@@ -811,17 +927,33 @@ func stringInSlice(ss []string, s string) bool {
 	return false
 }
 
+var (
+	// ErrNoVPs is used when there are no vps left
+	ErrNoVPs = fmt.Errorf("No VPs")
+	// ErrNoHopFound is used when no hop is found from a measurement round
+	ErrNoHopFound = fmt.Errorf("No Hop Found")
+	// ErrNoAdj is used when there are no adjacents found
+	ErrNoAdj = fmt.Errorf("No Adjacents found")
+)
+
 func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 	vps, target := revtr.GetRRVPs(revtr.LastHop())
+	log.Debug("reverseHopsRR vps: ", vps)
 	receiverToSpooferToTarget := make(map[string]map[string][]string)
+	init := func(s string) {
+		if _, ok := receiverToSpooferToTarget[s]; ok {
+			return
+		}
+		receiverToSpooferToTarget[s] = make(map[string][]string)
+	}
 	var pings []*datamodel.PingMeasurement
 	if len(vps) == 0 {
-		return fmt.Errorf("No VPs found")
+		return ErrNoVPs
 	}
 	var cls *string
 	cls = new(string)
 	if rrVPsByCluster {
-		*cls = ipToCluster[target]
+		*cls = ipToCluster.Get(target)
 	} else {
 		*cls = target
 	}
@@ -829,7 +961,9 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 	for k := range rrsSrcToDstToVPToRevHops[revtr.Src][*cls] {
 		keys = append(keys, k)
 	}
+	log.Debug("VPS ", vps)
 	vps = stringSliceMinus(vps, keys)
+	vpsc := cloneStringSlice(vps)
 	if stringInSlice(vps, "non_spoofed") {
 		var nvps []string
 		for _, vp := range vps {
@@ -841,39 +975,50 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 		srcs, _ := util.IPStringToInt32(revtr.Src)
 		dsts, _ := util.IPStringToInt32(target)
 		pings = append(pings, &datamodel.PingMeasurement{
-			Src: srcs,
-			Dst: dsts,
+			Src:        srcs,
+			Dst:        dsts,
+			RR:         true,
+			Timeout:    10,
+			Count:      "1",
+			CheckDb:    true,
+			CheckCache: true,
 		})
 	}
 	for _, vp := range vps {
+		init(revtr.Src)
 		receiverToSpooferToTarget[revtr.Src][vp] = append(receiverToSpooferToTarget[revtr.Src][vp], target)
 	}
 	if len(pings) == 1 {
 		issueRecordRoutes(pings[0], cl)
 	}
-	issueSpoofedRecordRoutes(receiverToSpooferToTarget, cl, true)
+	if len(receiverToSpooferToTarget) > 0 {
+		issueSpoofedRecordRoutes(receiverToSpooferToTarget, cl, true)
+	}
 	var segs []Segment
 	if rrVPsByCluster {
-		target = ipToCluster[target]
+		target = ipToCluster.Get(target)
 	}
-	for _, vp := range vps {
+	for _, vp := range vpsc {
+		log.Debug("Creating Segs for RR hops for src ", revtr.Src, " target ", target, " vp ", vp)
 		hops := rrsSrcToDstToVPToRevHops[revtr.Src][target][vp]
+		log.Debug("Trying to use hops ", hops)
 		if len(hops) > 0 {
 			// for every non-zero hop, build a revsegment
 			for i, hop := range hops {
 				if hop == "0.0.0.0" {
 					continue
 				}
+				// i+1 otherwise the last hop will never be considered?
 				if vp == "non_spoofed" {
-					segs = append(segs, NewRRRevSegment(hops[:i], revtr.Src, target))
+					segs = append(segs, NewRRRevSegment(hops[:i+1], revtr.Src, target))
 				} else {
-					segs = append(segs, NewSpoofRRRevSegment(hops[:i], revtr.Src, target, vp))
+					segs = append(segs, NewSpoofRRRevSegment(hops[:i+1], revtr.Src, target, vp))
 				}
 			}
 		}
 	}
 	if !revtr.AddSegments(segs) {
-		return fmt.Errorf("No hops found")
+		return ErrNoHopFound
 	}
 	return nil
 }
@@ -881,6 +1026,7 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 var rrsstdMu sync.Mutex
 
 func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]string, cl client.Client, deleteUnresponsive bool) error {
+	log.Debug("Issuing Spoofed RR probes")
 	var pings []*datamodel.PingMeasurement
 	for rec, spoofToTarg := range recvToSpooferToTarget {
 		for spoofer, targets := range spoofToTarg {
@@ -894,6 +1040,10 @@ func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]stri
 					SpooferAddr: ssrc,
 					Src:         sspoofer,
 					Dst:         sdst,
+					Timeout:     10,
+					Count:       "1",
+					CheckDb:     true,
+					CheckCache:  true,
 				})
 			}
 		}
@@ -912,6 +1062,7 @@ func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]stri
 		if err != nil {
 			return err
 		}
+		log.Debug("Got spoofed RR response: ", p)
 		pr := p.GetResponses()
 		if len(pr) > 0 {
 			rrsstdMu.Lock()
@@ -921,11 +1072,26 @@ func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]stri
 			rrs := pr[0].RR
 			cls := new(string)
 			if rrVPsByCluster {
-				*cls = ipToCluster[sdst]
+				*cls = ipToCluster.Get(sdst)
 			} else {
 				*cls = sdst
 			}
-			rrsSrcToDstToVPToRevHops[ssrc][sdst][sspoofer] = processRR(ssrc, sdst, rrs, true)
+
+			inner, ok := rrsSrcToDstToVPToRevHops[ssrc]
+			if ok {
+				f, ok := inner[sdst]
+				if ok {
+					f[sspoofer] = processRR(ssrc, sdst, rrs, true)
+				} else {
+					inner[sdst] = make(map[string][]string)
+					inner[sdst][sspoofer] = processRR(ssrc, sdst, rrs, true)
+				}
+			} else {
+				tmp := make(map[string]map[string][]string)
+				tmp[sdst] = make(map[string][]string)
+				tmp[sdst][sspoofer] = processRR(ssrc, sdst, rrs, true)
+
+			}
 			rrsstdMu.Unlock()
 		}
 	}
@@ -940,7 +1106,7 @@ func issueRecordRoutes(ping *datamodel.PingMeasurement, cl client.Client) error 
 	*ssrc, _ = util.Int32ToIPString(ping.Src)
 	if rrVPsByCluster {
 		*sdst, _ = util.Int32ToIPString(ping.Dst)
-		*cls = ipToCluster[*sdst]
+		*cls = ipToCluster.Get(*sdst)
 	} else {
 		*sdst, _ = util.Int32ToIPString(ping.Dst)
 		*cls = *sdst
@@ -962,9 +1128,29 @@ func issueRecordRoutes(ping *datamodel.PingMeasurement, cl client.Client) error 
 			return err
 		}
 		pr := p.GetResponses()
+		log.Debug("Received RR response: ", pr)
 		if len(pr) > 0 {
 			rrsstdMu.Lock()
-			rrsSrcToDstToVPToRevHops[*sdst][*cls]["non_spoofed"] = processRR(*ssrc, *sdst, pr[0].RR, true)
+			inner, ok := rrsSrcToDstToVPToRevHops[*ssrc]
+			if ok {
+				f, ok := inner[*cls]
+				if ok {
+					res := processRR(*ssrc, *sdst, pr[0].RR, true)
+					f["non_spoofed"] = res
+				} else {
+					inner[*cls] = make(map[string][]string)
+					res := processRR(*ssrc, *sdst, pr[0].RR, true)
+					inner[*cls]["non_spoofed"] = res
+				}
+			} else {
+				log.Debug("Setting hops")
+				tmp := make(map[string]map[string][]string)
+				tmp[*cls] = make(map[string][]string)
+				res := processRR(*ssrc, *sdst, pr[0].RR, true)
+				tmp[*cls]["non_spoofed"] = res
+				rrsSrcToDstToVPToRevHops[*ssrc] = tmp
+
+			}
 			rrsstdMu.Unlock()
 		}
 	}
@@ -986,13 +1172,14 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 	if len(hops) == 0 {
 		return []string{}
 	}
-	dstcls := ipToCluster[dst]
+	dstcls := ipToCluster.Get(dst)
 	var hopss []string
 	for _, s := range hops {
 		hs, _ := util.Int32ToIPString(s)
 		hopss = append(hopss, hs)
 	}
-	if ipToCluster[hopss[len(hopss)-1]] == dstcls {
+	log.Debug("Processing RR for src: ", src, " dst ", dst, " hops: ", hopss)
+	if ipToCluster.Get(hopss[len(hopss)-1]) == dstcls {
 		return []string{}
 	}
 	i := len(hops) - 1
@@ -1000,18 +1187,19 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 	// check if we reached dst with at least one hop to spare
 	for !found && i > 0 {
 		i--
-		if dstcls == ipToCluster[hopss[i]] {
+		if dstcls == ipToCluster.Get(hopss[i]) {
 			found = true
 		}
 	}
 	if found {
+		log.Debug("Found hops RR at: ", i)
 		hopss = hopss[i:]
 		// remove cluster level loops
 		if removeLoops {
 			var currIndex int
 			var clusters []string
 			for _, hop := range hopss {
-				clusters = append(clusters, ipToCluster[hop])
+				clusters = append(clusters, ipToCluster.Get(hop))
 			}
 			for currIndex < len(hopss)-1 {
 				for x := currIndex; currIndex < stringSliceRIndex(clusters, clusters[currIndex]); x++ {
@@ -1021,18 +1209,21 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 				currIndex++
 			}
 		}
+		log.Debug("Got Hops: ", hopss)
 		return hopss
 	}
 	return []string{}
 }
 
-func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl atlas.Atlas) error {
+func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 	as, err := cl.GetIntersectingPath()
+	var errs []error
 	if err != nil {
 		return nil
 	}
 	for _, hop := range revtr.CurrPath().LastSeg().Hops() {
-		dest, _ := util.IPStringToInt32(revtr.Dst)
+		log.Debug("Attempting to find TR for hop: ", hop)
+		dest, _ := util.IPStringToInt32(revtr.Src)
 		hops, _ := util.IPStringToInt32(hop)
 		is := datamodel.IntersectionRequest{
 			UseAliases: true,
@@ -1045,6 +1236,10 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl atlas.Atlas) error {
 			return err
 		}
 	}
+	err = as.CloseSend()
+	if err != nil {
+		log.Debug(err)
+	}
 	for {
 		tr, err := as.Recv()
 		if err == io.EOF {
@@ -1053,7 +1248,10 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl atlas.Atlas) error {
 		if err != nil {
 			return err
 		}
-		if tr.Type == datamodel.IResponseType_PATH {
+		log.Debug("Received response: ", tr)
+		switch tr.Type {
+		case datamodel.IResponseType_PATH:
+			log.Debug("Got PATH Response")
 			var hs []string
 			for _, h := range tr.Path.GetHops() {
 				hss, _ := util.Int32ToIPString(h.Ip)
@@ -1062,21 +1260,35 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl atlas.Atlas) error {
 			addrs, _ := util.Int32ToIPString(tr.Path.Address)
 			segment := NewTrtoSrcRevSegment(hs, revtr.Src, addrs)
 			revtr.AddBackgroundTRSegment(segment)
+		case datamodel.IResponseType_NONE_FOUND:
+			errs = append(errs, fmt.Errorf("None Found"))
+		case datamodel.IResponseType_ERROR:
+			errs = append(errs, fmt.Errorf(tr.Error))
 		}
+
+	}
+	if len(errs) == len(revtr.CurrPath().LastSeg().Hops()) {
+		var errstring bytes.Buffer
+		for _, err := range errs {
+			errstring.WriteString(err.Error() + " ")
+		}
+		return fmt.Errorf(errstring.String())
 	}
 	return nil
 }
 
-var trsSrcToDstToPath = make(map[string]map[string][]string)
 var trsMu sync.Mutex
 
 func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 	src, _ := util.IPStringToInt32(revtr.Src)
 	dst, _ := util.IPStringToInt32(revtr.LastHop())
 	tr := datamodel.TracerouteMeasurement{
-		Src: src,
-		Dst: dst,
+		Src:        src,
+		Dst:        dst,
+		CheckCache: true,
+		CheckDb:    true,
 	}
+	log.Debug("Issuing traceroute: ", tr)
 	st, err := cl.Traceroute(&datamodel.TracerouteArg{
 		Traceroutes: []*datamodel.TracerouteMeasurement{&tr},
 	})
@@ -1093,16 +1305,35 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 			log.Error(err)
 			return err
 		}
+		if tr.Error != "" {
+			log.Error(tr.Error)
+			return fmt.Errorf("Traceroute failed: %s", tr.Error)
+		}
 		dstSt, _ := util.Int32ToIPString(tr.Dst)
-		cls := ipToCluster[dstSt]
-		var hopst []string
+		cls := ipToCluster.Get(dstSt)
 		hops := tr.GetHops()
-		for _, hop := range hops {
+		var hopst []string
+		for i, hop := range hops {
+			if i != len(hops)-1 {
+				j := hop.ProbeTtl + 1
+				for j < hops[i].ProbeTtl {
+					hopst = append(hopst, "*")
+				}
+			}
 			addrst, _ := util.Int32ToIPString(hop.Addr)
 			hopst = append(hopst, addrst)
 		}
+		if hopst[len(hopst)-1] != revtr.LastHop() {
+			return fmt.Errorf("Traceroute didn't reach destination")
+		}
 		trsMu.Lock()
-		trsSrcToDstToPath[revtr.Src][cls] = hopst
+		log.Debug("got traceroute ", hopst)
+		if in, ok := trsSrcToDstToPath[revtr.Src]; ok {
+			in[cls] = hopst
+		} else {
+			trsSrcToDstToPath[revtr.Src] = make(map[string][]string)
+			trsSrcToDstToPath[revtr.Src][cls] = hopst
+		}
 		trsMu.Unlock()
 	}
 	return nil
@@ -1111,12 +1342,12 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 func reverseHopsAssumeSymmetric(revtr *ReverseTraceroute, cl client.Client, probeCounts map[string]int) error {
 	// if last hop is assumed, add one more from that tr
 	if reflect.TypeOf(revtr.CurrPath().LastSeg()) == reflect.TypeOf(&DstSymRevSegment{}) {
-		log.Debug("Backing off along current path for ", revtr.Src, revtr.Dst)
+		log.Debug("Backing off along current path for ", revtr.Src, " ", revtr.Dst)
 		// need to not ignore the hops in the last segment, so can't just
 		// call add_hops(revtr.hops + revtr.deadends)
 		newSeg := revtr.CurrPath().LastSeg().(*DstSymRevSegment)
 		var allHops []string
-		for _, seg := range revtr.CurrPath().Path {
+		for _, seg := range *revtr.CurrPath().Path {
 			allHops = append(allHops, seg.Hops()...)
 		}
 		allHops = append(allHops, revtr.Deadends()...)
@@ -1127,7 +1358,7 @@ func reverseHopsAssumeSymmetric(revtr *ReverseTraceroute, cl client.Client, prob
 		}
 	}
 	trsMu.Lock()
-	_, ok := trsSrcToDstToPath[revtr.Src][ipToCluster[revtr.LastHop()]]
+	tr, ok := trsSrcToDstToPath[revtr.Src][ipToCluster.Get(revtr.LastHop())]
 	trsMu.Unlock()
 	if !ok {
 		err := issueTraceroute(revtr, cl)
@@ -1135,19 +1366,31 @@ func reverseHopsAssumeSymmetric(revtr *ReverseTraceroute, cl client.Client, prob
 			return err
 		}
 		trsMu.Lock()
-		tr, ok := trsSrcToDstToPath[revtr.Src][ipToCluster[revtr.LastHop()]]
+		tr, ok := trsSrcToDstToPath[revtr.Src][ipToCluster.Get(revtr.LastHop())]
 		trsMu.Unlock()
-		if ok && ipToCluster[tr[len(tr)-1]] == ipToCluster[revtr.LastHop()] {
+		if ok && len(tr) > 0 && ipToCluster.Get(tr[len(tr)-1]) == ipToCluster.Get(revtr.LastHop()) {
 			var hToIgnore []string
 			hToIgnore = append(hToIgnore, revtr.Hops()...)
 			hToIgnore = append(hToIgnore, revtr.Deadends()...)
+			log.Debug("Attempting to add hop from tr ", tr)
 			if !revtr.AddSegments([]Segment{NewDstSymRevSegment(revtr.Src, revtr.LastHop(), tr, 1, hToIgnore)}) {
-				return fmt.Errorf("No Hops Added")
+				return ErrNoHopFound
 			}
+			return nil
 		}
-		return fmt.Errorf("No Hops Added")
+		return ErrNoHopFound
 	}
-	return nil
+	if ok && len(tr) > 0 && ipToCluster.Get(tr[len(tr)-1]) == ipToCluster.Get(revtr.LastHop()) {
+		var hToIgnore []string
+		hToIgnore = append(hToIgnore, revtr.Hops()...)
+		hToIgnore = append(hToIgnore, revtr.Deadends()...)
+		log.Debug("Attempting to add hop from tr ", tr)
+		if !revtr.AddSegments([]Segment{NewDstSymRevSegment(revtr.Src, revtr.LastHop(), tr, 1, hToIgnore)}) {
+			return ErrNoHopFound
+		}
+		return nil
+	}
+	return ErrNoHopFound
 }
 
 // give a partial reverse traceroute, try to find reverse hops using TS option
@@ -1177,30 +1420,52 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 	var tsToIssueSrcToProbe = make(map[string][][]string)
 	var receiverToSpooferToProbe = make(map[string]map[string][][]string)
 	var dstsDoNotStamp [][]string
-	if tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()] != 0 {
-		return fmt.Errorf("No VPS")
+
+	checkMapMagic := func(f, s string) {
+		if _, ok := receiverToSpooferToProbe[f]; ok {
+			return
+		}
+		receiverToSpooferToProbe[f] = make(map[string][][]string)
 	}
-	adjacents := revtr.GetTSAdjacents(ipToCluster[revtr.LastHop()])
+	checksrctohoptosendspoofedmagic := func(f string) {
+
+		if _, ok := tsSrcToHopToSendSpoofed[f]; !ok {
+			tsSrcToHopToSendSpoofed[f] = make(map[string]bool)
+		}
+	}
+	checksrctohoptosendspoofedmagic(revtr.Src)
+	if tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()] != 0 {
+		log.Debug("No VPS found for ", revtr.Src, " last hop: ", revtr.LastHop())
+		return ErrNoVPs
+	}
+	adjacents := revtr.GetTSAdjacents(ipToCluster.Get(revtr.LastHop()))
+	log.Debug("Adjacents: ", adjacents)
 	if len(adjacents) == 0 {
-		return fmt.Errorf("No Adjacents found")
+		log.Debug("No adjacents found")
+		return ErrNoAdj
 	}
 	if tsDstToStampsZero[revtr.LastHop()] {
+		log.Debug("tsDstToStampsZero wtf")
 		for _, adj := range adjacents {
 			dstsDoNotStamp = append(dstsDoNotStamp, []string{revtr.Src, revtr.LastHop(), adj})
 		}
-	} else if tsSrcToHopToSendSpoofed[revtr.Src][revtr.LastHop()] {
+	} else if !tsSrcToHopToSendSpoofed[revtr.Src][revtr.LastHop()] {
+		log.Debug("Adding Spoofed TS to send")
 		for _, adj := range adjacents {
 			tsToIssueSrcToProbe[revtr.Src] = append(tsToIssueSrcToProbe[revtr.Src], []string{revtr.LastHop(), revtr.LastHop(), adj, adj, dummyIP})
 		}
 	} else {
+		log.Debug("TS Non of the above")
 		spfs := getTimestampSpoofers(revtr.Src, revtr.LastHop())
 		for _, adj := range adjacents {
 			for _, spf := range spfs {
+				checkMapMagic(revtr.Src, spf)
 				receiverToSpooferToProbe[revtr.Src][spf] = append(receiverToSpooferToProbe[revtr.Src][spf], []string{revtr.LastHop(), revtr.LastHop(), adj, adj, dummyIP})
 			}
 		}
 		// if we haven't already decided whether it is responsive,
 		// we'll set it to false, then change to true if we get one
+		initTsSrcToHopToResponseive(revtr.Src)
 		if _, ok := tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()]; !ok {
 			tsSrcToHopToResponsive[revtr.Src][revtr.LastHop()] = 1
 		}
@@ -1220,14 +1485,19 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 	var destDoesNotStamp []tripletTs
 
 	processTSCheckForRevHop := func(src, vp string, p *datamodel.Ping) {
+		log.Debug("Processing TS: ", p)
 		dsts, _ := util.Int32ToIPString(p.Dst)
 		segClass := "SpoofTSAdjRevSegment"
 		if vp == "non_spoofed" {
 			tsSrcToHopToSendSpoofed[src][dsts] = false
 			segClass = "TSAdjRevSegment"
 		}
+		initTsSrcToHopToResponseive(src)
 		tsSrcToHopToResponsive[src][dsts] = 1
 		rps := p.GetResponses()
+		if len(rps) > 0 {
+			log.Debug("Response ", rps[0].Tsandaddr)
+		}
 		if len(rps) > 0 && len(rps[0].Tsandaddr) > 2 {
 			ts1 := rps[0].Tsandaddr[0]
 			ts2 := rps[0].Tsandaddr[1]
@@ -1257,6 +1527,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 			}
 		}
 	}
+	log.Debug("tsToIssueSrcToProbe ", tsToIssueSrcToProbe)
 	if len(tsToIssueSrcToProbe) > 0 {
 		// there should be a uniq thing here but I need to figure out how to do it
 		for src, probes := range tsToIssueSrcToProbe {
@@ -1264,10 +1535,13 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 				if _, ok := tsSrcToHopToSendSpoofed[src][probe[0]]; ok {
 					continue
 				}
+				// set it to true, then change it to false if we get a response
 				tsSrcToHopToSendSpoofed[src][probe[0]] = true
 			}
 		}
+		log.Debug("Issuing TS probes")
 		issueTimestamps(tsToIssueSrcToProbe, cl, probeCount, processTSCheckForRevHop)
+		log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
 		for src, probes := range tsToIssueSrcToProbe {
 			for _, probe := range probes {
 				// if we got a reply, would have set sendspoofed to false
@@ -1275,6 +1549,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 				if tsSrcToHopToSendSpoofed[src][probe[0]] {
 					mySpoofers := getTimestampSpoofers(src, probe[0])
 					for _, sp := range mySpoofers {
+						log.Debug("Adding spoofed TS probe to send")
 						receiverToSpooferToProbe[src][sp] = append(receiverToSpooferToProbe[src][sp], probe)
 					}
 					// if we haven't already decided whether it is responsive
@@ -1286,6 +1561,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 			}
 		}
 	}
+	log.Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
 	if len(receiverToSpooferToProbe) > 0 {
 		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSCheckForRevHop)
 	}
@@ -1433,7 +1709,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 			return nil
 		}
 	}
-	return nil
+	return ErrNoHopFound
 }
 
 // whether this destination is repsonsive but with ts=0
@@ -1447,10 +1723,18 @@ var tsSrcToHopToSendSpoofed = make(map[string]map[string]bool)
 // anythign else will be false
 var tsSrcToHopToResponsive = make(map[string]map[string]int)
 
+func initTsSrcToHopToResponseive(s string) {
+	if _, ok := tsSrcToHopToResponsive[s]; ok {
+		return
+	}
+	tsSrcToHopToResponsive[s] = make(map[string]int)
+}
+
 // nil means we issued the probe, did not get a response
 var tsSrcToProbeToVPToResult = make(map[string]map[string]map[string][]string)
 
 func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+	log.Debug("Issuing timestamps")
 	var pings []*datamodel.PingMeasurement
 	for src, probes := range issue {
 		srcip, _ := util.IPStringToInt32(src)
@@ -1458,13 +1742,25 @@ func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount m
 			dstip, _ := util.IPStringToInt32(probe[0])
 			var tsString bytes.Buffer
 			tsString.WriteString("tsprespec=")
-			for _, p := range probe {
-				tsString.WriteString(p + ",")
+			for i, p := range probe {
+				if i == 0 {
+					continue
+				}
+				tsString.WriteString(p)
+				if len(probe)-1 != i {
+					tsString.WriteString(",")
+				}
 			}
+			tss := tsString.String()
+			log.Debug("tss string: ", tss)
 			p := &datamodel.PingMeasurement{
-				Src:       srcip,
-				Dst:       dstip,
-				TimeStamp: tsString.String(),
+				Src:        srcip,
+				Dst:        dstip,
+				TimeStamp:  tss,
+				Timeout:    10,
+				Count:      "1",
+				CheckDb:    true,
+				CheckCache: true,
 			}
 			pings = append(pings, p)
 		}
@@ -1490,6 +1786,7 @@ func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount m
 }
 
 func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+	log.Debug("Issuing spoofed timestamps")
 	var pings []*datamodel.PingMeasurement
 	for reciever, spooferToProbes := range issue {
 		recip, _ := util.IPStringToInt32(reciever)
@@ -1498,14 +1795,24 @@ func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Cl
 			for _, probe := range probes {
 				dstip, _ := util.IPStringToInt32(probe[0])
 				var tsString bytes.Buffer
-				for _, p := range probe {
-					tsString.WriteString(p + ",")
+				for i, p := range probe {
+					if i == 0 {
+						continue
+					}
+					tsString.WriteString(p)
+					if i != len(probe)-1 {
+						tsString.WriteString(",")
+					}
 				}
 				p := &datamodel.PingMeasurement{
 					Src:         spoofip,
 					Spoof:       true,
 					Dst:         dstip,
 					SpooferAddr: recip,
+					Timeout:     10,
+					Count:       "1",
+					CheckDb:     true,
+					CheckCache:  true,
 				}
 				pings = append(pings, p)
 			}

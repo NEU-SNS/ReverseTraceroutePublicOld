@@ -2,6 +2,7 @@ package vpservice
 
 import (
 	"io"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -156,40 +157,46 @@ func (rvp *RVPService) checkCapabilities() {
 	}
 }
 
+func getRandomN(n int, vpm vpMap) []*dm.VantagePoint {
+	randoms := rand.Perm(n)
+	var vps []*dm.VantagePoint
+	var ret []*dm.VantagePoint
+	for _, v := range vpm {
+		vps = append(vps, v)
+	}
+	if n > len(vps) {
+		return vps
+	}
+	for _, r := range randoms {
+		ret = append(ret, vps[r])
+	}
+	return ret
+}
+
 func testSpoofs(vpm vpMap) {
 	lenvpm := len(vpm)
 	var first bool
 	var target uint32
-	var count, count2 int
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
-	for _, vps := range vpm {
-		if count == 50 {
-			break
-		}
+	vps := getRandomN(50, vpm)
+	for _, vp := range vps {
 		if !first {
 			first = true
-			target = vps.Ip
+			target = vp.Ip
 		}
-		for _, vpd := range vpm {
-			if count2 == 50 {
-				break
-			}
-			if vps.Ip == vpd.Ip {
-				continue
-			}
-			ip, _ := util.Int32ToIPString(vpd.Ip)
+		dests := getRandomN(50, vpm)
+		for _, d := range dests {
+			ip, _ := util.Int32ToIPString(d.Ip)
 			tests = append(tests, &dm.PingMeasurement{
-				Count: "1",
-				Src:   vps.Ip,
-				Dst:   target,
-				Spoof: true,
-				SAddr: ip,
+				Count:   "1",
+				Src:     vp.Ip,
+				Dst:     target,
+				Spoof:   true,
+				SAddr:   ip,
+				Timeout: 20,
 			})
-			count2++
 		}
-		count++
-		count2 = 0
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {
@@ -227,28 +234,18 @@ func testRR(vpm vpMap) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
-	var count, count2 int
-	for _, vps := range vpm {
-		if count == 50 {
-			break
-		}
-		for _, vpd := range vpm {
-			if vps.Ip == vpd.Ip {
-				continue
-			}
-			if count2 == 50 {
-				break
-			}
+
+	vps := getRandomN(50, vpm)
+	for _, vp := range vps {
+		dests := getRandomN(50, vpm)
+		for _, d := range dests {
 			tests = append(tests, &dm.PingMeasurement{
-				Count: "1",
-				Src:   vps.Ip,
-				Dst:   vpd.Ip,
-				RR:    true,
+				Count:   "1",
+				Src:     vp.Ip,
+				Dst:     d.Ip,
+				Timeout: 20,
 			})
-			count2++
 		}
-		count2 = 0
-		count++
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {
@@ -283,28 +280,18 @@ func testTS(vpm vpMap) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
-	var count, count2 int
-	for _, vps := range vpm {
-		if count == 50 {
-			break
-		}
-		for _, vpd := range vpm {
-			if vps.Ip == vpd.Ip {
-				continue
-			}
-			if count2 == 50 {
-				break
-			}
+	vps := getRandomN(50, vpm)
+	for _, vp := range vps {
+		dests := getRandomN(50, vpm)
+		for _, d := range dests {
 			tests = append(tests, &dm.PingMeasurement{
 				Count:     "1",
-				Src:       vps.Ip,
-				Dst:       vpd.Ip,
+				Src:       vp.Ip,
+				Dst:       d.Ip,
+				Timeout:   20,
 				TimeStamp: "tsonly",
 			})
-			count2++
 		}
-		count++
-		count2 = 0
 	}
 	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
 	if err != nil {

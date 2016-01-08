@@ -50,6 +50,7 @@ func processFile(file os.FileInfo, da *dataaccess.DataAccess) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	scan := iplane.NewTracerouteScanner(f)
 	for scan.Scan() {
 		trace := scan.Traceroute()
