@@ -158,6 +158,21 @@ func (d *DataAccess) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]d
 	return d.db.GetAdjacencyToDestByAddrAndDest24(dest24, addr)
 }
 
+// StoreAlias stores an alias with id id
+func (d *DataAccess) StoreAlias(id int, ips []net.IP) error {
+	return d.db.StoreAlias(id, ips)
+}
+
+// GetClusterIDByIP gets the cluster id for a given ip
+func (d *DataAccess) GetClusterIDByIP(ip uint32) (int, error) {
+	return d.db.GetClusterIDByIP(ip)
+}
+
+// GetIPsForClusterID gets all the ips associated with the given cluster id
+func (d *DataAccess) GetIPsForClusterID(id int) ([]uint32, error) {
+	return d.db.GetIPsForClusterID(id)
+}
+
 // New create a new dataAccess with the given config
 func New(c DbConfig) (*DataAccess, error) {
 	var conf sql.DbConfig

@@ -159,6 +159,8 @@ func (r *router) PutMT(s ServiceDef) {
 	if mt, ok := r.cache.cache[s]; ok {
 		mt.refCount--
 		if mt.refCount == 0 {
+			log.Debug("Closing mt for: ", s)
+			mt.mt.Close()
 			delete(r.cache.cache, s)
 		}
 		return
