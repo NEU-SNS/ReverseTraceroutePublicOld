@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
@@ -119,6 +120,7 @@ func (c *cache) Get(key string) (Item, error) {
 	if err != nil {
 		return nil, toError(err)
 	}
+	log.Debug("got cache result for key: ", key)
 	return toOutItem(item.Key, item.Value), nil
 }
 
@@ -139,6 +141,7 @@ func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	for k, v := range multi {
 		ret[fixKey(k)] = toOutItem(v.Key, v.Value)
 	}
+	log.Debug("got cache result for keys: ", keys)
 	return ret, nil
 }
 

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "datamodel";
+
+package datamodel;
+
+
+message Revtr {
+    uint32 src = 1;
+    uint32 dst = 2;
+}
+
+message RevtrRequest {
+    repeated Revtr revtrs  = 1;
+}
+
+

@@ -115,27 +115,41 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 	}
 	defer conc.Close()
 	ccl := cclient.New(context.Background(), conc)
-	st, err := ccl.Traceroute(&dm.TracerouteArg{
-		Traceroutes: meas,
-	})
-	if err != nil {
-		return err
-	}
-	for {
-		tr, err := st.Recv()
-		if err == io.EOF {
-			return nil
+
+	total := len(meas)
+	times := total/100 + 2
+	var curr int
+	for i := 1; i < times; i++ {
+		end := i * 2
+		if i*2 > total {
+			end = total
+		} else {
+			end = i * 2
 		}
+		st, err := ccl.Traceroute(&dm.TracerouteArg{
+			Traceroutes: meas[curr:end],
+		})
+		curr = end
 		if err != nil {
 			return err
 		}
-		go func() {
-			err := a.da.StoreAtlasTraceroute(tr)
-			if err != nil {
-				log.Error(err)
+		for {
+			tr, err := st.Recv()
+			if err == io.EOF {
+				break
 			}
-		}()
+			if err != nil {
+				return err
+			}
+			go func() {
+				err := a.da.StoreAtlasTraceroute(tr)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+		}
 	}
+	return nil
 }
 
 func (a *Atlas) updateTraceroutes() {
