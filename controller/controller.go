@@ -171,6 +171,7 @@ var (
 )
 
 func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.Ping, error) {
+	log.Debug("Checking for pings in cache: ", keys)
 	out := make(chan map[string]*dm.Ping)
 	quit := make(chan struct{})
 	eout := make(chan error)
@@ -202,6 +203,7 @@ func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.
 		close(quit)
 		return nil, ErrTimeout
 	case ret := <-out:
+		log.Debug("Got from ping cache: ", ret)
 		return ret, nil
 	case err := <-eout:
 		return nil, err
@@ -247,7 +249,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 		var remaining []*dm.PingMeasurement
 		var cacheKeys []string
 		for _, pm := range pm {
-			if pm.CheckCache {
+			if pm.CheckCache && !pm.RR && pm.TimeStamp == "" {
 				key := pm.Key()
 				checkCache[key] = pm
 				cacheKeys = append(cacheKeys, key)
@@ -255,9 +257,13 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			}
 			remaining = append(remaining, pm)
 		}
-		found, err := checkPingCache(ctx, cacheKeys, c.cache)
-		if err != nil {
-			log.Error(err)
+		var found map[string]*dm.Ping
+		if len(cacheKeys) > 0 {
+			var err error
+			found, err = checkPingCache(ctx, cacheKeys, c.cache)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 		// Figure out what we got vs what we asked for
 		for key, val := range checkCache {
@@ -291,7 +297,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			if p, ok := dbs[key]; ok {
 				//This should be stored in the cache
 				go func() {
-					var err = c.cache.Set(key, p.CMarshal())
+					var err = c.cache.SetWithExpire(key, p.CMarshal(), 5*60)
 					if err != nil {
 						log.Info(err)
 					}
@@ -358,6 +364,10 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						}
 						go func() {
 							err := c.db.StorePing(pp)
+							if err != nil {
+								log.Error(err)
+							}
+							err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
 							if err != nil {
 								log.Error(err)
 							}
@@ -455,6 +465,14 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						return
 					}
 					px := toPing(probe)
+					err := c.cache.SetWithExpire(px.Key(), px.CMarshal(), 5*60)
+					if err != nil {
+						log.Error(err)
+					}
+					err = c.db.StorePing(px)
+					if err != nil {
+						log.Error(err)
+					}
 					ret <- px
 				}
 			}
@@ -471,9 +489,11 @@ func toPing(probe *dm.Probe) *dm.Ping {
 	ping.Src = probe.Src
 	ping.Dst = probe.Dst
 	ping.SpoofedFrom = probe.SpooferIp
+	ping.Flags = append(ping.Flags, "spoof")
 	var pr dm.PingResponse
 	rrs := probe.GetRR()
 	if rrs != nil {
+		ping.Flags = append(ping.Flags, "v4rr")
 		pr.RR = rrs.Hops
 		ping.Responses = []*dm.PingResponse{
 			&pr}
@@ -482,6 +502,7 @@ func toPing(probe *dm.Probe) *dm.Ping {
 	if ts != nil {
 		switch ts.Type {
 		case dm.TSType_TSOnly:
+			ping.Flags = append(ping.Flags, "tsonly")
 			stamps := ts.GetStamps()
 			var ts []uint32
 			for _, stamp := range stamps {
@@ -492,6 +513,8 @@ func toPing(probe *dm.Probe) *dm.Ping {
 			stamps := ts.GetStamps()
 			var ts []*dm.TsAndAddr
 			if stamps != nil {
+
+				ping.Flags = append(ping.Flags, "tsandaddr")
 				for _, stamp := range stamps {
 					ts = append(ts, &dm.TsAndAddr{
 						Ip: stamp.Ip,
@@ -512,6 +535,7 @@ func (c *controllerT) doRecSpoof(ctx con.Context, pr *dm.Probe) {
 }
 
 func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*dm.Traceroute, error) {
+	log.Debug("Checking for traceroute in cache: ", keys)
 	out := make(chan map[string]*dm.Traceroute)
 	quit := make(chan struct{})
 	eout := make(chan error)
@@ -543,6 +567,7 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 		close(quit)
 		return nil, ErrTimeout
 	case ret := <-out:
+		log.Debug("Got from traceroute cache: ", ret)
 		return ret, nil
 	case err := <-eout:
 		return nil, err
@@ -596,9 +621,13 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 			}
 			remaining = append(remaining, tm)
 		}
-		found, err := checkTraceCache(ctx, cacheKeys, c.cache)
-		if err != nil {
-			log.Error(err)
+		var found map[string]*dm.Traceroute
+		if len(cacheKeys) > 0 {
+			var err error
+			found, err = checkTraceCache(ctx, cacheKeys, c.cache)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 		// Figure out what we got vs what we asked for
 		for key, val := range checkCache {
@@ -632,7 +661,10 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 			if p, ok := dbs[key]; ok {
 				//This should be stored in the cache
 				go func() {
-					var err = c.cache.Set(key, p.CMarshal())
+					if p.StopReason != "COMPLETED" {
+						return
+					}
+					var err = c.cache.SetWithExpire(key, p.CMarshal(), 5*60)
 					if err != nil {
 						log.Info(err)
 					}
@@ -686,6 +718,10 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 						log.Debug("Got TR ", pp)
 						go func() {
 							err := c.db.StoreTraceroute(pp)
+							if err != nil {
+								log.Error(err)
+							}
+							err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
 							if err != nil {
 								log.Error(err)
 							}

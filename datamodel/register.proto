@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-option go_package = "datamodel";
-
-package datamodel;
-
-message RegisterResponse {
-}

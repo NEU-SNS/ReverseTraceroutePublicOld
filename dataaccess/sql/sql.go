@@ -73,8 +73,9 @@ func makeDb(conf Config) (*sql.DB, error) {
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
-	db.SetMaxIdleConns(2)
 	db.SetMaxOpenConns(24)
+	db.SetMaxIdleConns(4)
+	db.SetConnMaxLifetime(time.Hour)
 	return db, nil
 }
 
@@ -810,10 +811,15 @@ func storePing(tx *sql.Tx, in *dm.Ping) (int64, error) {
 		"dl"
 		"8"
 	*/
-	start := time.Unix(in.Start.Sec, in.Start.Usec*1000)
-	flags := make(map[string]bool)
+	var start time.Time
+	if in.Start == nil {
+		start = time.Now()
+	} else {
+		start = time.Unix(in.Start.Sec, in.Start.Usec*1000)
+	}
+	flags := make(map[string]byte)
 	for _, flag := range in.Flags {
-		flags[flag] = true
+		flags[flag] = 1
 	}
 	res, err := tx.Exec(insertPing, in.Src, in.Dst, start, in.PingSent, in.ProbeSize,
 		in.UserId, in.Ttl, in.Wait, in.SpoofedFrom, in.Version,
@@ -1162,4 +1168,115 @@ func (db *DB) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.Adjac
 		adjs = append(adjs, adj)
 	}
 	return adjs, nil
+}
+
+const (
+	removeAliasCluster    = `DELETE FROM ip_aliases WHERE cluster_id = ?`
+	storeAlias            = `INSERT INTO ip_aliases(cluster_id, ip_address) VALUES(?, ?)`
+	aliasGetByIP          = `SELECT cluster_id FROM ip_aliases WHERE ip_address = ? LIMIT 1`
+	aliasGetIPsForCluster = `SELECT ip_address FROM ip_aliases WHERE cluster_id = ? LIMIT 2000`
+)
+
+// StoreAlias stores an IP alias
+func (db *DB) StoreAlias(id int, ips []net.IP) error {
+	con := db.getWriter()
+	tx, err := con.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(removeAliasCluster, id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, ip := range ips {
+		ipint, _ := util.IPtoInt32(ip)
+		_, err = tx.Exec(storeAlias, id, ipint)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+var (
+	// ErrNoAlias is returned when no alias is found for an ip
+	ErrNoAlias = fmt.Errorf("No alias found")
+)
+
+// GetClusterIDByIP gets a the cluster ID for a give ip
+func (db *DB) GetClusterIDByIP(ip uint32) (int, error) {
+	con := db.getReader()
+	var ret int
+	err := con.QueryRow(aliasGetByIP, ip).Scan(&ret)
+	switch {
+	case err == sql.ErrNoRows:
+		return ret, ErrNoAlias
+	case err != nil:
+		return ret, err
+	default:
+		return ret, nil
+	}
+}
+
+// GetIPsForClusterID gets all IPs associated with the given cluster id
+func (db *DB) GetIPsForClusterID(id int) ([]uint32, error) {
+	con := db.getReader()
+	var scan uint32
+	var ret []uint32
+	res, err := con.Query(aliasGetByIP, id)
+	defer res.Close()
+	if err != nil {
+		return nil, err
+	}
+	for res.Next() {
+		err := res.Scan(&scan)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, scan)
+	}
+	if err = res.Err(); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+const (
+	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason) VALUES
+	(?, ?, ?, ?, ?, ?)`
+	revtrStoreRevtrHop = `INSERT INTO reverse_traceroute_hops(reverse_traceroute_id, hop, hop_type, order) VALUES
+	(?, ?, ?, ?)`
+)
+
+// StoreRevtr stores a Revtr
+func (db *DB) StoreRevtr(r dm.Revtr) error {
+	con := db.getWriter()
+	tx, err := con.Begin()
+	if err != nil {
+		return err
+	}
+	res, err := tx.Exec(revtrStoreRevtr, r.Src, r.Dst, int64(r.Runtime), r.RRIssued, r.TSIssued, r.StopReason)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	for i, h := range r.Path {
+		_, err := tx.Exec(revtrStoreRevtrHop, id, h.Hop, h.Type, i)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
 }

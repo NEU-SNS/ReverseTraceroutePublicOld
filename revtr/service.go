@@ -13,6 +13,18 @@ var (
 	pn1, pn2, pn3 *net.IPNet
 )
 
+const (
+	dstRevSegment                         = 1
+	dstSymRevSegment                      = 2
+	trToSrcRevSegment                     = 3
+	rrRevSegment                          = 4
+	spoofRRRevSegment                     = 5
+	tsAdjRevSegment                       = 6
+	spoofTSAdjRevSegment                  = 7
+	spoofTSAdjRevSegmentTSZero            = 8
+	spoofTSAdjRevSegmentTSZeroDoubleStamp = 9
+)
+
 func init() {
 	var err error
 	_, pn1, err = net.ParseCIDR("192.168.0.0/16")
@@ -81,12 +93,18 @@ type Segment interface {
 	RemoveHops([]string) error
 	Clone() Segment
 	RemoveAt(int)
+	Type() int
 }
 
 // RevSegment is a...
 type RevSegment struct {
 	Segment  []string
 	Src, Hop string
+}
+
+// Type ...
+func (rv *RevSegment) Type() int {
+	return 0
 }
 
 // RemoveAt removes a hop at a given index
@@ -305,6 +323,11 @@ type DstRevSegment struct {
 	*RevSegment
 }
 
+// Type ...
+func (d *DstRevSegment) Type() int {
+	return dstRevSegment
+}
+
 // NewDstRevSegment creates a new DstRevSegment
 func NewDstRevSegment(segment []string, src, hop string) *DstRevSegment {
 	ret := DstRevSegment{
@@ -334,6 +357,11 @@ type DstSymRevSegment struct {
 	*RevSegment
 	tr      []string
 	numHops int
+}
+
+// Type ...
+func (d *DstSymRevSegment) Type() int {
+	return dstSymRevSegment
 }
 
 func (d *DstSymRevSegment) clone() *DstSymRevSegment {
@@ -429,6 +457,11 @@ type TRtoSrcRevSegment struct {
 	*RevSegment
 }
 
+// Type ...
+func (d *TRtoSrcRevSegment) Type() int {
+	return trToSrcRevSegment
+}
+
 // NewTrtoSrcRevSegment creates a new TRtoSrcRevSegment
 func NewTrtoSrcRevSegment(segment []string, src, hop string) *TRtoSrcRevSegment {
 	ret := TRtoSrcRevSegment{
@@ -444,6 +477,11 @@ func (d *TRtoSrcRevSegment) String() string {
 // RRRevSegment when the reverse hop was found with a non-spoofed RR probe
 type RRRevSegment struct {
 	*RevSegment
+}
+
+// Type ...
+func (d RRRevSegment) Type() int {
+	return rrRevSegment
 }
 
 // NewRRRevSegment creates a new RRRevSegment
@@ -474,6 +512,11 @@ func (d *RRRevSegment) String() string {
 type SpoofRRRevSegment struct {
 	*RRRevSegment
 	SpoofSource string
+}
+
+// Type ...
+func (d *SpoofRRRevSegment) Type() int {
+	return spoofRRRevSegment
 }
 
 func (d *SpoofRRRevSegment) clone() *SpoofRRRevSegment {
@@ -507,6 +550,11 @@ func NewSpoofRRRevSegment(segment []string, src, hop, spfsrc string) *SpoofRRRev
 type TSAdjRevSegment struct {
 	*RevSegment
 	LinuxBug bool
+}
+
+// Type ...
+func (d *TSAdjRevSegment) Type() int {
+	return tsAdjRevSegment
 }
 
 func (d *TSAdjRevSegment) clone() *TSAdjRevSegment {
@@ -544,6 +592,11 @@ type SpoofTSAdjRevSegment struct {
 	SpoofSource string
 }
 
+// Type ...
+func (d *SpoofTSAdjRevSegment) Type() int {
+	return spoofTSAdjRevSegment
+}
+
 func (d *SpoofTSAdjRevSegment) clone() *SpoofTSAdjRevSegment {
 	ret := SpoofTSAdjRevSegment{
 		TSAdjRevSegment: d.TSAdjRevSegment.clone(),
@@ -579,6 +632,11 @@ type SpoofTSAdjRevSegmentTSZero struct {
 	*SpoofTSAdjRevSegment
 }
 
+// Type ...
+func (d *SpoofTSAdjRevSegmentTSZero) Type() int {
+	return spoofTSAdjRevSegmentTSZero
+}
+
 func (d *SpoofTSAdjRevSegmentTSZero) clone() *SpoofTSAdjRevSegmentTSZero {
 	ret := SpoofTSAdjRevSegmentTSZero{
 		SpoofTSAdjRevSegment: d.SpoofTSAdjRevSegment.clone(),
@@ -609,6 +667,11 @@ func NewSpoofTSAdjRevSegmentTSZero(segment []string, src, hop, spfsrc string, li
 // and we assume one was fwd, one rev
 type SpoofTSAdjRevSegmentTSZeroDoubleStamp struct {
 	*SpoofTSAdjRevSegmentTSZero
+}
+
+// Type ...
+func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) Type() int {
+	return spoofTSAdjRevSegmentTSZeroDoubleStamp
 }
 
 func (d *SpoofTSAdjRevSegmentTSZeroDoubleStamp) clone() *SpoofTSAdjRevSegmentTSZeroDoubleStamp {

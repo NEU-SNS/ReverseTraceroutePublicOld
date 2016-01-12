@@ -1,8 +1,10 @@
 package vpservice
 
 import (
+	"bufio"
 	"io"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -109,6 +112,37 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 	return &dm.VPReturn{
 		Vps: rvp.vps.GetAll(),
 	}, nil
+}
+
+// StoreInFile stores the current state in a file
+func (rvp *RVPService) StoreInFile(file string) {
+	f, err := os.Create(file)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	for _, v := range rvp.vps {
+		f.WriteString(v.String() + "\n")
+	}
+}
+
+// LoadFromFile loads the state in from a file
+func (rvp *RVPService) LoadFromFile(file string) {
+	f, err := os.Open(file)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	scan := bufio.NewScanner(f)
+	for scan.Scan() {
+		vp := &dm.VantagePoint{}
+		err := proto.UnmarshalText(scan.Text(), vp)
+		if err != nil {
+			continue
+		}
+		rvp.vps[vp.Ip] = vp
+	}
+
 }
 
 // runs in a go routine
