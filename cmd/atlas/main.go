@@ -41,7 +41,7 @@ func main() {
 	}
 	svc := atlas.NewAtlasService(da)
 	serv := grpc.NewServer()
-	pb.RegisterAtlasServer(serv, atlas.GRPCServ{svc})
+	pb.RegisterAtlasServer(serv, atlas.GRPCServ{AtlasService: svc})
 	ln, err := net.Listen("tcp", "0.0.0.0:55000")
 	if err != nil {
 		log.Error(err)
