@@ -38,6 +38,7 @@ type PingMeasurement struct {
 	Timeout     int64  `protobuf:"varint,22,opt,name=timeout" json:"timeout,omitempty"`
 	CheckCache  bool   `protobuf:"varint,23,opt,name=check_cache" json:"check_cache,omitempty"`
 	CheckDb     bool   `protobuf:"varint,24,opt,name=check_db" json:"check_db,omitempty"`
+	Staleness   int64  `protobuf:"varint,25,opt,name=staleness" json:"staleness,omitempty"`
 }
 
 func (m *PingMeasurement) Reset()         { *m = PingMeasurement{} }

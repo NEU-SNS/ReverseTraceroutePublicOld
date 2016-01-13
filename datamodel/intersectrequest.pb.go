@@ -9,7 +9,7 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/intersectrequest.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto
-	github.com/NEU-SNS/ReverseTraceroute/datamodel/register.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/reverse_traceroute.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/service.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto
 	github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto
@@ -39,7 +39,9 @@ It has these top-level messages:
 	Stamp
 	NotifyRecSpoofResponse
 	ReceiveSpoofedProbesResponse
-	RegisterResponse
+	RevtrMeasurement
+	RevtrRequest
+	RevtrResponse
 	Time
 	RTT
 	TracerouteMeasurement

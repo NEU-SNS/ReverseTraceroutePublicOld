@@ -31,6 +31,7 @@ message PingMeasurement {
     int64 timeout       = 22;
     bool check_cache    = 23;
     bool check_db       = 24;
+    int64 staleness     = 25;
 
 }
 
