@@ -5,13 +5,17 @@ option go_package = "datamodel";
 package datamodel;
 
 
-message Revtr {
-    uint32 src = 1;
-    uint32 dst = 2;
+message RevtrMeasurement {
+    string src       = 1;
+    string dst       = 2;
+    uint32 staleness = 3;
 }
 
 message RevtrRequest {
-    repeated Revtr revtrs  = 1;
+    repeated RevtrMeasurement revtrs  = 1;
 }
 
+message RevtrResponse {
+    
+}
 

@@ -104,7 +104,7 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 			curr := &dm.TracerouteMeasurement{
 				Src:     vp.Ip,
 				Dst:     dst.Ip,
-				Timeout: 60 * 3,
+				Timeout: 60,
 			}
 			meas = append(meas, curr)
 		}

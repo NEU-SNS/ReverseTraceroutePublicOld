@@ -203,12 +203,13 @@ type ReverseTraceroute struct {
 	Src, Dst           string
 	StopReason         string
 	StartTime, EndTime time.Time
+	Staleness          int64
 	ProbeCount         map[string]int
 	as                 AdjacencySource
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
-func NewReverseTraceroute(src, dst string, as AdjacencySource) *ReverseTraceroute {
+func NewReverseTraceroute(src, dst string, stale uint32, as AdjacencySource) *ReverseTraceroute {
 	ret := ReverseTraceroute{
 		Src:             src,
 		Dst:             dst,
@@ -221,6 +222,7 @@ func NewReverseTraceroute(src, dst string, as AdjacencySource) *ReverseTracerout
 		ProbeCount:      make(map[string]int),
 		as:              as,
 		StartTime:       time.Now(),
+		Staleness:       int64(stale),
 	}
 	return &ret
 }
@@ -818,7 +820,6 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	if len(rt.RRHop2VPSLeft[*cls]) < min {
 		min = len(rt.RRHop2VPSLeft[*cls])
 	}
-	log.Debug(rt.RRHop2VPSLeft)
 	log.Debug("Getting vps for: ", *cls, " min: ", min)
 	if stringInSlice(rt.RRHop2VPSLeft[*cls][0:min], "non_spoofed") {
 		rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][1:]
@@ -872,7 +873,8 @@ var dstMustBeReachable = true
 
 // ReverseTracerouteReq isa revtr req
 type ReverseTracerouteReq struct {
-	Src, Dst string
+	Src, Dst  uint32
+	Staleness uint32
 }
 
 type stringInt int
@@ -914,7 +916,9 @@ func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl cl
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
-	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, as)
+	srcs, _ := util.Int32ToIPString(revtr.Src)
+	dsts, _ := util.Int32ToIPString(revtr.Dst)
+	rt := NewReverseTraceroute(srcs, dsts, revtr.Staleness, as)
 	if backoffEndhost || dstMustBeReachable {
 		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
 		if err != nil {
@@ -976,7 +980,6 @@ func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl cl
 		}
 		log.Debug("Assuming Symmetric")
 		err = reverseHopsAssumeSymmetric(rt, cl, probeCount)
-		log.Debug("error assuming symmetric: ", err)
 		if rt.Reaches() {
 			rt.StopReason = "REACHES"
 			rt.EndTime = time.Now()
@@ -1054,6 +1057,7 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 			Count:      "1",
 			CheckDb:    true,
 			CheckCache: true,
+			Staleness:  revtr.Staleness,
 		})
 	}
 	for _, vp := range vps {
@@ -1064,7 +1068,7 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 		issueRecordRoutes(pings[0], cl)
 	}
 	if len(receiverToSpooferToTarget) > 0 {
-		issueSpoofedRecordRoutes(receiverToSpooferToTarget, cl, revtr.ProbeCount, true)
+		issueSpoofedRecordRoutes(revtr, receiverToSpooferToTarget, cl, revtr.ProbeCount, true)
 	}
 	var segs []Segment
 	if rrVPsByCluster {
@@ -1097,7 +1101,7 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 
 var rrsstdMu sync.Mutex
 
-func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]string, cl client.Client, probeCounts map[string]int, deleteUnresponsive bool) error {
+func issueSpoofedRecordRoutes(revtr *ReverseTraceroute, recvToSpooferToTarget map[string]map[string][]string, cl client.Client, probeCounts map[string]int, deleteUnresponsive bool) error {
 	log.Debug("Issuing Spoofed RR probes")
 	var pings []*datamodel.PingMeasurement
 	for rec, spoofToTarg := range recvToSpooferToTarget {
@@ -1116,6 +1120,7 @@ func issueSpoofedRecordRoutes(recvToSpooferToTarget map[string]map[string][]stri
 					Count:       "1",
 					CheckDb:     true,
 					CheckCache:  true,
+					Staleness:   revtr.Staleness,
 				})
 			}
 		}
@@ -1366,6 +1371,7 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 		Dst:        dst,
 		CheckCache: true,
 		CheckDb:    true,
+		Staleness:  revtr.Staleness,
 	}
 	revtr.ProbeCount["tr"]++
 	log.Debug("Issuing traceroute src: ", revtr.Src, " dst: ", revtr.LastHop())
@@ -1627,7 +1633,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 			}
 		}
 		log.Debug("Issuing TS probes")
-		issueTimestamps(tsToIssueSrcToProbe, cl, probeCount, processTSCheckForRevHop)
+		issueTimestamps(revtr, tsToIssueSrcToProbe, cl, probeCount, processTSCheckForRevHop)
 		log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
 		for src, probes := range tsToIssueSrcToProbe {
 			for _, probe := range probes {
@@ -1650,7 +1656,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 	}
 	log.Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
 	if len(receiverToSpooferToProbe) > 0 {
-		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSCheckForRevHop)
+		issueSpoofedTimestamps(revtr, receiverToSpooferToProbe, cl, probeCount, processTSCheckForRevHop)
 	}
 	if len(linuxBugToCheckSrcDstVpToRevHops) > 0 {
 		var linuxChecksSrcToProbe = make(map[string][][]string)
@@ -1696,8 +1702,8 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 				}
 			}
 		}
-		issueTimestamps(linuxChecksSrcToProbe, cl, probeCount, processTSCheckForLinuxBug)
-		issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe, cl, probeCount, processTSCheckForLinuxBug)
+		issueTimestamps(revtr, linuxChecksSrcToProbe, cl, probeCount, processTSCheckForLinuxBug)
+		issueSpoofedTimestamps(revtr, linuxChecksSpoofedReceiverToSpooferToProbe, cl, probeCount, processTSCheckForLinuxBug)
 	}
 	receiverToSpooferToProbe = make(map[string]map[string][][]string)
 	for _, probe := range destDoesNotStamp {
@@ -1741,7 +1747,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 		}
 	}
 	if len(destDoesNotStamp) > 0 {
-		issueSpoofedTimestamps(receiverToSpooferToProbe, cl, probeCount, processTSDestDoesNotStamp)
+		issueSpoofedTimestamps(revtr, receiverToSpooferToProbe, cl, probeCount, processTSDestDoesNotStamp)
 	}
 
 	// if you don't get a response, add it with false
@@ -1773,7 +1779,7 @@ func reverseHopsTS(revtr *ReverseTraceroute, cl client.Client, probeCount map[st
 			}
 		}
 		log.Debug("Issuing to verify for dest does not stamp")
-		issueTimestamps(destDoesNotStampToVerifySpooferToProbe, cl, probeCount, processTSDestDoesNotStampToVerify)
+		issueTimestamps(revtr, destDoesNotStampToVerifySpooferToProbe, cl, probeCount, processTSDestDoesNotStampToVerify)
 		for k := range maybeRevhopVPDstAdjToBool {
 			for _, origsrc := range vpDstAdjToInterestedSrcs[tripletTs{src: k.src, dst: k.dst, tsip: k.tsip}] {
 				revHopsVPDstToRevSeg[pair{src: origsrc, dst: k.dst}] = append(revHopsVPDstToRevSeg[pair{src: origsrc, dst: k.dst}], NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{k.tsip}, origsrc, k.dst, k.src, false))
@@ -1820,7 +1826,7 @@ func initTsSrcToHopToResponseive(s string) {
 // nil means we issued the probe, did not get a response
 var tsSrcToProbeToVPToResult = make(map[string]map[string]map[string][]string)
 
-func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+func issueTimestamps(revtr *ReverseTraceroute, issue map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
 	log.Debug("Issuing timestamps")
 	var pings []*datamodel.PingMeasurement
 	for src, probes := range issue {
@@ -1848,6 +1854,7 @@ func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount m
 				Count:      "1",
 				CheckDb:    true,
 				CheckCache: true,
+				Staleness:  revtr.Staleness,
 			}
 			pings = append(pings, p)
 		}
@@ -1873,7 +1880,7 @@ func issueTimestamps(issue map[string][][]string, cl client.Client, probeCount m
 	return nil
 }
 
-func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
+func issueSpoofedTimestamps(revtr *ReverseTraceroute, issue map[string]map[string][][]string, cl client.Client, probeCount map[string]int, fn func(string, string, *datamodel.Ping)) error {
 	log.Debug("Issuing spoofed timestamps")
 	var pings []*datamodel.PingMeasurement
 	for reciever, spooferToProbes := range issue {
@@ -1901,6 +1908,7 @@ func issueSpoofedTimestamps(issue map[string]map[string][][]string, cl client.Cl
 					Count:       "1",
 					CheckDb:     true,
 					CheckCache:  true,
+					Staleness:   revtr.Staleness,
 				}
 				pings = append(pings, p)
 			}

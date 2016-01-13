@@ -2,25 +2,17 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"net"
-	"sync"
+	"net/http"
 
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-
-	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
-	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr"
-	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 )
 
 func main() {
 	flag.Parse()
-	dsts := []string{
+	/*
+		dsts := []string{
 
-		/*
 			"4.15.166.15",
 			"4.15.35.143",
 			"4.34.58.15",
@@ -41,9 +33,7 @@ func main() {
 			"23.228.128.182",
 			"38.65.210.207",
 			"38.90.140.143",
-		*/
-		"38.98.51.13",
-		/*
+			"38.98.51.13",
 			"38.102.0.77",
 			"38.102.163.143",
 			"38.106.70.139",
@@ -73,79 +63,84 @@ func main() {
 			"66.198.24.118",
 			"67.106.215.207",
 			"67.106.215.220",
-		*/
-	}
-	src := "4.15.166.15"
+		}
+		src := "4.15.166.15"
 
-	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
-	if err != nil {
-		panic(err)
-	}
-	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	cc, err := grpc.Dial(connstr, grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	defer cc.Close()
-	cli := client.New(context.Background(), cc)
-	_, srvs, err = net.LookupSRV("atlas", "tcp", "revtr.ccs.neu.edu")
-	if err != nil {
-		panic(err)
-	}
-	connstrat := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	c2, err := grpc.Dial(connstrat, grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	defer c2.Close()
-	atl := at.New(context.Background(), c2)
-	_, srvs, err = net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
-	if err != nil {
-		panic(err)
-	}
-	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	c3, err := grpc.Dial(connvp, grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	defer c3.Close()
-	vps := vpservice.New(context.Background(), c3)
+		_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+		if err != nil {
+			panic(err)
+		}
+		connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		cc, err := grpc.Dial(connstr, grpc.WithInsecure())
+		if err != nil {
+			panic(err)
+		}
+		defer cc.Close()
+		cli := client.New(context.Background(), cc)
+		_, srvs, err = net.LookupSRV("atlas", "tcp", "revtr.ccs.neu.edu")
+		if err != nil {
+			panic(err)
+		}
+		connstrat := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		c2, err := grpc.Dial(connstrat, grpc.WithInsecure())
+		if err != nil {
+			panic(err)
+		}
+		defer c2.Close()
+		atl := at.New(context.Background(), c2)
+		_, srvs, err = net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
+		if err != nil {
+			panic(err)
+		}
+		connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		c3, err := grpc.Dial(connvp, grpc.WithInsecure())
+		if err != nil {
+			panic(err)
+		}
+		defer c3.Close()
+		vps := vpservice.New(context.Background(), c3)
 
-	var dc dataaccess.DbConfig
-	var conf dataaccess.Config
-	conf.Host = "localhost"
-	conf.Db = "revtr"
-	conf.Password = "password"
-	conf.Port = "3306"
-	conf.User = "revtr"
-	dc.ReadConfigs = append(dc.ReadConfigs, conf)
-	dc.WriteConfigs = append(dc.WriteConfigs, conf)
-	da, err := dataaccess.New(dc)
-	if err != nil {
-		panic(err)
-	}
-	var revtrs []revtr.ReverseTracerouteReq
-	for _, d := range dsts {
-		revtrs = append(revtrs, revtr.ReverseTracerouteReq{Src: src, Dst: d})
-	}
+		var dc dataaccess.DbConfig
+		var conf dataaccess.Config
+		conf.Host = "localhost"
+		conf.Db = "revtr"
+		conf.Password = "password"
+		conf.Port = "3306"
+		conf.User = "revtr"
+		dc.ReadConfigs = append(dc.ReadConfigs, conf)
+		dc.WriteConfigs = append(dc.WriteConfigs, conf)
+		da, err := dataaccess.New(dc)
+		if err != nil {
+			panic(err)
+		}
+		var revtrs []revtr.ReverseTracerouteReq
+		for _, d := range dsts {
+			revtrs = append(revtrs, revtr.ReverseTracerouteReq{Src: src, Dst: d})
+		}
 
-	var res []*revtr.ReverseTraceroute
-	var wg sync.WaitGroup
-	for _, rt := range revtrs {
-		wg.Add(1)
-		go func(r revtr.ReverseTracerouteReq) {
-			rr, err := revtr.RunReverseTraceroute(r, true, cli, atl, vps, da, da)
-			wg.Done()
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			res = append(res, rr)
-		}(rt)
-	}
-	wg.Wait()
-	for _, rev := range res {
-		fmt.Println(rev)
-		fmt.Println(rev.CurrPath())
+		var res []*revtr.ReverseTraceroute
+		var wg sync.WaitGroup
+		for _, rt := range revtrs {
+			wg.Add(1)
+			go func(r revtr.ReverseTracerouteReq) {
+				rr, err := revtr.RunReverseTraceroute(r, true, cli, atl, vps, da, da)
+				wg.Done()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				res = append(res, rr)
+			}(rt)
+		}
+		wg.Wait()
+		for _, rev := range res {
+			fmt.Println(rev)
+		}
+	*/
+	sr := revtr.NewV1Revtr(nil)
+
+	http.HandleFunc(sr.Route, sr.Handle)
+	for {
+		log.Error(http.ListenAndServe(":8080", nil))
 	}
 }

@@ -2,12 +2,11 @@ package plcontroller
 
 import (
 	"fmt"
-	"math/rand"
 	"net/url"
 	"os/exec"
-	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -30,15 +29,14 @@ const (
 	restart string = "sudo /sbin/service plvp restart"
 	start   string = "sudo /sbin/service plvp start"
 	install string = "sudo bash << EOF\n" +
-		"cd /tmp\n" +
-		"mkdir %d\n" +
-		"cd %d\n" +
-		"/usr/bin/wget %s\n" +
-		"/usr/bin/yum install -y --nogpgcheck --disablerepo=\"fedora\" --disablerepo=\"updates\" %s\n" +
-		"/sbin/service plvp start\n" +
+		"wget http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz\n" +
+		"tar xzf plvp.tar.gz\n" +
+		"rm plvp.tar.gz\n" +
+		"cd plvp\n" +
+		"sudo /home/uw_geoloc4/plvp/install.sh" +
 		"EOF\n"
 
-	version string = "sudo /usr/local/bin/plvp --version"
+	version string = "sudo /home/uw_geoloc4/plvp/plvp --version"
 	update  string = "sudo bash << EOF\n" +
 		"/sbin/service plvp stop\n" +
 		"/usr/bin/yum remove -y plvp\n" +
@@ -71,36 +69,33 @@ var (
 )
 
 func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateURL string, db *dataaccess.DataAccess, dc chan struct{}) error {
-	return nil
-	/*
-		var wg sync.WaitGroup
-		for _, vp := range vps {
-			wg.Add(1)
-			go func(v *dm.VantagePoint) {
-				defer wg.Done()
-				err := checkVP(v, uname, certpath, updateURL)
-				var res string
+	var wg sync.WaitGroup
+	for _, vp := range vps {
+		wg.Add(1)
+		go func(v *dm.VantagePoint) {
+			defer wg.Done()
+			err := checkVP(v, uname, certpath, updateURL)
+			var res string
+			if err != nil {
+				res = err.Error()
+			} else {
+				res = "Healthy"
+			}
+			select {
+			case <-dc:
+				return
+			default:
+				err = db.UpdateCheckStatus(v.Ip, res)
 				if err != nil {
-					res = err.Error()
-				} else {
-					res = "Healthy"
+					log.Errorf("Failed to update Check Status: %v", err)
 				}
-				select {
-				case <-dc:
-					return
-				default:
-					err = db.UpdateCheckStatus(v.Ip, res)
-					if err != nil {
-						log.Errorf("Failed to update Check Status: %v", err)
-					}
-				}
+			}
 
-			}(vp)
+		}(vp)
 
-		}
-		wg.Wait()
-		return nil
-	*/
+	}
+	wg.Wait()
+	return nil
 }
 
 func getCmd(vp *dm.VantagePoint, uname, certPath, cmds string) *exec.Cmd {
@@ -135,19 +130,18 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 	case notFound:
 		httpupdate.CheckUpdate(updateURL, "0.0.0")
 		urlString := httpupdate.FetchUrl()
-		url, err := url.Parse(urlString)
+		_, err := url.Parse(urlString)
 		if err != nil {
 			return err
 		}
-		random := rand.Int()
 		err = installService(
 			getCmd(
 				vp,
 				uname,
 				certPath,
-				fmt.Sprintf(install, random, random, urlString, path.Base(url.Path)),
-			),
+				install),
 		)
+
 		if err != nil {
 			return err
 		}
@@ -222,35 +216,35 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateURL string) error
 	if vp.Controller == 0 {
 		return resetService(getCmd(vp, uname, certPath, restart))
 	}
-	v, err := checkVersion(getCmd(vp, uname, certPath, version))
-	if err != nil {
-		log.Info("Returning error from handleRunning")
-		log.Infof("Version: %v", v)
-		return err
-	}
-	update, err := httpupdate.CheckUpdate(updateURL, v)
-	if err != nil {
-		return err
-	}
-	if update {
-		log.Infof("Updating, got version: %v")
-		urlString := httpupdate.FetchUrl()
-		url, err := url.Parse(urlString)
+	/*
+		v, err := checkVersion(getCmd(vp, uname, certPath, version))
+		if err != nil {
+			log.Info("Returning error from handleRunning")
+			log.Infof("Version: %v", v)
+			return err
+		}
+		update, err := httpupdate.CheckUpdate(updateURL, v)
 		if err != nil {
 			return err
 		}
-		random := rand.Int()
-		err = updateService(getCmd(
-			vp,
-			uname,
-			certPath,
-			fmt.Sprintf(install, random, random, urlString, path.Base(url.Path)),
-		))
-		if err != nil {
-			return err
+		if update {
+			log.Infof("Updating, got version: %v")
+			urlString := httpupdate.FetchUrl()
+			_, err := url.Parse(urlString)
+			if err != nil {
+				return err
+			}
+			err = updateService(getCmd(
+				vp,
+				uname,
+				certPath,
+				install,
+			))
+			if err != nil {
+				return err
+			}
 		}
-	}
-
+	*/
 	return nil
 }
 

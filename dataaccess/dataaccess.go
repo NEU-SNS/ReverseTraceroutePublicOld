@@ -173,6 +173,16 @@ func (d *DataAccess) GetIPsForClusterID(id int) ([]uint32, error) {
 	return d.db.GetIPsForClusterID(id)
 }
 
+var (
+	// ErrNoRevtrUserFound is returned when no user is found with the given key
+	ErrNoRevtrUserFound = sql.ErrNoRevtrUserFound
+)
+
+// GetUserByKey gets a reverse traceroute user with the given key
+func (d *DataAccess) GetUserByKey(key string) (dm.RevtrUser, error) {
+	return d.db.GetUserByKey(key)
+}
+
 // New create a new dataAccess with the given config
 func New(c DbConfig) (*DataAccess, error) {
 	var conf sql.DbConfig
