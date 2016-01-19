@@ -62,7 +62,7 @@ type Config struct {
 	Db       string
 }
 
-var conFmt = "%s:%s@tcp(%s:%s)/%s?parseTime=true"
+var conFmt = "%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local"
 
 func makeDb(conf Config) (*sql.DB, error) {
 	conString := fmt.Sprintf(conFmt, conf.User, conf.Password, conf.Host, conf.Port, conf.Db)
@@ -938,14 +938,14 @@ FROM
 		a.ip_address = ? 
 	) alias
 INNER JOIN atlas_traceroutes atr on atr.dest = alias.ip_address
-WHERE atr.date > DATE(NOW() - interval 15  minute)
+WHERE atr.date > DATE_SUB(NOW(), interval ?  minute)
 ORDER BY atr.date desc)
 
 UNION
 
 (SELECT atr.Id, atr.date, atr.dest FROM
 atlas_traceroutes atr 
-WHERE atr.dest = ? AND atr.date > DATE(NOW() - interval 15  minute) 
+WHERE atr.dest = ? AND atr.date > DATE_SUB(NOW(), interval ?  minute) 
 ORDER BY atr.date desc)
 ) X 
 INNER JOIN atlas_traceroute_hops ath on ath.trace_id = X.Id
@@ -983,7 +983,7 @@ var (
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
 func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, pair.Dst, pair.Src, pair.Src)
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, stale, pair.Dst, stale, pair.Src, pair.Src)
 	if err != nil {
 		return nil, err
 	}

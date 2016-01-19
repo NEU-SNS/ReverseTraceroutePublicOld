@@ -33,7 +33,7 @@ const (
 		"tar xzf plvp.tar.gz\n" +
 		"rm plvp.tar.gz\n" +
 		"cd plvp\n" +
-		"sudo /home/uw_geoloc4/plvp/install.sh" +
+		"sudo /home/uw_geoloc4/plvp/install.sh\n" +
 		"EOF\n"
 
 	version string = "sudo /home/uw_geoloc4/plvp/plvp --version"
@@ -143,6 +143,7 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 		)
 
 		if err != nil {
+			log.Errorf("Failed to install service on %s: %v", vp, err)
 			return err
 		}
 		return handleStopped(getCmd(vp, uname, certPath, start))
@@ -322,7 +323,7 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 			log.Debugf("Got response: %s", out)
 			ps <- pidExists
 		default:
-			log.Errorf("Got response: %s", out)
+			log.Debugf("Got response: %s", out)
 			ec <- errorUnknownService
 		}
 	}()
@@ -345,9 +346,6 @@ func installService(cmd *exec.Cmd) error {
 	ec := make(chan error, 1)
 	go func() {
 		_, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Errorf("Failed to install service: %s", err)
-		}
 		ec <- err
 		return
 	}()

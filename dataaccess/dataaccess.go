@@ -176,11 +176,30 @@ func (d *DataAccess) GetIPsForClusterID(id int) ([]uint32, error) {
 var (
 	// ErrNoRevtrUserFound is returned when no user is found with the given key
 	ErrNoRevtrUserFound = sql.ErrNoRevtrUserFound
+	// ErrCannotAddRevtrBatch is returned when a batch cannot be added
+	ErrCannotAddRevtrBatch = sql.ErrCannotAddRevtrBatch
 )
 
 // GetUserByKey gets a reverse traceroute user with the given key
 func (d *DataAccess) GetUserByKey(key string) (dm.RevtrUser, error) {
 	return d.db.GetUserByKey(key)
+}
+
+// CreateRevtrBatch creatse a batch of revtrs if the user identified by id
+// is allowed to issue more reverse traceroutes
+func (d *DataAccess) CreateRevtrBatch(batch []dm.RevtrMeasurement, id string) ([]dm.RevtrMeasurement, uint32, error) {
+	return d.db.CreateRevtrBatch(batch, id)
+}
+
+// GetRevtrsInBatch gets the reverse traceroutes in batch bid
+func (d *DataAccess) GetRevtrsInBatch(uid, bid uint32) ([]*dm.ReverseTraceroute, error) {
+	return d.db.GetRevtrsInBatch(uid, bid)
+}
+
+// StoreBatchedRevtrs stores the results of a batch of revtrs
+// this means updating the initial entries and adding in hops
+func (d *DataAccess) StoreBatchedRevtrs(batch []dm.ReverseTraceroute) error {
+	return d.db.StoreBatchedRevtrs(batch)
 }
 
 // New create a new dataAccess with the given config

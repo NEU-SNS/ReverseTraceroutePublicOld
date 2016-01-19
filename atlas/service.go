@@ -33,7 +33,8 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequ
 				Dst: ir.Dest,
 			},
 		}
-		res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, time.Duration(ir.Staleness))
+		st := time.Duration(ir.Staleness)
+		res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, st*time.Minute)
 		log.Debug("FindIntersectingTraceroute resp ", res)
 		if err != nil {
 			log.Error(err)
@@ -99,12 +100,15 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 		set[vp.Site] = vp
 	}
 	var meas []*dm.TracerouteMeasurement
-	for _, vp := range set {
+	for _, vp := range vps {
 		for _, dst := range vps {
+			if vp.Ip == dst.Ip {
+				continue
+			}
 			curr := &dm.TracerouteMeasurement{
 				Src:     vp.Ip,
 				Dst:     dst.Ip,
-				Timeout: 60,
+				Timeout: 20,
 			}
 			meas = append(meas, curr)
 		}
@@ -117,7 +121,7 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 	ccl := cclient.New(context.Background(), conc)
 
 	total := len(meas)
-	times := total/100 + 2
+	times := total/200 + 2
 	var curr int
 	for i := 1; i < times; i++ {
 		end := i * 2

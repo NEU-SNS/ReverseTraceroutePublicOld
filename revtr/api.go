@@ -3,9 +3,13 @@ package revtr
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"html/template"
 	"net"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -14,9 +18,10 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
-	"github.com/prometheus/log"
+	"github.com/golang/protobuf/jsonpb"
 )
 
 // V1Revtr is the api endpoint for interacting with revtrs
@@ -33,6 +38,159 @@ func NewV1Revtr(da *dataaccess.DataAccess) V1Revtr {
 	}
 }
 
+// Home handles the home route for revtr
+type Home struct {
+	da       *dataaccess.DataAccess
+	cl       client.Client
+	Route    string
+	Template string
+}
+
+// NewHome creates a new home
+func NewHome(da *dataaccess.DataAccess, cl client.Client) Home {
+	return Home{
+		da:    da,
+		cl:    cl,
+		Route: "/",
+	}
+}
+
+// RunRevtr handles /runrevtr
+type RunRevtr struct {
+	da        *dataaccess.DataAccess
+	s         services
+	ipToRevtr map[string]*ReverseTraceroute
+	mu        *sync.Mutex // protects ipToRevtr
+}
+
+// NewRunRevtr creates a new RunRevtr
+func NewRunRevtr(da *dataaccess.DataAccess) RunRevtr {
+	s, err := connectToServices()
+	if err != nil {
+		log.Error(err)
+	}
+	return RunRevtr{
+		da:        da,
+		s:         s,
+		ipToRevtr: make(map[string]*ReverseTraceroute),
+		mu:        &sync.Mutex{},
+	}
+}
+
+func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
+	var notIP bool
+	ip := net.ParseIP(dst)
+	if ip == nil {
+		notIP = true
+	}
+	if notIP {
+		res, err := net.LookupHost(dst)
+		if err != nil {
+			log.Error(err)
+			return "", false
+		}
+		if len(res) == 0 {
+			return "", false
+		}
+		return res[0], true
+	}
+	return dst, true
+}
+
+// RunRevtr handles /runrevtr
+func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	src := req.FormValue("src")
+	dst := req.FormValue("dst")
+	if src == "" || dst == "" {
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		log.Errorf("bad request, src: %s, dst: %s", src, dst)
+		return
+	}
+	vps, err := rr.s.cl.GetVps(&datamodel.VPRequest{})
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	dst, valid := validDest(dst, vps.GetVps())
+	if !valid {
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	reqIP := req.RemoteAddr
+	head := req.Header.Get("X-Forwarded-For")
+	if head == "" {
+		head = req.Header.Get("x-forwarded-for")
+	}
+	if head == "" {
+		head = req.Header.Get("X-FORWARDED-FOR")
+	}
+	if head == "" {
+		head = reqIP
+	}
+	headSplit := strings.Split(head, ",")
+	if len(headSplit) > 0 {
+		head = headSplit[0]
+	}
+	// Split should be the actual ip of the client now
+	rr.mu.Lock()
+	if _, ok := rr.ipToRevtr[head]; !ok {
+		// At this point we need to run the revtr and redirect approprately
+	}
+}
+
+var (
+	homeTemplate = template.Must(template.ParseFiles("webroot/templates/home.html"))
+)
+
+type homeModel struct {
+	Nodes []vpModel
+}
+
+type vpModel struct {
+	Host string
+	IP   string
+}
+
+type vpModelSort []vpModel
+
+func (a vpModelSort) Len() int           { return len(a) }
+func (a vpModelSort) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a vpModelSort) Less(i, j int) bool { return a[i].Host < a[j].Host }
+
+// Home handles the "/" route
+func (h Home) Home(rw http.ResponseWriter, req *http.Request) {
+	if req.URL.Path != "/" {
+		http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	vps, err := h.cl.GetVps(&datamodel.VPRequest{})
+	if err != nil {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
+		return
+	}
+	var model homeModel
+	nodes := vps.GetVps()
+	var vpl []vpModel
+	for _, node := range nodes {
+		var vp vpModel
+		vp.Host = node.Hostname
+		vp.IP, err = util.Int32ToIPString(node.Ip)
+		if err != nil {
+			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
+			return
+		}
+		vpl = append(vpl, vp)
+	}
+	sort.Sort(vpModelSort(vpl))
+	model.Nodes = vpl
+	homeTemplate.Execute(rw, &model)
+}
+
 const (
 	keyHeader = "Revtr-Key"
 	errorPage = `An error has occurred: %s.
@@ -41,6 +199,7 @@ const (
 
 // Handle handles all methods for the route of V1Revtr
 func (s V1Revtr) Handle(rw http.ResponseWriter, req *http.Request) {
+	log.Debug(req.Host)
 	key := req.Header.Get(keyHeader)
 	if key == "" {
 		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -62,42 +221,66 @@ func (s V1Revtr) Handle(rw http.ResponseWriter, req *http.Request) {
 	case http.MethodPost:
 		s.submitRevtr(rw, req, user)
 	case http.MethodGet:
-		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte("Hello there!"))
+		s.retreiveRevtr(rw, req, user)
 	default:
 		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
 }
 
+func (s V1Revtr) retreiveRevtr(rw http.ResponseWriter, req *http.Request, user datamodel.RevtrUser) {
+	ids := req.URL.Query().Get("revtrid")
+	if len(ids) == 0 {
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseUint(ids, 10, 32)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	revtrs, err := s.da.GetRevtrsInBatch(user.ID, uint32(id))
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	ret := &datamodel.RevtrResponse{}
+	ret.Revtrs = revtrs
+	var m jsonpb.Marshaler
+	err = m.Marshal(rw, ret)
+	if err != nil {
+		log.Debug(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	return
+}
+
 func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user datamodel.RevtrUser) {
 	var revtrr datamodel.RevtrRequest
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&revtrr); err == io.EOF {
-		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		fmt.Fprintf(rw, err.Error())
-	} else if err != nil {
+	err := jsonpb.Unmarshal(req.Body, &revtrr)
+	if err != nil {
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		fmt.Fprintf(rw, err.Error())
 		return
 	}
 	rs := revtrr.GetRevtrs()
-	var reqToRun []ReverseTracerouteReq
+	var reqToRun []datamodel.RevtrMeasurement
 	for _, r := range rs {
-		src, err := util.IPStringToInt32(r.Src)
-		dst, err := util.IPStringToInt32(r.Dst)
+		// Doing this conversion just ensures they're valid ips
+		_, err := util.IPStringToInt32(r.Src)
+		_, err = util.IPStringToInt32(r.Dst)
 		if err != nil {
 			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			fmt.Fprintf(rw, err.Error())
 			return
 		}
-		reqToRun = append(reqToRun, ReverseTracerouteReq{Src: src, Dst: dst, Staleness: r.Staleness})
+		reqToRun = append(reqToRun, *r)
 	}
-	// At this point the request is valid and i'm loaded up with revtrs to run.
-	// I need to check if the api key that came in with the request can run more
-	// if not, give them a bad request and a message telling them why.
-
-	// If i'm all good to run, connect to the system services
+	// Connect to all the necessary services before trying to run anything
 	servs, err := connectToServices()
 	if err != nil {
 		// Failed to connect to a service
@@ -105,9 +288,53 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 		fmt.Fprintf(rw, errorPage, err)
 		return
 	}
-	// Now that i'm all connected, I need to create the neccessary state in the db to track these revtrs.
+	// At this point the request is valid, i've made all my connections
+	// and i'm loaded up with revtrs to run.
+	// I need to check if the api key that came in with the request can run more
+	// if not, give them a bad request and a message telling them why.
+	reqToRun, batchID, err := s.da.CreateRevtrBatch(reqToRun, user.Key)
+	if err == dataaccess.ErrCannotAddRevtrBatch {
+		fmt.Fprintf(rw, "There was an error when trying to run your reverse traceroutes.\n")
+		fmt.Fprintf(rw, "Please try again later.\n")
+		return
+	}
+	// I've gotten my id, i've added all the state to the DB that I need
+	// its time now to start the revtrs running and return the proper results
+	go func() {
+		defer servs.Close()
+		var rtrdone []*ReverseTraceroute
+		var rtrsave []datamodel.ReverseTraceroute
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		for _, rtr := range reqToRun {
+			wg.Add(1)
+			go func(r datamodel.RevtrMeasurement) {
+				defer wg.Done()
+				res, err := RunReverseTraceroute(r, true, servs.cl, servs.at, servs.vpserv, s.da, s.da)
+				if err != nil {
+					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
+				}
+				mu.Lock()
+				log.Debug(res)
+				rtrdone = append(rtrdone, res)
+				rtrsave = append(rtrsave, res.ToStorable())
+				mu.Unlock()
+			}(rtr)
+		}
+		wg.Wait()
+		log.Debug("Storing: ", rtrsave)
+		err = s.da.StoreBatchedRevtrs(rtrsave)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte("All Good"))
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(struct {
+		ResultURI string `json:"result_uri"`
+	}{
+		ResultURI: fmt.Sprintf("%s%s?revtrid=%d", req.Host, s.Route, batchID),
+	})
 }
 
 type services struct {
