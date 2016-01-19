@@ -13,23 +13,95 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+type RevtrHopType int32
+
+const (
+	RevtrHopType_DUMMY                                         RevtrHopType = 0
+	RevtrHopType_DST_REV_SEGMENT                               RevtrHopType = 1
+	RevtrHopType_DST_SYM_REV_SEGMENT                           RevtrHopType = 2
+	RevtrHopType_TR_TO_SRC_REV_SEGMENT                         RevtrHopType = 3
+	RevtrHopType_RR_REV_SEGMENT                                RevtrHopType = 4
+	RevtrHopType_SPOOF_RR_REV_SEGMENT                          RevtrHopType = 5
+	RevtrHopType_TS_ADJ_REV_SEGMENT                            RevtrHopType = 6
+	RevtrHopType_SPOOF_TS_ADJ_REV_SEGMENT                      RevtrHopType = 7
+	RevtrHopType_SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO              RevtrHopType = 8
+	RevtrHopType_SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP RevtrHopType = 9
+)
+
+var RevtrHopType_name = map[int32]string{
+	0: "DUMMY",
+	1: "DST_REV_SEGMENT",
+	2: "DST_SYM_REV_SEGMENT",
+	3: "TR_TO_SRC_REV_SEGMENT",
+	4: "RR_REV_SEGMENT",
+	5: "SPOOF_RR_REV_SEGMENT",
+	6: "TS_ADJ_REV_SEGMENT",
+	7: "SPOOF_TS_ADJ_REV_SEGMENT",
+	8: "SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO",
+	9: "SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP",
+}
+var RevtrHopType_value = map[string]int32{
+	"DUMMY":                                         0,
+	"DST_REV_SEGMENT":                               1,
+	"DST_SYM_REV_SEGMENT":                           2,
+	"TR_TO_SRC_REV_SEGMENT":                         3,
+	"RR_REV_SEGMENT":                                4,
+	"SPOOF_RR_REV_SEGMENT":                          5,
+	"TS_ADJ_REV_SEGMENT":                            6,
+	"SPOOF_TS_ADJ_REV_SEGMENT":                      7,
+	"SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO":              8,
+	"SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP": 9,
+}
+
+func (x RevtrHopType) String() string {
+	return proto.EnumName(RevtrHopType_name, int32(x))
+}
+func (RevtrHopType) EnumDescriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+
+type RevtrStatus int32
+
+const (
+	RevtrStatus_DUMMY_X   RevtrStatus = 0
+	RevtrStatus_RUNNING   RevtrStatus = 1
+	RevtrStatus_COMPLETED RevtrStatus = 2
+)
+
+var RevtrStatus_name = map[int32]string{
+	0: "DUMMY_X",
+	1: "RUNNING",
+	2: "COMPLETED",
+}
+var RevtrStatus_value = map[string]int32{
+	"DUMMY_X":   0,
+	"RUNNING":   1,
+	"COMPLETED": 2,
+}
+
+func (x RevtrStatus) String() string {
+	return proto.EnumName(RevtrStatus_name, int32(x))
+}
+func (RevtrStatus) EnumDescriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
+
 type RevtrMeasurement struct {
 	Src       string `protobuf:"bytes,1,opt,name=src" json:"src,omitempty"`
 	Dst       string `protobuf:"bytes,2,opt,name=dst" json:"dst,omitempty"`
 	Staleness uint32 `protobuf:"varint,3,opt,name=staleness" json:"staleness,omitempty"`
+	Id        uint32 `protobuf:"varint,4,opt,name=id" json:"id,omitempty"`
 }
 
-func (m *RevtrMeasurement) Reset()         { *m = RevtrMeasurement{} }
-func (m *RevtrMeasurement) String() string { return proto.CompactTextString(m) }
-func (*RevtrMeasurement) ProtoMessage()    {}
+func (m *RevtrMeasurement) Reset()                    { *m = RevtrMeasurement{} }
+func (m *RevtrMeasurement) String() string            { return proto.CompactTextString(m) }
+func (*RevtrMeasurement) ProtoMessage()               {}
+func (*RevtrMeasurement) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
 
 type RevtrRequest struct {
 	Revtrs []*RevtrMeasurement `protobuf:"bytes,1,rep,name=revtrs" json:"revtrs,omitempty"`
 }
 
-func (m *RevtrRequest) Reset()         { *m = RevtrRequest{} }
-func (m *RevtrRequest) String() string { return proto.CompactTextString(m) }
-func (*RevtrRequest) ProtoMessage()    {}
+func (m *RevtrRequest) Reset()                    { *m = RevtrRequest{} }
+func (m *RevtrRequest) String() string            { return proto.CompactTextString(m) }
+func (*RevtrRequest) ProtoMessage()               {}
+func (*RevtrRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
 
 func (m *RevtrRequest) GetRevtrs() []*RevtrMeasurement {
 	if m != nil {
@@ -38,9 +110,100 @@ func (m *RevtrRequest) GetRevtrs() []*RevtrMeasurement {
 	return nil
 }
 
-type RevtrResponse struct {
+type ReverseTraceroute struct {
+	Status     RevtrStatus `protobuf:"varint,1,opt,name=status,enum=datamodel.RevtrStatus" json:"status,omitempty"`
+	Src        string      `protobuf:"bytes,2,opt,name=src" json:"src,omitempty"`
+	Dst        string      `protobuf:"bytes,3,opt,name=dst" json:"dst,omitempty"`
+	Runtime    int64       `protobuf:"varint,4,opt,name=runtime" json:"runtime,omitempty"`
+	RrIssued   int32       `protobuf:"varint,5,opt,name=rr_issued" json:"rr_issued,omitempty"`
+	TsIssued   int32       `protobuf:"varint,6,opt,name=ts_issued" json:"ts_issued,omitempty"`
+	StopReason string      `protobuf:"bytes,7,opt,name=stop_reason" json:"stop_reason,omitempty"`
+	Date       string      `protobuf:"bytes,8,opt,name=date" json:"date,omitempty"`
+	Path       []*RevtrHop `protobuf:"bytes,9,rep,name=path" json:"path,omitempty"`
+	Id         uint32      `protobuf:"varint,10,opt,name=id" json:"id,omitempty"`
 }
 
-func (m *RevtrResponse) Reset()         { *m = RevtrResponse{} }
-func (m *RevtrResponse) String() string { return proto.CompactTextString(m) }
-func (*RevtrResponse) ProtoMessage()    {}
+func (m *ReverseTraceroute) Reset()                    { *m = ReverseTraceroute{} }
+func (m *ReverseTraceroute) String() string            { return proto.CompactTextString(m) }
+func (*ReverseTraceroute) ProtoMessage()               {}
+func (*ReverseTraceroute) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{2} }
+
+func (m *ReverseTraceroute) GetPath() []*RevtrHop {
+	if m != nil {
+		return m.Path
+	}
+	return nil
+}
+
+type RevtrHop struct {
+	Hop  string       `protobuf:"bytes,1,opt,name=hop" json:"hop,omitempty"`
+	Type RevtrHopType `protobuf:"varint,2,opt,name=type,enum=datamodel.RevtrHopType" json:"type,omitempty"`
+}
+
+func (m *RevtrHop) Reset()                    { *m = RevtrHop{} }
+func (m *RevtrHop) String() string            { return proto.CompactTextString(m) }
+func (*RevtrHop) ProtoMessage()               {}
+func (*RevtrHop) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{3} }
+
+type RevtrResponse struct {
+	Revtrs []*ReverseTraceroute `protobuf:"bytes,1,rep,name=revtrs" json:"revtrs,omitempty"`
+}
+
+func (m *RevtrResponse) Reset()                    { *m = RevtrResponse{} }
+func (m *RevtrResponse) String() string            { return proto.CompactTextString(m) }
+func (*RevtrResponse) ProtoMessage()               {}
+func (*RevtrResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{4} }
+
+func (m *RevtrResponse) GetRevtrs() []*ReverseTraceroute {
+	if m != nil {
+		return m.Revtrs
+	}
+	return nil
+}
+
+func init() {
+	proto.RegisterType((*RevtrMeasurement)(nil), "datamodel.RevtrMeasurement")
+	proto.RegisterType((*RevtrRequest)(nil), "datamodel.RevtrRequest")
+	proto.RegisterType((*ReverseTraceroute)(nil), "datamodel.ReverseTraceroute")
+	proto.RegisterType((*RevtrHop)(nil), "datamodel.RevtrHop")
+	proto.RegisterType((*RevtrResponse)(nil), "datamodel.RevtrResponse")
+	proto.RegisterEnum("datamodel.RevtrHopType", RevtrHopType_name, RevtrHopType_value)
+	proto.RegisterEnum("datamodel.RevtrStatus", RevtrStatus_name, RevtrStatus_value)
+}
+
+var fileDescriptor3 = []byte{
+	// 523 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x84, 0x53, 0xdd, 0x6e, 0xd3, 0x30,
+	0x18, 0xa5, 0x49, 0x7f, 0x96, 0xaf, 0x6b, 0x97, 0xb9, 0xb0, 0x19, 0xb1, 0x8b, 0x51, 0x01, 0x9a,
+	0x06, 0x6b, 0x45, 0x91, 0xb8, 0x41, 0x20, 0x6d, 0x6b, 0x28, 0x3f, 0x4b, 0x52, 0xc5, 0x29, 0x62,
+	0xbb, 0xb1, 0xb2, 0xd6, 0xa2, 0x95, 0xd6, 0x3a, 0xd8, 0x0e, 0x12, 0x4f, 0xc3, 0x9b, 0xf1, 0x2c,
+	0x38, 0x5e, 0x57, 0x48, 0x19, 0xe2, 0xae, 0xe7, 0x1c, 0xfb, 0x7c, 0xe7, 0x3b, 0x8d, 0x61, 0xf0,
+	0x65, 0xa6, 0xa6, 0xd9, 0x65, 0x67, 0xcc, 0xe7, 0xdd, 0xc0, 0x1b, 0x1d, 0x91, 0x80, 0x74, 0x23,
+	0xf6, 0x8d, 0x09, 0xc9, 0x62, 0x91, 0x8c, 0x99, 0xe0, 0x99, 0x62, 0xdd, 0x49, 0xa2, 0x92, 0x39,
+	0x9f, 0xb0, 0xab, 0xae, 0xb8, 0xd6, 0xa8, 0x5a, 0x89, 0x9d, 0x54, 0x70, 0xc5, 0x91, 0xb3, 0x3a,
+	0xd3, 0xfe, 0x08, 0xae, 0xb6, 0x50, 0xc2, 0x67, 0x89, 0xcc, 0x04, 0x9b, 0xb3, 0x85, 0x42, 0x75,
+	0xb0, 0xa5, 0x18, 0xe3, 0xd2, 0x7e, 0xe9, 0xc0, 0xc9, 0xc1, 0x44, 0x2a, 0x6c, 0x19, 0xb0, 0x0d,
+	0x8e, 0x54, 0xc9, 0x15, 0x5b, 0x30, 0x29, 0xb1, 0xad, 0xa9, 0x06, 0x02, 0xb0, 0x66, 0x13, 0x5c,
+	0xce, 0x7f, 0xb7, 0x5f, 0xc1, 0xa6, 0x31, 0x8b, 0xd8, 0xd7, 0x8c, 0x49, 0x85, 0x9e, 0x42, 0x55,
+	0xe4, 0x58, 0x6a, 0x2f, 0xfb, 0xa0, 0xde, 0x7b, 0xd0, 0x59, 0x0d, 0xee, 0xac, 0x4f, 0x6d, 0xff,
+	0x2c, 0xc1, 0xf6, 0x5f, 0xdb, 0xa0, 0x27, 0x50, 0xd5, 0x13, 0x55, 0x26, 0x4d, 0x9c, 0x66, 0x6f,
+	0x67, 0xdd, 0x82, 0x18, 0xf5, 0x26, 0xb3, 0xf5, 0x67, 0x66, 0xdb, 0x80, 0x2d, 0xa8, 0x89, 0x6c,
+	0xa1, 0x66, 0x73, 0x66, 0x52, 0xda, 0xf9, 0x12, 0x42, 0xd0, 0x99, 0x94, 0x19, 0x9b, 0xe0, 0x8a,
+	0xa6, 0x2a, 0x39, 0xa5, 0xe4, 0x0d, 0x55, 0x35, 0x54, 0x0b, 0xea, 0x52, 0xf1, 0x94, 0x0a, 0x1d,
+	0x91, 0x2f, 0x70, 0xcd, 0x78, 0x6d, 0x42, 0x59, 0x8f, 0x67, 0x78, 0xc3, 0xa0, 0x87, 0x50, 0x4e,
+	0x13, 0x35, 0xc5, 0x8e, 0x59, 0xae, 0xb5, 0x9e, 0xec, 0x1d, 0x4f, 0x97, 0xed, 0x80, 0x69, 0xe7,
+	0x0d, 0x6c, 0xac, 0x78, 0x9d, 0x70, 0xca, 0xd3, 0x65, 0xc5, 0x8f, 0xa1, 0xac, 0xbe, 0xa7, 0xcc,
+	0x84, 0x6f, 0xf6, 0x76, 0x6f, 0xf1, 0x89, 0xb5, 0xdc, 0x7e, 0x0d, 0x8d, 0x65, 0xbb, 0x32, 0xe5,
+	0x0b, 0xc9, 0xd0, 0xb3, 0xb5, 0x7a, 0xf7, 0x8a, 0x37, 0x8b, 0x4d, 0x1e, 0xfe, 0xb0, 0x96, 0xff,
+	0xce, 0xd2, 0x0f, 0x39, 0x50, 0xe9, 0x8f, 0x7c, 0xff, 0xdc, 0xbd, 0xa3, 0x97, 0xdd, 0xea, 0x93,
+	0x98, 0x46, 0xde, 0x27, 0x4a, 0xbc, 0x81, 0xef, 0x05, 0xb1, 0x5b, 0x42, 0xbb, 0xd0, 0xca, 0x49,
+	0x72, 0xee, 0x17, 0x04, 0x0b, 0xdd, 0x87, 0x7b, 0x71, 0x44, 0xe3, 0x90, 0x92, 0xe8, 0xb4, 0x20,
+	0xd9, 0x08, 0x41, 0x33, 0x8a, 0x0a, 0x5c, 0x19, 0x61, 0xb8, 0x4b, 0x86, 0x61, 0xf8, 0x96, 0xae,
+	0x29, 0x15, 0xb4, 0x03, 0x28, 0x26, 0xf4, 0xb8, 0xff, 0xa1, 0xc0, 0x57, 0xd1, 0x1e, 0xe0, 0xeb,
+	0x1b, 0xb7, 0xa8, 0x35, 0xf4, 0x08, 0xf6, 0xff, 0xa5, 0xe6, 0xd4, 0x85, 0x17, 0x85, 0xee, 0x06,
+	0x7a, 0x0e, 0x47, 0xff, 0x3b, 0x45, 0xfb, 0xe1, 0xe8, 0xe4, 0xcc, 0xa3, 0x24, 0x3e, 0xf6, 0x87,
+	0xae, 0x73, 0xf8, 0x12, 0xea, 0xc5, 0x4f, 0xaa, 0x66, 0xfa, 0xa1, 0x9f, 0x75, 0x43, 0x1a, 0x44,
+	0xa3, 0x20, 0x78, 0x1f, 0x0c, 0x74, 0x33, 0x0d, 0x70, 0x4e, 0x43, 0x7f, 0x78, 0xe6, 0xc5, 0x5e,
+	0xdf, 0xb5, 0x4e, 0xea, 0x17, 0xbf, 0x1f, 0xd4, 0x65, 0xd5, 0x3c, 0xb1, 0x17, 0xbf, 0x02, 0x00,
+	0x00, 0xff, 0xff, 0x27, 0x1e, 0xc5, 0x2d, 0xad, 0x03, 0x00, 0x00,
+}

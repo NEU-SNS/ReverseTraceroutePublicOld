@@ -16,6 +16,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/gorilla/websocket"
 )
 
 var plHost2IP map[string]string
@@ -179,8 +180,12 @@ func (rp *ReversePath) String() string {
 
 const (
 	// RateLimit is the ReverseTraceroute Rate Limit
-	RateLimit int = 10
+	RateLimit int = 5
 )
+
+type wsConnection struct {
+	c *websocket.Conn
+}
 
 // ReverseTraceroute is a reverse traceroute
 // Paths is a stack of ReversePaths
@@ -194,6 +199,7 @@ const (
 // [] means we've tried them all. if it is missing the key, that means we still need to
 // initialize it
 type ReverseTraceroute struct {
+	ID                 uint32
 	Paths              *[]*ReversePath
 	DeadEnd            map[string]bool
 	RRHop2RateLimit    map[string]int
@@ -209,8 +215,9 @@ type ReverseTraceroute struct {
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
-func NewReverseTraceroute(src, dst string, stale uint32, as AdjacencySource) *ReverseTraceroute {
+func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource) *ReverseTraceroute {
 	ret := ReverseTraceroute{
+		ID:              id,
 		Src:             src,
 		Dst:             dst,
 		Paths:           &[]*ReversePath{NewReversePath(src, dst, nil)},
@@ -356,17 +363,20 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
 }
 
 // ToStorable returns a storble form of a ReverseTraceroute
-func (rt *ReverseTraceroute) ToStorable() datamodel.Revtr {
-	var ret datamodel.Revtr
-	src, _ := util.IPStringToInt32(rt.Src)
-	dst, _ := util.IPStringToInt32(rt.Dst)
-	ret.Src = src
-	ret.Dst = dst
-	ret.Runtime = rt.EndTime.Sub(rt.StartTime)
-	ret.RRIssued = rt.ProbeCount["rr"] + rt.ProbeCount["spoof-rr"]
-	ret.TSIssued = rt.ProbeCount["ts"] + rt.ProbeCount["spoof-ts"]
+func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
+	var ret datamodel.ReverseTraceroute
+	ret.Id = rt.ID
+	ret.Src = rt.Src
+	ret.Dst = rt.Dst
+	ret.Runtime = rt.EndTime.Sub(rt.StartTime).Nanoseconds()
+	ret.RrIssued = int32(rt.ProbeCount["rr"] + rt.ProbeCount["spoof-rr"])
+	ret.TsIssued = int32(rt.ProbeCount["ts"] + rt.ProbeCount["spoof-ts"])
 	ret.StopReason = rt.StopReason
-
+	if rt.StopReason != "" {
+		ret.Status = datamodel.RevtrStatus_COMPLETED
+	} else {
+		ret.Status = datamodel.RevtrStatus_RUNNING
+	}
 	hopsSeen := make(map[string]bool)
 	for _, s := range *rt.CurrPath().Path {
 		ty := s.Type()
@@ -376,10 +386,9 @@ func (rt *ReverseTraceroute) ToStorable() datamodel.Revtr {
 			}
 			hopsSeen[hi] = true
 			var h datamodel.RevtrHop
-			hs, _ := util.IPStringToInt32(hi)
-			h.Hop = hs
-			h.Type = ty
-			ret.Path = append(ret.Path, h)
+			h.Hop = hi
+			h.Type = datamodel.RevtrHopType(ty)
+			ret.Path = append(ret.Path, &h)
 		}
 	}
 	return ret
@@ -911,20 +920,19 @@ type ClusterSource interface {
 var once sync.Once
 
 // RunReverseTraceroute runs a reverse traceroute
-func RunReverseTraceroute(revtr ReverseTracerouteReq, backoffEndhost bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
+func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
 	probeCount := make(map[string]int)
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
-	srcs, _ := util.Int32ToIPString(revtr.Src)
-	dsts, _ := util.Int32ToIPString(revtr.Dst)
-	rt := NewReverseTraceroute(srcs, dsts, revtr.Staleness, as)
+	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	if backoffEndhost || dstMustBeReachable {
 		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
 		if err != nil {
 			log.Debug("Backoff Endhost failed")
 			rt.StopReason = "FAILED"
 			rt.EndTime = time.Now()
+			log.Debug(rt.StopReason)
 			return rt, err
 		}
 		if rt.Reaches() {

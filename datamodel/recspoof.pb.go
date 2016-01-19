@@ -35,14 +35,16 @@ var TSType_value = map[string]int32{
 func (x TSType) String() string {
 	return proto.EnumName(TSType_name, int32(x))
 }
+func (TSType) EnumDescriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
 
 type RecSpoof struct {
 	Spoofs []*Spoof `protobuf:"bytes,1,rep,name=spoofs" json:"spoofs,omitempty"`
 }
 
-func (m *RecSpoof) Reset()         { *m = RecSpoof{} }
-func (m *RecSpoof) String() string { return proto.CompactTextString(m) }
-func (*RecSpoof) ProtoMessage()    {}
+func (m *RecSpoof) Reset()                    { *m = RecSpoof{} }
+func (m *RecSpoof) String() string            { return proto.CompactTextString(m) }
+func (*RecSpoof) ProtoMessage()               {}
+func (*RecSpoof) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
 
 func (m *RecSpoof) GetSpoofs() []*Spoof {
 	if m != nil {
@@ -56,17 +58,19 @@ type Spoof struct {
 	Id uint32 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
 }
 
-func (m *Spoof) Reset()         { *m = Spoof{} }
-func (m *Spoof) String() string { return proto.CompactTextString(m) }
-func (*Spoof) ProtoMessage()    {}
+func (m *Spoof) Reset()                    { *m = Spoof{} }
+func (m *Spoof) String() string            { return proto.CompactTextString(m) }
+func (*Spoof) ProtoMessage()               {}
+func (*Spoof) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
 
 type SpoofedProbes struct {
 	Probes []*Probe `protobuf:"bytes,1,rep,name=probes" json:"probes,omitempty"`
 }
 
-func (m *SpoofedProbes) Reset()         { *m = SpoofedProbes{} }
-func (m *SpoofedProbes) String() string { return proto.CompactTextString(m) }
-func (*SpoofedProbes) ProtoMessage()    {}
+func (m *SpoofedProbes) Reset()                    { *m = SpoofedProbes{} }
+func (m *SpoofedProbes) String() string            { return proto.CompactTextString(m) }
+func (*SpoofedProbes) ProtoMessage()               {}
+func (*SpoofedProbes) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
 
 func (m *SpoofedProbes) GetProbes() []*Probe {
 	if m != nil {
@@ -78,9 +82,10 @@ func (m *SpoofedProbes) GetProbes() []*Probe {
 type SpoofedProbesResponse struct {
 }
 
-func (m *SpoofedProbesResponse) Reset()         { *m = SpoofedProbesResponse{} }
-func (m *SpoofedProbesResponse) String() string { return proto.CompactTextString(m) }
-func (*SpoofedProbesResponse) ProtoMessage()    {}
+func (m *SpoofedProbesResponse) Reset()                    { *m = SpoofedProbesResponse{} }
+func (m *SpoofedProbesResponse) String() string            { return proto.CompactTextString(m) }
+func (*SpoofedProbesResponse) ProtoMessage()               {}
+func (*SpoofedProbesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{3} }
 
 type Probe struct {
 	SpooferIp uint32       `protobuf:"varint,1,opt,name=spoofer_ip" json:"spoofer_ip,omitempty"`
@@ -94,9 +99,10 @@ type Probe struct {
 	SenderIp  uint32       `protobuf:"varint,10,opt,name=sender_ip" json:"sender_ip,omitempty"`
 }
 
-func (m *Probe) Reset()         { *m = Probe{} }
-func (m *Probe) String() string { return proto.CompactTextString(m) }
-func (*Probe) ProtoMessage()    {}
+func (m *Probe) Reset()                    { *m = Probe{} }
+func (m *Probe) String() string            { return proto.CompactTextString(m) }
+func (*Probe) ProtoMessage()               {}
+func (*Probe) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{4} }
 
 func (m *Probe) GetRR() *RecordRoute {
 	if m != nil {
@@ -116,18 +122,20 @@ type RecordRoute struct {
 	Hops []uint32 `protobuf:"varint,1,rep,packed,name=hops" json:"hops,omitempty"`
 }
 
-func (m *RecordRoute) Reset()         { *m = RecordRoute{} }
-func (m *RecordRoute) String() string { return proto.CompactTextString(m) }
-func (*RecordRoute) ProtoMessage()    {}
+func (m *RecordRoute) Reset()                    { *m = RecordRoute{} }
+func (m *RecordRoute) String() string            { return proto.CompactTextString(m) }
+func (*RecordRoute) ProtoMessage()               {}
+func (*RecordRoute) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{5} }
 
 type TimeStamp struct {
 	Type   TSType   `protobuf:"varint,1,opt,name=type,enum=datamodel.TSType" json:"type,omitempty"`
 	Stamps []*Stamp `protobuf:"bytes,2,rep,name=stamps" json:"stamps,omitempty"`
 }
 
-func (m *TimeStamp) Reset()         { *m = TimeStamp{} }
-func (m *TimeStamp) String() string { return proto.CompactTextString(m) }
-func (*TimeStamp) ProtoMessage()    {}
+func (m *TimeStamp) Reset()                    { *m = TimeStamp{} }
+func (m *TimeStamp) String() string            { return proto.CompactTextString(m) }
+func (*TimeStamp) ProtoMessage()               {}
+func (*TimeStamp) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{6} }
 
 func (m *TimeStamp) GetStamps() []*Stamp {
 	if m != nil {
@@ -141,25 +149,69 @@ type Stamp struct {
 	Ip   uint32 `protobuf:"varint,2,opt,name=ip" json:"ip,omitempty"`
 }
 
-func (m *Stamp) Reset()         { *m = Stamp{} }
-func (m *Stamp) String() string { return proto.CompactTextString(m) }
-func (*Stamp) ProtoMessage()    {}
+func (m *Stamp) Reset()                    { *m = Stamp{} }
+func (m *Stamp) String() string            { return proto.CompactTextString(m) }
+func (*Stamp) ProtoMessage()               {}
+func (*Stamp) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{7} }
 
 type NotifyRecSpoofResponse struct {
 	Error string `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`
 }
 
-func (m *NotifyRecSpoofResponse) Reset()         { *m = NotifyRecSpoofResponse{} }
-func (m *NotifyRecSpoofResponse) String() string { return proto.CompactTextString(m) }
-func (*NotifyRecSpoofResponse) ProtoMessage()    {}
+func (m *NotifyRecSpoofResponse) Reset()                    { *m = NotifyRecSpoofResponse{} }
+func (m *NotifyRecSpoofResponse) String() string            { return proto.CompactTextString(m) }
+func (*NotifyRecSpoofResponse) ProtoMessage()               {}
+func (*NotifyRecSpoofResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{8} }
 
 type ReceiveSpoofedProbesResponse struct {
 }
 
-func (m *ReceiveSpoofedProbesResponse) Reset()         { *m = ReceiveSpoofedProbesResponse{} }
-func (m *ReceiveSpoofedProbesResponse) String() string { return proto.CompactTextString(m) }
-func (*ReceiveSpoofedProbesResponse) ProtoMessage()    {}
+func (m *ReceiveSpoofedProbesResponse) Reset()                    { *m = ReceiveSpoofedProbesResponse{} }
+func (m *ReceiveSpoofedProbesResponse) String() string            { return proto.CompactTextString(m) }
+func (*ReceiveSpoofedProbesResponse) ProtoMessage()               {}
+func (*ReceiveSpoofedProbesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{9} }
 
 func init() {
+	proto.RegisterType((*RecSpoof)(nil), "datamodel.RecSpoof")
+	proto.RegisterType((*Spoof)(nil), "datamodel.Spoof")
+	proto.RegisterType((*SpoofedProbes)(nil), "datamodel.SpoofedProbes")
+	proto.RegisterType((*SpoofedProbesResponse)(nil), "datamodel.SpoofedProbesResponse")
+	proto.RegisterType((*Probe)(nil), "datamodel.Probe")
+	proto.RegisterType((*RecordRoute)(nil), "datamodel.RecordRoute")
+	proto.RegisterType((*TimeStamp)(nil), "datamodel.TimeStamp")
+	proto.RegisterType((*Stamp)(nil), "datamodel.Stamp")
+	proto.RegisterType((*NotifyRecSpoofResponse)(nil), "datamodel.NotifyRecSpoofResponse")
+	proto.RegisterType((*ReceiveSpoofedProbesResponse)(nil), "datamodel.ReceiveSpoofedProbesResponse")
 	proto.RegisterEnum("datamodel.TSType", TSType_name, TSType_value)
+}
+
+var fileDescriptor2 = []byte{
+	// 423 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x6c, 0x92, 0xcf, 0x6e, 0xd3, 0x40,
+	0x10, 0xc6, 0x71, 0xfe, 0x35, 0x1e, 0x13, 0x70, 0x2d, 0x28, 0x3e, 0x20, 0x52, 0x96, 0x03, 0x15,
+	0x82, 0x44, 0x84, 0x33, 0x87, 0x56, 0xe2, 0x1a, 0x2a, 0xdb, 0x5c, 0xb8, 0x58, 0x89, 0x77, 0x4a,
+	0x2d, 0xd5, 0xde, 0x65, 0x76, 0x53, 0x29, 0x2f, 0xc7, 0xb3, 0xb1, 0x1e, 0xd7, 0xa9, 0x11, 0xb9,
+	0xcd, 0xec, 0xfc, 0xf6, 0x9b, 0xd9, 0xf9, 0x16, 0xbe, 0xfe, 0x2a, 0xed, 0xed, 0x6e, 0xbb, 0x28,
+	0x54, 0xb5, 0x5c, 0x7f, 0xfb, 0xf1, 0x29, 0x5d, 0xa7, 0xcb, 0x04, 0xef, 0x91, 0x0c, 0x66, 0xb4,
+	0x29, 0x90, 0xd4, 0xce, 0xe2, 0x52, 0x6e, 0xec, 0xa6, 0x52, 0x12, 0xef, 0x96, 0x84, 0x85, 0xd1,
+	0x4a, 0xdd, 0x2c, 0x34, 0x29, 0xab, 0x22, 0xff, 0x50, 0x11, 0x1f, 0x61, 0x9a, 0x60, 0x91, 0x36,
+	0xc5, 0xe8, 0x1c, 0x26, 0x4c, 0x99, 0xd8, 0x3b, 0x1f, 0x5e, 0x04, 0xab, 0x70, 0x71, 0xe0, 0x16,
+	0x4c, 0x88, 0x39, 0x8c, 0x5b, 0x14, 0x60, 0x50, 0x6a, 0x87, 0x79, 0x17, 0x33, 0x8e, 0x65, 0x3c,
+	0x68, 0x62, 0xf1, 0x19, 0x66, 0x0c, 0xa0, 0xbc, 0x26, 0xb5, 0x45, 0xd3, 0x68, 0x6a, 0x8e, 0x8e,
+	0x68, 0x32, 0x22, 0x5e, 0xc1, 0xcb, 0x7f, 0xae, 0x24, 0xe8, 0x86, 0xa8, 0x0d, 0x8a, 0x3f, 0x1e,
+	0x8c, 0xf9, 0x28, 0x72, 0x2d, 0x78, 0x30, 0xa4, 0xfc, 0xd0, 0x35, 0x84, 0x29, 0x0b, 0xe7, 0x5d,
+	0xef, 0x28, 0x80, 0xa1, 0xa1, 0x22, 0x1e, 0x75, 0x89, 0x34, 0x36, 0x1e, 0xf7, 0x26, 0x9c, 0x70,
+	0xfc, 0x1c, 0x4e, 0x0c, 0xfe, 0xce, 0xeb, 0x5d, 0x15, 0x9f, 0xf0, 0xc1, 0x3b, 0x18, 0x52, 0x4e,
+	0xf1, 0xd4, 0x25, 0xc1, 0xea, 0xac, 0x37, 0x9e, 0xdb, 0x8b, 0x22, 0x99, 0x34, 0xab, 0x74, 0xcf,
+	0x18, 0x58, 0x13, 0xfb, 0xcc, 0xbc, 0xe8, 0x31, 0x59, 0x59, 0x61, 0xea, 0x12, 0x1d, 0x9d, 0x82,
+	0x6f, 0xb0, 0x96, 0xed, 0x88, 0xc0, 0xcb, 0x98, 0x43, 0xd0, 0xd7, 0x08, 0x61, 0x74, 0xab, 0x74,
+	0xbb, 0x88, 0xd9, 0xd5, 0x20, 0xf4, 0xc4, 0x1a, 0xfc, 0x47, 0x81, 0x39, 0x8c, 0xec, 0x5e, 0x23,
+	0x3f, 0xef, 0xd9, 0xea, 0xb4, 0xdf, 0x24, 0xcd, 0x5c, 0x81, 0xed, 0x69, 0x48, 0xe3, 0xde, 0xfb,
+	0x9f, 0x3d, 0x4d, 0x41, 0xbc, 0x75, 0xf6, 0xb0, 0xd6, 0x53, 0xa7, 0xe5, 0x84, 0x7b, 0x06, 0xe9,
+	0x07, 0x83, 0xde, 0xc3, 0xd9, 0x5a, 0xd9, 0xf2, 0x66, 0xdf, 0xb9, 0xde, 0xad, 0x3b, 0x9a, 0xc1,
+	0x18, 0x89, 0x14, 0xf1, 0x25, 0x5f, 0xbc, 0x81, 0xd7, 0x0e, 0xc1, 0xf2, 0x1e, 0x8f, 0xba, 0xf3,
+	0x61, 0x05, 0x93, 0x87, 0xb9, 0xa0, 0x89, 0xbe, 0xd7, 0x77, 0xfb, 0xf0, 0x89, 0x13, 0xf1, 0xb3,
+	0xf4, 0xb2, 0x96, 0x97, 0x52, 0x52, 0xe8, 0xb5, 0xe9, 0x35, 0x39, 0x09, 0x2c, 0xc2, 0xe1, 0x55,
+	0xf0, 0xf3, 0xf1, 0xe7, 0x6d, 0x27, 0xfc, 0x17, 0xbf, 0xfc, 0x0d, 0x00, 0x00, 0xff, 0xff, 0x60,
+	0x94, 0xab, 0x33, 0xcc, 0x02, 0x00, 0x00,
 }

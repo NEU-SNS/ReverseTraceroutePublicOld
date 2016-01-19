@@ -9,13 +9,51 @@ message RevtrMeasurement {
     string src       = 1;
     string dst       = 2;
     uint32 staleness = 3;
+    uint32 id        = 4;
 }
 
 message RevtrRequest {
     repeated RevtrMeasurement revtrs  = 1;
 }
 
+message ReverseTraceroute {
+    RevtrStatus status     =  1; 
+    string src             =  2;
+    string dst             =  3;
+    int64 runtime          =  4;
+    int32 rr_issued        =  5;
+    int32 ts_issued        =  6;
+    string stop_reason     =  7;
+    string date            =  8;
+    repeated RevtrHop path =  9;
+    uint32 id              = 10;
+}
+
+message RevtrHop {  
+    string hop        = 1;
+    RevtrHopType type = 2;
+}
+
+enum RevtrHopType {
+    DUMMY                                         = 0;
+    DST_REV_SEGMENT                               = 1;
+    DST_SYM_REV_SEGMENT                           = 2;
+    TR_TO_SRC_REV_SEGMENT                         = 3;
+    RR_REV_SEGMENT                                = 4;
+    SPOOF_RR_REV_SEGMENT                          = 5;
+    TS_ADJ_REV_SEGMENT                            = 6;
+    SPOOF_TS_ADJ_REV_SEGMENT                      = 7;
+    SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO              = 8;
+    SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP = 9;
+}
+
+enum RevtrStatus {
+    DUMMY_X     = 0;
+    RUNNING     = 1;
+    COMPLETED   = 2;
+}
+
 message RevtrResponse {
-    
+    repeated ReverseTraceroute revtrs = 1;    
 }
 
