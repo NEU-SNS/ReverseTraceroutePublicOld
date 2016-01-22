@@ -38,6 +38,7 @@ func ConvertPing(in warts.Ping) Ping {
 		rxt.Sec = txt.Sec + resp.RTT.Sec
 		rxt.Usec = txt.Usec + resp.RTT.Usec
 		rep.Rx = rxt
+		rep.Rtt = uint32(resp.RTT.Sec*1000000 + resp.RTT.Usec)
 		rep.ProbeIpid = uint32(resp.ProbeIPID)
 		rep.ReplyIpid = uint32(resp.ReplyIPID)
 		rep.IcmpType = uint32((resp.ICMP & 0xFF00) >> 8)

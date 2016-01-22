@@ -271,7 +271,7 @@ func (c *plControllerT) maintain() {
 		select {
 		case <-c.shutdown:
 			return
-		case <-time.After(time.Minute * 2):
+		case <-time.After(time.Minute * 5):
 			vps, err := c.db.GetVPs()
 			if err != nil {
 				log.Errorf("Failed to get VPs: %v", err)

@@ -90,6 +90,7 @@ func (d *DataAccess) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 
 // StorePing stores a ping
 func (d *DataAccess) StorePing(p *dm.Ping) error {
+	log.Debug("Storing ping: ", p)
 	return d.db.StorePing(p)
 }
 
@@ -200,6 +201,11 @@ func (d *DataAccess) GetRevtrsInBatch(uid, bid uint32) ([]*dm.ReverseTraceroute,
 // this means updating the initial entries and adding in hops
 func (d *DataAccess) StoreBatchedRevtrs(batch []dm.ReverseTraceroute) error {
 	return d.db.StoreBatchedRevtrs(batch)
+}
+
+// StoreRevtr stores a revtr
+func (d *DataAccess) StoreRevtr(r dm.ReverseTraceroute) error {
+	return d.db.StoreRevtr(r)
 }
 
 // New create a new dataAccess with the given config

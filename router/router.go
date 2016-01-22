@@ -56,10 +56,10 @@ type MeasurementTool interface {
 	Close() error
 }
 
-func create(s ServiceDef) (MeasurementTool, error) {
+func (r *router) create(s ServiceDef) (MeasurementTool, error) {
 	switch s.Service {
 	case planetLab:
-		return createPLMT(s)
+		return createPLMT(s, r)
 	}
 	return nil, errCantCreateMt
 }
@@ -69,6 +69,10 @@ type ServiceDef struct {
 	Addr    string
 	Port    string
 	Service service
+}
+
+func (sd ServiceDef) key() string {
+	return fmt.Sprintf("%s:%s:%v", sd.Addr, sd.Port, sd.Service)
 }
 
 type source struct{}
@@ -97,7 +101,7 @@ type Source interface {
 
 type mtCache struct {
 	mu    sync.Mutex
-	cache map[ServiceDef]*mtCacheItem
+	cache map[string]*mtCacheItem
 }
 
 type mtCacheItem struct {
@@ -105,10 +109,13 @@ type mtCacheItem struct {
 	refCount uint32
 }
 
+func (mt *mtCacheItem) String() string {
+	return fmt.Sprintf("%v", *mt)
+}
+
 // Router is the interface for something that routes srcs to measurement tools
 type Router interface {
 	GetMT(ServiceDef) (MeasurementTool, error)
-	PutMT(ServiceDef)
 	GetService(string) (ServiceDef, error)
 	All() []MeasurementTool
 	SetSource(Source)
@@ -123,7 +130,7 @@ type router struct {
 func New() Router {
 	return &router{
 		cache: mtCache{
-			cache: make(map[ServiceDef]*mtCacheItem),
+			cache: make(map[string]*mtCacheItem),
 		},
 		source: source{},
 	}
@@ -134,13 +141,14 @@ func (r *router) SetSource(s Source) {
 }
 
 func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
+	log.Debug("GetMt: ", s)
 	r.cache.mu.Lock()
 	defer r.cache.mu.Unlock()
-	if mt, ok := r.cache.cache[s]; ok {
+	if mt, ok := r.cache.cache[s.key()]; ok {
 		mt.refCount++
 		return mt.mt, nil
 	}
-	mt, err := create(s)
+	mt, err := r.create(s)
 	if err != nil {
 		log.Error(err, s)
 		return nil, err
@@ -149,23 +157,9 @@ func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
 		mt:       mt,
 		refCount: 1,
 	}
-	r.cache.cache[s] = nc
+	r.cache.cache[s.key()] = nc
+	log.Debug(r.cache.cache)
 	return mt, nil
-}
-
-func (r *router) PutMT(s ServiceDef) {
-	r.cache.mu.Lock()
-	defer r.cache.mu.Unlock()
-	if mt, ok := r.cache.cache[s]; ok {
-		mt.refCount--
-		if mt.refCount == 0 {
-			log.Debug("Closing mt for: ", s)
-			mt.mt.Close()
-			delete(r.cache.cache, s)
-		}
-		return
-	}
-	panic("PutMT without GetMT first")
 }
 
 func (r *router) GetService(addr string) (ServiceDef, error) {
@@ -176,7 +170,7 @@ func (r *router) All() []MeasurementTool {
 	services := r.source.All()
 	ret := make([]MeasurementTool, len(services))
 	for i, s := range services {
-		mt, _ := create(s)
+		mt, _ := r.create(s)
 		ret[i] = mt
 	}
 	return ret

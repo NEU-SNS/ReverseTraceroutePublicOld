@@ -1,0 +1,390 @@
+hostname:"mlab3.iad01.measurement-lab.org" ip:3634152873 timestamp:true record_route:true last_updated:1453195483 controller:2164945341 site:"iad01.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.uml.edu" ip:2168430438 timestamp:true record_route:true last_updated:1452248300 controller:2164945341 site:"cs.uml.edu" port:22 
+hostname:"mlab3.nuq1t.measurement-lab.org" ip:400851113 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq1.measurement-lab.org" port:806 
+hostname:"mlab3.atl04.measurement-lab.org" ip:2915893481 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"atl04.measurement-lab.org" port:806 
+hostname:"planetlab1.unr.edu" ip:2261086467 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"unr.edu" port:22 
+hostname:"mlab3.mia05.measurement-lab.org" ip:2159111465 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"mia05.measurement-lab.org" port:806 
+hostname:"mlab2.los01.measurement-lab.org" ip:3302528348 timestamp:true record_route:true last_updated:1453195496 controller:2164945341 site:"los01.measurement-lab.org" port:806 
+hostname:"prata.mimuw.edu.pl" ip:3238030617 timestamp:true record_route:true last_updated:1453195437 controller:2164945341 site:"mimuw.edu.pl" port:22 
+hostname:"iraplab2.iralab.uni-karlsruhe.de" ip:3250857738 last_updated:1453204417 controller:2164945341 site:"iralab.uni-karlsruhe.de" port:22 
+hostname:"planetlab6.csee.usf.edu" ip:2214003448 timestamp:true record_route:true last_updated:1453195446 controller:2164945341 site:"csee.usf.edu" port:22 
+hostname:"mlab1.ord02.measurement-lab.org" ip:641848015 timestamp:true record_route:true last_updated:1452248398 can_spoof:true controller:2164945341 site:"ord02.measurement-lab.org" port:806 
+hostname:"planet-lab-node1.netgroup.uniroma2.it" ip:2689654053 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"netgroup.uniroma2.it" port:22 
+hostname:"mlab3.mia04.measurement-lab.org" ip:2915894185 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"mia04.measurement-lab.org" port:806 
+hostname:"mlab2.trn01.measurement-lab.org" ip:3262404060 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"trn01.measurement-lab.org" port:806 
+hostname:"mlab1.beg01.measurement-lab.org" ip:3162013455 timestamp:true record_route:true last_updated:1453195794 controller:2164945341 site:"beg01.measurement-lab.org" port:806 
+hostname:"mlab2.prg01.measurement-lab.org" ip:3567399772 timestamp:true last_updated:1453195493 controller:2164945341 site:"prg01.measurement-lab.org" port:806 
+hostname:"mlab3.ord03.measurement-lab.org" ip:1120278633 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ord03.measurement-lab.org" port:806 
+hostname:"mlab1.mad01.measurement-lab.org" ip:3586680719 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"mad01.measurement-lab.org" port:806 
+hostname:"mlab3.tpe01.measurement-lab.org" ip:2736135209 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"tpe01.measurement-lab.org" port:806 
+hostname:"planetlab2.utdallas.edu" ip:2171501876 timestamp:true record_route:true last_updated:1453195461 controller:2164945341 site:"utdallas.edu" port:22 
+hostname:"mlab1.nuq05.measurement-lab.org" ip:3634124239 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq05.measurement-lab.org" port:806 
+hostname:"mlab3.vie01.measurement-lab.org" ip:3587217449 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"vie01.measurement-lab.org" port:806 
+hostname:"mlab1.ord05.measurement-lab.org" ip:2159125263 timestamp:true record_route:true last_updated:1452248288 controller:2164945341 site:"ord05.measurement-lab.org" port:806 
+hostname:"mars.planetlab.haw-hamburg.de" ip:2367083811 timestamp:true record_route:true last_updated:1453195478 controller:2164945341 site:"planetlab.haw-hamburg.de" port:22 
+hostname:"netapp6.cs.kookmin.ac.kr" ip:3421925523 timestamp:true record_route:true last_updated:1453195604 controller:2164945341 site:"cs.kookmin.ac.kr" port:22 
+hostname:"pl2.6test.edu.cn" ip:3690188862 timestamp:true record_route:true last_updated:1453195496 controller:2164945341 site:"6test.edu.cn" port:22 
+hostname:"pl2.cs.unm.edu" ip:3327350061 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"cs.unm.edu" port:22 
+hostname:"planetlab-02.bu.edu" ip:3423116259 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"bu.edu" port:22 
+hostname:"host2.planetlab.informatik.tu-darmstadt.de" ip:2186520309 timestamp:true record_route:true last_updated:1453195445 controller:2164945341 site:"planetlab.informatik.tu-darmstadt.de" port:22 
+hostname:"mlab2.mnl01.measurement-lab.org" ip:3394935836 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"mnl01.measurement-lab.org" port:806 
+hostname:"mlab4.nuq1t.measurement-lab.org" ip:400851126 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"nuq1.measurement-lab.org" port:806 
+hostname:"planetlab-2.cse.ohio-state.edu" ip:2758508301 timestamp:true record_route:true last_updated:1453195502 controller:2164945341 site:"cse.ohio-state.edu" port:22 
+hostname:"mlab1.wlg02.measurement-lab.org" ip:2735178063 last_updated:1453337649 controller:2164945341 site:"wlg02.measurement-lab.org" port:806 
+hostname:"planetlab-1.cse.ohio-state.edu" ip:2758508300 timestamp:true record_route:true last_updated:1453196540 controller:2164945341 site:"cse.ohio-state.edu" port:22 
+hostname:"mlab1.lhr01.measurement-lab.org" ip:3651338580 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"lhr01.measurement-lab.org" port:806 
+hostname:"mlab1.arn01.measurement-lab.org" ip:3589828687 timestamp:true record_route:true last_updated:1453195495 controller:2164945341 site:"arn01.measurement-lab.org" port:806 
+hostname:"mlab2.dub01.measurement-lab.org" ip:3238071516 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"dub01.measurement-lab.org" port:806 
+hostname:"salt.planetlab.cs.umd.edu" ip:2148040303 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"planetlab.cs.umd.edu" port:22 
+hostname:"pl2.ucs.indiana.edu" ip:2620979939 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ucs.indiana.edu" port:22 
+hostname:"mlab1.ord04.measurement-lab.org" ip:2915894223 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ord04.measurement-lab.org" port:806 
+hostname:"planetlab1.utt.fr" ip:3271481099 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"utt.fr" port:22 
+hostname:"planetlab3.hiit.fi" ip:3248995257 timestamp:true record_route:true last_updated:1453195425 controller:2164945341 site:"hiit.fi" port:22 
+hostname:"node2pl.planet-lab.telecom-lille1.eu" ip:3265789459 timestamp:true record_route:true last_updated:1453195456 controller:2164945341 site:"planet-lab.telecom-lille1.eu" port:22 
+hostname:"planetlab2.ics.forth.gr" ip:2338020079 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ics.forth.gr" port:22 
+hostname:"planetlab2.aut.ac.nz" ip:2621368308 timestamp:true record_route:true last_updated:1453195424 controller:2164945341 site:"aut.ac.nz" port:22 
+hostname:"mlab3.ath01.measurement-lab.org" ip:1406403631 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ath01.measurement-lab.org" port:806 
+hostname:"mlab3.akl01.measurement-lab.org" ip:2735178025 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"akl01.measurement-lab.org" port:806 
+hostname:"mlab1.lax05.measurement-lab.org" ip:2159111631 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"lax05.measurement-lab.org" port:806 
+hostname:"mlab2.arn01.measurement-lab.org" ip:3589828700 timestamp:true record_route:true last_updated:1453199268 controller:2164945341 site:"arn01.measurement-lab.org" port:806 
+hostname:"planetlab3.cnds.jhu.edu" ip:2161960708 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"jhu.edu" port:22 
+hostname:"mlab3.mil01.measurement-lab.org" ip:3586679785 timestamp:true record_route:true last_updated:1453195488 controller:2164945341 site:"mil01.measurement-lab.org" port:806 
+hostname:"mlab2.nuq06.measurement-lab.org" ip:2159111580 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq06.measurement-lab.org" port:806 
+hostname:"mlab1.iad03.measurement-lab.org" ip:1120275087 timestamp:true record_route:true last_updated:1453195451 controller:2164945341 site:"iad03.measurement-lab.org" port:806 
+hostname:"planetlab-1.scie.uestc.edu.cn" ip:3737498761 timestamp:true record_route:true last_updated:1453195503 controller:2164945341 site:"scie.uestc.edu.cn" port:22 
+hostname:"planetlab-tea.ait.ie" ip:3238071566 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ait.ie" port:22 
+hostname:"planetlab1.acis.ufl.edu" ip:2162398731 timestamp:true record_route:true last_updated:1453195444 controller:2164945341 site:"acis.ufl.edu" port:22 
+hostname:"mlab2.ams02.measurement-lab.org" ip:1209719134 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ams02.measurement-lab.org" port:806 
+hostname:"pl-dccd-01.cua.uam.mx" ip:2496575777 timestamp:true record_route:true last_updated:1453195454 controller:2164945341 site:"cua.uam.mx" port:22 
+hostname:"node1.planetlab.mathcs.emory.edu" ip:2861332293 timestamp:true record_route:true last_updated:1453195454 controller:2164945341 site:"planetlab.mathcs.emory.edu" port:22 
+hostname:"mlab1.ord03.measurement-lab.org" ip:1120278607 timestamp:true record_route:true last_updated:1453195466 controller:2164945341 site:"ord03.measurement-lab.org" port:806 
+hostname:"mlab2.lca01.measurement-lab.org" ip:1383384860 timestamp:true record_route:true last_updated:1453195462 controller:2164945341 site:"lca01.measurement-lab.org" port:806 
+hostname:"mlab2.den03.measurement-lab.org" ip:1093545628 timestamp:true record_route:true last_updated:1453195452 controller:2164945341 site:"den03.measurement-lab.org" port:806 
+hostname:"mlab2.ord05.measurement-lab.org" ip:2159125276 timestamp:true record_route:true last_updated:1453195483 controller:2164945341 site:"ord05.measurement-lab.org" port:806 
+hostname:"mlab4.ord05.measurement-lab.org" ip:2159125302 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"ord05.measurement-lab.org" port:806 
+hostname:"mlab1.trn01.measurement-lab.org" ip:3262404047 timestamp:true record_route:true last_updated:1453195443 controller:2164945341 site:"trn01.measurement-lab.org" port:806 
+hostname:"pl2.pku.edu.cn" ip:2724842774 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"pku.edu.cn" port:22 
+hostname:"mlab2.tun01.measurement-lab.org" ip:703010076 timestamp:true record_route:true last_updated:1453195462 controller:2164945341 site:"tun01.measurement-lab.org" port:806 
+hostname:"mlab1.sea05.measurement-lab.org" ip:1073996111 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"sea05.measurement-lab.org" port:806 
+hostname:"mlab2.svg01.measurement-lab.org" ip:1369909020 timestamp:true record_route:true last_updated:1453195487 controller:2164945341 site:"svg01.measurement-lab.org" port:806 
+hostname:"mlab3.mnl01.measurement-lab.org" ip:3394935849 timestamp:true record_route:true last_updated:1452248439 can_spoof:true controller:2164945341 site:"mnl01.measurement-lab.org" port:806 
+hostname:"planetlab2.informatik.uni-kl.de" ip:2213942218 timestamp:true record_route:true last_updated:1453195465 controller:2164945341 site:"informatik.uni-kl.de" port:22 
+hostname:"mlab1.syd01.measurement-lab.org" ip:3406122132 timestamp:true record_route:true last_updated:1452248374 can_spoof:true controller:2164945341 receive_spoof:true site:"syd01.measurement-lab.org" port:806 
+hostname:"mlab1.ath01.measurement-lab.org" ip:1406403605 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ath01.measurement-lab.org" port:806 
+hostname:"mlab4.den03.measurement-lab.org" ip:1093545654 timestamp:true record_route:true last_updated:1453195457 controller:2164945341 site:"den03.measurement-lab.org" port:806 
+hostname:"mlab1.bog01.measurement-lab.org" ip:3188656911 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"bog01.measurement-lab.org" port:806 
+hostname:"dannan.disy.inf.uni-konstanz.de" ip:2250438148 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"disy.inf.uni-konstanz.de" port:22 
+hostname:"mlab3.hnd01.measurement-lab.org" ip:3417473769 timestamp:true record_route:true last_updated:1453195496 controller:2164945341 site:"hnd01.measurement-lab.org" port:806 
+hostname:"mlab1.lba01.measurement-lab.org" ip:1844407823 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"lba01.measurement-lab.org" port:806 
+hostname:"mlab3.trn01.measurement-lab.org" ip:3262404073 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"trn01.measurement-lab.org" port:806 
+hostname:"mlab3.svg01.measurement-lab.org" ip:1369909033 last_updated:1453195492 controller:2164945341 site:"svg01.measurement-lab.org" port:806 
+hostname:"planetlab-n1.wand.net.nz" ip:2195279106 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"wand.net.nz" port:22 
+hostname:"node2.planetlab.mathcs.emory.edu" ip:2861332294 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"planetlab.mathcs.emory.edu" port:22 
+hostname:"planetlab-2.ing.unimo.it" ip:2612606714 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ing.unimo.it" port:22 
+hostname:"mlab2.mia03.measurement-lab.org" ip:1114523932 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"mia03.measurement-lab.org" port:806 
+hostname:"planetlab-2.ssvl.kth.se" ip:3222306060 timestamp:true record_route:true last_updated:1453195486 controller:2164945341 site:"ssvl.kth.se" port:22 
+hostname:"planetlab2.comp.nus.edu.sg" ip:2307149929 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"comp.nus.edu.sg" port:22 
+hostname:"mlab2.mad01.measurement-lab.org" ip:3586680732 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"mad01.measurement-lab.org" port:806 
+hostname:"planetlab4.goto.info.waseda.ac.jp" ip:2231980452 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"goto.info.waseda.ac.jp" port:22 
+hostname:"mlab2.den02.measurement-lab.org" ip:69351964 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"den02.measurement-lab.org" port:806 
+hostname:"mlab1.dfw01.measurement-lab.org" ip:644601874 timestamp:true record_route:true last_updated:1453195451 controller:2164945341 site:"dfw01.measurement-lab.org" port:806 
+hostname:"mlab4.den02.measurement-lab.org" ip:69351990 record_route:true last_updated:1453195431 controller:2164945341 site:"den02.measurement-lab.org" port:806 
+hostname:"pl-dccd-02.cua.uam.mx" ip:2496575778 timestamp:true record_route:true last_updated:1453195459 controller:2164945341 site:"cua.uam.mx" port:22 
+hostname:"mlab3.iad05.measurement-lab.org" ip:69463785 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"iad05.measurement-lab.org" port:806 
+hostname:"mlab1.atl05.measurement-lab.org" ip:1131075535 timestamp:true record_route:true last_updated:1452248443 can_spoof:true controller:2164945341 site:"atl05.measurement-lab.org" port:806 
+hostname:"cs-planetlab3.cs.surrey.sfu.ca" ip:3456897178 timestamp:true record_route:true last_updated:1453195510 controller:2164945341 site:"cs.surrey.sfu.ca" port:22 
+hostname:"mlab4.ord04.measurement-lab.org" ip:2915894262 timestamp:true record_route:true last_updated:1453195488 controller:2164945341 site:"ord04.measurement-lab.org" port:806 
+hostname:"mlab1.lga05.measurement-lab.org" ip:69426703 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"lga05.measurement-lab.org" port:806 
+hostname:"mlab2.sea04.measurement-lab.org" ip:71802268 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"sea04.measurement-lab.org" port:806 
+hostname:"mlab1.den03.measurement-lab.org" ip:1093545615 timestamp:true record_route:true last_updated:1453195484 controller:2164945341 site:"den03.measurement-lab.org" port:806 
+hostname:"mlab1.sea03.measurement-lab.org" ip:2915894031 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"sea03.measurement-lab.org" port:806 
+hostname:"mlab1.akl01.measurement-lab.org" ip:2735177999 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"akl01.measurement-lab.org" port:806 
+hostname:"mlab1.lju01.measurement-lab.org" ip:1542414415 timestamp:true record_route:true last_updated:1453195635 controller:2164945341 site:"lju01.measurement-lab.org" port:806 
+hostname:"mlab1.nuq04.measurement-lab.org" ip:1114513487 timestamp:true record_route:true last_updated:1453195441 controller:2164945341 site:"nuq04.measurement-lab.org" port:806 
+hostname:"ple2.ait.ac.th" ip:3416211450 record_route:true last_updated:1453195499 controller:2164945341 site:"ait.ac.th" port:22 
+hostname:"mlab4.ord03.measurement-lab.org" ip:1120278646 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"ord03.measurement-lab.org" port:806 
+hostname:"mlab3.ord05.measurement-lab.org" ip:2159125289 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"ord05.measurement-lab.org" port:806 
+hostname:"mlab4.atl04.measurement-lab.org" ip:2915893494 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"atl04.measurement-lab.org" port:806 
+hostname:"mlab3.ord04.measurement-lab.org" ip:2915894249 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ord04.measurement-lab.org" port:806 
+hostname:"mlab2.nbo01.measurement-lab.org" ip:3314024540 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"nbo01.measurement-lab.org" port:806 
+hostname:"planetlab1.temple.edu" ip:2166379680 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"temple.edu" port:22 
+hostname:"mlab4.nuq06.measurement-lab.org" ip:2159111606 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq06.measurement-lab.org" port:806 
+hostname:"mlab1.den02.measurement-lab.org" ip:69351951 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"den02.measurement-lab.org" port:806 
+hostname:"planetlab2.s3.kth.se" ip:2196583037 timestamp:true record_route:true last_updated:1452248248 controller:2164945341 receive_spoof:true site:"s3.kth.se" port:22 
+hostname:"planetlab1.cs.purdue.edu" ip:2148143668 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"cs.purdue.edu" port:22 
+hostname:"pl1.pku.edu.cn" ip:2724842773 timestamp:true record_route:true last_updated:1453195479 controller:2164945341 site:"pku.edu.cn" port:22 
+hostname:"mlab3.syd02.measurement-lab.org" ip:2938982185 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"syd02.measurement-lab.org" port:806 
+hostname:"mlab1.iad05.measurement-lab.org" ip:69463759 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"iad05.measurement-lab.org" port:806 
+hostname:"planetlab1.fit.vutbr.cz" ip:2481260570 timestamp:true record_route:true last_updated:1452248431 controller:2164945341 site:"fit.vutbr.cz" port:22 
+hostname:"planet1.pnl.nitech.ac.jp" ip:2235891186 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"pnl.nitech.ac.jp" port:22 
+hostname:"planetlab2.cnis.nyit.edu" ip:1815743950 last_updated:1453374147 controller:2164945341 site:"cnis.nyit.edu" port:22 
+hostname:"planetlab2.cs.purdue.edu" ip:2148143669 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.purdue.edu" port:22 
+hostname:"planetlab1.cs.ucla.edu" ip:2209584710 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.ucla.edu" port:22 
+hostname:"mlab4.sea05.measurement-lab.org" ip:1073996150 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"sea05.measurement-lab.org" port:806 
+hostname:"mlab2.lhr01.measurement-lab.org" ip:3651338590 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"lhr01.measurement-lab.org" port:806 
+hostname:"planetlab1.cs.okstate.edu" ip:2337181171 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.okstate.edu" port:22 
+hostname:"mlab2.hnd01.measurement-lab.org" ip:3417473756 timestamp:true record_route:true last_updated:1453195504 controller:2164945341 site:"hnd01.measurement-lab.org" port:806 
+hostname:"planetlab1.cs.du.edu" ip:2197624185 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"cs.du.edu" port:22 
+hostname:"planetlab-03.cs.princeton.edu" ip:2154859361 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.princeton.edu" port:22 
+hostname:"planetlab5.eecs.umich.edu" ip:2379510196 timestamp:true record_route:true last_updated:1453195446 controller:2164945341 site:"eecs.umich.edu" port:22 
+hostname:"pl1.rcc.uottawa.ca" ip:3627044876 timestamp:true record_route:true last_updated:1452248220 can_spoof:true controller:2164945341 receive_spoof:true site:"rcc.uottawa.ca" port:22 
+hostname:"mlab1.lax03.measurement-lab.org" ip:2915894095 timestamp:true record_route:true last_updated:1453195462 controller:2164945341 site:"lax03.measurement-lab.org" port:806 
+hostname:"mlab3.tun01.measurement-lab.org" ip:703010089 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"tun01.measurement-lab.org" port:806 
+hostname:"planetlab-01.vt.nodes.planet-lab.org" ip:3327303918 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"vt.nodes.planet-lab.org" port:22 
+hostname:"sybaris.ipv6.lip6.fr" ip:2229485155 last_updated:1453376359 controller:2164945341 site:"ipv6.lip6.fr" port:22 
+hostname:"planetlab2.cs.ucla.edu" ip:2209584712 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.ucla.edu" port:22 
+hostname:"mlab4.iad05.measurement-lab.org" ip:69463798 timestamp:true record_route:true last_updated:1453195447 controller:2164945341 site:"iad05.measurement-lab.org" port:806 
+hostname:"ple1.ait.ac.th" ip:3416211449 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"ait.ac.th" port:22 
+hostname:"mlab1.mnl01.measurement-lab.org" ip:3394935823 timestamp:true record_route:true last_updated:1453195497 controller:2164945341 site:"mnl01.measurement-lab.org" port:806 
+hostname:"mlab1.yyz01.measurement-lab.org" ip:2732273679 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"yyz01.measurement-lab.org" port:806 
+hostname:"mlab1.sin01.measurement-lab.org" ip:3025625423 timestamp:true record_route:true last_updated:1452248287 can_spoof:true controller:2164945341 site:"sin01.measurement-lab.org" port:806 
+hostname:"mlab1.mia01.measurement-lab.org" ip:71815885 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"mia01.measurement-lab.org" port:806 
+hostname:"mlab3.acc02.measurement-lab.org" ip:3291549417 last_updated:1453389573 controller:2164945341 site:"acc02.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.du.edu" ip:2197624187 timestamp:true record_route:true last_updated:1452248230 can_spoof:true controller:2164945341 site:"cs.du.edu" port:22 
+hostname:"mlab1.lax02.measurement-lab.org" ip:1072951375 timestamp:true record_route:true last_updated:1453195466 controller:2164945341 site:"lax02.measurement-lab.org" port:806 
+hostname:"mlab2.syd02.measurement-lab.org" ip:2938982172 timestamp:true record_route:true last_updated:1453195502 controller:2164945341 site:"syd02.measurement-lab.org" port:806 
+hostname:"ple1.hpca.ual.es" ip:2530645689 timestamp:true record_route:true last_updated:1453195470 controller:2164945341 site:"hpca.ual.es" port:22 
+hostname:"planetlab1.postel.org" ip:3463783684 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"postel.org" port:22 
+hostname:"mlab2.yul01.measurement-lab.org" ip:2732273948 timestamp:true record_route:true last_updated:1453195459 controller:2164945341 site:"yul01.measurement-lab.org" port:806 
+hostname:"planetlab1.pop-mg.rnp.br" ip:3356729122 timestamp:true record_route:true last_updated:1452248334 can_spoof:true controller:2164945341 site:"pop-mg.rnp.br" port:22 
+hostname:"mlab1.atl03.measurement-lab.org" ip:1079429327 record_route:true last_updated:1453195490 controller:2164945341 site:"atl03.measurement-lab.org" port:806 
+hostname:"planetlab2.um.es" ip:2604068673 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"um.es" port:22 
+hostname:"planetlab1.cs.unc.edu" ip:3428171530 timestamp:true record_route:true last_updated:1453195443 controller:2164945341 site:"cs.unc.edu" port:22 
+hostname:"planetlab2.cs.ubc.ca" ip:2389115394 timestamp:true record_route:true last_updated:1453195455 controller:2164945341 site:"cs.ubc.ca" port:22 
+hostname:"mlab1.lga01.measurement-lab.org" ip:1245655565 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"lga01.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.uoregon.edu" ip:2162100336 timestamp:true record_route:true last_updated:1453195486 controller:2164945341 site:"cs.uoregon.edu" port:22 
+hostname:"mlab2.wlg02.measurement-lab.org" ip:2735178076 last_updated:1453340563 controller:2164945341 site:"wlg02.measurement-lab.org" port:806 
+hostname:"mlab3.sin01.measurement-lab.org" ip:3025625449 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"sin01.measurement-lab.org" port:806 
+hostname:"mlab4.den04.measurement-lab.org" ip:2159111542 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"den04.measurement-lab.org" port:806 
+hostname:"planetlab1.ecs.vuw.ac.nz" ip:2193818692 timestamp:true record_route:true last_updated:1452248341 can_spoof:true controller:2164945341 site:"ecs.vuw.ac.nz" port:22 
+hostname:"mlab1.nuq1t.measurement-lab.org" ip:400851087 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq1.measurement-lab.org" port:806 
+hostname:"mlab3.ath02.measurement-lab.org" ip:1406404011 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ath02.measurement-lab.org" port:806 
+hostname:"mlab2.ord03.measurement-lab.org" ip:1120278620 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"ord03.measurement-lab.org" port:806 
+hostname:"mlab1.mia02.measurement-lab.org" ip:644683023 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"mia02.measurement-lab.org" port:806 
+hostname:"mlab1.ams01.measurement-lab.org" ip:3589570705 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ams01.measurement-lab.org" port:806 
+hostname:"planetlab1.cesnet.cz" ip:3279003986 timestamp:true record_route:true last_updated:1453195438 controller:2164945341 site:"cesnet.cz" port:22 
+hostname:"planetlab1.aut.ac.nz" ip:2621368306 timestamp:true record_route:true last_updated:1453195497 controller:2164945341 site:"aut.ac.nz" port:22 
+hostname:"mlab2.ham01.measurement-lab.org" ip:1357876958 timestamp:true record_route:true last_updated:1452248406 can_spoof:true controller:2164945341 receive_spoof:true site:"ham01.measurement-lab.org" port:806 
+hostname:"mlab3.par01.measurement-lab.org" ip:1357883627 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"par01.measurement-lab.org" port:806 
+hostname:"mlab4.sea04.measurement-lab.org" ip:71802294 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"sea04.measurement-lab.org" port:806 
+hostname:"planetlab4.inf.ethz.ch" ip:3223411269 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"ethz.ch" port:22 
+hostname:"pl2.sos.info.hiroshima-cu.ac.jp" ip:2784123521 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"sos.info.hiroshima-cu.ac.jp" port:22 
+hostname:"ebb.colgate.edu" ip:2502643732 timestamp:true record_route:true last_updated:1452248317 controller:2164945341 site:"colgate.edu" port:22 
+hostname:"mlab2.atl05.measurement-lab.org" ip:1131075548 timestamp:true record_route:true last_updated:1453195483 controller:2164945341 site:"atl05.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.unc.edu" ip:3428171531 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"cs.unc.edu" port:22 
+hostname:"pl2.zju.edu.cn" ip:3525359032 timestamp:true record_route:true last_updated:1453195649 controller:2164945341 site:"zju.edu.cn" port:22 
+hostname:"planetlab1.ustc.edu.cn" ip:3398279467 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"ustc.edu.cn" port:22 
+hostname:"planetlab2.unr.edu" ip:2261086468 timestamp:true record_route:true last_updated:1453195424 controller:2164945341 site:"unr.edu" port:22 
+hostname:"mlab3.mad01.measurement-lab.org" ip:3586680745 timestamp:true record_route:true last_updated:1453195425 controller:2164945341 site:"mad01.measurement-lab.org" port:806 
+hostname:"planetlab-1.ing.unimo.it" ip:2612606713 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ing.unimo.it" port:22 
+hostname:"mlab2.tpe01.measurement-lab.org" ip:2736135196 timestamp:true record_route:true last_updated:1453195436 controller:2164945341 site:"tpe01.measurement-lab.org" port:806 
+hostname:"mlab1.lga02.measurement-lab.org" ip:644499083 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"lga02.measurement-lab.org" port:806 
+hostname:"planetlab2.pop-mg.rnp.br" ip:3356729123 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"pop-mg.rnp.br" port:22 
+hostname:"mlab3.nbo01.measurement-lab.org" ip:3314024553 timestamp:true record_route:true last_updated:1452248358 controller:2164945341 receive_spoof:true site:"nbo01.measurement-lab.org" port:806 
+hostname:"planetlab1.rutgers.edu" ip:2783326578 timestamp:true record_route:true last_updated:1453195496 controller:2164945341 site:"rutgers.edu" port:22 
+hostname:"ricepl-2.cs.rice.edu" ip:2150272554 timestamp:true record_route:true last_updated:1453195426 controller:2164945341 site:"cs.rice.edu" port:22 
+hostname:"planetlab5.csee.usf.edu" ip:2214003446 timestamp:true record_route:true last_updated:1453195461 controller:2164945341 site:"csee.usf.edu" port:22 
+hostname:"mlab1.sea01.measurement-lab.org" ip:644218957 timestamp:true record_route:true last_updated:1452248348 can_spoof:true controller:2164945341 site:"sea01.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.pitt.edu" ip:3224694998 timestamp:true record_route:true last_updated:1453195458 controller:2164945341 site:"cs.pitt.edu" port:22 
+hostname:"mlab1.yul01.measurement-lab.org" ip:2732273935 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"yul01.measurement-lab.org" port:806 
+hostname:"mlab2.sea03.measurement-lab.org" ip:2915894044 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"sea03.measurement-lab.org" port:806 
+hostname:"mlab1.mia04.measurement-lab.org" ip:2915894159 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"mia04.measurement-lab.org" port:806 
+hostname:"planetlab3.net.in.tum.de" ip:2331442435 timestamp:true record_route:true last_updated:1453195487 controller:2164945341 site:"net.in.tum.de" port:22 
+hostname:"planetlab3.inf.ethz.ch" ip:3223411268 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ethz.ch" port:22 
+hostname:"planetlab2.arizona-gigapop.net" ip:3469735971 timestamp:true record_route:true last_updated:1453195424 controller:2164945341 site:"arizona-gigapop.net" port:22 
+hostname:"mlab2.lju01.measurement-lab.org" ip:1542414428 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"lju01.measurement-lab.org" port:806 
+hostname:"planetlab1.cs.uoregon.edu" ip:2162100335 timestamp:true last_updated:1453195491 controller:2164945341 site:"cs.uoregon.edu" port:22 
+hostname:"mlab1.lga04.measurement-lab.org" ip:2915894351 timestamp:true record_route:true last_updated:1452248266 controller:2164945341 site:"lga04.measurement-lab.org" port:806 
+hostname:"mlab3.iad04.measurement-lab.org" ip:2915894313 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"iad04.measurement-lab.org" port:806 
+hostname:"mlab1.nuq06.measurement-lab.org" ip:2159111567 record_route:true last_updated:1453195490 controller:2164945341 site:"nuq06.measurement-lab.org" port:806 
+hostname:"planetlab2-buenosaires.lan.redclara.net" ip:3355496105 timestamp:true record_route:true last_updated:1453195497 controller:2164945341 site:"buenosaires.lan.redclara.net" port:22 
+hostname:"mlab3.ham01.measurement-lab.org" ip:1357876971 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ham01.measurement-lab.org" port:806 
+hostname:"planetlab1.arizona-gigapop.net" ip:3469735970 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"arizona-gigapop.net" port:22 
+hostname:"planetlab1.unl.edu" ip:2170414474 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"unl.edu" port:22 
+hostname:"pl4.cs.unm.edu" ip:3327350063 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.unm.edu" port:22 
+hostname:"mlab2.mia04.measurement-lab.org" ip:2915894172 timestamp:true record_route:true last_updated:1453195442 controller:2164945341 site:"mia04.measurement-lab.org" port:806 
+hostname:"planet-lab-node2.netgroup.uniroma2.it" ip:2689654055 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"netgroup.uniroma2.it" port:22 
+hostname:"mlab1.dfw02.measurement-lab.org" ip:1079411791 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"dfw02.measurement-lab.org" port:806 
+hostname:"planetvs2.informatik.uni-stuttgart.de" ip:2168836705 timestamp:true record_route:true last_updated:1453195486 controller:2164945341 site:"informatik.uni-stuttgart.de" port:22 
+hostname:"pl1.eecs.utk.edu" ip:2686728620 timestamp:true record_route:true last_updated:1452707768 controller:2164945341 site:"eecs.utk.edu" port:22 
+hostname:"mlab2.yyc01.measurement-lab.org" ip:2732274204 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"yyc01.measurement-lab.org" port:806 
+hostname:"planetlab-5.eecs.cwru.edu" ip:2165741134 timestamp:true record_route:true last_updated:1453195453 controller:2164945341 site:"eecs.cwru.edu" port:22 
+hostname:"planetlab1.informatik.uni-goettingen.de" ip:2253191653 timestamp:true record_route:true last_updated:1453196385 controller:2164945341 site:"informatik.uni-goettingen.de" port:22 
+hostname:"mlab1.lax04.measurement-lab.org" ip:68134415 timestamp:true record_route:true last_updated:1452248251 controller:2164945341 site:"lax04.measurement-lab.org" port:806 
+hostname:"planetlab1.mini.pw.edu.pl" ip:3256726021 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"pw.edu.pl" port:22 
+hostname:"mlab3.yyc01.measurement-lab.org" ip:2732274217 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"yyc01.measurement-lab.org" port:806 
+hostname:"mlab4.mia05.measurement-lab.org" ip:2159111478 last_updated:1453206649 controller:2164945341 site:"mia05.measurement-lab.org" port:806 
+hostname:"mlab4.sea03.measurement-lab.org" ip:2915894070 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"sea03.measurement-lab.org" port:806 
+hostname:"planetlab04.cs.washington.edu" ip:2161116259 timestamp:true record_route:true last_updated:1452248448 controller:2164945341 site:"cs.washington.edu" port:22 
+hostname:"mlab3.arn01.measurement-lab.org" ip:3589828713 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"arn01.measurement-lab.org" port:806 
+hostname:"mlab2.acc02.measurement-lab.org" ip:3291549404 last_updated:1453389572 controller:2164945341 site:"acc02.measurement-lab.org" port:806 
+hostname:"mlab1.iad02.measurement-lab.org" ip:643468431 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"iad02.measurement-lab.org" port:806 
+hostname:"mlab2.sea05.measurement-lab.org" ip:1073996124 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"sea05.measurement-lab.org" port:806 
+hostname:"mlab3.sea04.measurement-lab.org" ip:71802281 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"sea04.measurement-lab.org" port:806 
+hostname:"mlab2.yyz01.measurement-lab.org" ip:2732273692 timestamp:true record_route:true last_updated:1453195446 controller:2164945341 site:"yyz01.measurement-lab.org" port:806 
+hostname:"mlab1.den01.measurement-lab.org" ip:3093894991 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"den01.measurement-lab.org" port:806 
+hostname:"mlab1.den04.measurement-lab.org" ip:2159111503 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"den04.measurement-lab.org" port:806 
+hostname:"pl2.cs.montana.edu" ip:2572812579 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"cs.montana.edu" port:22 
+hostname:"mlab1.acc02.measurement-lab.org" ip:3291549391 last_updated:1453389576 controller:2164945341 site:"acc02.measurement-lab.org" port:806 
+hostname:"planetlab1.diku.dk" ip:3223743887 timestamp:true record_route:true last_updated:1452248307 controller:2164945341 receive_spoof:true site:"diku.dk" port:22 
+hostname:"mlab3.den03.measurement-lab.org" ip:1093545641 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"den03.measurement-lab.org" port:806 
+hostname:"planetlab2.citadel.edu" ip:2615214664 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"citadel.edu" port:22 
+hostname:"mlab3.los01.measurement-lab.org" ip:3302528361 timestamp:true record_route:true last_updated:1453195497 controller:2164945341 site:"los01.measurement-lab.org" port:806 
+hostname:"mlab2.par01.measurement-lab.org" ip:1357883614 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"par01.measurement-lab.org" port:806 
+hostname:"mlab1.syd02.measurement-lab.org" ip:2938982159 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"syd02.measurement-lab.org" port:806 
+hostname:"planetlab3.rutgers.edu" ip:2783326582 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"rutgers.edu" port:22 
+hostname:"planetlab-1.ida.liu.se" ip:3223608834 timestamp:true record_route:true last_updated:1453195435 controller:2164945341 site:"ida.liu.se" port:22 
+hostname:"mlab1.dfw03.measurement-lab.org" ip:68101007 timestamp:true record_route:true last_updated:1453195483 controller:2164945341 site:"dfw03.measurement-lab.org" port:806 
+hostname:"planetlab4.hiit.fi" ip:3248995258 timestamp:true record_route:true last_updated:1452742107 controller:2164945341 site:"hiit.fi" port:22 
+hostname:"mlab1.svg01.measurement-lab.org" ip:1369909007 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"svg01.measurement-lab.org" port:806 
+hostname:"mlab1.prg01.measurement-lab.org" ip:3567399759 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"prg01.measurement-lab.org" port:806 
+hostname:"planetlab1.csee.usf.edu" ip:2214003441 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"csee.usf.edu" port:22 
+hostname:"mlab3.sea03.measurement-lab.org" ip:2915894057 record_route:true last_updated:1453195491 controller:2164945341 site:"sea03.measurement-lab.org" port:806 
+hostname:"mlab3.ams01.measurement-lab.org" ip:3589570732 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ams01.measurement-lab.org" port:806 
+hostname:"utet.ii.uam.es" ip:2532588193 timestamp:true record_route:true last_updated:1453195494 controller:2164945341 site:"ii.uam.es" port:22 
+hostname:"mlab3.den02.measurement-lab.org" ip:69351977 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"den02.measurement-lab.org" port:806 
+hostname:"mlab2.ath01.measurement-lab.org" ip:1406403618 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ath01.measurement-lab.org" port:806 
+hostname:"mlab1.iad04.measurement-lab.org" ip:2915894287 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"iad04.measurement-lab.org" port:806 
+hostname:"mlab2.bkk01.measurement-lab.org" ip:1023933468 timestamp:true record_route:true last_updated:1453195470 controller:2164945341 site:"bkk01.measurement-lab.org" port:806 
+hostname:"mlab1.mia05.measurement-lab.org" ip:2159111439 timestamp:true record_route:true last_updated:1453195443 controller:2164945341 site:"mia05.measurement-lab.org" port:806 
+hostname:"mlab4.mia03.measurement-lab.org" ip:1114523958 timestamp:true record_route:true last_updated:1453195427 controller:2164945341 site:"mia03.measurement-lab.org" port:806 
+hostname:"mlab1.sea04.measurement-lab.org" ip:71802255 timestamp:true record_route:true last_updated:1453195486 controller:2164945341 site:"sea04.measurement-lab.org" port:806 
+hostname:"mlab2.ams01.measurement-lab.org" ip:3589570718 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ams01.measurement-lab.org" port:806 
+hostname:"mlab3.lba01.measurement-lab.org" ip:1844407849 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"lba01.measurement-lab.org" port:806 
+hostname:"planetlab1.comp.nus.edu.sg" ip:2307149930 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"comp.nus.edu.sg" port:22 
+hostname:"mlab2.mia05.measurement-lab.org" ip:2159111452 timestamp:true record_route:true last_updated:1453195427 controller:2164945341 site:"mia05.measurement-lab.org" port:806 
+hostname:"netapp7.cs.kookmin.ac.kr" ip:3421925524 timestamp:true record_route:true last_updated:1453195617 controller:2164945341 site:"cs.kookmin.ac.kr" port:22 
+hostname:"mlab1.yyc01.measurement-lab.org" ip:2732274191 timestamp:true record_route:true last_updated:1453195452 controller:2164945341 site:"yyc01.measurement-lab.org" port:806 
+hostname:"planetlab2.informatik.uni-erlangen.de" ip:2210147430 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"informatik.uni-erlangen.de" port:22 
+hostname:"pl3.cs.unm.edu" ip:3327350062 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"cs.unm.edu" port:22 
+hostname:"mlab1.ord01.measurement-lab.org" ip:71826317 timestamp:true record_route:true last_updated:1453195452 controller:2164945341 site:"ord01.measurement-lab.org" port:806 
+hostname:"mlab1.atl04.measurement-lab.org" ip:2915893455 timestamp:true record_route:true last_updated:1453195471 controller:2164945341 site:"atl04.measurement-lab.org" port:806 
+hostname:"ple3.ipv6.lip6.fr" ip:2229485177 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"ipv6.lip6.fr" port:22 
+hostname:"saturn.planetlab.carleton.ca" ip:2255872692 timestamp:true record_route:true last_updated:1453195436 controller:2164945341 site:"planetlab.carleton.ca" port:22 
+hostname:"mlab2.sin01.measurement-lab.org" ip:3025625436 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"sin01.measurement-lab.org" port:806 
+hostname:"planetlab2.utt.fr" ip:3271481100 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"utt.fr" port:22 
+hostname:"mlab2.syd01.measurement-lab.org" ip:3406122146 timestamp:true record_route:true last_updated:1453199121 controller:2164945341 site:"syd01.measurement-lab.org" port:806 
+hostname:"mlab3.yul01.measurement-lab.org" ip:2732273961 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"yul01.measurement-lab.org" port:806 
+hostname:"mlab4.mnl01.measurement-lab.org" ip:3394935862 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"mnl01.measurement-lab.org" port:806 
+hostname:"mlab1.sea02.measurement-lab.org" ip:1072947215 timestamp:true record_route:true last_updated:1452248366 can_spoof:true controller:2164945341 receive_spoof:true site:"sea02.measurement-lab.org" port:806 
+hostname:"mlab1.nuq03.measurement-lab.org" ip:644260751 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"nuq03.measurement-lab.org" port:806 
+hostname:"mlab2.atl04.measurement-lab.org" ip:2915893468 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"atl04.measurement-lab.org" port:806 
+hostname:"onelab1.pl.sophia.inria.fr" ip:2321575996 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"pl.sophia.inria.fr" port:22 
+hostname:"ple2.hpca.ual.es" ip:2530645691 timestamp:true record_route:true last_updated:1453195433 controller:2164945341 site:"hpca.ual.es" port:22 
+hostname:"mlab1.iad01.measurement-lab.org" ip:3634152847 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"iad01.measurement-lab.org" port:806 
+hostname:"mlab3.yyz01.measurement-lab.org" ip:2732273705 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"yyz01.measurement-lab.org" port:806 
+hostname:"mlab2.beg01.measurement-lab.org" ip:3162013468 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"beg01.measurement-lab.org" port:806 
+hostname:"mlab3.nuq05.measurement-lab.org" ip:3634124265 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"nuq05.measurement-lab.org" port:806 
+hostname:"planetlab-js1.cert.org.cn" ip:3663620720 timestamp:true record_route:true last_updated:1453196097 controller:2164945341 site:"cert.org.cn" port:22 
+hostname:"plink.cs.uwaterloo.ca" ip:2170636812 timestamp:true record_route:true last_updated:1453195458 controller:2164945341 site:"cs.uwaterloo.ca" port:22 
+hostname:"ricepl-1.cs.rice.edu" ip:2150272553 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"cs.rice.edu" port:22 
+hostname:"mlab1.hnd01.measurement-lab.org" ip:3417473743 timestamp:true record_route:true last_updated:1453195497 controller:2164945341 site:"hnd01.measurement-lab.org" port:806 
+hostname:"host3.planetlab.informatik.tu-darmstadt.de" ip:2186520311 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"planetlab.informatik.tu-darmstadt.de" port:22 
+hostname:"mlab3.bkk01.measurement-lab.org" ip:1023933481 timestamp:true record_route:true last_updated:1453195457 controller:2164945341 site:"bkk01.measurement-lab.org" port:806 
+hostname:"mlab1.par01.measurement-lab.org" ip:1357883601 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"par01.measurement-lab.org" port:806 
+hostname:"mlab1.nuq02.measurement-lab.org" ip:2501117263 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq02.measurement-lab.org" port:806 
+hostname:"mlab3.bog01.measurement-lab.org" ip:3188656937 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"bog01.measurement-lab.org" port:806 
+hostname:"planetlab2.cs.otago.ac.nz" ip:2337328773 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"cs.otago.ac.nz" port:22 
+hostname:"mlab1.vie01.measurement-lab.org" ip:3587217423 timestamp:true record_route:true last_updated:1453195488 controller:2164945341 site:"vie01.measurement-lab.org" port:806 
+hostname:"planetlab1.emich.edu" ip:3328992572 last_updated:1453265888 controller:2164945341 site:"emich.edu" port:22 
+hostname:"planetlab2.rutgers.edu" ip:2783326579 timestamp:true record_route:true last_updated:1453195450 controller:2164945341 site:"rutgers.edu" port:22 
+hostname:"planetlab5.ie.cuhk.edu.hk" ip:2310890194 timestamp:true record_route:true last_updated:1452248255 controller:2164945341 site:"ie.cuhk.edu.hk" port:22 
+hostname:"mlab2.ath02.measurement-lab.org" ip:1406403999 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ath02.measurement-lab.org" port:806 
+hostname:"mlab1.los01.measurement-lab.org" ip:3302528335 record_route:true last_updated:1453195496 controller:2164945341 site:"los01.measurement-lab.org" port:806 
+hostname:"mlab1.tpe01.measurement-lab.org" ip:2736135183 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"tpe01.measurement-lab.org" port:806 
+hostname:"pl1.ucs.indiana.edu" ip:2620979938 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ucs.indiana.edu" port:22 
+hostname:"planetlab1.cnds.jhu.edu" ip:2161960706 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"jhu.edu" port:22 
+hostname:"pl1.cs.montana.edu" ip:2572812578 timestamp:true record_route:true last_updated:1453195484 controller:2164945341 site:"cs.montana.edu" port:22 
+hostname:"planetlabone.ccs.neu.edu" ip:2164947137 timestamp:true record_route:true last_updated:1453195454 controller:2164945341 site:"ccs.neu.edu" port:22 
+hostname:"planetlab1.cs.uit.no" ip:2180125636 timestamp:true record_route:true last_updated:1453195488 controller:2164945341 site:"cs.uit.no" port:22 
+hostname:"planet2.pnl.nitech.ac.jp" ip:2235891187 timestamp:true record_route:true last_updated:1453195494 controller:2164945341 site:"pnl.nitech.ac.jp" port:22 
+hostname:"planetlab3.cslab.ece.ntua.gr" ip:2472936305 timestamp:true record_route:true last_updated:1453195472 controller:2164945341 site:"planetlab.ntua.gr" port:22 
+hostname:"mlab1.nbo01.measurement-lab.org" ip:3314024527 timestamp:true record_route:true last_updated:1453195428 controller:2164945341 site:"nbo01.measurement-lab.org" port:806 
+hostname:"planetlab1.research.nicta.com.au" ip:3720862096 timestamp:true record_route:true last_updated:1453195488 controller:2164945341 site:"research.nicta.com.au" port:22 
+hostname:"mlab2.vie01.measurement-lab.org" ip:3587217436 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"vie01.measurement-lab.org" port:806 
+hostname:"planetlab2.csee.usf.edu" ip:2214003442 timestamp:true record_route:true last_updated:1453196395 controller:2164945341 site:"csee.usf.edu" port:22 
+hostname:"mlab4.mia04.measurement-lab.org" ip:2915894198 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"mia04.measurement-lab.org" port:806 
+hostname:"mlab2.lba01.measurement-lab.org" ip:1844407836 timestamp:true record_route:true last_updated:1453195487 controller:2164945341 site:"lba01.measurement-lab.org" port:806 
+hostname:"mlab2.bog01.measurement-lab.org" ip:3188656924 timestamp:true record_route:true last_updated:1453195494 controller:2164945341 site:"bog01.measurement-lab.org" port:806 
+hostname:"planetlab-2.sjtu.edu.cn" ip:3396344932 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"sjtu.edu.cn" port:22 
+hostname:"mlab1.lca01.measurement-lab.org" ip:1383384847 timestamp:true record_route:true last_updated:1453195437 controller:2164945341 site:"lca01.measurement-lab.org" port:806 
+hostname:"planetlab3.arizona-gigapop.net" ip:3469735974 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"arizona-gigapop.net" port:22 
+hostname:"planetlab4.cs.uoregon.edu" ip:2162100338 timestamp:true record_route:true last_updated:1453195427 controller:2164945341 site:"cs.uoregon.edu" port:22 
+hostname:"mlab3.lhr01.measurement-lab.org" ip:3651338605 timestamp:true record_route:true last_updated:1452248383 can_spoof:true controller:2164945341 receive_spoof:true site:"lhr01.measurement-lab.org" port:806 
+hostname:"mlab1.dub01.measurement-lab.org" ip:3238071503 timestamp:true record_route:true last_updated:1453195460 controller:2164945341 site:"dub01.measurement-lab.org" port:806 
+hostname:"planetlab-4.eecs.cwru.edu" ip:2165741085 timestamp:true record_route:true last_updated:1453195797 controller:2164945341 site:"eecs.cwru.edu" port:22 
+hostname:"mlab3.dub01.measurement-lab.org" ip:3238071529 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"dub01.measurement-lab.org" port:806 
+hostname:"mlab1.atl01.measurement-lab.org" ip:71827085 timestamp:true record_route:true last_updated:1453199119 controller:2164945341 site:"atl01.measurement-lab.org" port:806 
+hostname:"planetlaba.engr.ccny.cuny.edu" ip:2253028902 last_updated:1453323646 controller:2164945341 site:"engr.ccny.cuny.edu" port:22 
+hostname:"planetlab4.ie.cuhk.edu.hk" ip:2310890193 timestamp:true record_route:true last_updated:1453195431 controller:2164945341 site:"ie.cuhk.edu.hk" port:22 
+hostname:"mlab1.lga03.measurement-lab.org" ip:1079415951 record_route:true last_updated:1453198961 controller:2164945341 site:"lga03.measurement-lab.org" port:806 
+hostname:"planetlab2.inf.ethz.ch" ip:3223411267 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"ethz.ch" port:22 
+hostname:"planetlabtwo.ccs.neu.edu" ip:2164947138 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"ccs.neu.edu" port:22 
+hostname:"merkur.planetlab.haw-hamburg.de" ip:2367083810 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"planetlab.haw-hamburg.de" port:22 
+hostname:"cs-planetlab4.cs.surrey.sfu.ca" ip:3456897179 timestamp:true record_route:true last_updated:1453195505 controller:2164945341 site:"cs.surrey.sfu.ca" port:22 
+hostname:"planetlab2.acis.ufl.edu" ip:2162398732 timestamp:true record_route:true last_updated:1453195448 controller:2164945341 site:"acis.ufl.edu" port:22 
+hostname:"mlab2.akl01.measurement-lab.org" ip:2735178012 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"akl01.measurement-lab.org" port:806 
+hostname:"mlab2.iad04.measurement-lab.org" ip:2915894300 timestamp:true record_route:true last_updated:1453195483 controller:2164945341 site:"iad04.measurement-lab.org" port:806 
+hostname:"mlab1.mil01.measurement-lab.org" ip:3586679759 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"mil01.measurement-lab.org" port:806 
+hostname:"mlab1.ath02.measurement-lab.org" ip:1406403989 timestamp:true record_route:true last_updated:1453195435 controller:2164945341 site:"ath02.measurement-lab.org" port:806 
+hostname:"planetlab2.cti.espol.edu.ec" ip:3356137213 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"cti.espol.edu.ec" port:22 
+hostname:"mlab2.iad05.measurement-lab.org" ip:69463772 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"iad05.measurement-lab.org" port:806 
+hostname:"mlab2.nuq05.measurement-lab.org" ip:3634124252 timestamp:true record_route:true last_updated:1453195434 controller:2164945341 site:"nuq05.measurement-lab.org" port:806 
+hostname:"planetlab01.cs.washington.edu" ip:2161116357 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"cs.washington.edu" port:22 
+hostname:"pluto.cs.brown.edu" ip:3227249638 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"cs.brown.edu" port:22 
+hostname:"mlab4.iad04.measurement-lab.org" ip:2915894326 timestamp:true record_route:true last_updated:1453195480 controller:2164945341 site:"iad04.measurement-lab.org" port:806 
+hostname:"planetlab2.cesnet.cz" ip:3279003987 timestamp:true record_route:true last_updated:1453195476 controller:2164945341 site:"cesnet.cz" port:22 
+hostname:"ple4.ipv6.lip6.fr" ip:2229485178 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ipv6.lip6.fr" port:22 
+hostname:"planetlab2.upm.ro" ip:3252818719 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"upm.ro" port:22 
+hostname:"mlab3.beg01.measurement-lab.org" ip:3162013481 timestamp:true record_route:true last_updated:1453195495 controller:2164945341 site:"beg01.measurement-lab.org" port:806 
+hostname:"mlab3.atl05.measurement-lab.org" ip:1131075561 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"atl05.measurement-lab.org" port:806 
+hostname:"mlab1.mia03.measurement-lab.org" ip:1114523919 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"mia03.measurement-lab.org" port:806 
+hostname:"planetlab1.ifi.uio.no" ip:3248321530 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ifi.uio.no" port:22 
+hostname:"planet-lab1.itba.edu.ar" ip:3202589582 timestamp:true record_route:true last_updated:1453195499 controller:2164945341 site:"itba.edu.ar" port:22 
+hostname:"mlab1.tun01.measurement-lab.org" ip:703010063 timestamp:true record_route:true last_updated:1453195495 controller:2164945341 site:"tun01.measurement-lab.org" port:806 
+hostname:"planetlab2.dit.upm.es" ip:2315518072 timestamp:true record_route:true last_updated:1452248352 controller:2164945341 site:"dit.upm.es" port:22 
+hostname:"mlab3.sea05.measurement-lab.org" ip:1073996137 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"sea05.measurement-lab.org" port:806 
+hostname:"planetlab3.cs.uoregon.edu" ip:2162100337 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"cs.uoregon.edu" port:22 
+hostname:"planetlab2.ecs.vuw.ac.nz" ip:2193818693 timestamp:true record_route:true last_updated:1453195495 controller:2164945341 site:"ecs.vuw.ac.nz" port:22 
+hostname:"mlab3.mia03.measurement-lab.org" ip:1114523945 record_route:true last_updated:1453195490 controller:2164945341 site:"mia03.measurement-lab.org" port:806 
+hostname:"planetlab-um00.di.uminho.pt" ip:3246920461 timestamp:true record_route:true last_updated:1453195599 controller:2164945341 site:"di.uminho.pt" port:22 
+hostname:"planetlab-04.vt.nodes.planet-lab.org" ip:3327303901 timestamp:true last_updated:1453195447 controller:2164945341 site:"vt.nodes.planet-lab.org" port:22 
+hostname:"mlab3.lca01.measurement-lab.org" ip:1383384873 timestamp:true record_route:true last_updated:1453195495 controller:2164945341 site:"lca01.measurement-lab.org" port:806 
+hostname:"planetlab4.mini.pw.edu.pl" ip:3256726030 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"pw.edu.pl" port:22 
+hostname:"mlab3.lju01.measurement-lab.org" ip:1542414441 record_route:true last_updated:1453196554 controller:2164945341 site:"lju01.measurement-lab.org" port:806 
+hostname:"planet-lab2.itba.edu.ar" ip:3202589581 timestamp:true record_route:true last_updated:1453195501 controller:2164945341 site:"itba.edu.ar" port:22 
+hostname:"mlab1.lax01.measurement-lab.org" ip:643969805 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"lax01.measurement-lab.org" port:806 
+hostname:"planetlab2.emich.edu" ip:3328992573 timestamp:true record_route:true last_updated:1453173458 controller:2164945341 site:"emich.edu" port:22 
+hostname:"gschembra3.diit.unict.it" ip:2539719136 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"diit.unict.it" port:22 
+hostname:"mlab4.atl05.measurement-lab.org" ip:1131075574 timestamp:true record_route:true last_updated:1452248283 can_spoof:true controller:2164945341 receive_spoof:true site:"atl05.measurement-lab.org" port:806 
+hostname:"mlab2.nuq1t.measurement-lab.org" ip:400851100 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"nuq1.measurement-lab.org" port:806 
+hostname:"pl1.tailab.eu" ip:3259995044 timestamp:true record_route:true last_updated:1452762276 controller:2164945341 site:"tailab.eu" port:22 
+hostname:"planetlab3.mini.pw.edu.pl" ip:3256726029 timestamp:true record_route:true last_updated:1453195492 controller:2164945341 site:"pw.edu.pl" port:22 
+hostname:"mlab1.bkk01.measurement-lab.org" ip:1023933455 timestamp:true record_route:true last_updated:1453195498 controller:2164945341 site:"bkk01.measurement-lab.org" port:806 
+hostname:"planetlab1.ie.cuhk.edu.hk" ip:2310890192 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ie.cuhk.edu.hk" port:22 
+hostname:"pl2.rcc.uottawa.ca" ip:3627044878 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"rcc.uottawa.ca" port:22 
+hostname:"planetlab-coffee.ait.ie" ip:3238071564 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"ait.ie" port:22 
+hostname:"mlab3.prg01.measurement-lab.org" ip:3567399785 timestamp:true record_route:true last_updated:1453195457 controller:2164945341 site:"prg01.measurement-lab.org" port:806 
+hostname:"pl1.sos.info.hiroshima-cu.ac.jp" ip:2784123520 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"sos.info.hiroshima-cu.ac.jp" port:22 
+hostname:"planetlab-2.ida.liu.se" ip:3223608835 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ida.liu.se" port:22 
+hostname:"planetlab3.comp.nus.edu.sg" ip:2307149934 timestamp:true record_route:true last_updated:1452742105 controller:2164945341 site:"comp.nus.edu.sg" port:22 
+hostname:"planetlab1.cs.uml.edu" ip:2168430437 timestamp:true record_route:true last_updated:1453195450 controller:2164945341 site:"cs.uml.edu" port:22 
+hostname:"planetlab1.cs.otago.ac.nz" ip:2337328772 timestamp:true record_route:true last_updated:1453195496 controller:2164945341 site:"cs.otago.ac.nz" port:22 
+hostname:"planetlab-1.sjtu.edu.cn" ip:3396344930 timestamp:true record_route:true last_updated:1453195500 controller:2164945341 site:"sjtu.edu.cn" port:22 
+hostname:"planetlab-n2.wand.net.nz" ip:2195279108 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"wand.net.nz" port:22 
+hostname:"plonk.cs.uwaterloo.ca" ip:2170636814 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"cs.uwaterloo.ca" port:22 
+hostname:"mlab2.iad01.measurement-lab.org" ip:3634152860 timestamp:true record_route:true last_updated:1452248368 can_spoof:true controller:2164945341 site:"iad01.measurement-lab.org" port:806 
+hostname:"mlab4.nuq05.measurement-lab.org" ip:3634124278 record_route:true last_updated:1453195493 controller:2164945341 site:"nuq05.measurement-lab.org" port:806 
+hostname:"mlab2.mil01.measurement-lab.org" ip:3586679772 timestamp:true record_route:true last_updated:1453195451 controller:2164945341 site:"mil01.measurement-lab.org" port:806 
+hostname:"planetlab3.wail.wisc.edu" ip:3330662547 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"cs.wisc.edu" port:22 
+hostname:"mlab1.ham01.measurement-lab.org" ip:1357876945 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ham01.measurement-lab.org" port:806 
+hostname:"planetlab2.unl.edu" ip:2170414475 timestamp:true record_route:true last_updated:1453195489 controller:2164945341 site:"unl.edu" port:22 
+hostname:"chronos.disy.inf.uni-konstanz.de" ip:2250438149 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"disy.inf.uni-konstanz.de" port:22 
+hostname:"planetlab-2.scie.uestc.edu.cn" ip:3737498763 timestamp:true record_route:true last_updated:1453195503 controller:2164945341 site:"scie.uestc.edu.cn" port:22 
+hostname:"mlab2.ord04.measurement-lab.org" ip:2915894236 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"ord04.measurement-lab.org" port:806 
+hostname:"mlab1.dfw05.measurement-lab.org" ip:2159125327 timestamp:true record_route:true last_updated:1453195490 controller:2164945341 site:"dfw05.measurement-lab.org" port:806 
+hostname:"planetlab-01.cs.princeton.edu" ip:2154859306 timestamp:true record_route:true last_updated:1453195487 controller:2164945341 site:"cs.princeton.edu" port:22 
+hostname:"mlab3.nuq06.measurement-lab.org" ip:2159111593 timestamp:true record_route:true last_updated:1453195441 controller:2164945341 site:"nuq06.measurement-lab.org" port:806 
+hostname:"mlab4.prg01.measurement-lab.org" ip:3567399798 timestamp:true record_route:true last_updated:1453195493 controller:2164945341 site:"prg01.measurement-lab.org" port:806 
+hostname:"mlab1.lga06.measurement-lab.org" ip:2159114191 last_updated:1453323645 controller:2164945341 site:"lga06.measurement-lab.org" port:806 
+hostname:"planetlab02.cs.washington.edu" ip:2161116358 timestamp:true record_route:true last_updated:1453195491 controller:2164945341 site:"cs.washington.edu" port:22 

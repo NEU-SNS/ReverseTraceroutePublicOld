@@ -41,7 +41,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
-	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
+	plc "github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/prometheus/client_golang/prometheus"

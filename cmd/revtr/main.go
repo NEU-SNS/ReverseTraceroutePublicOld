@@ -13,6 +13,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr"
+	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 )
 
 func main() {
@@ -39,16 +40,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	_, srvs, err = net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		panic(err)
+	}
+	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	c3, err := grpc.Dial(connvp, grpc.WithInsecure())
+	vps := vpservice.New(context.Background(), c3)
 	cli := client.New(context.Background(), cc)
 	sr := revtr.NewV1Revtr(da)
-	h := revtr.NewHome(da, cli)
+	h := revtr.NewHome(da, cli, vps)
+	runrtr := revtr.NewRunRevtr(da)
 	http.Handle("/styles/", http.StripPrefix("/styles/", http.FileServer(http.Dir("webroot/style"))))
 	http.HandleFunc(sr.Route, sr.Handle)
 	http.HandleFunc(h.Route, h.Home)
-	http.HandleFunc("/runrevtr", func(rw http.ResponseWriter, req *http.Request) {
-		log.Debug(req.URL.Query())
-		rw.Write([]byte("Hello"))
-	})
+	http.HandleFunc(runrtr.Route, runrtr.RunRevtr)
+	http.HandleFunc("/ws", runrtr.WS)
 	for {
 		log.Error(http.ListenAndServe(":8080", nil))
 	}

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -187,6 +189,65 @@ type wsConnection struct {
 	c *websocket.Conn
 }
 
+func (ws wsConnection) Close() error {
+	if ws.c == nil {
+		return nil
+	}
+	return ws.c.Close()
+}
+
+func (ws wsConnection) Write(in string) error {
+	if ws.c == nil {
+		return nil
+	}
+	err := ws.c.SetWriteDeadline(time.Now().Add(time.Second * 10))
+	if err != nil {
+		return err
+	}
+	return ws.c.WriteMessage(websocket.TextMessage, []byte(in))
+
+}
+
+type wsConns []wsConnection
+
+type multiError []error
+
+func (m multiError) Error() string {
+	return fmt.Sprintf("%v", m)
+}
+
+func (wc wsConns) Close() error {
+	var err multiError
+	for _, w := range wc {
+		e2 := w.Close()
+		if e2 != nil {
+			err = append(err, e2)
+		}
+	}
+	if len(err) == 0 {
+		return nil
+	}
+	return err
+}
+
+func (wc wsConns) Write(in string) error {
+	var err multiError
+	for _, w := range wc {
+		e2 := w.c.SetWriteDeadline(time.Now().Add(time.Second * 10))
+		if e2 != nil {
+			err = append(err, e2)
+		}
+		e2 = w.c.WriteMessage(websocket.TextMessage, []byte(in))
+		if e2 != nil {
+			err = append(err, e2)
+		}
+	}
+	if len(err) == 0 {
+		return nil
+	}
+	return err
+}
+
 // ReverseTraceroute is a reverse traceroute
 // Paths is a stack of ReversePaths
 // DeadEnd is a has of ip -> bool of paths (stored as lasthop) we know don't work
@@ -212,6 +273,15 @@ type ReverseTraceroute struct {
 	Staleness          int64
 	ProbeCount         map[string]int
 	as                 AdjacencySource
+	ws                 wsConns
+	backoffEndhost     bool
+	cl                 client.Client
+	at                 at.Atlas
+	print              bool
+	running            bool
+	mu                 sync.Mutex // protects running
+	hostnameCache      map[string]string
+	rttCache           map[string]float32
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -230,8 +300,16 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 		as:              as,
 		StartTime:       time.Now(),
 		Staleness:       int64(stale),
+		hostnameCache:   make(map[string]string),
+		rttCache:        make(map[string]float32),
 	}
 	return &ret
+}
+
+func (rt *ReverseTraceroute) output() error {
+	log.Debug("Writing output")
+	st := fmt.Sprintf("%s\n%s", rt.HTML(), rt.StopReason)
+	return rt.ws.Write(strings.Replace(st, "\n", "<br>", -1))
 }
 
 func (rt *ReverseTraceroute) len() int {
@@ -317,6 +395,10 @@ func (rt *ReverseTraceroute) AddAndReplaceSegment(s Segment) bool {
 	basePath.Pop()
 	basePath.Add(s)
 	*rt.Paths = append(*rt.Paths, basePath)
+
+	if rt.print {
+		rt.output()
+	}
 	return true
 }
 
@@ -359,6 +441,9 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
 			*rt.Paths = append(*rt.Paths, cl)
 		}
 	}
+	if *added && rt.print {
+		rt.output()
+	}
 	return *added
 }
 
@@ -394,14 +479,18 @@ func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
 	return ret
 }
 
-func (rt *ReverseTraceroute) String() string {
+// HTML creates the html output for a ReverseTraceroute
+func (rt *ReverseTraceroute) HTML() string {
+	//need to find hostnames and rtts
 	hopsSeen := make(map[string]bool)
 	var out bytes.Buffer
-	out.WriteString("Reverse Traceroute from ")
-	out.WriteString(rt.Hops()[0])
-	out.WriteString(" back to ")
+	out.WriteString(`<table class="table">`)
+	out.WriteString(`<caption class="text-center">Reverse Traceroute from `)
+	out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Hops()[0], rt.resolveHostname(rt.Hops()[0])))
 	out.WriteString(rt.LastHop())
-	out.WriteString("\n")
+	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.LastHop())))
+	out.WriteString("</caption>")
+	out.WriteString(`<tbody>`)
 	first := true
 	var i int
 	for _, segment := range *rt.CurrPath().Path {
@@ -439,9 +528,129 @@ func (rt *ReverseTraceroute) String() string {
 				*tech = "-" + *symbol
 			}
 			if hop == "0.0.0.0" || hop == "*" {
+				out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s</td><td></td><td>%s</td></tr>", i, "* * *", *tech))
+			} else {
+				out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s (%s)</td><td>%.3fms</td><td>%s</td></tr>", i, hop, rt.resolveHostname(hop), rt.getRTT(hop), *tech))
+			}
+			i++
+		}
+	}
+	out.WriteString("</tbody></table>")
+	return out.String()
+}
+
+func (rt *ReverseTraceroute) resolveHostname(ip string) string {
+	hn, ok := rt.hostnameCache[ip]
+	if !ok {
+		hns, err := net.LookupAddr(ip)
+		if err != nil {
+			log.Error(err)
+			rt.hostnameCache[ip] = ""
+			hn = ""
+		} else {
+			if len(hns) == 0 {
+				rt.hostnameCache[ip] = ""
+			} else {
+				rt.hostnameCache[ip] = hns[0]
+				hn = hns[0]
+			}
+		}
+	}
+	return hn
+}
+
+func (rt *ReverseTraceroute) getRTT(ip string) float32 {
+	rtt, ok := rt.rttCache[ip]
+	if ok {
+		log.Debug("Rtt in cache")
+		return rtt
+	}
+	targ, _ := util.IPStringToInt32(ip)
+	src, _ := util.IPStringToInt32(rt.Src)
+	ping := &datamodel.PingMeasurement{
+		Src:     src,
+		Dst:     targ,
+		Count:   "1",
+		Timeout: 10,
+	}
+	log.Debug("Issuing ping for RTT")
+	st, err := rt.cl.Ping(&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
+	if err != nil {
+		log.Error(err)
+		rt.rttCache[ip] = 0
+		return 0
+	}
+	for {
+		p, err := st.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Error(err)
+			rt.rttCache[ip] = 0
+			break
+		}
+		if len(p.Responses) == 0 {
+			log.Debug("Got no responses on ping for rtt ", p.Error)
+			rt.rttCache[ip] = 0
+			break
+		}
+		log.Debug(p)
+		rt.rttCache[ip] = float32(p.Responses[0].Rtt) / 1000
+	}
+	return rt.rttCache[ip]
+}
+
+func (rt *ReverseTraceroute) String() string {
+	hopsSeen := make(map[string]bool)
+	var out bytes.Buffer
+	out.WriteString("Reverse Traceroute from ")
+	out.WriteString(rt.Hops()[0])
+	out.WriteString(fmt.Sprintf("(%s) back to ", rt.resolveHostname(rt.Hops()[0])))
+	out.WriteString(rt.LastHop())
+	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.LastHop())))
+	out.WriteString("\n")
+	first := true
+	var i int
+	for _, segment := range *rt.CurrPath().Path {
+		symbol := new(string)
+		switch segment.(type) {
+		case *DstSymRevSegment:
+			*symbol = "sym"
+		case *DstRevSegment:
+			*symbol = "dst"
+		case *TRtoSrcRevSegment:
+			*symbol = "tr"
+		case *SpoofRRRevSegment:
+			*symbol = "rr"
+		case *RRRevSegment:
+			*symbol = "rr"
+		case *SpoofTSAdjRevSegmentTSZeroDoubleStamp:
+			*symbol = "ts"
+		case *SpoofTSAdjRevSegmentTSZero:
+			*symbol = "ts"
+		case *SpoofTSAdjRevSegment:
+			*symbol = "ts"
+		case *TSAdjRevSegment:
+			*symbol = "ts"
+		}
+		for _, hop := range segment.Hops() {
+			if hopsSeen[hop] {
+				continue
+			}
+			hopsSeen[hop] = true
+			tech := new(string)
+			if first {
+				*tech = *symbol
+				first = false
+			} else {
+				*tech = "-" + *symbol
+			}
+
+			if hop == "0.0.0.0" || hop == "*" {
 				out.WriteString(fmt.Sprintf("%-2d %-80s %s\n", i, "* * *", *tech))
 			} else {
-				out.WriteString(fmt.Sprintf("%-2d %-80s %s\n", i, hop, *tech))
+				out.WriteString(fmt.Sprintf("%-2d %-80s (%s)  %.3fms  %s\n", i, hop, rt.resolveHostname(hop), rt.getRTT(hop), *tech))
 			}
 			i++
 		}
@@ -630,7 +839,11 @@ func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
 		// This is the case for using smarter results for vp selection
 		// currently we don't have this so nothing is gunna happen
 	}
-	rt.RRHop2VPSLeft[cls] = spoofersForTarget
+	if len(spoofersForTarget) > 10 {
+		rt.RRHop2VPSLeft[cls] = spoofersForTarget[:10]
+	} else {
+		rt.RRHop2VPSLeft[cls] = spoofersForTarget
+	}
 	return nil
 }
 
@@ -878,6 +1091,105 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	return vps, *target
 }
 
+// CreateReverseTraceroute creates a reverse traceroute for the web interface
+func CreateReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost, print bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) *ReverseTraceroute {
+	once.Do(func() {
+		initialize(vpserv, cs)
+	})
+	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
+	rt.backoffEndhost = backoffEndhost
+	rt.print = print
+	rt.cl = cl
+	rt.at = at
+	return rt
+}
+
+func (rt *ReverseTraceroute) isRunning() bool {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	return rt.running
+}
+
+func (rt *ReverseTraceroute) run() error {
+
+	rt.mu.Lock()
+	rt.running = true
+	rt.mu.Unlock()
+	if rt.backoffEndhost || dstMustBeReachable {
+		err := reverseHopsAssumeSymmetric(rt, rt.cl, rt.ProbeCount)
+		if err != nil {
+			log.Debug("Backoff Endhost failed")
+			rt.StopReason = "FAILED"
+			rt.EndTime = time.Now()
+			log.Debug(rt.StopReason)
+			return err
+		}
+		if rt.Reaches() {
+			rt.StopReason = "TRIVIAL"
+			rt.EndTime = time.Now()
+			return nil
+		}
+		log.Debug("Done backing off")
+	}
+	for {
+		log.Debug(rt.CurrPath())
+		log.Debug("Attempting to find TR")
+		err := reverseHopsTRToSrc(rt, rt.at)
+		if rt.Reaches() {
+			rt.EndTime = time.Now()
+			rt.StopReason = "REACHES"
+			return nil
+		}
+		if err == nil {
+			continue
+		}
+		log.Debug("Attempting RR")
+		err = nil
+		for err != ErrNoVPs {
+			err = reverseHopsRR(rt, rt.cl)
+			if rt.Reaches() {
+				rt.EndTime = time.Now()
+				rt.StopReason = "REACHES"
+				return nil
+			}
+			if err == nil {
+				break
+			}
+		}
+		if err == nil {
+			continue
+		}
+		log.Debug("Attempting TS")
+		err = nil
+		for err != ErrNoVPs && err != ErrNoAdj {
+			err = reverseHopsTS(rt, rt.cl, rt.ProbeCount)
+			if rt.Reaches() {
+				rt.StopReason = "REACHES"
+				rt.EndTime = time.Now()
+				return nil
+			}
+			if err == nil {
+				break
+			}
+		}
+		if err == nil {
+			continue
+		}
+		log.Debug("Assuming Symmetric")
+		err = reverseHopsAssumeSymmetric(rt, rt.cl, rt.ProbeCount)
+		if rt.Reaches() {
+			rt.StopReason = "REACHES"
+			rt.EndTime = time.Now()
+			return nil
+		}
+		if err == ErrNoHopFound {
+			rt.StopReason = "FAILED"
+			rt.EndTime = time.Now()
+			return err
+		}
+	}
+}
+
 var dstMustBeReachable = true
 
 // ReverseTracerouteReq isa revtr req
@@ -921,84 +1233,12 @@ var once sync.Once
 
 // RunReverseTraceroute runs a reverse traceroute
 func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
-	probeCount := make(map[string]int)
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
-	if backoffEndhost || dstMustBeReachable {
-		err := reverseHopsAssumeSymmetric(rt, cl, probeCount)
-		if err != nil {
-			log.Debug("Backoff Endhost failed")
-			rt.StopReason = "FAILED"
-			rt.EndTime = time.Now()
-			log.Debug(rt.StopReason)
-			return rt, err
-		}
-		if rt.Reaches() {
-			rt.StopReason = "TRIVIAL"
-			rt.EndTime = time.Now()
-			return rt, nil
-		}
-		log.Debug("Done backing off")
-	}
-	for {
-		log.Debug(rt.CurrPath())
-		log.Debug("Attempting to find TR")
-		err := reverseHopsTRToSrc(rt, at)
-		if rt.Reaches() {
-			rt.EndTime = time.Now()
-			rt.StopReason = "REACHES"
-			return rt, nil
-		}
-		if err == nil {
-			continue
-		}
-		log.Debug("Attempting RR")
-		err = nil
-		for err != ErrNoVPs {
-			err = reverseHopsRR(rt, cl)
-			if rt.Reaches() {
-				rt.EndTime = time.Now()
-				rt.StopReason = "REACHES"
-				return rt, nil
-			}
-			if err == nil {
-				break
-			}
-		}
-		if err == nil {
-			continue
-		}
-		log.Debug("Attempting TS")
-		err = nil
-		for err != ErrNoVPs && err != ErrNoAdj {
-			err = reverseHopsTS(rt, cl, probeCount)
-			if rt.Reaches() {
-				rt.StopReason = "REACHES"
-				rt.EndTime = time.Now()
-				return rt, nil
-			}
-			if err == nil {
-				break
-			}
-		}
-		if err == nil {
-			continue
-		}
-		log.Debug("Assuming Symmetric")
-		err = reverseHopsAssumeSymmetric(rt, cl, probeCount)
-		if rt.Reaches() {
-			rt.StopReason = "REACHES"
-			rt.EndTime = time.Now()
-			return rt, nil
-		}
-		if err == ErrNoHopFound {
-			rt.StopReason = "FAILED"
-			rt.EndTime = time.Now()
-			return rt, err
-		}
-	}
+	rt.backoffEndhost = backoffEndhost
+	return rt, rt.run()
 }
 
 func stringInSlice(ss []string, s string) bool {

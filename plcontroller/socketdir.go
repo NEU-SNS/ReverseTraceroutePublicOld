@@ -42,7 +42,7 @@ import (
 	"gopkg.in/fsnotify.v1"
 )
 
-func (c *plControllerT) handlEvents(ec chan error) {
+func (c *plControllerT) handlEvents() {
 	log.Info("Started event handling loop")
 	for {
 		select {
@@ -57,18 +57,16 @@ func (c *plControllerT) handlEvents(ec chan error) {
 					json.Unmarshal,
 					net.Dial)
 				if err != nil {
-					ec <- err
+					log.Error(err)
 					continue
 				}
 				ip, err := util.IPStringToInt32(s.IP())
 				if err != nil {
-					ec <- err
 					log.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
 				err = c.db.UpdateController(ip, c.ip, c.ip)
 				if err != nil {
-					ec <- err
 					log.Errorf("Failed to update controller  %v", err)
 					continue
 				}
@@ -80,13 +78,11 @@ func (c *plControllerT) handlEvents(ec chan error) {
 				ip := strings.Split(path.Base(e.Name), ":")[0]
 				nip, err := util.IPStringToInt32(ip)
 				if err != nil {
-					ec <- err
 					log.Errorf("Failed to convert socket IP: %v", err)
 					continue
 				}
 				err = c.db.UpdateController(nip, 0, c.ip)
 				if err != nil {
-					ec <- err
 					log.Errorf("Failed to update controller  %v", err)
 					continue
 				}
@@ -156,7 +152,7 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 		return
 	}
 	c.w = w
-	go c.handlEvents(ec)
+	go c.handlEvents()
 	err = w.Add(dir)
 	if err != nil {
 		log.Errorf("Failed to add dir: %s, %v", dir, err)
