@@ -19,6 +19,8 @@ var (
 	configPath    string
 	versionNo     string
 	vFlag         bool
+	pidFile       string
+	lockFile      string
 )
 
 var conf = plvp.NewConfig()
@@ -56,7 +58,6 @@ func init() {
 
 func main() {
 	go sigHandle()
-
 	var parseConf plvp.Config
 	err := config.Parse(flag.CommandLine, &parseConf)
 	if err != nil {
@@ -67,6 +68,18 @@ func main() {
 		fmt.Println(versionNo)
 		exit(0)
 	}
+	_, err = os.Stat(lockFile)
+	if err == nil {
+		log.Debug("Lockfile exists")
+		log.Error(err)
+		exit(1)
+	} else {
+		_, err = os.Create(lockFile)
+		if err != nil {
+			log.Error(err)
+			exit(1)
+		}
+	}
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 	err = <-plvp.Start(conf)
 	if err != nil {
@@ -76,6 +89,7 @@ func main() {
 }
 
 func exit(status int) {
+	os.Remove(pidFile)
 	os.Exit(status)
 }
 
@@ -85,6 +99,7 @@ func sigHandle() {
 		syscall.SIGQUIT, syscall.SIGSTOP)
 	for sig := range c {
 		log.Infof("Got signal: %v", sig)
+		os.Remove(lockFile)
 		plvp.HandleSig(sig)
 		exit(1)
 	}

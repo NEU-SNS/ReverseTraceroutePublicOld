@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	plc "github.com/NEU-SNS/ReverseTraceroute/plcontrollerapi"
+	plc "github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
 	"google.golang.org/grpc"
 )
 

@@ -42,10 +42,11 @@ func TestParsePing(t *testing.T) {
 	}
 	pingFilter := make([]warts.WartsT, 1)
 	pingFilter[0] = warts.PingT
-	_, err = warts.Parse(content, pingFilter)
+	p, err := warts.Parse(content, pingFilter)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
+	t.Log(p)
 }
 
 func TestParsePingTSPreSpec(t *testing.T) {

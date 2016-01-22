@@ -22,6 +22,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/golang/protobuf/jsonpb"
+	"github.com/gorilla/websocket"
 )
 
 // V1Revtr is the api endpoint for interacting with revtrs
@@ -38,27 +39,16 @@ func NewV1Revtr(da *dataaccess.DataAccess) V1Revtr {
 	}
 }
 
-// Home handles the home route for revtr
-type Home struct {
-	da       *dataaccess.DataAccess
-	cl       client.Client
-	Route    string
-	Template string
-}
-
-// NewHome creates a new home
-func NewHome(da *dataaccess.DataAccess, cl client.Client) Home {
-	return Home{
-		da:    da,
-		cl:    cl,
-		Route: "/",
-	}
+type runningModel struct {
+	Key string
+	URL string
 }
 
 // RunRevtr handles /runrevtr
 type RunRevtr struct {
 	da        *dataaccess.DataAccess
 	s         services
+	Route     string
 	ipToRevtr map[string]*ReverseTraceroute
 	mu        *sync.Mutex // protects ipToRevtr
 }
@@ -72,9 +62,20 @@ func NewRunRevtr(da *dataaccess.DataAccess) RunRevtr {
 	return RunRevtr{
 		da:        da,
 		s:         s,
+		Route:     "/runrevtr",
 		ipToRevtr: make(map[string]*ReverseTraceroute),
 		mu:        &sync.Mutex{},
 	}
+}
+
+func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
+	for _, vp := range vps {
+		if vp.Hostname == src {
+			s, _ := util.Int32ToIPString(vp.Ip)
+			return s, true
+		}
+	}
+	return "", false
 }
 
 func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
@@ -97,8 +98,61 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 	return dst, true
 }
 
+// WS is the endpoint for websockets
+func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
+	var upgrader websocket.Upgrader
+	ws, err := upgrader.Upgrade(rw, req, nil)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	key := req.URL.Query().Get("key")
+	log.Debug("WS request for key: ", key)
+	if key == "" {
+		defer ws.Close()
+		err = ws.WriteMessage(websocket.TextMessage, []byte("Missing key."))
+		if err != nil {
+			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+	c := wsConnection{c: ws}
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	rtr, ok := rr.ipToRevtr[key]
+	if !ok {
+		defer ws.Close()
+		log.Error("Invalid Key")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	rtr.ws = append(rtr.ws, c)
+	go func() {
+		defer rtr.ws.Close()
+		rtr.print = true
+		if !rtr.isRunning() {
+			err := rtr.run()
+			if err != nil {
+				log.Error(err)
+				rtr.output()
+			}
+		} else {
+			rtr.output()
+			return
+		}
+		rr.mu.Lock()
+		defer rr.mu.Unlock()
+		delete(rr.ipToRevtr, key)
+		rr.da.StoreRevtr(rtr.ToStorable())
+	}()
+
+}
+
 // RunRevtr handles /runrevtr
 func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("RunRevtr")
+
 	if req.Method != http.MethodGet {
 		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
@@ -121,6 +175,11 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	src, valid = validSrc(src, vps.GetVps())
+	if !valid {
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	reqIP := req.RemoteAddr
 	head := req.Header.Get("X-Forwarded-For")
 	if head == "" {
@@ -136,15 +195,42 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	if len(headSplit) > 0 {
 		head = headSplit[0]
 	}
+	if strings.Contains(head, ":") {
+		head, _, err = net.SplitHostPort(head)
+		if err != nil {
+			log.Error(err)
+			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+	}
+	var rt runningModel
+	rt.Key = head
+	rt.URL = req.Host
 	// Split should be the actual ip of the client now
 	rr.mu.Lock()
+	defer rr.mu.Unlock()
 	if _, ok := rr.ipToRevtr[head]; !ok {
+		serv, err := connectToServices()
+		if err != nil {
+			log.Error(err)
+			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 		// At this point we need to run the revtr and redirect approprately
+		log.Debug("Running RTR with src: ", src, " ", "dst: ", dst)
+		rt := CreateReverseTraceroute(datamodel.RevtrMeasurement{
+			Src: src,
+			Dst: dst,
+		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
+		rr.ipToRevtr[head] = rt
 	}
+	runningTemplate.Execute(rw, &rt)
+	return
 }
 
 var (
-	homeTemplate = template.Must(template.ParseFiles("webroot/templates/home.html"))
+	homeTemplate    = template.Must(template.ParseFiles("webroot/templates/home.html"))
+	runningTemplate = template.Must(template.ParseFiles("webroot/templates/running.html"))
 )
 
 type homeModel struct {
@@ -162,25 +248,53 @@ func (a vpModelSort) Len() int           { return len(a) }
 func (a vpModelSort) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a vpModelSort) Less(i, j int) bool { return a[i].Host < a[j].Host }
 
+// Home handles the home route for revtr
+type Home struct {
+	da    *dataaccess.DataAccess
+	cl    client.Client
+	vps   vpservice.VPSource
+	Route string
+}
+
+// NewHome creates a new home
+func NewHome(da *dataaccess.DataAccess, cl client.Client, vps vpservice.VPSource) Home {
+	return Home{
+		da:    da,
+		cl:    cl,
+		vps:   vps,
+		Route: "/",
+	}
+}
+
 // Home handles the "/" route
 func (h Home) Home(rw http.ResponseWriter, req *http.Request) {
 	if req.URL.Path != "/" {
 		http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
-	vps, err := h.cl.GetVps(&datamodel.VPRequest{})
+	vps, err := h.vps.GetVPs()
 	if err != nil {
+		log.Error(err)
 		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
 		return
 	}
 	var model homeModel
 	nodes := vps.GetVps()
+	sites := make(map[string]bool)
 	var vpl []vpModel
 	for _, node := range nodes {
+		if !node.RecordRoute || !node.Timestamp {
+			continue
+		}
+		if sites[node.Site] {
+			continue
+		}
+		sites[node.Site] = true
 		var vp vpModel
 		vp.Host = node.Hostname
 		vp.IP, err = util.Int32ToIPString(node.Ip)
 		if err != nil {
+			log.Error(err)
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
 			return
 		}

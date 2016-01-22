@@ -36,12 +36,18 @@ import (
 )
 
 var (
-	ErrorNoClient     = fmt.Errorf("No cache client!")
-	ErrorCacheMiss    = memcache.ErrCacheMiss
-	ErrorNotStored    = memcache.ErrNotStored
-	ErrorServerError  = memcache.ErrServerError
+	// ErrorNoClient is returned when there is no cache client
+	ErrorNoClient = fmt.Errorf("No cache client!")
+	// ErrorCacheMiss is when a cache miss occurs
+	ErrorCacheMiss = memcache.ErrCacheMiss
+	// ErrorNotStored is when an error occurs when storing something
+	ErrorNotStored = memcache.ErrNotStored
+	// ErrorServerError is when there is a server error
+	ErrorServerError = memcache.ErrServerError
+	// ErrorMalformedKey is a malformed key error
 	ErrorMalformedKey = memcache.ErrMalformedKey
-	ErrorNoServers    = memcache.ErrNoServers
+	// ErrorNoServers is when there are no servers set
+	ErrorNoServers = memcache.ErrNoServers
 )
 
 func toError(err error) error {

@@ -1,6 +1,6 @@
 /*
  Copyright (c) 2015, Northeastern University
- All rights reserved.
+, r All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
@@ -38,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	ca "github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
@@ -344,7 +345,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					errorAllPing(err, ret, meas)
 					return
 				}
-				defer c.router.PutMT(s)
+				defer mt.Close()
 				pc, err := mt.Ping(ctx, &dm.PingArg{
 					Pings: meas,
 				})
@@ -429,7 +430,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					log.Error(err)
 					return
 				}
-				defer c.router.PutMT(s)
+				defer mt.Close()
 				mt.ReceiveSpoof(ctx, &dm.RecSpoof{
 					Spoofs: sps,
 				})
@@ -444,7 +445,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					log.Error(err)
 					return
 				}
-				defer c.router.PutMT(s)
+				defer mt.Close()
 				mt.Ping(ctx, &dm.PingArg{
 					Pings: sps,
 				})
@@ -491,6 +492,13 @@ func toPing(probe *dm.Probe) *dm.Ping {
 	ping.SpoofedFrom = probe.SpooferIp
 	ping.Flags = append(ping.Flags, "spoof")
 	var pr dm.PingResponse
+	tx := &dm.Time{}
+	now := time.Now().Unix()
+	tx.Sec = now
+	pr.Tx = tx
+	rx := &dm.Time{}
+	rx.Sec = now
+	pr.Rx = rx
 	rrs := probe.GetRR()
 	if rrs != nil {
 		ping.Flags = append(ping.Flags, "v4rr")
@@ -700,7 +708,7 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 					errorAllTrace(err, ret, meas)
 					return
 				}
-				defer c.router.PutMT(s)
+				defer mt.Close()
 				pc, err := mt.Traceroute(ctx, &dm.TracerouteArg{
 					Traceroutes: meas,
 				})

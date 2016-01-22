@@ -42,6 +42,7 @@ type plmt struct {
 	s  ServiceDef
 	c  *grpc.ClientConn
 	cl pb.PLControllerClient
+	r  *router
 }
 
 func (p plmt) ReceiveSpoof(ctx con.Context, rs *dm.RecSpoof) (<-chan *dm.NotifyRecSpoofResponse, error) {
@@ -148,10 +149,26 @@ func (p plmt) GetVPs(ctx con.Context, v *dm.VPRequest) (<-chan *dm.VPReturn, err
 }
 
 func (p plmt) Close() error {
-	return p.c.Close()
+	log.Debug("Closing: ", p.s)
+	p.r.cache.mu.Lock()
+	defer p.r.cache.mu.Unlock()
+	log.Debug(p.r.cache)
+	mt, ok := p.r.cache.cache[p.s.key()]
+	if !ok {
+		log.Debug("No cache found calling close")
+		return p.c.Close()
+	}
+	mt.refCount--
+	if mt.refCount == 0 {
+		log.Debug("Cache empty")
+		delete(p.r.cache.cache, p.s.key())
+		return p.c.Close()
+	}
+	return nil
 }
 
-func createPLMT(s ServiceDef) (plmt, error) {
+func createPLMT(s ServiceDef, r *router) (plmt, error) {
+	log.Debug("Creating: ", s)
 	var ret plmt
 	opts := make([]grpc.DialOption, 1)
 	opts[0] = grpc.WithInsecure()
@@ -164,5 +181,6 @@ func createPLMT(s ServiceDef) (plmt, error) {
 	ret.c = conn
 	ret.cl = cl
 	ret.s = s
+	ret.r = r
 	return ret, nil
 }

@@ -28,25 +28,28 @@ const (
 	status  string = "sudo /sbin/service plvp status"
 	restart string = "sudo /sbin/service plvp restart"
 	start   string = "sudo /sbin/service plvp start"
-	install string = "sudo bash << EOF\n" +
-		"wget http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz\n" +
-		"tar xzf plvp.tar.gz\n" +
-		"rm plvp.tar.gz\n" +
-		"cd plvp\n" +
-		"sudo /home/uw_geoloc4/plvp/install.sh\n" +
-		"EOF\n"
+	install string = `sudo bash << EOF
+		rm plvp.*
+		wget -q http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz
+		tar xzf plvp.tar.gz
+		rm plvp.tar.gz
+		cd plvp
+		sudo /home/uw_geoloc4/plvp/install.sh
+		EOF`
 
 	version string = "sudo /home/uw_geoloc4/plvp/plvp --version"
-	update  string = "sudo bash << EOF\n" +
-		"/sbin/service plvp stop\n" +
-		"/usr/bin/yum remove -y plvp\n" +
-		"cd /tmp\n" +
-		"mkdir %d\n" +
-		"cd %d\n" +
-		"/usr/bin/wget %s\n" +
-		"/usr/bin/yum install -y --nogpgcheck %s\n" +
-		"/sbin/service plvp start\n" +
-		"EOF\n"
+	update  string = `sudo bash << EOF
+		sudo /sbin/service plvp stop
+		sudo /home/uw_geoloc4/plvp/pre-uninstall.sh
+		sudo rm -rf /home/uw_geoloc4/plvp
+		cd /home/uw_geoloc4
+		rm -f plvp.*
+		wget -q http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz
+		tar xzf plvp.tar.gz
+		rm plvp.tar.gz
+		cd plvp
+		sudo /home/uw_geoloc4/plvp/install.sh
+		EOF`
 )
 
 var (
@@ -64,7 +67,7 @@ var (
 	failed  = regexp.MustCompile("FAILED")
 	pidLeft = regexp.MustCompile("plvp dead but pid file exists")
 
-	args = []string{"-o", "ConnectTimeout=20", "-o", "StrictHostKeyChecking=no",
+	args = []string{"-T", "-o", "ConnectTimeout=20", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
@@ -119,6 +122,7 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 		return errorNilVP
 	}
 	stat, err := checkRunning(getCmd(vp, uname, certPath, status))
+	log.Debug("VP: ", vp.Hostname, "Status: ", stat)
 	if err != nil {
 		return err
 	}
@@ -143,7 +147,7 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 		)
 
 		if err != nil {
-			log.Errorf("Failed to install service on %s: %v", vp, err)
+			log.Errorf("Failed to install service on %s: %v", vp.Hostname, err)
 			return err
 		}
 		return handleStopped(getCmd(vp, uname, certPath, start))
@@ -156,6 +160,7 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 }
 
 func handleStopped(cmd *exec.Cmd) error {
+	log.Debug("Handling stopped vp")
 	ec := make(chan error, 1)
 	dc := make(chan struct{})
 	go func() {
@@ -171,7 +176,7 @@ func handleStopped(cmd *exec.Cmd) error {
 		close(dc)
 	}()
 	select {
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 40):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return err
@@ -200,7 +205,7 @@ func resetService(cmd *exec.Cmd) error {
 		close(dc)
 	}()
 	select {
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 40):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return err
@@ -217,39 +222,37 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateURL string) error
 	if vp.Controller == 0 {
 		return resetService(getCmd(vp, uname, certPath, restart))
 	}
-	/*
-		v, err := checkVersion(getCmd(vp, uname, certPath, version))
+	v, err := checkVersion(getCmd(vp, uname, certPath, version))
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	update, err := httpupdate.CheckUpdate(updateURL, v)
+	if err != nil {
+		return err
+	}
+	if update {
+		log.Debugf("Updating, got version: %v", v)
+		urlString := httpupdate.FetchUrl()
+		_, err := url.Parse(urlString)
 		if err != nil {
-			log.Info("Returning error from handleRunning")
-			log.Infof("Version: %v", v)
 			return err
 		}
-		update, err := httpupdate.CheckUpdate(updateURL, v)
+		err = updateService(getCmd(
+			vp,
+			uname,
+			certPath,
+			install,
+		))
 		if err != nil {
 			return err
 		}
-		if update {
-			log.Infof("Updating, got version: %v")
-			urlString := httpupdate.FetchUrl()
-			_, err := url.Parse(urlString)
-			if err != nil {
-				return err
-			}
-			err = updateService(getCmd(
-				vp,
-				uname,
-				certPath,
-				install,
-			))
-			if err != nil {
-				return err
-			}
-		}
-	*/
+	}
 	return nil
 }
 
 func updateService(cmd *exec.Cmd) error {
+	log.Debug("Updating Service")
 	ec := make(chan error, 1)
 	go func() {
 		out, err := cmd.CombinedOutput()
@@ -260,7 +263,7 @@ func updateService(cmd *exec.Cmd) error {
 		return
 	}()
 	select {
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 40):
 		err := cmd.Process.Kill()
 		if err != nil {
 			log.Error("Failed killing process, update service")
@@ -289,9 +292,9 @@ func checkVersion(cmd *exec.Cmd) (string, error) {
 	case v := <-res:
 		vlines := strings.Split(v, "\n")
 		vline := vlines[len(vlines)-2]
-		log.Infof("Got version: %v", vline)
+		log.Debugf("Got version: %v", vline)
 		return vline, nil
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 40):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return "", err
@@ -323,7 +326,6 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 			log.Debugf("Got response: %s", out)
 			ps <- pidExists
 		default:
-			log.Debugf("Got response: %s", out)
 			ec <- errorUnknownService
 		}
 	}()
@@ -333,7 +335,7 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 		return unknown, err
 	case stat := <-ps:
 		return stat, nil
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 40):
 		err := cmd.Process.Kill()
 		if err != nil {
 			return unknown, err
@@ -352,7 +354,7 @@ func installService(cmd *exec.Cmd) error {
 	select {
 	case err := <-ec:
 		return err
-	case <-time.After(time.Second * 25):
+	case <-time.After(time.Second * 60):
 		err := cmd.Process.Kill()
 		if err != nil {
 			log.Error("Failed killing process, install service")

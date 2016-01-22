@@ -229,7 +229,9 @@ func (db *DB) StoreRevtr(r dm.ReverseTraceroute) error {
 		log.Error(err)
 		return err
 	}
-	res, err := tx.Exec(revtrStoreRevtr, r.Src, r.Dst, r.Runtime, r.RrIssued, r.TsIssued, r.StopReason)
+	src, _ := util.IPStringToInt32(r.Src)
+	dst, _ := util.IPStringToInt32(r.Dst)
+	res, err := tx.Exec(revtrStoreRevtr, src, dst, r.Runtime, r.RrIssued, r.TsIssued, r.StopReason)
 	if err != nil {
 		log.Error(err)
 		tx.Rollback()
