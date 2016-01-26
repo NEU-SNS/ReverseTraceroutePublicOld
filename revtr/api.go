@@ -79,6 +79,7 @@ func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
 }
 
 func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
+	log.Debug("")
 	var notIP bool
 	ip := net.ParseIP(dst)
 	if ip == nil {
@@ -88,6 +89,12 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 		res, err := net.LookupHost(dst)
 		if err != nil {
 			log.Error(err)
+			for _, vp := range vps {
+				if vp.Hostname == dst {
+					ips, _ := util.Int32ToIPString(vp.Ip)
+					return ips, true
+				}
+			}
 			return "", false
 		}
 		if len(res) == 0 {
@@ -132,11 +139,12 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		defer rtr.ws.Close()
 		rtr.print = true
 		if !rtr.isRunning() {
+			rtr.output()
 			err := rtr.run()
 			if err != nil {
 				log.Error(err)
-				rtr.output()
 			}
+			rtr.output()
 		} else {
 			rtr.output()
 			return
@@ -144,6 +152,10 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		rr.mu.Lock()
 		defer rr.mu.Unlock()
 		delete(rr.ipToRevtr, key)
+		err = rtr.ws.Close()
+		if err != nil {
+			log.Error(err)
+		}
 		rr.da.StoreRevtr(rtr.ToStorable())
 	}()
 

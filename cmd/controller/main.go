@@ -80,7 +80,7 @@ func main() {
 		log.Errorf("Failed to create db: %v", err)
 		exit(1)
 	}
-	err = <-controller.Start(conf, db, cache.New(*conf.Cache.Addrs), router.New())
+	err = <-controller.Start(conf, db, cache.New(*conf.Cache.Addrs), router.New(*conf.Local.RootCA))
 
 	if err != nil {
 		log.Errorf("Controller Start returned with error: %v", err)

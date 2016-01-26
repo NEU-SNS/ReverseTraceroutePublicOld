@@ -2,8 +2,10 @@ package vpservice
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type vpMap map[uint32]*dm.VantagePoint
@@ -69,6 +72,7 @@ type RVPService struct {
 	rw         sync.RWMutex
 	vps        vpMap
 	lastUpdate time.Time
+	rootCA     string
 }
 
 // GetVPs satisfies the VPService interface
@@ -90,8 +94,20 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 			Vps: rvp.vps.GetAll(),
 		}, nil
 	}
-	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
+
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	creds, err := credentials.NewClientTLSFromFile(rvp.rootCA, srvs[0].Target)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	cc, err := grpc.Dial(fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port), grpc.WithTransportCredentials(creds))
+	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer cc.Close()
@@ -160,11 +176,11 @@ func (rvp *RVPService) checkCapabilities() {
 			// First check spoofing
 			// Send a spoof from everyone to everyone else
 			// Results determine who can spoof and who can receive spoofs
-			testSpoofs(vps)
+			testSpoofs(vps, rvp.rootCA)
 			// Test RR, just try to RR everyone
-			testRR(vps)
+			testRR(vps, rvp.rootCA)
 			// Test TS, just try to prespec everyone
-			testTS(vps)
+			testTS(vps, rvp.rootCA)
 			rvp.rw.Lock()
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
@@ -178,11 +194,11 @@ func (rvp *RVPService) checkCapabilities() {
 			// First check spoofing
 			// Send a spoof from everyone to everyone else
 			// Results determine who can spoof and who can receive spoofs
-			testSpoofs(vps)
+			testSpoofs(vps, rvp.rootCA)
 			// Test RR, just try to RR everyone
-			testRR(vps)
+			testRR(vps, rvp.rootCA)
 			// Test TS, just try to prespec everyone
-			testTS(vps)
+			testTS(vps, rvp.rootCA)
 			rvp.rw.Lock()
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
@@ -207,7 +223,7 @@ func getRandomN(n int, vpm vpMap) []*dm.VantagePoint {
 	return ret
 }
 
-func testSpoofs(vpm vpMap) {
+func testSpoofs(vpm vpMap, rootCA string) {
 	lenvpm := len(vpm)
 	var first bool
 	var target uint32
@@ -232,7 +248,19 @@ func testSpoofs(vpm vpMap) {
 			})
 		}
 	}
-	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
+
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	creds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Error(err)
 		return
@@ -264,7 +292,7 @@ func testSpoofs(vpm vpMap) {
 	}
 }
 
-func testRR(vpm vpMap) {
+func testRR(vpm vpMap, rootCA string) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
@@ -281,7 +309,19 @@ func testRR(vpm vpMap) {
 			})
 		}
 	}
-	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
+
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	creds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Error(err)
 		return
@@ -310,7 +350,7 @@ func testRR(vpm vpMap) {
 	}
 }
 
-func testTS(vpm vpMap) {
+func testTS(vpm vpMap, rootCA string) {
 	lenvpm := len(vpm)
 	// Sending one spoof from each src to each dst so len in len(vpm)**2 - lenvpm
 	var tests = make([]*dm.PingMeasurement, 0, lenvpm*(lenvpm-1))
@@ -327,7 +367,18 @@ func testTS(vpm vpMap) {
 			})
 		}
 	}
-	cc, err := grpc.Dial("controller.revtr.ccs.neu.edu:4382", grpc.WithInsecure())
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	creds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Error(err)
 		return
@@ -349,6 +400,9 @@ func testTS(vpm vpMap) {
 		if err != nil {
 			log.Error(err)
 		}
+		if p == nil {
+			continue
+		}
 		if vp, ok := vpm[p.Src]; ok {
 			vp.Timestamp = true
 		}
@@ -356,9 +410,10 @@ func testTS(vpm vpMap) {
 }
 
 // NewRVPService creates a new RVPService
-func NewRVPService() *RVPService {
+func NewRVPService(rootCA string) *RVPService {
 	ret := &RVPService{
-		vps: make(vpMap),
+		vps:    make(vpMap),
+		rootCA: rootCA,
 	}
 	go ret.checkCapabilities()
 	return ret

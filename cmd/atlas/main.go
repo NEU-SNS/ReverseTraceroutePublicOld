@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/NEU-SNS/ReverseTraceroute/atlas"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
@@ -18,7 +19,10 @@ import (
 
 // Config is the config for the atlas
 type Config struct {
-	Db dataaccess.DbConfig
+	Db       dataaccess.DbConfig
+	KeyFile  string
+	CertFile string
+	RootCA   string
 }
 
 func init() {
@@ -39,8 +43,14 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	svc := atlas.NewAtlasService(da)
-	serv := grpc.NewServer()
+	cres, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.KeyFile)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
+	svc := atlas.NewAtlasService(da, conf.RootCA)
+	serv := grpc.NewServer(grpc.Creds(cres))
 	pb.RegisterAtlasServer(serv, atlas.GRPCServ{AtlasService: svc})
 	ln, err := net.Listen("tcp", "0.0.0.0:55000")
 	if err != nil {

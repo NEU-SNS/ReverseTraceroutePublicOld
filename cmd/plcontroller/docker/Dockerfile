@@ -9,6 +9,7 @@ RUN useradd -ms /bin/bash plcontroller
 RUN chown plcontroller:plcontroller id_rsa_pl
 RUN apt-get update && apt-get install -y \
     wget \
+    openssh-client \
     build-essential \
 &&  apt-get clean \
 &&  rm -rf /var/lib/apt/lists/*

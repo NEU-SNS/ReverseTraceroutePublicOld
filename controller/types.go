@@ -50,6 +50,7 @@ type LocalConfig struct {
 	CertFile     *string `flag:"cert-file"`
 	KeyFile      *string `flag:"key-file"`
 	ConnTimeout  *int64  `flag:"conn-timeout"`
+	RootCA       *string `flag:"root-ca"`
 }
 
 // NewConfig returns a new blank Config
@@ -63,6 +64,7 @@ func NewConfig() Config {
 		KeyFile:      new(string),
 		ConnTimeout:  new(int64),
 		Port:         new(int),
+		RootCA:       new(string),
 	}
 	c := Config{
 		Local: lc,

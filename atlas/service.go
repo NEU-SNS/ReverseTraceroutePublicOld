@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -18,8 +19,9 @@ import (
 
 // Atlas is the atlas
 type Atlas struct {
-	da    *dataaccess.DataAccess
-	donec chan struct{}
+	da     *dataaccess.DataAccess
+	donec  chan struct{}
+	rootCA string
 }
 
 // GetIntersectingPath satisfies the server interface
@@ -84,7 +86,11 @@ func (a *Atlas) GetPathsWithToken(ctx context.Context, in <-chan *dm.TokenReques
 
 func (a *Atlas) runTraces(vp, con *net.SRV) error {
 	connstr := fmt.Sprintf("%s:%d", vp.Target, vp.Port)
-	cc, err := grpc.Dial(connstr, grpc.WithInsecure())
+	creds, err := credentials.NewClientTLSFromFile(a.rootCA, vp.Target)
+	if err != nil {
+		return err
+	}
+	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return err
 	}
@@ -113,8 +119,14 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 			meas = append(meas, curr)
 		}
 	}
-	conc, err := grpc.Dial(fmt.Sprintf("%s:%d", con.Target, con.Port), grpc.WithInsecure())
+
+	credscon, err := credentials.NewClientTLSFromFile(a.rootCA, con.Target)
 	if err != nil {
+		return err
+	}
+	conc, err := grpc.Dial(fmt.Sprintf("%s:%d", con.Target, con.Port), grpc.WithTransportCredentials(credscon))
+	if err != nil {
+		log.Error(err)
 		return err
 	}
 	defer conc.Close()
@@ -181,9 +193,10 @@ func (a *Atlas) updateTraceroutes() {
 }
 
 // NewAtlasService creates a new Atlas
-func NewAtlasService(da *dataaccess.DataAccess) *Atlas {
+func NewAtlasService(da *dataaccess.DataAccess, rootCA string) *Atlas {
 	ret := &Atlas{
-		da: da,
+		da:     da,
+		rootCA: rootCA,
 	}
 	go ret.updateTraceroutes()
 	return ret

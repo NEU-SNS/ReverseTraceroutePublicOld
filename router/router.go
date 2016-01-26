@@ -124,15 +124,17 @@ type Router interface {
 type router struct {
 	source Source
 	cache  mtCache
+	caPath string
 }
 
 // New creates a new Router
-func New() Router {
+func New(caPath string) Router {
 	return &router{
 		cache: mtCache{
 			cache: make(map[string]*mtCacheItem),
 		},
 		source: source{},
+		caPath: caPath,
 	}
 }
 
