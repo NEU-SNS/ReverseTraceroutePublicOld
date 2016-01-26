@@ -1,2 +1,4 @@
 atlas
+*.crt
+*.key
 *.config

@@ -24,14 +24,17 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package plcontroller
 
+// Config is the config struct for the plc
 type Config struct {
 	Local   LocalConfig
 	Scamper ScamperConfig
 	Db      DbConfig
 }
 
+// LocalConfig is the local section of the config
 type LocalConfig struct {
 	Addr         *string `flag:"a"`
 	Port         *int    `flag:"p"`
@@ -42,9 +45,10 @@ type LocalConfig struct {
 	KeyFile      *string `flag:"key-file"`
 	SSHKeyPath   *string `flag:"sshkey-path"`
 	PLUName      *string `flag:"pluname"`
-	UpdateUrl    *string `flag:"update-url"`
+	UpdateURL    *string `flag:"update-url"`
 }
 
+// ScamperConfig is the scamper config info
 type ScamperConfig struct {
 	Port          *string `flag:"scamper-port"`
 	SockDir       *string `flag:"socket-dir"`
@@ -52,6 +56,7 @@ type ScamperConfig struct {
 	ConverterPath *string `flag:"converter-path"`
 }
 
+// DbConfig is the DB config options
 type DbConfig struct {
 	UName    *string `flag:"db-uname"`
 	Password *string `flag:"db-pass"`
@@ -60,6 +65,7 @@ type DbConfig struct {
 	Db       *string `flag:"db-name"`
 }
 
+// NewConfig creates a new config
 func NewConfig() Config {
 	lc := LocalConfig{
 		Addr:         new(string),
@@ -71,7 +77,7 @@ func NewConfig() Config {
 		KeyFile:      new(string),
 		SSHKeyPath:   new(string),
 		PLUName:      new(string),
-		UpdateUrl:    new(string),
+		UpdateURL:    new(string),
 	}
 	sc := ScamperConfig{
 		Port:          new(string),

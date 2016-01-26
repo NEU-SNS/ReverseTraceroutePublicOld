@@ -50,6 +50,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -826,7 +827,14 @@ func (c *controllerT) run(ec chan error, con Config, db DataAccess, cache ca.Cac
 		ec <- errors.New("Controller Start, nil router")
 		return
 	}
-	controller.server = grpc.NewServer()
+	certs, err := credentials.NewServerTLSFromFile(*con.Local.CertFile, *con.Local.KeyFile)
+	if err != nil {
+		log.Error(err)
+		c.stop()
+		ec <- err
+		return
+	}
+	controller.server = grpc.NewServer(grpc.Creds(certs))
 	controllerapi.RegisterControllerServer(controller.server, c)
 	controller.sm = &spoofMap{
 		sm: make(map[uint32]chan *dm.Probe),

@@ -487,8 +487,8 @@ func (rt *ReverseTraceroute) HTML() string {
 	out.WriteString(`<table class="table">`)
 	out.WriteString(`<caption class="text-center">Reverse Traceroute from `)
 	out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Hops()[0], rt.resolveHostname(rt.Hops()[0])))
-	out.WriteString(rt.LastHop())
-	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.LastHop())))
+	out.WriteString(rt.Src)
+	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.Src)))
 	out.WriteString("</caption>")
 	out.WriteString(`<tbody>`)
 	first := true
@@ -1238,6 +1238,8 @@ func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost bool,
 	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	rt.backoffEndhost = backoffEndhost
+	rt.cl = cl
+	rt.at = at
 	return rt, rt.run()
 }
 

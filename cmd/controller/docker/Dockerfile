@@ -5,6 +5,11 @@ COPY . /controller
 
 RUN useradd -ms /bin/bash controller
 
+RUN apt-get update && apt-get install -y \
+    curl \
+&&  apt-get clean \
+&&  rm -rf /var/lib/apt/lists/*
+
 USER controller
 
 ENTRYPOINT ["/controller/controller"]

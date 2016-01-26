@@ -48,6 +48,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"gopkg.in/fsnotify.v1"
 
 	"net/http"
@@ -247,7 +248,6 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.Data
 		ec <- err
 		return
 	}
-
 	c.db = db
 	c.ip = ip
 	c.shutdown = make(chan struct{})
@@ -260,7 +260,14 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.Data
 	}
 	c.client = cl
 	c.watchDir(sc.Path, ec)
-	c.server = grpc.NewServer()
+	creds, err := credentials.NewServerTLSFromFile(*con.Local.CertFile, *con.Local.KeyFile)
+	if err != nil {
+		log.Error(err)
+		c.stop()
+		ec <- err
+		return
+	}
+	c.server = grpc.NewServer(grpc.Creds(creds))
 	plc.RegisterPLControllerServer(plController.server, c)
 	go c.startRPC(ec)
 	go c.maintain()
@@ -281,7 +288,7 @@ func (c *plControllerT) maintain() {
 				vps,
 				*c.config.Local.PLUName,
 				*c.config.Local.SSHKeyPath,
-				*c.config.Local.UpdateUrl,
+				*c.config.Local.UpdateURL,
 				c.db,
 				c.shutdown,
 			)

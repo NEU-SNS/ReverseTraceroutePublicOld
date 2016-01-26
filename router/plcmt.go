@@ -36,6 +36,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type plmt struct {
@@ -76,6 +77,7 @@ func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 		log.Error(err)
 		return nil, err
 	}
+	defer ps.CloseSend()
 	if err := ps.Send(pa); err != nil {
 		log.Error(err)
 	}
@@ -93,7 +95,6 @@ func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 			ret <- in
 		}
 	}()
-	ps.CloseSend()
 	return ret, nil
 }
 
@@ -103,6 +104,7 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 	if err != nil {
 		return nil, err
 	}
+	defer ps.CloseSend()
 	if err := ps.Send(t); err != nil {
 		log.Error(err)
 	}
@@ -120,7 +122,6 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 			ret <- in
 		}
 	}()
-	ps.CloseSend()
 	return ret, nil
 }
 
@@ -159,11 +160,6 @@ func (p plmt) Close() error {
 		return p.c.Close()
 	}
 	mt.refCount--
-	if mt.refCount == 0 {
-		log.Debug("Cache empty")
-		delete(p.r.cache.cache, p.s.key())
-		return p.c.Close()
-	}
 	return nil
 }
 
@@ -171,7 +167,11 @@ func createPLMT(s ServiceDef, r *router) (plmt, error) {
 	log.Debug("Creating: ", s)
 	var ret plmt
 	opts := make([]grpc.DialOption, 1)
-	opts[0] = grpc.WithInsecure()
+	creds, err := credentials.NewClientTLSFromFile(r.caPath, "plcontroller.revtr.ccs.neu.edu")
+	if err != nil {
+		return ret, err
+	}
+	opts[0] = grpc.WithTransportCredentials(creds)
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", s.Addr, s.Port), opts...)
 	if err != nil {
 		log.Error(err)

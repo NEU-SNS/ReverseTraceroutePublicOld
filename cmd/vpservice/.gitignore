@@ -1,1 +1,3 @@
 vpservice
+*.crt
+*.key

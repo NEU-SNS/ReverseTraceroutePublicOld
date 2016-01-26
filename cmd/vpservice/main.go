@@ -8,15 +8,34 @@ import (
 	"syscall"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
+	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 )
 
+// Config is the config struct for the atlas
+type Config struct {
+	KeyFile  string
+	CertFile string
+	RootCA   string
+}
+
+func init() {
+	config.SetEnvPrefix("ATLAS")
+	config.AddConfigPath("./vpservice.config")
+}
+
 func main() {
-	flag.Parse()
-	svc := vpservice.NewRVPService()
+	conf := Config{}
+	err := config.Parse(flag.CommandLine, &conf)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+	svc := vpservice.NewRVPService(conf.RootCA)
 	go sigHandle(svc)
 	svc.LoadFromFile("./backup.txt")
 	ln, err := net.Listen("tcp", "0.0.0.0:45000")
@@ -24,7 +43,14 @@ func main() {
 		panic(err)
 	}
 	defer ln.Close()
-	serv := grpc.NewServer()
+	creds, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.KeyFile)
+	if err != nil {
+		log.Error(err)
+		log.Error(conf)
+		ln.Close()
+		os.Exit(1)
+	}
+	serv := grpc.NewServer(grpc.Creds(creds))
 	pb.RegisterVPServiceServer(serv, vpservice.GRPCServ{VPService: svc})
 	serv.Serve(ln)
 }
