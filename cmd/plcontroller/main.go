@@ -143,7 +143,7 @@ func main() {
 		log.Fatalf("Failed to create db: %v", err)
 		exit(1)
 	}
-	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{})
+	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{RootCA: *conf.Local.RootCA})
 
 	if err != nil {
 		log.Fatalf("PLController Start returned with error: %v", err)

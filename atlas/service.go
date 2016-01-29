@@ -35,11 +35,19 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequ
 				Dst: ir.Dest,
 			},
 		}
-		st := time.Duration(ir.Staleness)
+		var stale int64
+		if ir.Staleness == 0 {
+			stale = 60
+		} else {
+			stale = ir.Staleness
+		}
+		st := time.Duration(stale)
 		res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, st*time.Minute)
 		log.Debug("FindIntersectingTraceroute resp ", res)
 		if err != nil {
-			log.Error(err)
+			if err != dataaccess.ErrNoIntFound {
+				log.Error(err)
+			}
 			in <- &dm.IntersectionResponse{
 				Type:  dm.IResponseType_ERROR,
 				Error: err.Error(),
@@ -88,23 +96,23 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 	connstr := fmt.Sprintf("%s:%d", vp.Target, vp.Port)
 	creds, err := credentials.NewClientTLSFromFile(a.rootCA, vp.Target)
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	defer cc.Close()
 	vpc := client.New(context.Background(), cc)
 	vpr, err := vpc.GetVPs()
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	vps := vpr.GetVps()
-	set := make(map[string]*dm.VantagePoint)
-	for _, vp := range vps {
-		set[vp.Site] = vp
-	}
+	log.Debug("Running traces for: ", len(vps), " VPS.")
 	var meas []*dm.TracerouteMeasurement
 	for _, vp := range vps {
 		for _, dst := range vps {
@@ -112,9 +120,13 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 				continue
 			}
 			curr := &dm.TracerouteMeasurement{
-				Src:     vp.Ip,
-				Dst:     dst.Ip,
-				Timeout: 20,
+				Src:        vp.Ip,
+				Dst:        dst.Ip,
+				Timeout:    20,
+				Wait:       "2",
+				Attempts:   "1",
+				LoopAction: "1",
+				Loops:      "3",
 			}
 			meas = append(meas, curr)
 		}
@@ -133,7 +145,7 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 	ccl := cclient.New(context.Background(), conc)
 
 	total := len(meas)
-	times := total/200 + 2
+	times := total/2500 + 2
 	var curr int
 	for i := 1; i < times; i++ {
 		end := i * 2
@@ -155,9 +167,14 @@ func (a *Atlas) runTraces(vp, con *net.SRV) error {
 				break
 			}
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 			go func() {
+				if tr.Error != "" {
+					log.Error("Atlas tr error: ", tr)
+					return
+				}
 				err := a.da.StoreAtlasTraceroute(tr)
 				if err != nil {
 					log.Error(err)
@@ -180,13 +197,21 @@ func (a *Atlas) updateTraceroutes() {
 		log.Error(err)
 		return
 	}
-	tick := time.NewTicker(time.Minute * 10)
+	tick := time.NewTicker(time.Minute * 30)
+	dirty := make(chan struct{})
+	close(dirty)
 	for {
+		log.Debug("Update loop")
 		select {
 		case <-a.donec:
 			return
 		case <-tick.C:
 			a.runTraces(srv, srvs[0])
+		case <-dirty:
+			log.Debug("Doing it dirty")
+			a.runTraces(srv, srvs[0])
+			// turn off this option
+			dirty = nil
 		}
 	}
 
@@ -194,6 +219,7 @@ func (a *Atlas) updateTraceroutes() {
 
 // NewAtlasService creates a new Atlas
 func NewAtlasService(da *dataaccess.DataAccess, rootCA string) *Atlas {
+	log.Debug("Creating New Atlas Service")
 	ret := &Atlas{
 		da:     da,
 		rootCA: rootCA,

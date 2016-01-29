@@ -3,30 +3,36 @@ package main
 
 import (
 	"fmt"
+	"net"
 
 	"golang.org/x/net/context"
 
-	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	vpserv "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 
-	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
 func main() {
-	creds, err := credentials.NewClientTLSFromFile("/home/rhansen2/sslkey/root.crt", "controller.revtr.ccs.neu.edu")
+	_, srvs, err := net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
 		panic(err)
 	}
-	cc, err := grpc.Dial(fmt.Sprintf("%s:%d", "controller.revtr.ccs.neu.edu", 4382), grpc.WithTransportCredentials(creds))
+	vpcreds, err := credentials.NewClientTLSFromFile("/home/rhansen2/sslkey/root.crt", srvs[0].Target)
+	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	if err != nil {
 		panic(err)
 	}
-	defer cc.Close()
-	cl := client.New(context.Background(), cc)
-	vps, err := cl.GetVps(&datamodel.VPRequest{})
+	vcl := vpserv.New(context.Background(), c3)
+	defer c3.Close()
+	vps, err := vcl.GetVPs()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(vps)
+	for _, vp := range vps.GetVps() {
+		if vp.CanSpoof {
+			fmt.Println(vp.Hostname)
+		}
+	}
 }

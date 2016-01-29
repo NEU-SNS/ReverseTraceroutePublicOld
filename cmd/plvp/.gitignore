@@ -1,1 +1,3 @@
 plvp
+*.crt
+*.key

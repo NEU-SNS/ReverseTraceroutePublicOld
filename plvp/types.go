@@ -52,6 +52,7 @@ type LocalConfig struct {
 	KeyPath      *string `flag:"key-path"`
 	StartScamp   *bool   `flag:"start-scamper"`
 	Host         *string `flag:"host"`
+	RootCA       *string `flag:"root-ca"`
 }
 
 // ScamperConfig represents the scamper configuration options
@@ -61,6 +62,7 @@ type ScamperConfig struct {
 	Port    *string `flag:"scamper-port"`
 }
 
+// NewConfig creates a new config struct for the plvp
 func NewConfig() Config {
 	lc := LocalConfig{
 		Addr:         new(string),
@@ -73,6 +75,7 @@ func NewConfig() Config {
 		StartScamp:   new(bool),
 		Host:         new(string),
 		Port:         new(int),
+		RootCA:       new(string),
 	}
 	sc := ScamperConfig{
 		Port:    new(string),

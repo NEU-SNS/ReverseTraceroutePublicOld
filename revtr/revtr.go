@@ -2,6 +2,7 @@ package revtr
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -196,7 +197,7 @@ func (ws wsConnection) Close() error {
 	return ws.c.Close()
 }
 
-func (ws wsConnection) Write(in string) error {
+func (ws wsConnection) Write(in []byte) error {
 	if ws.c == nil {
 		return nil
 	}
@@ -204,7 +205,7 @@ func (ws wsConnection) Write(in string) error {
 	if err != nil {
 		return err
 	}
-	return ws.c.WriteMessage(websocket.TextMessage, []byte(in))
+	return ws.c.WriteMessage(websocket.TextMessage, in)
 
 }
 
@@ -230,7 +231,7 @@ func (wc wsConns) Close() error {
 	return err
 }
 
-func (wc wsConns) Write(in string) error {
+func (wc wsConns) Write(in []byte) error {
 	var err multiError
 	for _, w := range wc {
 		e2 := w.c.SetWriteDeadline(time.Now().Add(time.Second * 10))
@@ -306,10 +307,24 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 	return &ret
 }
 
+type wsMessage struct {
+	HTML   string
+	Status bool
+}
+
 func (rt *ReverseTraceroute) output() error {
-	log.Debug("Writing output")
+
 	st := fmt.Sprintf("%s\n%s", rt.HTML(), rt.StopReason)
-	return rt.ws.Write(strings.Replace(st, "\n", "<br>", -1))
+	res, err := json.Marshal(&wsMessage{
+		HTML: strings.Replace(st, "\n", "<br>", -1),
+		// Either we're done because we reached or we're done for some other reason
+		// so signal the brower that we're gunna disconnect
+		Status: rt.Reaches() || rt.StopReason != "",
+	})
+	if err != nil {
+		return err
+	}
+	return rt.ws.Write(res)
 }
 
 func (rt *ReverseTraceroute) len() int {
@@ -562,7 +577,6 @@ func (rt *ReverseTraceroute) resolveHostname(ip string) string {
 func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 	rtt, ok := rt.rttCache[ip]
 	if ok {
-		log.Debug("Rtt in cache")
 		return rtt
 	}
 	targ, _ := util.IPStringToInt32(ip)
@@ -573,7 +587,6 @@ func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 		Count:   "1",
 		Timeout: 10,
 	}
-	log.Debug("Issuing ping for RTT")
 	st, err := rt.cl.Ping(&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 	if err != nil {
 		log.Error(err)
@@ -591,7 +604,6 @@ func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 			break
 		}
 		if len(p.Responses) == 0 {
-			log.Debug("Got no responses on ping for rtt ", p.Error)
 			rt.rttCache[ip] = 0
 			break
 		}
@@ -797,6 +809,7 @@ func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
 			ret[vp.Site] = vp
 		}
 	}
+	log.Debug("OneSpooferPerSite: ", ret)
 	return ret
 }
 
@@ -993,6 +1006,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 		log.Debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
 		var vals [][]string
 		for _, val := range rrsSrcToDstToVPToRevHops[rt.Src][*cls] {
+			log.Debug("Found old values: ", val)
 			if len(val) > 0 {
 				vals = append(vals, val)
 			}
@@ -1190,7 +1204,7 @@ func (rt *ReverseTraceroute) run() error {
 	}
 }
 
-var dstMustBeReachable = true
+var dstMustBeReachable = false
 
 // ReverseTracerouteReq isa revtr req
 type ReverseTracerouteReq struct {
@@ -1213,6 +1227,7 @@ func initialize(cl vpservice.VPSource, cs ClusterSource) {
 		panic(err)
 	}
 	vps = vpr.GetVps()
+	log.Debug("VPS: ", vps)
 	ipToCluster = newClusterMap(cs)
 }
 
@@ -1303,7 +1318,7 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 			Src:        srcs,
 			Dst:        dsts,
 			RR:         true,
-			Timeout:    10,
+			Timeout:    30,
 			Count:      "1",
 			CheckDb:    true,
 			CheckCache: true,
@@ -1366,7 +1381,7 @@ func issueSpoofedRecordRoutes(revtr *ReverseTraceroute, recvToSpooferToTarget ma
 					SpooferAddr: ssrc,
 					Src:         sspoofer,
 					Dst:         sdst,
-					Timeout:     10,
+					Timeout:     30,
 					Count:       "1",
 					CheckDb:     true,
 					CheckCache:  true,
@@ -1453,6 +1468,7 @@ func issueRecordRoutes(ping *datamodel.PingMeasurement, cl client.Client) error 
 			break
 		}
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 		pr := p.GetResponses()
@@ -1550,12 +1566,12 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 		return nil
 	}
 	for _, hop := range revtr.CurrPath().LastSeg().Hops() {
-		log.Debug("Attempting to find TR for hop: ", hop)
 		dest, _ := util.IPStringToInt32(revtr.Src)
 		hops, _ := util.IPStringToInt32(hop)
+		log.Debug("Attempting to find TR for hop: ", hop, "(", hops, ")", " to ", dest)
 		is := datamodel.IntersectionRequest{
 			UseAliases: true,
-			Staleness:  15,
+			Staleness:  240,
 			Dest:       dest,
 			Address:    hops,
 		}
@@ -1622,6 +1638,11 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 		CheckCache: true,
 		CheckDb:    true,
 		Staleness:  revtr.Staleness,
+		Timeout:    40,
+		Wait:       "2",
+		Attempts:   "1",
+		LoopAction: "1",
+		Loops:      "3",
 	}
 	revtr.ProbeCount["tr"]++
 	log.Debug("Issuing traceroute src: ", revtr.Src, " dst: ", revtr.LastHop())
@@ -1638,6 +1659,7 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 			break
 		}
 		if err != nil {
+			log.Info(tr)
 			log.Error(err)
 			return err
 		}
@@ -2100,7 +2122,7 @@ func issueTimestamps(revtr *ReverseTraceroute, issue map[string][][]string, cl c
 				Src:        srcip,
 				Dst:        dstip,
 				TimeStamp:  tss,
-				Timeout:    10,
+				Timeout:    30,
 				Count:      "1",
 				CheckDb:    true,
 				CheckCache: true,
@@ -2154,7 +2176,7 @@ func issueSpoofedTimestamps(revtr *ReverseTraceroute, issue map[string]map[strin
 					Spoof:       true,
 					Dst:         dstip,
 					SpooferAddr: recip,
-					Timeout:     10,
+					Timeout:     40,
 					Count:       "1",
 					CheckDb:     true,
 					CheckCache:  true,

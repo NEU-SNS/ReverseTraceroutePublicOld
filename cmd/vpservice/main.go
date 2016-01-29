@@ -52,7 +52,10 @@ func main() {
 	}
 	serv := grpc.NewServer(grpc.Creds(creds))
 	pb.RegisterVPServiceServer(serv, vpservice.GRPCServ{VPService: svc})
-	serv.Serve(ln)
+	err = serv.Serve(ln)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func sigHandle(s *vpservice.RVPService) {

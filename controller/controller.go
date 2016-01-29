@@ -245,7 +245,6 @@ func checkPingDb(ctx con.Context, check []*dm.PingMeasurement, db DataAccess) (m
 
 func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *dm.Ping {
 	ret := make(chan *dm.Ping)
-
 	go func() {
 		var checkCache = make(map[string]*dm.PingMeasurement)
 		var remaining []*dm.PingMeasurement
@@ -273,6 +272,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			// If it was found, send it back,
 			// Otherwise, add it to the remaining list
 			if p, ok := found[key]; ok {
+				log.Debug("sending: ", p)
 				ret <- p
 			} else {
 				remaining = append(remaining, val)
@@ -374,6 +374,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 								log.Error(err)
 							}
 						}()
+						log.Debug("Sending: ", pp)
 						ret <- pp
 					}
 				}
