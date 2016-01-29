@@ -47,6 +47,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	ctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"net/http"
 )
@@ -85,7 +86,6 @@ type plVantagepointT struct {
 	mp       mproc.MProc
 	config   Config
 	mu       sync.Mutex
-	plc      *plClient
 	monec    chan error
 	monip    chan dm.Probe
 	am       sync.Mutex // protect addr
@@ -160,7 +160,6 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 	vp.sc = *con
 	vp.mp = mproc.New()
 	vp.spoofmon = NewSpoofPingMonitor()
-	vp.plc = &plClient{}
 	monaddr, err := util.GetBindAddr()
 	if err != nil {
 		log.Errorf("Could not get bind addr: %v", err)
@@ -198,11 +197,18 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	if len(probes) == 0 {
 		return
 	}
-	vp.am.Lock()
-	ip := vp.addr
-	vp.am.Unlock()
-	addr := fmt.Sprintf("%s:%d", ip, *vp.config.Local.Port)
-	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second), grpc.WithInsecure())
+	_, srvs, err := net.LookupSRV("plcontroller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	creds, err := credentials.NewClientTLSFromFile(*vp.config.Local.RootCA, srvs[0].Target)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second), grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Errorf("Failed to send spoofs: %v", err)
 		return

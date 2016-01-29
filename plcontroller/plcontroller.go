@@ -268,7 +268,7 @@ func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.Data
 		return
 	}
 	c.server = grpc.NewServer(grpc.Creds(creds))
-	plc.RegisterPLControllerServer(plController.server, c)
+	plc.RegisterPLControllerServer(c.server, c)
 	go c.startRPC(ec)
 	go c.maintain()
 }

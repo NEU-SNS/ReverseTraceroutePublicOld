@@ -58,8 +58,7 @@ func init() {
 
 func main() {
 	go sigHandle()
-	var parseConf plvp.Config
-	err := config.Parse(flag.CommandLine, &parseConf)
+	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Errorf("Failed to parse config: %v", err)
 		exit(1)
@@ -71,7 +70,6 @@ func main() {
 	_, err = os.Stat(lockFile)
 	if err == nil {
 		log.Debug("Lockfile exists")
-		log.Error(err)
 		exit(1)
 	} else {
 		_, err = os.Create(lockFile)

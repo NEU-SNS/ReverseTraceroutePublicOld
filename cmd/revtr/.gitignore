@@ -1,1 +1,4 @@
 revtr
+*.config
+*.crt
+*.key

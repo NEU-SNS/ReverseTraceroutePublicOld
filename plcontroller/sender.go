@@ -38,6 +38,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const (
@@ -45,14 +46,20 @@ const (
 )
 
 // ControllerSender Is a Sender which sends to the central controller received spoofs
-type ControllerSender struct{}
+type ControllerSender struct {
+	RootCA string
+}
 
 // Send satisfies the Sender interface for a ControllerSender
 func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	log.Debug("Sending: ", sps)
 	ip, _ := util.Int32ToIPString(addr)
 	saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
-	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5), grpc.WithInsecure())
+	creds, err := credentials.NewClientTLSFromFile(cs.RootCA, "controller.revtr.ccs.neu.edu")
+	if err != nil {
+		return err
+	}
+	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5), grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return err
 	}
@@ -62,10 +69,10 @@ func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	if err != nil {
 		return err
 	}
+	defer stream.CloseSend()
 	for _, sp := range sps {
 		if err := stream.Send(sp); err != nil {
 			log.Errorf("Error sending spoofed probe: %v", err)
-			stream.CloseSend()
 			return err
 		}
 	}

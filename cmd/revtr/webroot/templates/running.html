@@ -5,6 +5,7 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
         <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
         <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
         <!--[if lt IE 9]>
@@ -22,6 +23,11 @@
                 <div id="results" class="text-center">
                 </div>
             </div>
+            <div class="row text-center" id="spinning">
+                <i class="fa fa-spinner fa-pulse"></i>
+                <span>Working...</span>
+                <i class="fa fa-spinner fa-pulse"></i>
+            </div>
         </div>
     </body>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
@@ -37,13 +43,27 @@
             }
             $(
                     function() {
+                        var done 
                         if (!key) {
                             res.append($('<p>Error! Missing key to display reverse traceroute</p>'))
                                 return
                         }
                         ws = new WebSocket("ws://{{ .URL }}/ws?key=" + key)
                         ws.onmessage = function(e) {
-                            res.html($('<span>' + e.data + '</span>'))
+                            mess =  $.parseJSON(e.data)
+                            done = mess.Status
+                            if(done){
+                                $('#spinning').hide()
+                            }
+                            show = mess.HTML
+                            res.html($('<span>' + show + '</span>'))
+                        }
+                        ws.onclose = function() {
+                            if(done) {
+                                return
+                            }
+                            $('#spinning').hide()
+                            res.html($('<span>The websocket connection closed prematurely, refresh the page to reconnect.</span>'))
                         }
                     }
              )

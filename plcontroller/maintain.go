@@ -28,7 +28,7 @@ const (
 	status  string = "sudo /sbin/service plvp status"
 	restart string = "sudo /sbin/service plvp restart"
 	start   string = "sudo /sbin/service plvp start"
-	install string = `sudo bash << EOF
+	install string = `sudo bash <<-EOF
 		rm plvp.*
 		wget -q http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz
 		tar xzf plvp.tar.gz
@@ -38,12 +38,11 @@ const (
 		EOF`
 
 	version string = "sudo /home/uw_geoloc4/plvp/plvp --version"
-	update  string = `sudo bash << EOF
+	update  string = `sudo bash <<-EOF
 		sudo /sbin/service plvp stop
 		sudo /home/uw_geoloc4/plvp/pre-uninstall.sh
 		sudo rm -rf /home/uw_geoloc4/plvp
 		cd /home/uw_geoloc4
-		rm -f plvp.*
 		wget -q http://www.ccs.neu.edu/home/rhansen2/plvp.tar.gz
 		tar xzf plvp.tar.gz
 		rm plvp.tar.gz

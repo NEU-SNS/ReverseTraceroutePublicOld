@@ -129,7 +129,9 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 	}
 	// Parse the payload for ICMP stuff
 	mess, err := icmp.ParseMessage(icmpProtocolNum, pload)
+	log.Debug(mess)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	if echo, ok := mess.Body.(*icmp.Echo); ok {
@@ -164,6 +166,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 		}
 		probe.SeqNum = uint32(echo.Seq)
 		probe.Id = uint32(echo.ID)
+		log.Debug("Probe")
 		for _, option := range options {
 			switch option.Type {
 			case opt.RecordRoute:
@@ -207,7 +210,8 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {
-				log.Info("Got probe", pr)
+				log.Error(err)
+				log.Info("Got probe ", pr)
 				ec <- err
 				switch err {
 				case ErrorReadError:
@@ -220,6 +224,7 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 				}
 				continue
 			}
+			log.Debug("Got Spoofed probe: ", *pr)
 			probes <- *pr
 		}
 	}

@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
@@ -27,15 +28,17 @@ import (
 
 // V1Revtr is the api endpoint for interacting with revtrs
 type V1Revtr struct {
-	da    *dataaccess.DataAccess
-	Route string
+	da     *dataaccess.DataAccess
+	Route  string
+	rootCA string
 }
 
 // NewV1Revtr creates a new V1Revtr
-func NewV1Revtr(da *dataaccess.DataAccess) V1Revtr {
+func NewV1Revtr(da *dataaccess.DataAccess, rootCA string) V1Revtr {
 	return V1Revtr{
-		da:    da,
-		Route: "/api/v1/revtr",
+		da:     da,
+		Route:  "/api/v1/revtr",
+		rootCA: rootCA,
 	}
 }
 
@@ -51,11 +54,12 @@ type RunRevtr struct {
 	Route     string
 	ipToRevtr map[string]*ReverseTraceroute
 	mu        *sync.Mutex // protects ipToRevtr
+	rootCa    string
 }
 
 // NewRunRevtr creates a new RunRevtr
-func NewRunRevtr(da *dataaccess.DataAccess) RunRevtr {
-	s, err := connectToServices()
+func NewRunRevtr(da *dataaccess.DataAccess, rootCa string) RunRevtr {
+	s, err := connectToServices(rootCa)
 	if err != nil {
 		log.Error(err)
 	}
@@ -65,6 +69,7 @@ func NewRunRevtr(da *dataaccess.DataAccess) RunRevtr {
 		Route:     "/runrevtr",
 		ipToRevtr: make(map[string]*ReverseTraceroute),
 		mu:        &sync.Mutex{},
+		rootCa:    rootCa,
 	}
 }
 
@@ -79,7 +84,6 @@ func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
 }
 
 func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
-	log.Debug("")
 	var notIP bool
 	ip := net.ParseIP(dst)
 	if ip == nil {
@@ -152,6 +156,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		rr.mu.Lock()
 		defer rr.mu.Unlock()
 		delete(rr.ipToRevtr, key)
+		log.Debug("Revtrs running: ", rr.ipToRevtr)
 		err = rtr.ws.Close()
 		if err != nil {
 			log.Error(err)
@@ -222,7 +227,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
 	if _, ok := rr.ipToRevtr[head]; !ok {
-		serv, err := connectToServices()
+		serv, err := connectToServices(rr.rootCa)
 		if err != nil {
 			log.Error(err)
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -231,9 +236,10 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 		// At this point we need to run the revtr and redirect approprately
 		log.Debug("Running RTR with src: ", src, " ", "dst: ", dst)
 		rt := CreateReverseTraceroute(datamodel.RevtrMeasurement{
-			Src: src,
-			Dst: dst,
-		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
+			Src:       src,
+			Dst:       dst,
+			Staleness: 60,
+		}, false, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
 		rr.ipToRevtr[head] = rt
 	}
 	runningTemplate.Execute(rw, &rt)
@@ -389,26 +395,28 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	var revtrr datamodel.RevtrRequest
 	err := jsonpb.Unmarshal(req.Body, &revtrr)
 	if err != nil {
+		log.Error(err)
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		fmt.Fprintf(rw, err.Error())
 		return
 	}
 	rs := revtrr.GetRevtrs()
+	log.Debug("revtrr: ", revtrr)
 	var reqToRun []datamodel.RevtrMeasurement
 	for _, r := range rs {
 		// Doing this conversion just ensures they're valid ips
 		_, err := util.IPStringToInt32(r.Src)
-		_, err = util.IPStringToInt32(r.Dst)
-		if err != nil {
+		_, err2 := util.IPStringToInt32(r.Dst)
+		if err != nil || err2 != nil {
+			log.Errorf("Src(%s): %v Dst(%s): %v", r.Src, err, r.Dst, err2)
 			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-			fmt.Fprintf(rw, err.Error())
 			return
 		}
 		reqToRun = append(reqToRun, *r)
 	}
 	// Connect to all the necessary services before trying to run anything
-	servs, err := connectToServices()
+	servs, err := connectToServices(s.rootCA)
 	if err != nil {
+		log.Error(err)
 		// Failed to connect to a service
 		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		fmt.Fprintf(rw, errorPage, err)
@@ -420,6 +428,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	// if not, give them a bad request and a message telling them why.
 	reqToRun, batchID, err := s.da.CreateRevtrBatch(reqToRun, user.Key)
 	if err == dataaccess.ErrCannotAddRevtrBatch {
+		log.Error(err)
 		fmt.Fprintf(rw, "There was an error when trying to run your reverse traceroutes.\n")
 		fmt.Fprintf(rw, "Please try again later.\n")
 		return
@@ -427,32 +436,27 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	// I've gotten my id, i've added all the state to the DB that I need
 	// its time now to start the revtrs running and return the proper results
 	go func() {
-		defer servs.Close()
-		var rtrdone []*ReverseTraceroute
-		var rtrsave []datamodel.ReverseTraceroute
-		var mu sync.Mutex
 		var wg sync.WaitGroup
+		defer servs.Close()
 		for _, rtr := range reqToRun {
 			wg.Add(1)
 			go func(r datamodel.RevtrMeasurement) {
 				defer wg.Done()
+				if r.Staleness == 0 {
+					r.Staleness = 60
+				}
 				res, err := RunReverseTraceroute(r, true, servs.cl, servs.at, servs.vpserv, s.da, s.da)
 				if err != nil {
 					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
 				}
-				mu.Lock()
 				log.Debug(res)
-				rtrdone = append(rtrdone, res)
-				rtrsave = append(rtrsave, res.ToStorable())
-				mu.Unlock()
+				err = s.da.StoreBatchedRevtrs([]datamodel.ReverseTraceroute{res.ToStorable()})
+				if err != nil {
+					log.Errorf("Error storing Revtr(%d): %v", res.ID, err)
+				}
 			}(rtr)
 		}
 		wg.Wait()
-		log.Debug("Storing: ", rtrsave)
-		err = s.da.StoreBatchedRevtrs(rtrsave)
-		if err != nil {
-			log.Error(err)
-		}
 	}()
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
@@ -489,14 +493,18 @@ func (s services) Close() error {
 	return err
 }
 
-func connectToServices() (services, error) {
+func connectToServices(rootCA string) (services, error) {
 	var ret services
 	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
 		return ret, err
 	}
+	ccreds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		return ret, err
+	}
 	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	cc, err := grpc.Dial(connstr, grpc.WithInsecure())
+	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(ccreds))
 	if err != nil {
 		return ret, err
 	}
@@ -506,8 +514,13 @@ func connectToServices() (services, error) {
 		cc.Close()
 		return ret, err
 	}
+	atcreds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		cc.Close()
+		return ret, err
+	}
 	connstrat := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	c2, err := grpc.Dial(connstrat, grpc.WithInsecure())
+	c2, err := grpc.Dial(connstrat, grpc.WithTransportCredentials(atcreds))
 	if err != nil {
 		cc.Close()
 		return ret, err
@@ -517,8 +530,14 @@ func connectToServices() (services, error) {
 	if err != nil {
 		return ret, err
 	}
+	vpcreds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		cc.Close()
+		c2.Close()
+		return ret, err
+	}
 	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	c3, err := grpc.Dial(connvp, grpc.WithInsecure())
+	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	if err != nil {
 		cc.Close()
 		c2.Close()

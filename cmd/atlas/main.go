@@ -48,7 +48,6 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-
 	svc := atlas.NewAtlasService(da, conf.RootCA)
 	serv := grpc.NewServer(grpc.Creds(cres))
 	pb.RegisterAtlasServer(serv, atlas.GRPCServ{AtlasService: svc})
@@ -59,6 +58,9 @@ func main() {
 	}
 	defer ln.Close()
 	err = serv.Serve(ln)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func sigHandle() {
