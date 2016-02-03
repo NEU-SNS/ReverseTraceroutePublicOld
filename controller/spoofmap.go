@@ -9,14 +9,45 @@ import (
 
 type spoofMap struct {
 	sync.Mutex
-	sm map[uint32]chan *dm.Probe
+	sm map[uint32]*channel
 }
 
-func (sm *spoofMap) Add(notify chan *dm.Probe, ids ...uint32) {
+type channel struct {
+	mu    sync.Mutex
+	count int
+	ch    chan *dm.Probe
+	kill  chan struct{}
+}
+
+func newChannel(ch chan *dm.Probe, kill chan struct{}, count int) *channel {
+	return &channel{
+		ch:    ch,
+		count: count,
+		kill:  kill,
+	}
+}
+
+func (c *channel) Send(p *dm.Probe) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.count--
+	select {
+	case c.ch <- p:
+	case <-c.kill:
+		return
+	}
+
+	if c.count == 0 {
+		close(c.ch)
+	}
+}
+
+func (sm *spoofMap) Add(notify chan *dm.Probe, kill chan struct{}, ids []uint32) {
 	sm.Lock()
 	defer sm.Unlock()
+	ch := newChannel(notify, kill, len(ids))
 	for _, id := range ids {
-		sm.sm[id] = notify
+		sm.sm[id] = ch
 	}
 }
 
@@ -25,7 +56,7 @@ func (sm *spoofMap) Notify(probe *dm.Probe) {
 	defer sm.Unlock()
 	log.Debug("Notify: ", probe)
 	if c, ok := sm.sm[probe.ProbeId]; ok {
-		c <- probe
+		c.Send(probe)
 		delete(sm.sm, probe.ProbeId)
 		return
 	}
