@@ -35,6 +35,7 @@ import (
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 import "github.com/go-sql-driver/mysql"
@@ -68,9 +69,11 @@ func makeDb(conf Config) (*sql.DB, error) {
 	conString := fmt.Sprintf(conFmt, conf.User, conf.Password, conf.Host, conf.Port, conf.Db)
 	db, err := sql.Open("mysql", conString)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	if err = db.Ping(); err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	db.SetMaxOpenConns(24)
@@ -982,15 +985,18 @@ var (
 
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
 func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
+	log.Debug("Finding intersecting traceroute ", pairs, " alias: ", alias, "stale: ", int64(stale.Minutes()))
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, stale, pair.Dst, stale, pair.Src, pair.Src)
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, stale, pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer rows.Close()
 	ret := dm.Path{}
 	for rows.Next() {
-		row := &hopRow{}
+		log.Debug("Parsing hop row")
+		row := hopRow{}
 		rows.Scan(&row.src, &row.dest, &row.hop, &row.ttl)
 		ret.Hops = append(ret.Hops, &dm.Hop{
 			Ip:  row.hop,
@@ -999,6 +1005,7 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 		ret.Address = row.src
 	}
 	if err = rows.Err(); err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	if len(ret.Hops) == 0 {

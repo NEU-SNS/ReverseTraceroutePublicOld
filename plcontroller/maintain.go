@@ -205,9 +205,11 @@ func resetService(cmd *exec.Cmd) error {
 	}()
 	select {
 	case <-time.After(time.Second * 40):
-		err := cmd.Process.Kill()
-		if err != nil {
-			return err
+		if cmd.Process != nil {
+			err := cmd.Process.Kill()
+			if err != nil {
+				return err
+			}
 		}
 		return errorVpTimeout
 	case err := <-ec:
@@ -263,10 +265,12 @@ func updateService(cmd *exec.Cmd) error {
 	}()
 	select {
 	case <-time.After(time.Second * 40):
-		err := cmd.Process.Kill()
-		if err != nil {
-			log.Error("Failed killing process, update service")
-			return err
+		if cmd.Process != nil {
+			err := cmd.Process.Kill()
+			if err != nil {
+				log.Error("Failed killing process, update service")
+				return err
+			}
 		}
 		return errorVpTimeout
 	case err := <-ec:
@@ -294,9 +298,11 @@ func checkVersion(cmd *exec.Cmd) (string, error) {
 		log.Debugf("Got version: %v", vline)
 		return vline, nil
 	case <-time.After(time.Second * 40):
-		err := cmd.Process.Kill()
-		if err != nil {
-			return "", err
+		if cmd.Process != nil {
+			err := cmd.Process.Kill()
+			if err != nil {
+				return "", err
+			}
 		}
 		return "", errorVpTimeout
 	}
@@ -335,9 +341,11 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 	case stat := <-ps:
 		return stat, nil
 	case <-time.After(time.Second * 40):
-		err := cmd.Process.Kill()
-		if err != nil {
-			return unknown, err
+		if cmd.Process != nil {
+			err := cmd.Process.Kill()
+			if err != nil {
+				return unknown, err
+			}
 		}
 		return unknown, errorVpTimeout
 	}
@@ -354,10 +362,12 @@ func installService(cmd *exec.Cmd) error {
 	case err := <-ec:
 		return err
 	case <-time.After(time.Second * 60):
-		err := cmd.Process.Kill()
-		if err != nil {
-			log.Error("Failed killing process, install service")
-			return err
+		if cmd.Process != nil {
+			err := cmd.Process.Kill()
+			if err != nil {
+				log.Error("Failed killing process, install service")
+				return err
+			}
 		}
 		return errorVpTimeout
 

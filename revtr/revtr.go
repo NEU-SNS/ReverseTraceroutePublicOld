@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -283,6 +285,7 @@ type ReverseTraceroute struct {
 	mu                 sync.Mutex // protects running
 	hostnameCache      map[string]string
 	rttCache           map[string]float32
+	tokens             []*datamodel.IntersectionResponse
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -587,7 +590,9 @@ func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 		Count:   "1",
 		Timeout: 10,
 	}
-	st, err := rt.cl.Ping(&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := rt.cl.Ping(ctx, &datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 	if err != nil {
 		log.Error(err)
 		rt.rttCache[ip] = 0
@@ -809,7 +814,6 @@ func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
 			ret[vp.Site] = vp
 		}
 	}
-	log.Debug("OneSpooferPerSite: ", ret)
 	return ret
 }
 
@@ -907,6 +911,15 @@ func stringSliceIndex(segs []string, seg string) int {
 	return -1
 }
 
+func stringSliceIndexWithClusters(ss []string, seg string) int {
+	for i, s := range ss {
+		if ipToCluster.Get(s) == ipToCluster.Get(seg) {
+			return i
+		}
+	}
+	return -1
+}
+
 // AddBackgroundTRSegment need a different function because a TR segment might intersect
 // at an IP back up the TR chain, want to delete anything that has been added along the way
 // THIS IS ALMOST DEFINITLY WRONG AND WILL NEED DEBUGGING
@@ -918,7 +931,7 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment) bool {
 	for _, chunk := range *rt.Paths {
 		var index int
 		log.Debug("Looking for ", trSeg.Hops()[0], " in ", chunk.Hops())
-		if index = stringSliceIndex(chunk.Hops(), trSeg.Hops()[0]); index != -1 {
+		if index = stringSliceIndexWithClusters(chunk.Hops(), trSeg.Hops()[0]); index != -1 {
 			log.Debug("Intersected: ", trSeg.Hops()[0], " in ", chunk)
 			chunk = chunk.Clone()
 			found = chunk
@@ -1157,6 +1170,7 @@ func (rt *ReverseTraceroute) run() error {
 		if err == nil {
 			continue
 		}
+		log.Debug(err)
 		log.Debug("Attempting RR")
 		err = nil
 		for err != ErrNoVPs {
@@ -1189,6 +1203,17 @@ func (rt *ReverseTraceroute) run() error {
 		if err == nil {
 			continue
 		}
+		log.Debug("Attempting to add from background traceroute")
+		err = revtreiveBackgroundTRS(rt)
+		if rt.Reaches() {
+			rt.EndTime = time.Now()
+			rt.StopReason = "REACHES"
+			return nil
+		}
+		if err == nil {
+			continue
+		}
+		log.Debug(err)
 		log.Debug("Assuming Symmetric")
 		err = reverseHopsAssumeSymmetric(rt, rt.cl, rt.ProbeCount)
 		if rt.Reaches() {
@@ -1227,7 +1252,6 @@ func initialize(cl vpservice.VPSource, cs ClusterSource) {
 		panic(err)
 	}
 	vps = vpr.GetVps()
-	log.Debug("VPS: ", vps)
 	ipToCluster = newClusterMap(cs)
 }
 
@@ -1367,31 +1391,30 @@ func reverseHopsRR(revtr *ReverseTraceroute, cl client.Client) error {
 var rrsstdMu sync.Mutex
 
 func issueSpoofedRecordRoutes(revtr *ReverseTraceroute, recvToSpooferToTarget map[string]map[string][]string, cl client.Client, probeCounts map[string]int, deleteUnresponsive bool) error {
-	log.Debug("Issuing Spoofed RR probes")
+	log.Debug("Issuing Spoofed RR probes ", recvToSpooferToTarget)
 	var pings []*datamodel.PingMeasurement
 	for rec, spoofToTarg := range recvToSpooferToTarget {
 		for spoofer, targets := range spoofToTarg {
 			for _, target := range targets {
-				ssrc, _ := util.IPStringToInt32(rec)
 				sspoofer, _ := util.IPStringToInt32(spoofer)
 				sdst, _ := util.IPStringToInt32(target)
 				pings = append(pings, &datamodel.PingMeasurement{
-					Spoof:       true,
-					RR:          true,
-					SpooferAddr: ssrc,
-					Src:         sspoofer,
-					Dst:         sdst,
-					Timeout:     30,
-					Count:       "1",
-					CheckDb:     true,
-					CheckCache:  true,
-					Staleness:   revtr.Staleness,
+					Spoof:     true,
+					RR:        true,
+					SAddr:     rec,
+					Src:       sspoofer,
+					Dst:       sdst,
+					Timeout:   10,
+					Count:     "1",
+					Staleness: revtr.Staleness,
 				})
 			}
 		}
 	}
 	probeCounts["spoof-rr"] += len(pings)
-	st, err := cl.Ping(&datamodel.PingArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := cl.Ping(ctx, &datamodel.PingArg{
 		Pings: pings,
 	})
 	if err != nil {
@@ -1454,7 +1477,9 @@ func issueRecordRoutes(ping *datamodel.PingMeasurement, cl client.Client) error 
 		*sdst, _ = util.Int32ToIPString(ping.Dst)
 		*cls = *sdst
 	}
-	st, err := cl.Ping(&datamodel.PingArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := cl.Ping(ctx, &datamodel.PingArg{
 		Pings: []*datamodel.PingMeasurement{
 			ping,
 		},
@@ -1560,7 +1585,9 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 }
 
 func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
-	as, err := cl.GetIntersectingPath()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	as, err := cl.GetIntersectingPath(ctx)
 	var errs []error
 	if err != nil {
 		return nil
@@ -1571,7 +1598,7 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 		log.Debug("Attempting to find TR for hop: ", hop, "(", hops, ")", " to ", dest)
 		is := datamodel.IntersectionRequest{
 			UseAliases: true,
-			Staleness:  240,
+			Staleness:  revtr.Staleness,
 			Dest:       dest,
 			Address:    hops,
 		}
@@ -1582,7 +1609,7 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 	}
 	err = as.CloseSend()
 	if err != nil {
-		log.Debug(err)
+		log.Error(err)
 	}
 	for {
 		tr, err := as.Recv()
@@ -1590,6 +1617,7 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 			break
 		}
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 		log.Debug("Received response: ", tr)
@@ -1599,24 +1627,100 @@ func reverseHopsTRToSrc(revtr *ReverseTraceroute, cl at.Atlas) error {
 			var hs []string
 			var found bool
 			for _, h := range tr.Path.GetHops() {
+				log.Debug("Fixing up hop: ", h)
 				hss, _ := util.Int32ToIPString(h.Ip)
 				addr, _ := util.Int32ToIPString(tr.Path.Address)
-				if !found && addr != hss {
+				if !found && ipToCluster.Get(addr) != ipToCluster.Get(hss) {
 					continue
 				}
 				found = true
 				hs = append(hs, hss)
 			}
 			addrs, _ := util.Int32ToIPString(tr.Path.Address)
+			log.Debug("Creating TRtoSrc seg: ", hs, " ", revtr.Src, " ", addrs)
 			segment := NewTrtoSrcRevSegment(hs, revtr.Src, addrs)
-			revtr.AddBackgroundTRSegment(segment)
+			if !revtr.AddBackgroundTRSegment(segment) {
+				errs = append(errs, fmt.Errorf("Failed to add segment"))
+			} else {
+				return nil
+			}
 		case datamodel.IResponseType_NONE_FOUND:
 			errs = append(errs, fmt.Errorf("None Found"))
 		case datamodel.IResponseType_ERROR:
 			errs = append(errs, fmt.Errorf(tr.Error))
+		case datamodel.IResponseType_TOKEN:
+			revtr.tokens = append(revtr.tokens, tr)
+			errs = append(errs, fmt.Errorf("Token Received: %v", tr))
 		}
 
 	}
+	if len(errs) == len(revtr.CurrPath().LastSeg().Hops()) {
+		var errstring bytes.Buffer
+		for _, err := range errs {
+			errstring.WriteString(err.Error() + " ")
+		}
+		return fmt.Errorf(errstring.String())
+	}
+	return nil
+}
+
+func revtreiveBackgroundTRS(revtr *ReverseTraceroute) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	as, err := revtr.at.GetPathsWithToken(ctx)
+	if err != nil {
+		return nil
+	}
+	for _, token := range revtr.tokens {
+		log.Debug("Sending for token: ", token)
+		err := as.Send(&datamodel.TokenRequest{
+			Token: token.Token,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	revtr.tokens = nil
+	err = as.CloseSend()
+	if err != nil {
+		log.Error(err)
+	}
+	var errs []error
+	for {
+		resp, err := as.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		log.Debug("Received token response: ", resp)
+		switch resp.Type {
+		case datamodel.IResponseType_PATH:
+			var hs []string
+			var found bool
+			for _, h := range resp.Path.GetHops() {
+				hss, _ := util.Int32ToIPString(h.Ip)
+				addr, _ := util.Int32ToIPString(resp.Path.Address)
+				if !found && addr != hss {
+					continue
+				}
+				found = true
+				hs = append(hs, hss)
+			}
+			addrs, _ := util.Int32ToIPString(resp.Path.Address)
+			segment := NewTrtoSrcRevSegment(hs, revtr.Src, addrs)
+			if !revtr.AddBackgroundTRSegment(segment) {
+				errs = append(errs, fmt.Errorf("Failed to add segment"))
+			}
+		case datamodel.IResponseType_NONE_FOUND:
+			errs = append(errs, fmt.Errorf("None Found"))
+		case datamodel.IResponseType_ERROR:
+			errs = append(errs, fmt.Errorf(resp.Error))
+		}
+	}
+	log.Debug(errs, " Hops ", revtr.CurrPath().LastSeg().Hops())
 	if len(errs) == len(revtr.CurrPath().LastSeg().Hops()) {
 		var errstring bytes.Buffer
 		for _, err := range errs {
@@ -1646,7 +1750,9 @@ func issueTraceroute(revtr *ReverseTraceroute, cl client.Client) error {
 	}
 	revtr.ProbeCount["tr"]++
 	log.Debug("Issuing traceroute src: ", revtr.Src, " dst: ", revtr.LastHop())
-	st, err := cl.Traceroute(&datamodel.TracerouteArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := cl.Traceroute(ctx, &datamodel.TracerouteArg{
 		Traceroutes: []*datamodel.TracerouteMeasurement{&tr},
 	})
 	if err != nil {
@@ -2122,7 +2228,7 @@ func issueTimestamps(revtr *ReverseTraceroute, issue map[string][][]string, cl c
 				Src:        srcip,
 				Dst:        dstip,
 				TimeStamp:  tss,
-				Timeout:    30,
+				Timeout:    10,
 				Count:      "1",
 				CheckDb:    true,
 				CheckCache: true,
@@ -2132,7 +2238,9 @@ func issueTimestamps(revtr *ReverseTraceroute, issue map[string][][]string, cl c
 		}
 	}
 	probeCount["ts"] += len(pings)
-	st, err := cl.Ping(&datamodel.PingArg{Pings: pings})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := cl.Ping(ctx, &datamodel.PingArg{Pings: pings})
 	if err != nil {
 		log.Error(err)
 		return err
@@ -2187,7 +2295,9 @@ func issueSpoofedTimestamps(revtr *ReverseTraceroute, issue map[string]map[strin
 		}
 	}
 	probeCount["spoof-ts"] = len(pings)
-	st, err := cl.Ping(&datamodel.PingArg{Pings: pings})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	st, err := cl.Ping(ctx, &datamodel.PingArg{Pings: pings})
 	if err != nil {
 		log.Error(err)
 		return err

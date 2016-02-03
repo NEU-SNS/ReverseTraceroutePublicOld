@@ -30,7 +30,6 @@ package controller
 
 import (
 	"io"
-	"time"
 
 	cont "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -43,15 +42,23 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 	if pms == nil {
 		return nil
 	}
-	ctx, cancel := con.WithTimeout(stream.Context(), time.Second*70)
+	ctx, cancel := con.WithCancel(stream.Context())
 	defer cancel()
 	res := c.doPing(ctx, pms)
-	for p := range res {
-		if err := stream.Send(p); err != nil {
-			return err
+	for {
+		select {
+		case p, ok := <-res:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(p); err != nil {
+				log.Error(err)
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
-	return nil
 }
 
 func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_TracerouteServer) error {
@@ -59,13 +66,23 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 	if tms == nil {
 		return nil
 	}
-	res := c.doTraceroute(stream.Context(), tms)
-	for t := range res {
-		if err := stream.Send(t); err != nil {
-			return err
+	ctx, cancel := con.WithCancel(stream.Context())
+	defer cancel()
+	res := c.doTraceroute(ctx, tms)
+	for {
+		select {
+		case t, ok := <-res:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(t); err != nil {
+				log.Error(err)
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
-	return nil
 }
 
 func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {

@@ -357,6 +357,8 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 				}
 				for {
 					select {
+					case <-ctx.Done():
+						return
 					case pp, ok := <-pc:
 						if !ok {
 							return
@@ -410,9 +412,12 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			id := c.nextSpoofID()
 			sp.Payload = fmt.Sprintf("%08x", id)
 			spoofIds = append(spoofIds, id)
+			sa, _ := util.IPStringToInt32(sp.SAddr)
 			sdForSpoof[sds] = append(sdForSpoof[sds], &dm.Spoof{
-				Ip: sp.Src,
-				Id: id,
+				Ip:  sp.Src,
+				Id:  id,
+				Sip: sa,
+				Dst: sp.Dst,
 			})
 
 		}
@@ -721,6 +726,8 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 				}
 				for {
 					select {
+					case <-ctx.Done():
+						return
 					case pp, ok := <-pc:
 						if !ok {
 							return

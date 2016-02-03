@@ -2,7 +2,7 @@
 
 cd ../../cmd/atlas
 
-go build
+go build -a
 
 cp atlas ./docker
 cp atlas.config ./docker
