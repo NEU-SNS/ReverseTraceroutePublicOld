@@ -16,7 +16,7 @@
     <body>
         <div class="container">
             <div class="row text-center">
-                <h2>Running Reverse Traceroute</h2>
+                <h2 id="title">Running Reverse Traceroute</h2>
             </div>
             <div class="row">
                 <input type="hidden" id="key" value="{{ .Key }}">
@@ -53,6 +53,7 @@
                             mess =  $.parseJSON(e.data)
                             done = mess.Status
                             if(done){
+                                $('#title').val("Completed Reverse Traceroute")
                                 $('#spinning').hide()
                             }
                             show = mess.HTML

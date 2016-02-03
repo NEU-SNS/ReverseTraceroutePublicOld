@@ -94,7 +94,6 @@ func makeID(a, b, c, d byte) uint32 {
 	var id uint32
 	id |= uint32(a) << 24
 	id |= uint32(b) << 16
-	// NewSpoofPingMonitor makes a SpoofPingMonitor
 	id |= uint32(c) << 8
 	id |= uint32(d)
 	return id
@@ -156,8 +155,11 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 		if err != nil {
 			return nil, ErrorSpooferIP
 		}
-		probe.Src, err = util.IPtoInt32(header.Src)
-		probe.Dst, err = util.IPtoInt32(header.Dst)
+		log.Debug("Header: ", header)
+		// This is reversed so that it appears as though it came from the src to the dst
+		// but since this is a response probe, the src is the destination of the original probe
+		probe.Dst, err = util.IPtoInt32(header.Src)
+		probe.Src, err = util.IPtoInt32(header.Dst)
 		// Parse the options
 		options, err := opt.Parse(header.Options)
 		if err != nil {

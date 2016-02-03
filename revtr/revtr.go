@@ -823,6 +823,16 @@ func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
 	return ret
 }
 
+func getRRSpoofers() map[string]*datamodel.VantagePoint {
+	ret := make(map[string]*datamodel.VantagePoint)
+	for _, vp := range vps {
+		if vp.CanSpoof && vp.RecordRoute {
+			ret[vp.Site] = vp
+		}
+	}
+	return ret
+}
+
 // for now we're just ignoring the src dst and choosing randomly
 func getTimestampSpoofers(src, dst string) []string {
 	siteToSpoofer := chooseOneSpooferPerSite()
@@ -840,7 +850,7 @@ func getTimestampSpoofers(src, dst string) []string {
 func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
 	log.Debug("Initializing RR VPs individually for spoofers for ", cls)
 	rt.RRHop2RateLimit[cls] = RateLimit
-	siteToSpoofer := chooseOneSpooferPerSite()
+	siteToSpoofer := getRRSpoofers()
 	var sitesForTarget []*datamodel.VantagePoint
 	sitesForTarget = nil
 	spoofersForTarget := []string{"non_spoofed"}

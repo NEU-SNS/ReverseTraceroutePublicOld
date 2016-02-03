@@ -422,8 +422,9 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 
 		}
 		rChan := make(chan *dm.Probe, len(spoofIds))
+		kill := make(chan struct{})
 		if len(spoofIds) != 0 {
-			c.sm.Add(rChan, spoofIds...)
+			c.sm.Add(rChan, kill, spoofIds)
 		} else {
 			// This is ugly but prevent waiting for no reason
 			close(rChan)
@@ -464,6 +465,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			for {
 				select {
 				case <-ctx.Done():
+					close(kill)
 					return
 				case probe, ok := <-rChan:
 					if !ok {
@@ -845,7 +847,7 @@ func (c *controllerT) run(ec chan error, con Config, db DataAccess, cache ca.Cac
 	controller.server = grpc.NewServer(grpc.Creds(certs))
 	controllerapi.RegisterControllerServer(controller.server, c)
 	controller.sm = &spoofMap{
-		sm: make(map[uint32]chan *dm.Probe),
+		sm: make(map[uint32]*channel),
 	}
 	go controller.startRPC(ec)
 }
