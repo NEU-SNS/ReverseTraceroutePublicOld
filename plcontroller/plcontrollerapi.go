@@ -52,6 +52,8 @@ var (
 )
 
 func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
+	ctx, cancel := con.WithCancel(server.Context())
+	defer cancel()
 	for {
 		pa, err := server.Recv()
 		if err == io.EOF {
@@ -71,7 +73,7 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 			go func(p *dm.PingMeasurement) {
 				start := time.Now()
 				defer wg.Done()
-				pr, err := c.runPing(p)
+				pr, err := c.runPing(ctx, p)
 				if err != nil {
 					log.Debugf("Got ping result: %v, with error %v", pr, err)
 					pr.Error = err.Error()
@@ -82,7 +84,10 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 						Usec: int64(start.Nanosecond() / 1000),
 					}
 				}
-				sendChan <- &pr
+				select {
+				case sendChan <- &pr:
+				case <-ctx.Done():
+				}
 			}(ping)
 		}
 
@@ -90,16 +95,25 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 			wg.Wait()
 			close(sendChan)
 		}()
-		for p := range sendChan {
-			if err := server.Send(p); err != nil {
-				return err
+		for {
+			select {
+			case p, ok := <-sendChan:
+				if !ok {
+					return nil
+				}
+				if err := server.Send(p); err != nil {
+					return err
+				}
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
-		return nil
 	}
 }
 
 func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) error {
+	ctx, cancel := con.WithCancel(server.Context())
+	defer cancel()
 	for {
 		ta, err := server.Recv()
 		if err == io.EOF {
@@ -119,7 +133,7 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 			go func(t *dm.TracerouteMeasurement) {
 				start := time.Now()
 				defer wg.Done()
-				tr, err := c.runTraceroute(t)
+				tr, err := c.runTraceroute(ctx, t)
 				if err != nil {
 					log.Debugf("Got tracerotue result: %v, with error %v", tr, err)
 					tr.Error = err.Error()
@@ -131,7 +145,11 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 						Ftime: dm.TTime(start).String(),
 					}
 				}
-				sendChan <- &tr
+				select {
+				case sendChan <- &tr:
+				case <-ctx.Done():
+				}
+
 			}(trace)
 
 		}
@@ -139,12 +157,19 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 			wg.Wait()
 			close(sendChan)
 		}()
-		for t := range sendChan {
-			if err := server.Send(t); err != nil {
-				return err
+		for {
+			select {
+			case t, ok := <-sendChan:
+				if !ok {
+					return nil
+				}
+				if err := server.Send(t); err != nil {
+					return err
+				}
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
-		return nil
 	}
 }
 
@@ -161,14 +186,15 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 		if err != nil {
 			ret.Error = err.Error()
 		}
-		if e := stream.Send(ret); e != nil {
-			return e
+		if err := stream.Send(ret); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
+	log.Error("Accepting probes: ", probes)
 	ps := probes.GetProbes()
 	if ps == nil {
 		return nil, ErrorNilArgList

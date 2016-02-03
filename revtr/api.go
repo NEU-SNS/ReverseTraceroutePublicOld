@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -181,7 +182,9 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("bad request, src: %s, dst: %s", src, dst)
 		return
 	}
-	vps, err := rr.s.cl.GetVps(&datamodel.VPRequest{})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	vps, err := rr.s.cl.GetVps(ctx, &datamodel.VPRequest{})
 	if err != nil {
 		log.Error(err)
 		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

@@ -41,6 +41,6 @@ message TokenRequest {
 message TokenResponse {
     uint32 token        = 1;
     IResponseType type  = 2; 
-    repeated Path paths = 3;
+    Path          path  = 3;
     string error        = 4;
 }

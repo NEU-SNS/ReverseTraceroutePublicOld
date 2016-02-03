@@ -118,7 +118,6 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 		return nil, err
 	}
 	gotvps := ret.GetVps()
-	log.Debug(gotvps)
 	newVps := make(vpMap)
 	for _, vp := range gotvps {
 		newVps[vp.Ip] = vp
@@ -169,6 +168,7 @@ func (rvp *RVPService) checkCapabilities() {
 	for {
 		select {
 		case <-t.C:
+			log.Debug("Checking Capabilities")
 			rvp.rw.Lock()
 			// Copy so we don't block everything while this is happening
 			vps := rvp.vps.DeepCopy()
@@ -208,7 +208,6 @@ func (rvp *RVPService) checkCapabilities() {
 }
 
 func getRandomN(n int, vpm vpMap) []*dm.VantagePoint {
-	randoms := rand.Perm(n)
 	var vps []*dm.VantagePoint
 	var ret []*dm.VantagePoint
 	for _, v := range vpm {
@@ -217,7 +216,8 @@ func getRandomN(n int, vpm vpMap) []*dm.VantagePoint {
 	if n > len(vps) {
 		return vps
 	}
-	for _, r := range randoms {
+	randoms := rand.Perm(len(vps))
+	for _, r := range randoms[:n] {
 		ret = append(ret, vps[r])
 	}
 	return ret
@@ -267,7 +267,9 @@ func testSpoofs(vpm vpMap, rootCA string) {
 	}
 	defer cc.Close()
 	cl := controllerapi.NewControllerClient(cc)
-	res, err := cl.Ping(context.Background(), &dm.PingArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	res, err := cl.Ping(ctx, &dm.PingArg{
 		Pings: tests,
 	})
 	if err != nil {
@@ -283,6 +285,7 @@ func testSpoofs(vpm vpMap, rootCA string) {
 			log.Error(err)
 			return
 		}
+		log.Debug("Got spoof response: ", p)
 		if vp, ok := vpm[p.SpoofedFrom]; ok {
 			vp.CanSpoof = true
 		}
@@ -328,7 +331,9 @@ func testRR(vpm vpMap, rootCA string) {
 	}
 	defer cc.Close()
 	cl := controllerapi.NewControllerClient(cc)
-	res, err := cl.Ping(context.Background(), &dm.PingArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	res, err := cl.Ping(ctx, &dm.PingArg{
 		Pings: tests,
 	})
 	if err != nil {
@@ -385,7 +390,9 @@ func testTS(vpm vpMap, rootCA string) {
 	}
 	defer cc.Close()
 	cl := controllerapi.NewControllerClient(cc)
-	res, err := cl.Ping(context.Background(), &dm.PingArg{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	res, err := cl.Ping(ctx, &dm.PingArg{
 		Pings: tests,
 	})
 	if err != nil {

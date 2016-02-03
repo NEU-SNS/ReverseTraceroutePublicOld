@@ -36,6 +36,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
+
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -133,11 +135,23 @@ var plController plControllerT
 
 func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
 	resp := &dm.NotifyRecSpoofResponse{}
+	saddr, _ := util.Int32ToIPString(rs.Sip)
+	dummy := &dm.PingMeasurement{
+		Src:     rs.Ip,
+		Dst:     rs.Dst,
+		Spoof:   true,
+		SAddr:   saddr,
+		Count:   "1",
+		Timeout: 2,
+		Ttl:     "1",
+	}
+	src, _ := util.Int32ToIPString(rs.Sip)
+	c.client.DoMeasurement(src, dummy)
 	err := c.spoofs.Register(*rs)
 	return resp, err
 }
 
-func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
+func (c *plControllerT) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm.Ping, error) {
 	log.Debugf("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
@@ -166,6 +180,8 @@ func (c *plControllerT) runPing(pa *dm.PingMeasurement) (dm.Ping, error) {
 		src, _ := util.Int32ToIPString(pa.Src)
 		c.client.RemoveMeasurement(src, id)
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
+	case <-ctx.Done():
+		return dm.Ping{}, ctx.Err()
 	}
 }
 
@@ -173,7 +189,7 @@ func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
 	return c.spoofs.Receive(probe)
 }
 
-func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
+func (c *plControllerT) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -202,6 +218,8 @@ func (c *plControllerT) runTraceroute(ta *dm.TracerouteMeasurement) (dm.Tracerou
 		src, _ := util.Int32ToIPString(ta.Src)
 		c.client.RemoveMeasurement(src, id)
 		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
+	case <-ctx.Done():
+		return dm.Traceroute{}, ctx.Err()
 	}
 }
 

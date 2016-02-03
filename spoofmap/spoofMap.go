@@ -105,6 +105,7 @@ func (s *SpoofMap) sendSpoofs() {
 			for ip, probes := range dests {
 				if err := s.transport.Send(probes, ip); err != nil {
 					log.Error(err)
+					s.Unlock()
 					return
 				}
 				delete(dests, ip)

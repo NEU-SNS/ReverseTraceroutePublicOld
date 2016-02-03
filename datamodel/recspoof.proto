@@ -15,8 +15,10 @@ message RecSpoof {
 }
 
 message Spoof {
-    uint32 ip = 1;
-    uint32 id = 2;
+    uint32 ip  = 1;
+    uint32 id  = 2;
+    uint32 sip = 3;
+    uint32 dst = 4;
 }
 
 message SpoofedProbes {

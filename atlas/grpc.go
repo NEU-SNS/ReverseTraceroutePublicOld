@@ -41,11 +41,13 @@ func (gs GRPCServ) GetIntersectingPath(stream pb.Atlas_GetIntersectingPathServer
 				ec <- err
 				return
 			}
+
 			for _, ret := range rets {
 				rec <- ret
 			}
 		}
 	}()
+
 	for {
 		select {
 		case err := <-ec:
@@ -60,11 +62,57 @@ func (gs GRPCServ) GetIntersectingPath(stream pb.Atlas_GetIntersectingPathServer
 				log.Error(err)
 				return err
 			}
+
 		}
 	}
 }
 
 // GetPathsWithToken gets paths from traces that were run in response to a request
 func (gs GRPCServ) GetPathsWithToken(stream pb.Atlas_GetPathsWithTokenServer) error {
-	return nil
+	log.Debug("GetPathsWithToken")
+	ec := make(chan error, 1)
+	rets := make(chan *dm.TokenResponse, 1)
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+	go func() {
+		for {
+			req, err := stream.Recv()
+			log.Debug("GetPathsWithToken: ", req)
+			if err == io.EOF {
+				close(rets)
+				return
+			}
+			if err != nil {
+				ec <- err
+				log.Error(err)
+				return
+			}
+			rest, err := gs.AtlasService.GetPathsWithToken(ctx, req)
+			if err != nil {
+				log.Error(err)
+				ec <- err
+				return
+			}
+			for _, ret := range rest {
+				rets <- ret
+			}
+		}
+	}()
+	for {
+		select {
+		case err := <-ec:
+			log.Error(err)
+			return err
+		case tr, ok := <-rets:
+			log.Debug("Got from token intersection: ", tr)
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(tr); err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
 }

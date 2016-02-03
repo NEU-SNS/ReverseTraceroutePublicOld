@@ -30,7 +30,6 @@ package plcontroller
 
 import (
 	"fmt"
-	"time"
 
 	plc "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -48,25 +47,31 @@ const (
 // ControllerSender Is a Sender which sends to the central controller received spoofs
 type ControllerSender struct {
 	RootCA string
+	conn   *grpc.ClientConn
 }
 
 // Send satisfies the Sender interface for a ControllerSender
 func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	log.Debug("Sending: ", sps)
-	ip, _ := util.Int32ToIPString(addr)
-	saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
-	creds, err := credentials.NewClientTLSFromFile(cs.RootCA, "controller.revtr.ccs.neu.edu")
-	if err != nil {
-		return err
+	if cs.conn == nil {
+		ip, _ := util.Int32ToIPString(addr)
+		saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
+		creds, err := credentials.NewClientTLSFromFile(cs.RootCA, "controller.revtr.ccs.neu.edu")
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		cc, err := grpc.Dial(saddr, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		cs.conn = cc
 	}
-	cc, err := grpc.Dial(saddr, grpc.WithTimeout(time.Second*5), grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return err
-	}
-	defer cc.Close()
-	cl := plc.NewControllerClient(cc)
+	cl := plc.NewControllerClient(cs.conn)
 	stream, err := cl.ReceiveSpoofedProbes(con.Background())
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	defer stream.CloseSend()

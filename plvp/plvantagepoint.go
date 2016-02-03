@@ -90,6 +90,7 @@ type plVantagepointT struct {
 	monip    chan dm.Probe
 	am       sync.Mutex // protect addr
 	addr     string
+	conn     *grpc.ClientConn
 }
 
 var plVantagepoint plVantagepointT
@@ -194,28 +195,33 @@ func Start(c Config) chan error {
 }
 
 func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
+	log.Debug("Sending spoofed probes")
 	if len(probes) == 0 {
+		log.Debug("No Spoofs to send")
 		return
 	}
-	_, srvs, err := net.LookupSRV("plcontroller", "tcp", "revtr.ccs.neu.edu")
-	if err != nil {
-		log.Error(err)
-		return
+	if vp.conn == nil {
+		_, srvs, err := net.LookupSRV("plcontroller", "tcp", "revtr.ccs.neu.edu")
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		creds, err := credentials.NewClientTLSFromFile(*vp.config.Local.RootCA, srvs[0].Target)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Errorf("Failed to send spoofs: %v", err)
+			return
+		}
+		vp.conn = cc
 	}
-	creds, err := credentials.NewClientTLSFromFile(*vp.config.Local.RootCA, srvs[0].Target)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	cc, err := grpc.Dial(addr, grpc.WithTimeout(2*time.Second), grpc.WithTransportCredentials(creds))
-	if err != nil {
-		log.Errorf("Failed to send spoofs: %v", err)
-		return
-	}
-	defer cc.Close()
-	client := plc.NewPLControllerClient(cc)
-	_, err = client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
+	log.Debug("About to send spoofed probes")
+	client := plc.NewPLControllerClient(vp.conn)
+	_, err := client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
 	if err != nil {
 		log.Errorf("Error sending probes: %v", err)
 	}

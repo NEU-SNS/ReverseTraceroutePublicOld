@@ -108,8 +108,7 @@ func init() {
 
 func main() {
 	go sigHandle()
-	var parseConf plcontroller.Config
-	err := config.Parse(flag.CommandLine, &parseConf)
+	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Fatalf("Failed to parse config: %v", err)
 		exit(1)
