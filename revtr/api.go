@@ -242,7 +242,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 			Src:       src,
 			Dst:       dst,
 			Staleness: 60,
-		}, false, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
+		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
 		rr.ipToRevtr[head] = rt
 	}
 	runningTemplate.Execute(rw, &rt)
