@@ -107,6 +107,9 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 		}
 		return res[0], true
 	}
+	if isInPrivatePrefix(ip) {
+		return "", false
+	}
 	return dst, true
 }
 

@@ -53,7 +53,7 @@
                             mess =  $.parseJSON(e.data)
                             done = mess.Status
                             if(done){
-                                $('#title').val("Completed Reverse Traceroute")
+                                $('#title').text("Completed Reverse Traceroute")
                                 $('#spinning').hide()
                             }
                             show = mess.HTML
