@@ -156,10 +156,8 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 			return nil, ErrorSpooferIP
 		}
 		log.Debug("Header: ", header)
-		// This is reversed so that it appears as though it came from the src to the dst
-		// but since this is a response probe, the src is the destination of the original probe
-		probe.Dst, err = util.IPtoInt32(header.Src)
-		probe.Src, err = util.IPtoInt32(header.Dst)
+		probe.Dst, err = util.IPtoInt32(header.Dst)
+		probe.Src, err = util.IPtoInt32(header.Src)
 		// Parse the options
 		options, err := opt.Parse(header.Options)
 		if err != nil {
@@ -208,7 +206,10 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 	for {
 		select {
 		case <-sm.quit:
-			c.Close()
+			err = c.Close()
+			if err != nil {
+				log.Error(err)
+			}
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {

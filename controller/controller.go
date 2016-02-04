@@ -496,8 +496,12 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 
 func toPing(probe *dm.Probe) *dm.Ping {
 	var ping dm.Ping
-	ping.Src = probe.Src
-	ping.Dst = probe.Dst
+	// Ping src and dst are reversed from the probe
+	// since the probe is a response from a ping
+	// Ping srcs and dsts are from the measurement
+	// not the response
+	ping.Src = probe.Dst
+	ping.Dst = probe.Src
 	ping.SpoofedFrom = probe.SpooferIp
 	ping.Flags = append(ping.Flags, "spoof")
 	var pr dm.PingResponse
@@ -508,6 +512,7 @@ func toPing(probe *dm.Probe) *dm.Ping {
 	rx := &dm.Time{}
 	rx.Sec = now
 	pr.Rx = rx
+	pr.From = probe.Src
 	rrs := probe.GetRR()
 	if rrs != nil {
 		ping.Flags = append(ping.Flags, "v4rr")
@@ -837,6 +842,7 @@ func (c *controllerT) run(ec chan error, con Config, db DataAccess, cache ca.Cac
 		ec <- errors.New("Controller Start, nil router")
 		return
 	}
+	log.Infof("Starting with creds: %s, %s", *con.Local.CertFile, *con.Local.KeyFile)
 	certs, err := credentials.NewServerTLSFromFile(*con.Local.CertFile, *con.Local.KeyFile)
 	if err != nil {
 		log.Error(err)

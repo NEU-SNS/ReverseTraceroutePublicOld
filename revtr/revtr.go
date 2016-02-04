@@ -624,6 +624,7 @@ func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 	return rt.rttCache[ip]
 }
 
+/*
 func (rt *ReverseTraceroute) String() string {
 	hopsSeen := make(map[string]bool)
 	var out bytes.Buffer
@@ -681,6 +682,7 @@ func (rt *ReverseTraceroute) String() string {
 	return out.String()
 }
 
+*/
 type adjSettings struct {
 	timeout      int
 	maxnum       int
@@ -1019,6 +1021,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	}
 	// CASES:
 	segHops := cloneStringSlice(rt.CurrPath().LastSeg().Hops())
+	log.Debug("segHops: ", segHops)
 	var target, cls *string
 	target = new(string)
 	cls = new(string)
@@ -1173,6 +1176,7 @@ func (rt *ReverseTraceroute) run() error {
 		log.Debug("Done backing off")
 	}
 	for {
+		log.Debug(*rt.Paths)
 		log.Debug(rt.CurrPath())
 		log.Debug("Attempting to find TR")
 		err := rt.reverseHopsTRToSrc()
@@ -1425,7 +1429,7 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 		}
 	}
 	rt.ProbeCount["spoof-rr"] += len(pings)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	st, err := rt.cl.Ping(ctx, &datamodel.PingArg{
 		Pings: pings,
@@ -1754,6 +1758,7 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		Attempts:   "1",
 		LoopAction: "1",
 		Loops:      "3",
+		GapLimit:   "7",
 	}
 	rt.ProbeCount["tr"]++
 	log.Debug("Issuing traceroute src: ", rt.Src, " dst: ", rt.LastHop())
@@ -1819,15 +1824,23 @@ func (rt *ReverseTraceroute) reverseHopsAssumeSymmetric() error {
 		log.Debug("Backing off along current path for ", rt.Src, " ", rt.Dst)
 		// need to not ignore the hops in the last segment, so can't just
 		// call add_hops(revtr.hops + revtr.deadends)
-		newSeg := rt.CurrPath().LastSeg().(*DstSymRevSegment)
+		newSeg := rt.CurrPath().LastSeg().Clone().(*DstSymRevSegment)
+		log.Debug("newSeg: ", newSeg)
 		var allHops []string
-		for _, seg := range *rt.CurrPath().Path {
+		for i, seg := range *rt.CurrPath().Path {
+			// Skip the last one
+			if i == len(*rt.CurrPath().Path)-1 {
+				continue
+			}
 			allHops = append(allHops, seg.Hops()...)
 		}
 		allHops = append(allHops, rt.Deadends()...)
+		log.Debug("all hops: ", allHops)
 		newSeg.AddHop(allHops)
+		log.Debug("New seg: ", newSeg)
 		added := rt.AddAndReplaceSegment(newSeg)
 		if added {
+			log.Debug("Added hop from another DstSymRevSegment")
 			return nil
 		}
 	}

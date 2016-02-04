@@ -135,19 +135,24 @@ var plController plControllerT
 
 func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
 	resp := &dm.NotifyRecSpoofResponse{}
-	saddr, _ := util.Int32ToIPString(rs.Sip)
 	dummy := &dm.PingMeasurement{
-		Src:     rs.Ip,
+		Src:     rs.Sip,
 		Dst:     rs.Dst,
-		Spoof:   true,
-		SAddr:   saddr,
 		Count:   "1",
 		Timeout: 2,
 		Ttl:     "1",
+		Sport:   "61681",
+		Dport:   "62195",
 	}
 	src, _ := util.Int32ToIPString(rs.Sip)
-	c.client.DoMeasurement(src, dummy)
-	err := c.spoofs.Register(*rs)
+	_, _, err := c.client.DoMeasurement(src, dummy)
+	if err != nil {
+		log.Error(err)
+	}
+	err = c.spoofs.Register(*rs)
+	if err != nil {
+		log.Error(err)
+	}
 	return resp, err
 }
 
@@ -178,7 +183,10 @@ func (c *plControllerT) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		src, _ := util.Int32ToIPString(pa.Src)
-		c.client.RemoveMeasurement(src, id)
+		err := c.client.RemoveMeasurement(src, id)
+		if err != nil {
+			log.Error(err)
+		}
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	case <-ctx.Done():
 		return dm.Ping{}, ctx.Err()
@@ -216,7 +224,7 @@ func (c *plControllerT) runTraceroute(ctx context.Context, ta *dm.TracerouteMeas
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
 		src, _ := util.Int32ToIPString(ta.Src)
-		c.client.RemoveMeasurement(src, id)
+		_ = c.client.RemoveMeasurement(src, id)
 		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
 	case <-ctx.Done():
 		return dm.Traceroute{}, ctx.Err()
@@ -350,7 +358,10 @@ func (c *plControllerT) startRPC(eChan chan error) {
 
 func (c *plControllerT) startScamperProc() {
 	sp := scamper.GetProc(c.sc.Path, c.sc.Port, c.sc.ScPath)
-	c.mp.ManageProcess(sp, true, 1000, handleScamperStop)
+	_, err := c.mp.ManageProcess(sp, true, 1000, handleScamperStop)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 // HandleSig allows the plController to react appropriately to signals
@@ -363,13 +374,19 @@ func (c *plControllerT) stop() {
 		close(c.shutdown)
 	}
 	if c.w != nil {
-		c.w.Close()
+		err := c.w.Close()
+		if err != nil {
+			log.Error(err)
+		}
 	}
 	if c.mp != nil {
 		c.mp.IntAll()
 	}
 	c.removeAllVps()
-	c.db.Close()
+	err := c.db.Close()
+	if err != nil {
+		log.Error(err)
+	}
 	if c.spoofs != nil {
 		c.spoofs.Quit()
 	}

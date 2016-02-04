@@ -393,6 +393,7 @@ func inArray(arr []string, s string) bool {
 
 // This mimics the functionality of the static method select_nonzero_hops
 func ndsrsSelectNonzeroHops(tr []string, hops int, hopsToIgnore []string) []string {
+	log.Debugf("Selecting %d non-zero hops from %v, ignoring %v", hops, tr, hopsToIgnore)
 	var i, found int
 	for found < hops && i < len(tr) {
 		if tr[i] != "0.0.0.0" && (!inArray(hopsToIgnore, tr[i])) {
@@ -429,9 +430,13 @@ func stringSliceReverse(ss []string) []string {
 // still need to include numhops, since we don't know how many of those are being ignored
 // hop to ignore does no persist
 func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore []string) *DstSymRevSegment {
-	tr = append([]string{src}, tr...)
-	rev := stringSliceReverse(tr)
+	log.Debugf("src: %s, hop: %s, tr: %v, numHops: %d, htoi: %v", src, hop, tr, numhops, hopsToIgnore)
+	ntr := append([]string{src}, tr[:len(tr)-1]...)
+	log.Debug("New TR: ", ntr)
+	rev := stringSliceReverse(ntr)
+	log.Debug("The reversed slice is: ", rev)
 	segment := ndsrsSelectNonzeroHops(rev, numhops, hopsToIgnore)
+	log.Debug("The segment is: ", segment)
 	ret := DstSymRevSegment{
 		tr:         tr,
 		numHops:    numhops,
@@ -446,7 +451,8 @@ func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore
 // note: right now, this starts from scratch every time and counts hops,
 // replacing the curring segments with a new one.
 func (d *DstSymRevSegment) AddHop(hopsToIgnore []string) error {
-	rev := stringSliceReverse(d.tr)
+	tr := append([]string{d.Src}, d.tr[:len(d.tr)-1]...)
+	rev := stringSliceReverse(tr)
 	d.numHops++
 	d.Segment = ndsrsSelectNonzeroHops(rev, d.numHops, hopsToIgnore)
 	return nil
