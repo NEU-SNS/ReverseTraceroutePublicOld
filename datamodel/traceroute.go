@@ -28,10 +28,12 @@
 package datamodel
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -71,6 +73,28 @@ func (t *Traceroute) CMarshal() []byte {
 		return nil
 	}
 	return ret
+}
+
+func (t *Traceroute) ErrorString() string {
+	var buf bytes.Buffer
+	ssrc, _ := util.Int32ToIPString(t.Src)
+	sdst, _ := util.Int32ToIPString(t.Dst)
+	_, err := buf.WriteString(fmt.Sprintf("Trace from %s to %s\n", ssrc, sdst))
+	if err != nil {
+		return err.Error()
+	}
+	for i, hop := range t.GetHops() {
+		hops, _ := util.Int32ToIPString(hop.Addr)
+		_, err := buf.WriteString(fmt.Sprintf("%d: %s\n", i+1, hops))
+		if err != nil {
+			return err.Error()
+		}
+	}
+	_, err = buf.WriteString("Stop Reason: " + t.StopReason + "\n")
+	if err != nil {
+		return err.Error()
+	}
+	return buf.String()
 }
 
 func (tm *TracerouteMeasurement) CMarshal() []byte {
