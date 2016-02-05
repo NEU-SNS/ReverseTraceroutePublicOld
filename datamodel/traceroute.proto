@@ -80,6 +80,7 @@ message Traceroute {
   repeated TracerouteHop hops   = 19;
     string error                = 20;
     string version              = 21;
+    uint32 gap_limit            = 22;
 }
 
 message TracerouteTime {
