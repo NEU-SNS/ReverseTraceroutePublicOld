@@ -294,6 +294,7 @@ type ReverseTraceroute struct {
 	trsSrcToDstToPath        map[string]map[string][]string
 	tsSrcToProbeToVPToResult map[string]map[string]map[string][]string
 	errorDetails             bytes.Buffer
+	lastResponsive           string
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -1768,7 +1769,6 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		Attempts:   "1",
 		LoopAction: "1",
 		Loops:      "3",
-		GapLimit:   "7",
 	}
 	rt.ProbeCount["tr"]++
 	log.Debug("Issuing traceroute src: ", rt.Src, " dst: ", rt.LastHop())
@@ -1805,7 +1805,7 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		log.Debug("Got traceroute: ", tr)
 		for i, hop := range hops {
 			if i != len(hops)-1 {
-				j := hop.ProbeTtl + 1
+				j := hop.ProbeTtl + 2
 				for j < hops[i].ProbeTtl {
 					hopst = append(hopst, "*")
 				}
@@ -1820,7 +1820,8 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		}
 		if len(hopst) > 0 && hopst[len(hopst)-1] != rt.LastHop() {
 			rt.errorDetails.WriteString("Traceroute didn't reach destination.\n")
-			rt.errorDetails.WriteString(tr.ErrorString())
+			rt.errorDetails.WriteString(tr.ErrorString() + "\n")
+			rt.errorDetails.WriteString(fmt.Sprintf("<a href=\"/runrevtr?src=%s&dst=%s\">Try rerunning from the last responseiv hop!</a>", rt.Src, hopst[len(hopst)-1]))
 			return fmt.Errorf("Traceroute didn't reach destination")
 		}
 		log.Debug("got traceroute ", hopst)

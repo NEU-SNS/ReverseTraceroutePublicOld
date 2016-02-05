@@ -34,6 +34,7 @@ func ConvertTraceroute(in warts.Traceroute) Traceroute {
 	t.ProbeSize = uint32(in.Flags.ProbeSize)
 	hops := convertHops(in)
 	t.Hops = hops
+	t.GapLimit = uint32(in.Flags.GapLimit)
 	return t
 }
 

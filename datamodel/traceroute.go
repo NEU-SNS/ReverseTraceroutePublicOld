@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/protobuf/proto"
 )
@@ -83,12 +84,29 @@ func (t *Traceroute) ErrorString() string {
 	if err != nil {
 		return err.Error()
 	}
+	last := new(int)
 	for i, hop := range t.GetHops() {
+		if i > 0 && int(hop.ProbeTtl) != int(t.GetHops()[i-1].ProbeTtl)+1 {
+			log.Debug("ttl: ", hop.ProbeTtl, " i: ", i)
+			for j := int(t.GetHops()[i-1].ProbeTtl) + 1; j < int(hop.ProbeTtl); j++ {
+				_, err := buf.WriteString(fmt.Sprintf("%d: *   *   *\n", j))
+				if err != nil {
+					return err.Error()
+				}
+			}
+		}
 		hops, _ := util.Int32ToIPString(hop.Addr)
-		_, err := buf.WriteString(fmt.Sprintf("%d: %s\n", i+1, hops))
+		_, err := buf.WriteString(fmt.Sprintf("%d: %s\n", hop.ProbeTtl, hops))
 		if err != nil {
 			return err.Error()
 		}
+		*last = int(hop.ProbeTtl)
+	}
+	if t.StopReason == "GAPLIMIT" {
+		for i := 0; i < 7; i++ {
+			buf.WriteString(fmt.Sprintf("%d: *   *   *\n", *last+i+1))
+		}
+
 	}
 	_, err = buf.WriteString("Stop Reason: " + t.StopReason + "\n")
 	if err != nil {

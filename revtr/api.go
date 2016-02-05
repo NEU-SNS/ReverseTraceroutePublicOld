@@ -32,15 +32,92 @@ type V1Revtr struct {
 	da     *dataaccess.DataAccess
 	Route  string
 	rootCA string
+	vps    vpservice.VPSource
 }
 
 // NewV1Revtr creates a new V1Revtr
-func NewV1Revtr(da *dataaccess.DataAccess, rootCA string) V1Revtr {
+func NewV1Revtr(da *dataaccess.DataAccess, vps vpservice.VPSource, rootCA string) V1Revtr {
 	return V1Revtr{
 		da:     da,
 		Route:  "/api/v1/revtr",
 		rootCA: rootCA,
+		vps:    vps,
 	}
+}
+
+// V1Sources is the api endpoint for getting the sources
+type V1Sources struct {
+	da     *dataaccess.DataAccess
+	vps    vpservice.VPSource
+	Route  string
+	rootCA string
+}
+
+// NewV1Sources createsa a new V1Sources
+func NewV1Sources(da *dataaccess.DataAccess, rootCA string, vps vpservice.VPSource) V1Sources {
+	return V1Sources{
+		da:     da,
+		Route:  "/api/v1/sources",
+		rootCA: rootCA,
+		vps:    vps,
+	}
+}
+
+type src struct {
+	Hostname string `json:"hostname"`
+	IP       string `json:"ip"`
+}
+
+type srcsModel struct {
+	Srcs []src `json:"srcs"`
+}
+
+// Handle handles all methods for the route of V1Sources
+func (s V1Sources) Handle(rw http.ResponseWriter, req *http.Request) {
+	log.Debug(req.Host)
+	key := req.Header.Get(keyHeader)
+	if key == "" {
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	_, err := s.da.GetUserByKey(key)
+	if err == dataaccess.ErrNoRevtrUserFound {
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if req.Method != http.MethodGet {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	vps, err := s.vps.GetVPs()
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	var srcs []src
+	for _, vp := range vps.GetVps() {
+		ips, _ := util.Int32ToIPString(vp.Ip)
+		srcs = append(srcs, src{
+			Hostname: vp.Hostname,
+			IP:       ips,
+		})
+	}
+	log.Debug(srcs)
+	err = json.NewEncoder(rw).Encode(srcsModel{
+		Srcs: srcs,
+	})
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
 }
 
 type runningModel struct {
@@ -51,6 +128,7 @@ type runningModel struct {
 // RunRevtr handles /runrevtr
 type RunRevtr struct {
 	da         *dataaccess.DataAccess
+	vps        vpservice.VPSource
 	s          services
 	Route      string
 	keyToRevtr map[uint32]*ReverseTraceroute
@@ -78,8 +156,8 @@ func NewRunRevtr(da *dataaccess.DataAccess, rootCa string) RunRevtr {
 
 func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
 	for _, vp := range vps {
-		if vp.Hostname == src {
-			s, _ := util.Int32ToIPString(vp.Ip)
+		s, _ := util.Int32ToIPString(vp.Ip)
+		if vp.Hostname == src || s == src {
 			return s, true
 		}
 	}
@@ -203,11 +281,13 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	}
 	dst, valid := validDest(dst, vps.GetVps())
 	if !valid {
+		log.Debug("Invalid destination ", dst)
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	src, valid = validSrc(src, vps.GetVps())
 	if !valid {
+		log.Debug("Invalid src: ", src)
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -354,7 +434,7 @@ func (s V1Revtr) Handle(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (s V1Revtr) retreiveRevtr(rw http.ResponseWriter, req *http.Request, user datamodel.RevtrUser) {
-	ids := req.URL.Query().Get("revtrid")
+	ids := req.URL.Query().Get("batchid")
 	if len(ids) == 0 {
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
@@ -392,10 +472,29 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	vps, err := s.vps.GetVPs()
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		fmt.Fprintf(rw, errorPage, err)
+		return
+	}
 	rs := revtrr.GetRevtrs()
 	log.Debug("revtrr: ", revtrr)
 	var reqToRun []datamodel.RevtrMeasurement
 	for _, r := range rs {
+		_, valid := validSrc(r.Src, vps.GetVps())
+		if !valid {
+			log.Error(err)
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		_, valid = validDest(r.Dst, vps.GetVps())
+		if !valid {
+			log.Error(err)
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 		// Doing this conversion just ensures they're valid ips
 		_, err := util.IPStringToInt32(r.Src)
 		_, err2 := util.IPStringToInt32(r.Dst)
@@ -405,6 +504,11 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 			return
 		}
 		reqToRun = append(reqToRun, *r)
+	}
+	if len(reqToRun) == 0 {
+		log.Debug("No req to run")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 	// Connect to all the necessary services before trying to run anything
 	servs, err := connectToServices(s.rootCA)
@@ -456,7 +560,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	err = json.NewEncoder(rw).Encode(struct {
 		ResultURI string `json:"result_uri"`
 	}{
-		ResultURI: fmt.Sprintf("%s%s?revtrid=%d", req.Host, s.Route, batchID),
+		ResultURI: fmt.Sprintf("http://%s%s?batchid=%d", req.Host, s.Route, batchID),
 	})
 }
 

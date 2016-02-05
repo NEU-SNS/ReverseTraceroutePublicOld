@@ -124,30 +124,35 @@ func (db *DB) GetRevtrsInBatch(uid, bid uint32) ([]*dm.ReverseTraceroute, error)
 		}
 		ret = append(ret, rtid{rt: r, id: id})
 	}
+	log.Debug(ret)
 	if err := res.Err(); err != nil {
 		return nil, err
 	}
 	for _, rt := range ret {
-		if rt.rt.Status == dm.RevtrStatus_COMPLETED {
+		use := rt.rt
+		log.Debug(rt)
+		if use.Status == dm.RevtrStatus_COMPLETED {
 			res2, err := con.Query(revtrGetHopsForRevtr, rt.id)
 			if err != nil {
 				return nil, err
 			}
 			for res2.Next() {
-				h := &dm.RevtrHop{}
+				h := dm.RevtrHop{}
 				var hop, hopType uint32
 				err = res2.Scan(&hop, &hopType)
 				h.Hop, _ = util.Int32ToIPString(hop)
 				h.Type = dm.RevtrHopType(hopType)
-				rt.rt.Path = append(rt.rt.Path, h)
+				use.Path = append(use.Path, &h)
+				log.Debug(h)
 			}
 			if err := res2.Err(); err != nil {
 				return nil, err
 			}
 			res2.Close()
 		}
-		final = append(final, &rt.rt)
+		final = append(final, &(use))
 	}
+	log.Debug(final)
 	return final, nil
 }
 
