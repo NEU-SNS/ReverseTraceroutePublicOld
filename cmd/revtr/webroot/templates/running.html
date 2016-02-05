@@ -23,6 +23,9 @@
                 <div id="results" class="text-center">
                 </div>
             </div>
+	    <div class="row">
+		    <div id="errors" class="text-center"></div>
+	    </div>
             <div class="row text-center" id="spinning">
                 <i class="fa fa-spinner fa-pulse"></i>
                 <span>Working...</span>
@@ -37,6 +40,7 @@
         
             res = $('#results')
             key = $('#key').val()
+            errors = $('#errors')
             if (!window['WebSocket']){
                 res.append($('<p>Your browser does not support web sockets.<p>'))
                 return
@@ -54,6 +58,7 @@
                             done = mess.Status
                             if(done){
                                 $('#title').text("Completed Reverse Traceroute")
+                                errors.html($('<span>' + mess.Error + '</span>'))
                                 $('#spinning').hide()
                             }
                             show = mess.HTML

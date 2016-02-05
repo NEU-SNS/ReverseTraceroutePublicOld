@@ -216,7 +216,11 @@ type wsConns []wsConnection
 type multiError []error
 
 func (m multiError) Error() string {
-	return fmt.Sprintf("%v", m)
+	var buf bytes.Buffer
+	for _, e := range m {
+		buf.WriteString(e.Error() + "\n")
+	}
+	return buf.String()
 }
 
 func (wc wsConns) Close() error {
@@ -289,6 +293,7 @@ type ReverseTraceroute struct {
 	rrsSrcToDstToVPToRevHops map[string]map[string]map[string][]string
 	trsSrcToDstToPath        map[string]map[string][]string
 	tsSrcToProbeToVPToResult map[string]map[string]map[string][]string
+	errorDetails             bytes.Buffer
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -319,6 +324,7 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 type wsMessage struct {
 	HTML   string
 	Status bool
+	Error  string
 }
 
 func (rt *ReverseTraceroute) output() error {
@@ -329,6 +335,7 @@ func (rt *ReverseTraceroute) output() error {
 		// Either we're done because we reached or we're done for some other reason
 		// so signal the brower that we're gunna disconnect
 		Status: rt.Reaches() || rt.StopReason != "",
+		Error:  strings.Replace(rt.errorDetails.String(), "\n", "<br>", -1),
 	})
 	if err != nil {
 		return err
@@ -1155,7 +1162,6 @@ func (rt *ReverseTraceroute) isRunning() bool {
 }
 
 func (rt *ReverseTraceroute) run() error {
-
 	rt.mu.Lock()
 	rt.running = true
 	rt.mu.Unlock()
@@ -1244,6 +1250,10 @@ func (rt *ReverseTraceroute) run() error {
 			if rt.Failed(rt.backoffEndhost) {
 				rt.StopReason = "FAILED"
 				rt.EndTime = time.Now()
+				_, err := rt.errorDetails.WriteString("All techniques failed to find a hop.\n")
+				if err != nil {
+					log.Error(err)
+				}
 				return err
 			}
 		}
@@ -1252,7 +1262,7 @@ func (rt *ReverseTraceroute) run() error {
 
 var dstMustBeReachable = true
 
-// ReverseTracerouteReq isa revtr req
+// ReverseTracerouteReq is a revtr req
 type ReverseTracerouteReq struct {
 	Src, Dst  uint32
 	Staleness uint32
@@ -1769,6 +1779,7 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 	})
 	if err != nil {
 		log.Error(err)
+		rt.errorDetails.WriteString("Couldn't complete traceroute.\n")
 		return err
 	}
 	for {
@@ -1777,12 +1788,14 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 			break
 		}
 		if err != nil {
-			log.Info(tr)
+			rt.errorDetails.WriteString("Error running traceroute.\n")
 			log.Error(err)
 			return err
 		}
 		if tr.Error != "" {
 			log.Error(tr.Error)
+			rt.errorDetails.WriteString("Error running traceroute.\n")
+			rt.errorDetails.WriteString(tr.Error + "\n")
 			return fmt.Errorf("Traceroute failed: %s", tr.Error)
 		}
 		dstSt, _ := util.Int32ToIPString(tr.Dst)
@@ -1802,9 +1815,12 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		}
 		if len(hopst) == 0 {
 			log.Debug("Found no hops with traceroute")
+			rt.errorDetails.WriteString("Traceroute didn't find any hops.\n")
 			return fmt.Errorf("Traceroute didn't find hops")
 		}
 		if len(hopst) > 0 && hopst[len(hopst)-1] != rt.LastHop() {
+			rt.errorDetails.WriteString("Traceroute didn't reach destination.\n")
+			rt.errorDetails.WriteString(tr.ErrorString())
 			return fmt.Errorf("Traceroute didn't reach destination")
 		}
 		log.Debug("got traceroute ", hopst)

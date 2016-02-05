@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/context"
@@ -50,12 +50,13 @@ type runningModel struct {
 
 // RunRevtr handles /runrevtr
 type RunRevtr struct {
-	da        *dataaccess.DataAccess
-	s         services
-	Route     string
-	ipToRevtr map[string]*ReverseTraceroute
-	mu        *sync.Mutex // protects ipToRevtr
-	rootCa    string
+	da         *dataaccess.DataAccess
+	s          services
+	Route      string
+	keyToRevtr map[uint32]*ReverseTraceroute
+	mu         *sync.Mutex // protects ipToRevtr
+	next       *uint32
+	rootCa     string
 }
 
 // NewRunRevtr creates a new RunRevtr
@@ -65,12 +66,13 @@ func NewRunRevtr(da *dataaccess.DataAccess, rootCa string) RunRevtr {
 		log.Error(err)
 	}
 	return RunRevtr{
-		da:        da,
-		s:         s,
-		Route:     "/runrevtr",
-		ipToRevtr: make(map[string]*ReverseTraceroute),
-		mu:        &sync.Mutex{},
-		rootCa:    rootCa,
+		da:         da,
+		s:          s,
+		Route:      "/runrevtr",
+		keyToRevtr: make(map[uint32]*ReverseTraceroute),
+		mu:         &sync.Mutex{},
+		rootCa:     rootCa,
+		next:       new(uint32),
 	}
 }
 
@@ -135,7 +137,14 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	c := wsConnection{c: ws}
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
-	rtr, ok := rr.ipToRevtr[key]
+	keyint, err := strconv.ParseUint(key, 10, 32)
+	if err != nil {
+		log.Error(err)
+		log.Error("Invalid Key")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	rtr, ok := rr.keyToRevtr[uint32(keyint)]
 	if !ok {
 		defer ws.Close()
 		log.Error("Invalid Key")
@@ -144,7 +153,6 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	}
 	rtr.ws = append(rtr.ws, c)
 	go func() {
-		defer rtr.ws.Close()
 		rtr.print = true
 		if !rtr.isRunning() {
 			rtr.output()
@@ -157,10 +165,11 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 			rtr.output()
 			return
 		}
+		defer rtr.ws.Close()
 		rr.mu.Lock()
 		defer rr.mu.Unlock()
-		delete(rr.ipToRevtr, key)
-		log.Debug("Revtrs running: ", rr.ipToRevtr)
+		delete(rr.keyToRevtr, uint32(keyint))
+		log.Debug("Revtrs running: ", rr.keyToRevtr)
 		err = rtr.ws.Close()
 		if err != nil {
 			log.Error(err)
@@ -173,7 +182,6 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 // RunRevtr handles /runrevtr
 func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	log.Debug("RunRevtr")
-
 	if req.Method != http.MethodGet {
 		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
@@ -203,36 +211,15 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	reqIP := req.RemoteAddr
-	head := req.Header.Get("X-Forwarded-For")
-	if head == "" {
-		head = req.Header.Get("x-forwarded-for")
-	}
-	if head == "" {
-		head = req.Header.Get("X-FORWARDED-FOR")
-	}
-	if head == "" {
-		head = reqIP
-	}
-	headSplit := strings.Split(head, ",")
-	if len(headSplit) > 0 {
-		head = headSplit[0]
-	}
-	if strings.Contains(head, ":") {
-		head, _, err = net.SplitHostPort(head)
-		if err != nil {
-			log.Error(err)
-			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-	}
+	key := atomic.AddUint32(rr.next, 1)
+	log.Debug("New key: ", key)
 	var rt runningModel
-	rt.Key = head
+	rt.Key = fmt.Sprintf("%d", key)
 	rt.URL = req.Host
 	// Split should be the actual ip of the client now
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
-	if _, ok := rr.ipToRevtr[head]; !ok {
+	if _, ok := rr.keyToRevtr[key]; !ok {
 		serv, err := connectToServices(rr.rootCa)
 		if err != nil {
 			log.Error(err)
@@ -246,7 +233,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 			Dst:       dst,
 			Staleness: 60,
 		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
-		rr.ipToRevtr[head] = rt
+		rr.keyToRevtr[key] = rt
 	}
 	runningTemplate.Execute(rw, &rt)
 	return
