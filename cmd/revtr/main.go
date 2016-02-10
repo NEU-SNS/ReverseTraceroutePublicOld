@@ -27,7 +27,10 @@ func init() {
 }
 
 func main() {
-	config.Parse(flag.CommandLine, &conf)
+	err := config.Parse(flag.CommandLine, &conf)
+	if err != nil {
+		log.Error(err)
+	}
 	da, err := dataaccess.New(conf.Db)
 	if err != nil {
 		panic(err)
