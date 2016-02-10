@@ -89,6 +89,7 @@ func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 				return
 			}
 			if err != nil {
+				close(ret)
 				log.Error(err)
 				return
 			}
@@ -117,6 +118,7 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 			}
 			if err != nil {
 				log.Error(err)
+				close(ret)
 				return
 			}
 			ret <- in

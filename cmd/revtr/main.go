@@ -16,6 +16,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var conf = revtr.NewConfig()
@@ -67,6 +68,7 @@ func main() {
 	http.HandleFunc(runrtr.Route, runrtr.RunRevtr)
 	http.HandleFunc(srcs.Route, srcs.Handle)
 	http.HandleFunc("/ws", runrtr.WS)
+	http.Handle("/metrics", prometheus.Handler())
 	for {
 		log.Error(http.ListenAndServe(":8080", nil))
 	}

@@ -75,6 +75,18 @@ var (
 		Name:      "error_count",
 		Help:      "Count of Rpc Errors",
 	})
+	pingResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "ping_response_times",
+		Help:      "The time it takes for pings to respond",
+	})
+	tracerouteResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "traceroute_response_times",
+		Help:      "The time it takes for traceroutes to reponsd",
+	})
 )
 var id = rand.Uint32()
 

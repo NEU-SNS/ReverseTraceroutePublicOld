@@ -74,12 +74,15 @@ func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 		log.Error(err)
 		return err
 	}
-	defer stream.CloseSend()
 	for _, sp := range sps {
 		if err := stream.Send(sp); err != nil {
 			log.Errorf("Error sending spoofed probe: %v", err)
 			return err
 		}
 	}
-	return nil
+	_, err = stream.CloseAndRecv()
+	if err != nil {
+		log.Error(err)
+	}
+	return err
 }

@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,7 +28,29 @@ import (
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	goCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+)
+
+var id = rand.Uint32()
+
+func init() {
+	prometheus.MustRegister(goCollector)
+}
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("revtr_%d", id)
+	}
+	r := strings.NewReplacer(".", "_", "-", "")
+	return fmt.Sprintf("revtr_%s", r.Replace(name))
+}
 
 // V1Revtr is the api endpoint for interacting with revtrs
 type V1Revtr struct {

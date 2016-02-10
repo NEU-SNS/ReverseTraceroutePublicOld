@@ -30,6 +30,7 @@ package controller
 
 import (
 	"io"
+	"time"
 
 	cont "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
@@ -42,6 +43,7 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 	if pms == nil {
 		return nil
 	}
+	start := time.Now()
 	ctx, cancel := con.WithCancel(stream.Context())
 	defer cancel()
 	res := c.doPing(ctx, pms)
@@ -49,13 +51,19 @@ func (c *controllerT) Ping(pa *dm.PingArg, stream cont.Controller_PingServer) er
 		select {
 		case p, ok := <-res:
 			if !ok {
+				end := time.Since(start).Seconds()
+				pingResponseTimes.Observe(end)
 				return nil
 			}
 			if err := stream.Send(p); err != nil {
 				log.Error(err)
+				end := time.Since(start).Seconds()
+				pingResponseTimes.Observe(end)
 				return err
 			}
 		case <-ctx.Done():
+			end := time.Since(start).Seconds()
+			pingResponseTimes.Observe(end)
 			return ctx.Err()
 		}
 	}
@@ -66,6 +74,7 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 	if tms == nil {
 		return nil
 	}
+	start := time.Now()
 	ctx, cancel := con.WithCancel(stream.Context())
 	defer cancel()
 	res := c.doTraceroute(ctx, tms)
@@ -73,13 +82,19 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 		select {
 		case t, ok := <-res:
 			if !ok {
+				end := time.Since(start).Seconds()
+				tracerouteResponseTimes.Observe(end)
 				return nil
 			}
 			if err := stream.Send(t); err != nil {
 				log.Error(err)
+				end := time.Since(start).Seconds()
+				tracerouteResponseTimes.Observe(end)
 				return err
 			}
 		case <-ctx.Done():
+			end := time.Since(start).Seconds()
+			tracerouteResponseTimes.Observe(end)
 			return ctx.Err()
 		}
 	}
@@ -95,9 +110,10 @@ func (c *controllerT) ReceiveSpoofedProbes(probes cont.Controller_ReceiveSpoofed
 	for {
 		pr, err := probes.Recv()
 		if err == io.EOF {
-			return nil
+			return probes.SendAndClose(&dm.ReceiveSpoofedProbesResponse{})
 		}
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 		c.doRecSpoof(probes.Context(), pr)

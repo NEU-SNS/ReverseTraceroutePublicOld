@@ -11,3 +11,4 @@ ENTRYPOINT ["/vpservice/vpservice"]
 CMD ["-loglevel", "error"]
 
 EXPOSE 45000
+EXPOSE 8080
