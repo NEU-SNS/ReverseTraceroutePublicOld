@@ -11,3 +11,4 @@ ENTRYPOINT ["/atlas/atlas"]
 CMD ["-loglevel", "error"]
 
 EXPOSE 55000
+EXPOSE 8080

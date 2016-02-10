@@ -6,7 +6,9 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,10 +17,31 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
+
+var (
+	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+)
+
+var id = rand.Uint32()
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("vpservice_%d", id)
+	}
+	return fmt.Sprintf("vpservice_%s", strings.Replace(name, ".", "_", -1))
+}
+
+func init() {
+	prometheus.MustRegister(procCollector)
+}
 
 type vpMap map[uint32]*dm.VantagePoint
 
@@ -110,7 +133,12 @@ func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPRet
 		log.Error(err)
 		return nil, err
 	}
-	defer cc.Close()
+	defer func() {
+		err := cc.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	vps := controllerapi.NewControllerClient(cc)
 	ret, err := vps.GetVPs(ctx, req)
 	if err != nil {
@@ -135,9 +163,17 @@ func (rvp *RVPService) StoreInFile(file string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	for _, v := range rvp.vps {
-		f.WriteString(v.String() + "\n")
+		_, err := f.WriteString(v.String() + "\n")
+		if err != nil {
+			log.Error(err)
+		}
 	}
 }
 
@@ -147,7 +183,12 @@ func (rvp *RVPService) LoadFromFile(file string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	scan := bufio.NewScanner(f)
 	for scan.Scan() {
 		vp := &dm.VantagePoint{}
@@ -185,7 +226,10 @@ func (rvp *RVPService) checkCapabilities() {
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
 		case <-dirty:
-			rvp.GetVPs(context.Background(), &dm.VPRequest{})
+			_, err := rvp.GetVPs(context.Background(), &dm.VPRequest{})
+			if err != nil {
+				log.Error(err)
+			}
 			// Gets us an initial check without waiting 10 min
 			rvp.rw.Lock()
 			// Copy so we don't block everything while this is happening
@@ -265,7 +309,12 @@ func testSpoofs(vpm vpMap, rootCA string) {
 		log.Error(err)
 		return
 	}
-	defer cc.Close()
+	defer func() {
+		err := cc.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	cl := controllerapi.NewControllerClient(cc)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -329,7 +378,12 @@ func testRR(vpm vpMap, rootCA string) {
 		log.Error(err)
 		return
 	}
-	defer cc.Close()
+	defer func() {
+		err := cc.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	cl := controllerapi.NewControllerClient(cc)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -388,7 +442,12 @@ func testTS(vpm vpMap, rootCA string) {
 		log.Error(err)
 		return
 	}
-	defer cc.Close()
+	defer func() {
+		err := cc.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	cl := controllerapi.NewControllerClient(cc)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -423,5 +482,17 @@ func NewRVPService(rootCA string) *RVPService {
 		rootCA: rootCA,
 	}
 	go ret.checkCapabilities()
+	ret.startHTTP()
 	return ret
+}
+
+func startHTTP(addr string) {
+	for {
+		log.Error(http.ListenAndServe(addr, nil))
+	}
+}
+
+func (rvp *RVPService) startHTTP() {
+	http.Handle("/metrics", prometheus.Handler())
+	go startHTTP(":8080")
 }

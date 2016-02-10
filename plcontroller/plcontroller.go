@@ -78,7 +78,38 @@ var (
 		Name:      "error_count",
 		Help:      "Count of Rpc Errors",
 	})
+	pingGoroutineGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "ping_goroutines",
+		Help:      "The current number of goroutines running pings",
+	})
+	pingResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "ping_response_times",
+		Help:      "The time it takes for pings to respond",
+	})
+	tracerouteGoroutineGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "traceroute_goroutines",
+		Help:      "The current number of goroutines running traceroutes",
+	})
+	tracerouteResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "traceroute_response_times",
+		Help:      "The time it takes for traceroutes to reponsd",
+	})
+	vpsConnected = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "vantage_points",
+		Name:      "connected_vantage_points",
+		Help:      "The number of currently connected vantage points",
+	})
 )
+
 var id = rand.Uint32()
 
 func getName() string {
@@ -95,6 +126,10 @@ func init() {
 	prometheus.MustRegister(rpcCounter)
 	prometheus.MustRegister(timeoutCounter)
 	prometheus.MustRegister(errorCounter)
+	prometheus.MustRegister(pingGoroutineGauge)
+	prometheus.MustRegister(tracerouteGoroutineGauge)
+	prometheus.MustRegister(pingResponseTimes)
+	prometheus.MustRegister(tracerouteResponseTimes)
 }
 
 type plControllerT struct {

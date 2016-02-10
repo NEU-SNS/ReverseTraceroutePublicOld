@@ -55,7 +55,7 @@ func init() {
 		"The port that the controller will use.")
 	flag.BoolVar(conf.Local.CloseStdDesc, "D", false,
 		"Determines if the sandard file descriptors are closed")
-	flag.StringVar(conf.Local.PProfAddr, "pprof", "localhost:55555",
+	flag.StringVar(conf.Local.PProfAddr, "pprof", ":55555",
 		"The port for pprof")
 	flag.StringVar(conf.Local.CertFile, "cert-file", "cert.pem",
 		"The path the the cert file for the the server")

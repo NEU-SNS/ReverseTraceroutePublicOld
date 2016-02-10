@@ -3,8 +3,12 @@ package atlas
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
+	"net/http"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,8 +21,29 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 )
+
+var (
+	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
+		return os.Getpid(), nil
+	}, getName())
+)
+
+var id = rand.Uint32()
+
+func getName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		return fmt.Sprintf("atlas_%d", id)
+	}
+	return fmt.Sprintf("atlas_%s", strings.Replace(name, ".", "_", -1))
+}
+
+func init() {
+	prometheus.MustRegister(procCollector)
+}
 
 // Atlas is the atlas
 type Atlas struct {
@@ -40,7 +65,19 @@ func NewAtlasService(da *dataaccess.DataAccess, rootCA string) *Atlas {
 		curr:   newRunningTraces(),
 		tc:     newTokenCache(),
 	}
+	ret.startHTTP()
 	return ret
+}
+
+func startHTTP(addr string) {
+	for {
+		log.Error(http.ListenAndServe(addr, nil))
+	}
+}
+
+func (a *Atlas) startHTTP() {
+	http.Handle("/metrics", prometheus.Handler())
+	go startHTTP(":8080")
 }
 
 // GetPathsWithToken satisfies the server interface

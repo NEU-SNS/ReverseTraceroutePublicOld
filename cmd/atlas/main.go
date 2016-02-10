@@ -56,7 +56,12 @@ func main() {
 		log.Error(err)
 		os.Exit(1)
 	}
-	defer ln.Close()
+	defer func() {
+		err := ln.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	err = serv.Serve(ln)
 	if err != nil {
 		log.Error(err)

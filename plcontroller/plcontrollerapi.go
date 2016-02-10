@@ -70,9 +70,11 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 		var wg sync.WaitGroup
 		for _, ping := range pings {
 			wg.Add(1)
+			pingGoroutineGauge.Add(1)
 			go func(p *dm.PingMeasurement) {
 				start := time.Now()
 				defer wg.Done()
+				defer pingGoroutineGauge.Sub(1)
 				pr, err := c.runPing(ctx, p)
 				if err != nil {
 					log.Debugf("Got ping result: %v, with error %v", pr, err)
@@ -88,6 +90,8 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 				case sendChan <- &pr:
 				case <-ctx.Done():
 				}
+				done := time.Since(start).Seconds()
+				pingResponseTimes.Observe(done)
 			}(ping)
 		}
 
@@ -130,9 +134,11 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 		var wg sync.WaitGroup
 		for _, trace := range traces {
 			wg.Add(1)
+			tracerouteGoroutineGauge.Add(1)
 			go func(t *dm.TracerouteMeasurement) {
 				start := time.Now()
 				defer wg.Done()
+				defer tracerouteGoroutineGauge.Sub(1)
 				tr, err := c.runTraceroute(ctx, t)
 				if err != nil {
 					log.Debugf("Got tracerotue result: %v, with error %v", tr, err)
@@ -149,7 +155,8 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 				case sendChan <- &tr:
 				case <-ctx.Done():
 				}
-
+				done := time.Since(start).Seconds()
+				tracerouteResponseTimes.Observe(done)
 			}(trace)
 
 		}

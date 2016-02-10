@@ -71,6 +71,7 @@ func (c *plControllerT) handlEvents() {
 					continue
 				}
 				c.client.AddSocket(s)
+				vpsConnected.Add(1)
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
@@ -87,6 +88,7 @@ func (c *plControllerT) handlEvents() {
 					continue
 				}
 				c.client.RemoveSocket(ip)
+				vpsConnected.Sub(1)
 				break
 			}
 		}
@@ -162,5 +164,8 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 }
 
 func (c *plControllerT) closeWatcher() {
-	c.w.Close()
+	err := c.w.Close()
+	if err != nil {
+		log.Debug(err)
+	}
 }

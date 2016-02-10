@@ -47,7 +47,6 @@ func (gs GRPCServ) GetIntersectingPath(stream pb.Atlas_GetIntersectingPathServer
 			}
 		}
 	}()
-
 	for {
 		select {
 		case err := <-ec:
