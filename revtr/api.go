@@ -35,12 +35,19 @@ var (
 	goCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
 	}, getName())
+	runningRevtrs = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "revtrs",
+		Name:      "running_revtrs",
+		Help:      "The count of currently running reverse traceroutes.",
+	})
 )
 
 var id = rand.Uint32()
 
 func init() {
 	prometheus.MustRegister(goCollector)
+	prometheus.MustRegister(runningRevtrs)
 }
 
 func getName() string {
@@ -258,6 +265,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	go func() {
 		rtr.print = true
 		if !rtr.isRunning() {
+			runningRevtrs.Add(1)
 			rtr.output()
 			err := rtr.run()
 			if err != nil {
@@ -268,6 +276,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 			rtr.output()
 			return
 		}
+		runningRevtrs.Sub(1)
 		defer rtr.ws.Close()
 		rr.mu.Lock()
 		defer rr.mu.Unlock()
@@ -562,7 +571,9 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 		defer servs.Close()
 		for _, rtr := range reqToRun {
 			wg.Add(1)
+			runningRevtrs.Add(1)
 			go func(r datamodel.RevtrMeasurement) {
+				defer runningRevtrs.Sub(1)
 				defer wg.Done()
 				if r.Staleness == 0 {
 					r.Staleness = 60
