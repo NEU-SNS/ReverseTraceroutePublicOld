@@ -29,10 +29,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"golang.org/x/net/trace"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
@@ -104,6 +108,18 @@ func init() {
 		"The path for the version info of the plvps")
 	flag.BoolVar(&showVersion, "version",
 		false, "Show version info")
+	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
+		host, _, err := net.SplitHostPort(req.RemoteAddr)
+		switch {
+		case err != nil:
+			return false, false
+		case host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "rhansen2.local" || host == "rhansen2.revtr.ccs.neu.edu" || host == "129.10.113.189":
+			return true, true
+		default:
+			return false, false
+		}
+	}
+
 }
 
 func main() {
@@ -142,7 +158,7 @@ func main() {
 		log.Fatalf("Failed to create db: %v", err)
 		exit(1)
 	}
-	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), plcontroller.ControllerSender{RootCA: *conf.Local.RootCA})
+	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), &plcontroller.ControllerSender{RootCA: *conf.Local.RootCA})
 
 	if err != nil {
 		log.Fatalf("PLController Start returned with error: %v", err)

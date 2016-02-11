@@ -331,12 +331,17 @@ type wsMessage struct {
 func (rt *ReverseTraceroute) output() error {
 
 	st := fmt.Sprintf("%s\n%s", rt.HTML(), rt.StopReason)
+	var showError = !rt.Reaches()
+	var errorText string
+	if showError {
+		errorText = strings.Replace(rt.errorDetails.String(), "\n", "<br>", -1)
+	}
 	res, err := json.Marshal(&wsMessage{
 		HTML: strings.Replace(st, "\n", "<br>", -1),
 		// Either we're done because we reached or we're done for some other reason
 		// so signal the brower that we're gunna disconnect
 		Status: rt.Reaches() || rt.StopReason != "",
-		Error:  strings.Replace(rt.errorDetails.String(), "\n", "<br>", -1),
+		Error:  errorText,
 	})
 	if err != nil {
 		return err

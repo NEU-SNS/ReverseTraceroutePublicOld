@@ -4,23 +4,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 )
 
 func main() {
 	flag.Parse()
-	vpcreds, err := credentials.NewClientTLSFromFile("/home/rhansen2/sslkey/root.crt", "controller.revtr.ccs.neu.edu")
-	connvp := fmt.Sprintf("%s:%d", "fring.ccs.neu.edu", 4382)
+	vpcreds, err := credentials.NewClientTLSFromFile("/home/rhansen2/sslkey/root.crt", "vpservice.revtr.ccs.neu.edu")
+	connvp := fmt.Sprintf("%s:%d", "fring.ccs.neu.edu", 45000)
 	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	if err != nil {
 		panic(err)
@@ -28,30 +25,20 @@ func main() {
 	defer c3.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
-	cl := client.New(context.Background(), c3)
-	saddr, _ := util.Int32ToIPString(2164947137)
-	s, err := cl.Ping(ctx, &datamodel.PingArg{Pings: []*datamodel.PingMeasurement{
-		&datamodel.PingMeasurement{
-			Src:   2170636814,
-			SAddr: saddr,
-			Dst:   2162100337,
-			Spoof: true,
-			Count: "1",
-		},
-	}})
+	cl := client.New(ctx, c3)
+	res, err := cl.GetVPs()
 	if err != nil {
 		panic(err)
 	}
-	for {
-		r, err := s.Recv()
-		if err == io.EOF {
-			log.Info("done")
-			break
+	var spoofers []*datamodel.VantagePoint
+	for _, vp := range res.GetVps() {
+		if vp.CanSpoof {
+			fmt.Println(vp)
+			spoofers = append(spoofers, vp)
 		}
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		log.Info(r)
+	}
+	onePerSite := make(map[string]*datamodel.VantagePoint)
+	for _, sp := range spoofers {
+		onePerSite[sp.Site] = sp
 	}
 }
