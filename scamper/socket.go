@@ -160,7 +160,6 @@ func NewSocket(fname, cPath string, um unmarshal, dial DialFunc) (*Socket, error
 		df:            dial,
 	}
 
-	go sock.monitorResponses()
 	go sock.monitorConn()
 	return sock, nil
 }
@@ -178,23 +177,6 @@ func (s *Socket) Stop() {
 		return
 	default:
 		close(s.closeChan)
-	}
-}
-
-func (s *Socket) monitorResponses() {
-	for {
-		select {
-		case <-s.closeChan:
-			return
-		case resp := <-s.respChan:
-			cmdmap, err := s.cmds.getCmd(resp.UserID)
-			if err != nil {
-				log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
-				continue
-			}
-			s.cmds.rmCmd(resp.UserID)
-			cmdmap.done <- resp
-		}
 	}
 }
 
@@ -220,6 +202,7 @@ func (s *Socket) readConn() {
 			if err != nil {
 				s.con.Close()
 				if err = s.reconnect(); err != nil {
+					log.Error(err)
 					return
 				}
 				s.rc = 0
@@ -248,26 +231,33 @@ func (s *Socket) readConn() {
 				var filter []warts.WartsT
 				filter = append(filter, warts.PingT, warts.TracerouteT)
 				res, err := warts.Parse(dec.Bytes(), filter)
+				resp.Err = err
 				if err != nil {
-					resp.Err = err
-					s.respChan <- resp
 					log.Errorf("Could not parse response: %s", err)
-					return
 				}
 				if len(res) != 1 {
-					resp.Err = err
-					s.respChan <- resp
-					log.Error("Wrong number of objects parsed from warts")
-					return
+					log.Errorf("Wrong number of objects parsed from warts, expected 1, got %d", len(res))
+				} else {
+					switch t := res[0].(type) {
+					case warts.Traceroute:
+						resp.UserID = t.Flags.UserID
+					case warts.Ping:
+						resp.UserID = t.Flags.UserID
+					}
+					resp.Ret = res[0]
+					cmdmap, err := s.cmds.getCmd(resp.UserID)
+					if err != nil {
+						log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
+						return
+					}
+					s.cmds.rmCmd(resp.UserID)
+
+					select {
+					case <-s.closeChan:
+						s.con.Close()
+					case cmdmap.done <- resp:
+					}
 				}
-				switch t := res[0].(type) {
-				case warts.Traceroute:
-					resp.UserID = t.Flags.UserID
-				case warts.Ping:
-					resp.UserID = t.Flags.UserID
-				}
-				resp.Ret = res[0]
-				s.respChan <- resp
 			}()
 		}
 
