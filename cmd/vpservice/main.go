@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -26,6 +29,17 @@ type Config struct {
 func init() {
 	config.SetEnvPrefix("ATLAS")
 	config.AddConfigPath("./vpservice.config")
+	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
+		host, _, err := net.SplitHostPort(req.RemoteAddr)
+		switch {
+		case err != nil:
+			return false, false
+		case host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "rhansen2.local" || host == "rhansen2.revtr.ccs.neu.edu" || host == "129.10.113.189":
+			return true, true
+		default:
+			return false, false
+		}
+	}
 }
 
 func main() {
