@@ -64,7 +64,11 @@ func (p plmt) ReceiveSpoof(ctx con.Context, rs *dm.RecSpoof) (<-chan *dm.NotifyR
 				log.Error(err)
 				return
 			}
-			ret <- in
+			select {
+			case ret <- in:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ret, nil
@@ -93,7 +97,11 @@ func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 				log.Error(err)
 				return
 			}
-			ret <- in
+			select {
+			case ret <- in:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ret, nil
@@ -121,7 +129,11 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 				close(ret)
 				return
 			}
-			ret <- in
+			select {
+			case ret <- in:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ret, nil
@@ -145,7 +157,11 @@ func (p plmt) GetVPs(ctx con.Context, v *dm.VPRequest) (<-chan *dm.VPReturn, err
 				log.Error(err)
 				continue
 			}
-			ret <- in
+			select {
+			case ret <- in:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return ret, nil

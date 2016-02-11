@@ -51,7 +51,7 @@ type ControllerSender struct {
 }
 
 // Send satisfies the Sender interface for a ControllerSender
-func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
+func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	log.Debug("Sending: ", sps)
 	if cs.conn == nil {
 		ip, _ := util.Int32ToIPString(addr)
@@ -69,7 +69,9 @@ func (cs ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 		cs.conn = cc
 	}
 	cl := plc.NewControllerClient(cs.conn)
-	stream, err := cl.ReceiveSpoofedProbes(con.Background())
+	ctx, cancel := con.WithCancel(con.Background())
+	defer cancel()
+	stream, err := cl.ReceiveSpoofedProbes(ctx)
 	if err != nil {
 		log.Error(err)
 		return err
