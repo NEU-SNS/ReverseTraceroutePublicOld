@@ -157,13 +157,18 @@ type runningModel struct {
 	URL string
 }
 
+type revtrAndService struct {
+	rt   *ReverseTraceroute
+	serv *services
+}
+
 // RunRevtr handles /runrevtr
 type RunRevtr struct {
 	da         *dataaccess.DataAccess
 	vps        vpservice.VPSource
 	s          services
 	Route      string
-	keyToRevtr map[uint32]*ReverseTraceroute
+	keyToRevtr map[uint32]revtrAndService
 	mu         *sync.Mutex // protects ipToRevtr
 	next       *uint32
 	rootCa     string
@@ -179,7 +184,7 @@ func NewRunRevtr(da *dataaccess.DataAccess, rootCa string) RunRevtr {
 		da:         da,
 		s:          s,
 		Route:      "/runrevtr",
-		keyToRevtr: make(map[uint32]*ReverseTraceroute),
+		keyToRevtr: make(map[uint32]revtrAndService),
 		mu:         &sync.Mutex{},
 		rootCa:     rootCa,
 		next:       new(uint32),
@@ -254,7 +259,8 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	rtr, ok := rr.keyToRevtr[uint32(keyint)]
+	rtrs, ok := rr.keyToRevtr[uint32(keyint)]
+	rtr := rtrs.rt
 	if !ok {
 		defer ws.Close()
 		log.Error("Invalid Key")
@@ -278,6 +284,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		}
 		runningRevtrs.Sub(1)
 		defer rtr.ws.Close()
+		defer rtrs.serv.Close()
 		rr.mu.Lock()
 		defer rr.mu.Unlock()
 		delete(rr.keyToRevtr, uint32(keyint))
@@ -347,7 +354,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 			Dst:       dst,
 			Staleness: 60,
 		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
-		rr.keyToRevtr[key] = rt
+		rr.keyToRevtr[key] = revtrAndService{rt: rt, serv: &serv}
 	}
 	runningTemplate.Execute(rw, &rt)
 	return

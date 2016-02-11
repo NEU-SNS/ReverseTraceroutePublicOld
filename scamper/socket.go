@@ -320,6 +320,12 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 		return nil, 0, err
 	}
 	log.Debugf("Running cmd: %v", cmd)
+	select {
+	case <-s.closeChan:
+		s.cmds.rmCmd(id)
+		return nil, 0, fmt.Errorf("Socket closed before command could run.")
+	case s.cmdChan <- &cmd:
+	}
 	s.cmdChan <- &cmd
 	return cr.done, id, err
 }
