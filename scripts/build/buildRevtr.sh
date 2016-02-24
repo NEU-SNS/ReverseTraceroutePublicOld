@@ -14,5 +14,7 @@ docker build --rm=true -t rhansen2/revtr .
 
 rm revtr
 rm root.crt
+rm revtr.crt
+rm revtr.key
 rm revtr.config
 rm -rf webroot

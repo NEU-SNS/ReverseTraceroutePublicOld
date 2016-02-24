@@ -201,7 +201,6 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 }
 
 func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
-	log.Error("Accepting probes: ", probes)
 	ps := probes.GetProbes()
 	if ps == nil {
 		return nil, ErrorNilArgList
@@ -212,7 +211,7 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 	for _, p := range ps {
 		err := c.acceptProbe(p)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("%v %v", err, p)
 		}
 	}
 	return &dm.SpoofedProbesResponse{}, nil

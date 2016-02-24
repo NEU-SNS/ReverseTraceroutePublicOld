@@ -170,10 +170,14 @@ func (r *router) GetService(addr string) (ServiceDef, error) {
 
 func (r *router) All() []MeasurementTool {
 	services := r.source.All()
-	ret := make([]MeasurementTool, len(services))
-	for i, s := range services {
-		mt, _ := r.create(s)
-		ret[i] = mt
+	var ret []MeasurementTool
+	for _, service := range services {
+		mt, err := r.GetMT(service)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		ret = append(ret, mt)
 	}
 	return ret
 }

@@ -121,7 +121,6 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 		return errorNilVP
 	}
 	stat, err := checkRunning(getCmd(vp, uname, certPath, status))
-	log.Debug("VP: ", vp.Hostname, "Status: ", stat)
 	if err != nil {
 		return err
 	}
@@ -159,7 +158,6 @@ func checkVP(vp *dm.VantagePoint, uname, certPath, updateURL string) error {
 }
 
 func handleStopped(cmd *exec.Cmd) error {
-	log.Debug("Handling stopped vp")
 	ec := make(chan error, 1)
 	dc := make(chan struct{})
 	go func() {
@@ -233,7 +231,6 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateURL string) error
 		return err
 	}
 	if update {
-		log.Debugf("Updating, got version: %v", v)
 		urlString := httpupdate.FetchUrl()
 		_, err := url.Parse(urlString)
 		if err != nil {
@@ -253,7 +250,6 @@ func handleRunning(vp *dm.VantagePoint, uname, certPath, updateURL string) error
 }
 
 func updateService(cmd *exec.Cmd) error {
-	log.Debug("Updating Service")
 	ec := make(chan error, 1)
 	go func() {
 		out, err := cmd.CombinedOutput()
@@ -295,7 +291,6 @@ func checkVersion(cmd *exec.Cmd) (string, error) {
 	case v := <-res:
 		vlines := strings.Split(v, "\n")
 		vline := vlines[len(vlines)-2]
-		log.Debugf("Got version: %v", vline)
 		return vline, nil
 	case <-time.After(time.Second * 40):
 		if cmd.Process != nil {
@@ -319,16 +314,12 @@ func checkRunning(cmd *exec.Cmd) (procStatus, error) {
 		}
 		switch {
 		case run.Match(out):
-			log.Debugf("Got response: %s", out)
 			ps <- running
 		case stop.Match(out):
-			log.Debugf("Got response: %s", out)
 			ps <- stopped
 		case nf.Match(out):
-			log.Debugf("Got response: %s", out)
 			ps <- notFound
 		case pidLeft.Match(out):
-			log.Debugf("Got response: %s", out)
 			ps <- pidExists
 		default:
 			ec <- errorUnknownService

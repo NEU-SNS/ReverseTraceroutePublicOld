@@ -987,7 +987,7 @@ var (
 func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
 	log.Debug("Finding intersecting traceroute ", pairs, " alias: ", alias, "stale: ", int64(stale.Minutes()))
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, stale, pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, int64(stale.Minutes()), pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
 	if err != nil {
 		log.Error(err)
 		return nil, err

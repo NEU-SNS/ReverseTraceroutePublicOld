@@ -2,7 +2,7 @@
 
 cd ../../cmd/plcontroller
 
-go build
+go build -a
 
 cp plcontroller ./docker
 cp plcontroller.config ./docker

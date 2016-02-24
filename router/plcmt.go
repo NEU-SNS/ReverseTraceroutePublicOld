@@ -54,10 +54,10 @@ func (p plmt) ReceiveSpoof(ctx con.Context, rs *dm.RecSpoof) (<-chan *dm.NotifyR
 		return nil, err
 	}
 	go func() {
+		defer close(ret)
 		for {
 			in, err := recsp.Recv()
 			if err == io.EOF {
-				close(ret)
 				return
 			}
 			if err != nil {
@@ -86,14 +86,13 @@ func (p plmt) Ping(ctx con.Context, pa *dm.PingArg) (<-chan *dm.Ping, error) {
 		log.Error(err)
 	}
 	go func() {
+		defer close(ret)
 		for {
 			in, err := ps.Recv()
 			if err == io.EOF {
-				close(ret)
 				return
 			}
 			if err != nil {
-				close(ret)
 				log.Error(err)
 				return
 			}
@@ -118,15 +117,14 @@ func (p plmt) Traceroute(ctx con.Context, t *dm.TracerouteArg) (<-chan *dm.Trace
 		log.Error(err)
 	}
 	go func() {
+		defer close(ret)
 		for {
 			in, err := ps.Recv()
 			if err == io.EOF {
-				close(ret)
 				return
 			}
 			if err != nil {
 				log.Error(err)
-				close(ret)
 				return
 			}
 			select {
@@ -147,15 +145,15 @@ func (p plmt) GetVPs(ctx con.Context, v *dm.VPRequest) (<-chan *dm.VPReturn, err
 		return nil, err
 	}
 	go func() {
+		defer close(ret)
 		for {
 			in, err := ps.Recv()
 			if err == io.EOF {
-				close(ret)
 				return
 			}
 			if err != nil {
 				log.Error(err)
-				continue
+				return
 			}
 			select {
 			case ret <- in:

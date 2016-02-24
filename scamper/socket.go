@@ -38,17 +38,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/uuencode"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
+	"github.com/prometheus/log"
 )
-
-type stringReadWriter interface {
-	io.Reader
-	io.Writer
-	ReadString(delim byte) (line string, err error)
-}
 
 var (
 	// ErrorCmdNotFound returned when no cmd is found in the cmdMap
@@ -113,24 +107,20 @@ type userID struct {
 	UserID uint32 `json:"userid"`
 }
 
-type unmarshal func(data []byte, v interface{}) error
-
 // Socket represents a scamper control socket
 type Socket struct {
-	fname         string
-	ip            string
-	port          string
-	converterPath string
-	closeChan     chan struct{}
-	errChan       chan error
-	cmdChan       chan *Cmd
-	respChan      chan Response
-	cmds          *cmdMap
-	con           net.Conn
-	wartsHeader   [2]Response
-	rc            uint32
-	unmarsh       unmarshal
-	df            DialFunc
+	fname       string
+	ip          string
+	port        string
+	closeChan   chan struct{}
+	errChan     chan error
+	cmdChan     chan *Cmd
+	respChan    chan Response
+	cmds        *cmdMap
+	con         net.Conn
+	wartsHeader [2]Response
+	rc          uint32
+	df          DialFunc
 	// Protects userID
 	mu     sync.Mutex
 	userID uint32
@@ -140,7 +130,7 @@ type Socket struct {
 type DialFunc func(network, address string) (net.Conn, error)
 
 // NewSocket creates a new scamper socket
-func NewSocket(fname, cPath string, um unmarshal, dial DialFunc) (*Socket, error) {
+func NewSocket(fname string, dial DialFunc) (*Socket, error) {
 	con, err := dial("unix", fname)
 	if err != nil {
 		return nil, err
@@ -149,15 +139,13 @@ func NewSocket(fname, cPath string, um unmarshal, dial DialFunc) (*Socket, error
 	rc := make(chan Response, 10)
 	clc := make(chan struct{})
 	sock := &Socket{
-		fname:         fname,
-		cmds:          newCmdMap(),
-		cmdChan:       cc,
-		respChan:      rc,
-		closeChan:     clc,
-		con:           con,
-		converterPath: cPath,
-		unmarsh:       um,
-		df:            dial,
+		fname:     fname,
+		cmds:      newCmdMap(),
+		cmdChan:   cc,
+		respChan:  rc,
+		closeChan: clc,
+		con:       con,
+		df:        dial,
 	}
 
 	go sock.monitorConn()
@@ -214,7 +202,7 @@ func (s *Socket) readConn() {
 				log.Errorf("Error parsing response: %s", line)
 				continue
 			}
-			if resp.RType != DATA {
+			if resp.RType != data {
 				continue
 			}
 			// The first two data messages received are the header of the warts format
@@ -254,7 +242,6 @@ func (s *Socket) readConn() {
 
 					select {
 					case <-s.closeChan:
-						s.con.Close()
 					case cmdmap.done <- resp:
 					}
 				}
@@ -270,7 +257,6 @@ func (s *Socket) monitorConn() {
 	for {
 		select {
 		case c := <-s.cmdChan:
-			log.Debugf("Issuing cmd: %v", c)
 			err := c.issueCommand(s.con)
 			if err != nil {
 				log.Errorf("Error issuing command %s", c.Marshal())
@@ -282,15 +268,6 @@ func (s *Socket) monitorConn() {
 
 		}
 	}
-}
-
-func convertWarts(path string, b []byte) ([]byte, error) {
-	res, err := util.ConvertBytes(path, b)
-	if err != nil {
-		log.Errorf("Failed to convert bytes: %v, %s", err, b)
-		return []byte{}, err
-	}
-	return res, err
 }
 
 func (s *Socket) getID() uint32 {
@@ -319,14 +296,12 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 	if err != nil {
 		return nil, 0, err
 	}
-	log.Debugf("Running cmd: %v", cmd)
 	select {
 	case <-s.closeChan:
 		s.cmds.rmCmd(id)
 		return nil, 0, fmt.Errorf("Socket closed before command could run.")
 	case s.cmdChan <- &cmd:
 	}
-	s.cmdChan <- &cmd
 	return cr.done, id, err
 }
 
@@ -351,8 +326,8 @@ func (s *Socket) Port() string {
 func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 	resp := Response{}
 	switch {
-	case strings.Contains(r, string(OK)):
-		resp.RType = OK
+	case strings.Contains(r, string(ok)):
+		resp.RType = ok
 		r = strings.TrimSpace(r)
 		split := strings.Split(r, " ")
 		idsp := strings.Split(split[1], "-")
@@ -361,11 +336,11 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 			return resp, ErrorBadResponse
 		}
 		return resp, nil
-	case strings.Contains(r, string(ERR)):
-		resp.RType = ERR
+	case strings.Contains(r, string(err)):
+		resp.RType = err
 		return resp, nil
-	case strings.Contains(r, string(DATA)):
-		resp.RType = DATA
+	case strings.Contains(r, string(data)):
+		resp.RType = data
 		split := strings.Split(r, " ")
 		if len(split) != 2 {
 			return resp, ErrorBadDataResponse
@@ -383,8 +358,8 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		}
 		resp.Data = buff
 		return resp, nil
-	case strings.Contains(r, string(MORE)):
-		resp.RType = MORE
+	case strings.Contains(r, string(more)):
+		resp.RType = more
 		return resp, nil
 	}
 	return resp, ErrorBadResponse

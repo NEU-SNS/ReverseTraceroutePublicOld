@@ -52,7 +52,7 @@
                             res.append($('<p>Error! Missing key to display reverse traceroute</p>'))
                                 return
                         }
-                        ws = new WebSocket("ws://{{ .URL }}/ws?key=" + key)
+                        ws = new WebSocket("wss://{{ .URL }}/ws?key=" + key)
                         ws.onmessage = function(e) {
                             mess =  $.parseJSON(e.data)
                             done = mess.Status

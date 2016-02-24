@@ -29,7 +29,6 @@
 package plcontroller
 
 import (
-	"encoding/json"
 	"net"
 	"os"
 	"path"
@@ -50,11 +49,8 @@ func (c *plControllerT) handlEvents() {
 			return
 		case e := <-c.w.Events:
 			if e.Op&fsnotify.Create == fsnotify.Create {
-				log.Debugf("Received fs event: %v", e)
 				s, err := scamper.NewSocket(
 					e.Name,
-					*c.config.Scamper.ConverterPath,
-					json.Unmarshal,
 					net.Dial)
 				if err != nil {
 					log.Error(err)
@@ -75,7 +71,6 @@ func (c *plControllerT) handlEvents() {
 				break
 			}
 			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				log.Debugf("Received fs event: %v", e)
 				ip := strings.Split(path.Base(e.Name), ":")[0]
 				nip, err := util.IPStringToInt32(ip)
 				if err != nil {
@@ -97,7 +92,6 @@ func (c *plControllerT) handlEvents() {
 
 //This is only for use when a server is going down
 func (c *plControllerT) removeAllVps() {
-	log.Debug("Removing all vps")
 	for sock := range c.client.GetAllSockets() {
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
@@ -140,7 +134,6 @@ func cleanDir(dir string) error {
 }
 
 func (c *plControllerT) watchDir(dir string, ec chan error) {
-	log.Debugf("Starting to watch dir: %s", dir)
 	err := cleanDir(dir)
 	if err != nil {
 		log.Errorf("Failed to clean watch directory: %v", err)
@@ -166,6 +159,6 @@ func (c *plControllerT) watchDir(dir string, ec chan error) {
 func (c *plControllerT) closeWatcher() {
 	err := c.w.Close()
 	if err != nil {
-		log.Debug(err)
+		log.Error(err)
 	}
 }

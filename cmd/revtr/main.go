@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"strings"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
@@ -84,8 +85,32 @@ func main() {
 	http.HandleFunc(runrtr.Route, runrtr.RunRevtr)
 	http.HandleFunc(srcs.Route, srcs.Handle)
 	http.HandleFunc("/ws", runrtr.WS)
-	http.Handle("/metrics", prometheus.Handler())
+	metricsServ := http.NewServeMux()
+	metricsServ.Handle("/metrics", prometheus.Handler())
+	go func() {
+		for {
+			log.Error(http.ListenAndServe(":45454", metricsServ))
+		}
+	}()
+	go func() {
+		for {
+			log.Error(http.ListenAndServe(":8181", http.HandlerFunc(redirect)))
+		}
+	}()
 	for {
-		log.Error(http.ListenAndServe(":8080", nil))
+		log.Error(http.ListenAndServeTLS(":8080", *conf.CertFile, *conf.KeyFile, nil))
 	}
+}
+
+func redirect(w http.ResponseWriter, req *http.Request) {
+	host, _, err := net.SplitHostPort(req.Host)
+	if err != nil {
+		if !strings.Contains(err.Error(), "missing port in address") {
+			log.Error(err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		host = req.Host
+	}
+	http.Redirect(w, req, "https://"+host+":443"+req.RequestURI, http.StatusMovedPermanently)
 }
