@@ -34,7 +34,6 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess/sql"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 // DbConfig is a database configuration
@@ -90,7 +89,6 @@ func (d *DataAccess) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 
 // StorePing stores a ping
 func (d *DataAccess) StorePing(p *dm.Ping) error {
-	log.Debug("Storing ping: ", p)
 	return d.db.StorePing(p)
 }
 
@@ -236,7 +234,6 @@ func New(c DbConfig) (*DataAccess, error) {
 			Db:       cc.Db,
 		})
 	}
-	log.Info("Creating DB with config: ", conf)
 	db, err := sql.NewDB(conf)
 	if err != nil {
 		return nil, err

@@ -465,6 +465,7 @@ func testTS(vpm vpMap, rootCA string) {
 		}
 		if err != nil {
 			log.Error(err)
+			break
 		}
 		if p == nil {
 			continue

@@ -45,6 +45,7 @@ func (c *channel) Send(p *dm.Probe) {
 func (sm *spoofMap) Add(notify chan *dm.Probe, kill chan struct{}, ids []uint32) {
 	sm.Lock()
 	defer sm.Unlock()
+	log.Debugf("Adding spoof IDs: %v", ids)
 	ch := newChannel(notify, kill, len(ids))
 	for _, id := range ids {
 		sm.sm[id] = ch
@@ -60,5 +61,5 @@ func (sm *spoofMap) Notify(probe *dm.Probe) {
 		delete(sm.sm, probe.ProbeId)
 		return
 	}
-	log.Error("No channel found for probe: ", probe)
+	log.Errorf("No channel found for probe: %v", probe.ProbeId)
 }

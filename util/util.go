@@ -33,7 +33,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -172,13 +171,6 @@ func ConvertBytes(path string, b []byte) ([]byte, error) {
 	return res[:n], err
 }
 
-// StartPProf starts the pprof http service
-func StartPProf(addr string) {
-	go func() {
-		log.Println(http.ListenAndServe(addr, nil))
-	}()
-}
-
 // Int32ToIPString converts an ip as an uint32 to a string
 func Int32ToIPString(ip uint32) (string, error) {
 	var a, b, c, d byte
@@ -244,7 +236,9 @@ func GetBindAddr() (string, error) {
 		return "", err
 	}
 	for _, iface := range ifaces {
-		if strings.Contains(iface.Name, "eth0") && uint(iface.Flags)&uint(net.FlagUp) > 0 {
+		if strings.Contains(iface.Name, "em1") ||
+			strings.Contains(iface.Name, "eth0") &&
+				uint(iface.Flags)&uint(net.FlagUp) > 0 {
 			addrs, err := iface.Addrs()
 			if err != nil {
 				return "", err

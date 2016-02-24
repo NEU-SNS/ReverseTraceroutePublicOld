@@ -2,7 +2,7 @@
 
 cd ../../cmd/controller
 
-go build
+go build -a
 
 cp controller ./docker
 cp controller.config ./docker

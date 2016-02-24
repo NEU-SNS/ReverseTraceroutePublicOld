@@ -35,18 +35,13 @@ import (
 	"sync"
 )
 
-// SResponseT represents the type of responses scamper can send
-type SResponseT string
+type responseT string
 
 const (
-	// OK is the accept response from scamper
-	OK SResponseT = "OK"
-	// MORE is the response when more commands can be given
-	MORE SResponseT = "MORE"
-	// DATA represensts a data message
-	DATA SResponseT = "DATA"
-	// ERR is the error response from scamper
-	ERR SResponseT = "ERR"
+	ok   responseT = "OK"
+	more responseT = "MORE"
+	data responseT = "DATA"
+	err  responseT = "ERR"
 )
 
 var (
@@ -63,7 +58,7 @@ var (
 
 // Response represents a response from scamper
 type Response struct {
-	RType  SResponseT
+	RType  responseT
 	Data   []byte
 	DS     int
 	UserID uint32
@@ -101,6 +96,9 @@ func newSocketMap() *socketMap {
 func (sm *socketMap) Add(s *Socket) {
 	sm.Lock()
 	defer sm.Unlock()
+	if so, ok := sm.socks[s.IP()]; ok {
+		so.Stop()
+	}
 	sm.socks[s.IP()] = s
 }
 

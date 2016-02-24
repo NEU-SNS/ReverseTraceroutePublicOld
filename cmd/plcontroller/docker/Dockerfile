@@ -1,9 +1,7 @@
 FROM ubuntu:latest
 
-ENV LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
 WORKDIR /plcontroller
 COPY . /plcontroller
-
 
 RUN useradd -ms /bin/bash plcontroller
 RUN chown plcontroller:plcontroller id_rsa_pl

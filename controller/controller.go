@@ -451,9 +451,15 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				}
 				defer mt.Close()
-				mt.ReceiveSpoof(ctx, &dm.RecSpoof{
+				resp, err := mt.ReceiveSpoof(ctx, &dm.RecSpoof{
 					Spoofs: sps,
 				})
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				for _ = range resp {
+				}
 			}(sd, spoofs)
 		}
 		for sd, spoofs := range sdForSpoofP {
@@ -466,9 +472,16 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				}
 				defer mt.Close()
-				mt.Ping(ctx, &dm.PingArg{
+				resp, err := mt.Ping(ctx, &dm.PingArg{
 					Pings: sps,
 				})
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				for _ = range resp {
+
+				}
 			}(sd, spoofs)
 		}
 		wg.Add(1)
@@ -495,7 +508,12 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					if err != nil {
 						log.Error(err)
 					}
-					ret <- px
+					select {
+					case <-ctx.Done():
+						close(kill)
+						return
+					case ret <- px:
+					}
 				}
 			}
 		}()

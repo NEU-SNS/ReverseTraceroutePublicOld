@@ -30,8 +30,6 @@ package uuencode
 import (
 	"bytes"
 	"errors"
-
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 var (
@@ -65,9 +63,7 @@ func UUDecode(e []byte) ([]byte, error) {
 	sep := []byte{'\n'}
 	result := make([]byte, 0, len(e))
 	lines := bytes.Split(e, sep)
-	log.Debugf("%s lines to decode", lines)
 	for _, line := range lines {
-		log.Debugf("Decoding line: %s", line)
 		if len(line) == 0 || line[0] > 96 || line[0] < 32 {
 			break
 		}
@@ -94,12 +90,10 @@ func uudecodeLine(e []byte) ([]byte, error) {
 		}
 		result = append(result, s...)
 	}
-	log.Debugf("Line Data Len: %d len of iteration: %d", lenB, len(e))
 	return result[:lenB], nil
 }
 
 func uudecodeBytes(by []byte) ([]byte, error) {
-	log.Debugf("Decoding bytes: %v", by)
 	bytes := make([]byte, 3)
 	if (by[0] > 96 || by[0] < 32) ||
 		(by[1] > 96 || by[1] < 32) ||

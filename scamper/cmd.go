@@ -35,7 +35,6 @@ import (
 	"reflect"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
@@ -124,7 +123,6 @@ func (c *Cmd) marshal() []byte {
 		buf.WriteString(arg + " ")
 	}
 	buf.WriteString("\n")
-	log.Debugf("Cmd as string: %s", buf.String())
 	return buf.Bytes()
 }
 
@@ -136,7 +134,6 @@ func (c *Cmd) Marshal() []byte {
 // IssueCommand marshals the Cmd and writes it to the provided writer
 func (c *Cmd) issueCommand(w io.Writer) error {
 	cmd := c.marshal()
-	log.Debugf("Writing cmd: %s", cmd)
 	_, err := w.Write(cmd)
 	return err
 }
@@ -182,7 +179,6 @@ func createCmd(arg interface{}, t cmdT) (Cmd, error) {
 		if o, ok := opts[f.Name]; ok {
 			str, err := o.opt(o.format, v.FieldByName(f.Name).Interface())
 			if err != nil {
-				log.Errorf("Failed on option: %s", f.Name)
 				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
 			}
 			if len(str) == 0 {

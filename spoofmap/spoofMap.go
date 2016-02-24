@@ -79,7 +79,8 @@ func (s *SpoofMap) Receive(p *dm.Probe) error {
 	s.Lock()
 	defer s.Unlock()
 	if sp, ok := s.spoofs[p.ProbeId]; ok {
-		sp.probe = p
+		pr := *p
+		sp.probe = &pr
 		return nil
 	}
 	return ErrorSpoofNotFound

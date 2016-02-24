@@ -24,208 +24,67 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package scamper_test
 
-/*
+import (
+	"net"
+	"testing"
+
+	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
+)
+
 var sockPath = "/tmp/192.168.1.2:5000"
 var testIP = "192.168.1.2"
 var testPort = "5000"
 
-func TestMain(m *testing.M) {
-	setupSocket()
-	result := m.Run()
-	cleanupSocket()
-	os.Exit(result)
-}
-
-var listener net.Listener
-
-func setupSocket() {
-	lis, _ := net.Listen("unix", sockPath)
-	listener = lis
+func setupSocket(t *testing.T) func() {
+	l, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Failed to setupSocket: %v", err)
+	}
+	donec := make(chan struct{})
 	go func() {
 		for {
-			con, err := lis.Accept()
-			content, err := ioutil.ReadFile("../doc/test_scamper.txt")
-			if err != nil {
-				con.Close()
-				continue
+			select {
+			case <-donec:
+				l.Close()
+				return
+			default:
+				l.Accept()
 			}
-			_, err = con.Write(content)
 		}
 	}()
-
-}
-
-func cleanupSocket() {
-	os.Remove(sockPath)
-}
-
-func TestSocket(t *testing.T) {
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-	soc.Stop()
-
-}
-
-func TestSocketDoMeasurement(t *testing.T) {
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-	testIDStr := "0"
-	var testID uint32
-	ping := dm.PingMeasurement{
-		Dst:    "8.8.8.8",
-		Src:    testIP,
-		UserId: testIDStr,
-	}
-
-	rec, _, err := soc.DoMeasurement(ping)
-	if err != nil {
-		t.Fatalf("Failed to do measurement: %v", err)
-	}
-	select {
-	case r := <-rec:
-		if r.UserID != testID {
-			t.Fatalf("UserId did not match %d != %d", testID, r.UserID)
-		}
-	case <-time.After(time.Second * 5):
-		t.Fatal("Timeout running measurement")
-	}
-	soc.Stop()
-}
-
-func TestSocketIP(t *testing.T) {
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-	ip := soc.IP()
-	if ip != testIP {
-		t.Fatalf("SocketIP failed, got: %s expected: %s", ip, testIP)
+	return func() {
+		close(donec)
 	}
 }
 
-func TestSocketPort(t *testing.T) {
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
+func TestSocketStop(t *testing.T) {
+	done := setupSocket(t)
+	defer util.LeakCheck(t)()
+	sock, err := scamper.NewSocket(sockPath, net.Dial)
 	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
+		t.Fatalf("Failed to create a socket: %v", err)
 	}
-	port := soc.Port()
-	if port != testPort {
-		t.Fatalf("SocketIP failed, got: %s expected: %s", port, testPort)
-	}
+	sock.Stop()
+	done()
 }
 
-func TestClientDoMeasurementNoSocket(t *testing.T) {
-	client := scamper.NewClient()
-	_, _, err := client.DoMeasurement("192.168.1.1", 6)
-	if err == nil {
-		t.Fatal("Client failed to throw error for unknown socket")
+func TestSocketIP_Port(t *testing.T) {
+	done := setupSocket(t)
+	defer util.LeakCheck(t)()
+	sock, err := scamper.NewSocket(sockPath, net.Dial)
+	if err != nil {
+		t.Fatalf("Failed to create a socket: %v", err)
 	}
+	if sock.IP() != "192.168.1.2" {
+		t.Fatalf("Failed getting socket IP expected[192.168.1.2] got[%s]", sock.IP())
+	}
+	if sock.Port() != "5000" {
+		t.Fatalf("Failed getting socket Port expected[5000] got [%s]", sock.Port())
+	}
+	sock.Stop()
+	done()
 }
-
-func TestClientAddSocket(t *testing.T) {
-	client := scamper.NewClient()
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-
-	client.AddSocket(soc)
-
-}
-
-func TestClientRemoveSocket(t *testing.T) {
-	client := scamper.NewClient()
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-
-	client.AddSocket(soc)
-	client.RemoveSocket(soc.IP())
-}
-
-func TestClientGetSocket(t *testing.T) {
-	client := scamper.NewClient()
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-
-	client.AddSocket(soc)
-	soc, err = client.GetSocket(soc.IP())
-	if err != nil {
-		t.Fatal("Failed to get registered socket")
-	}
-}
-
-/*
-func TestClientDoMeasurement(t *testing.T) {
-	soc, err := scamper.NewSocket(
-		sockPath,
-		"/usr/local/bin/sc_warts2json",
-		json.Unmarshal,
-		net.Dial)
-
-	if err != nil {
-		t.Fatalf("Failed to create socket: %v", err)
-	}
-	testIDStr := "0"
-	var testID uint32
-	ping := dm.PingMeasurement{
-		Dst:    "8.8.8.8",
-		Src:    testIP,
-		UserId: testIDStr,
-	}
-	client := scamper.NewClient()
-	client.AddSocket(soc)
-	rec, _, err := client.DoMeasurement(soc.IP(), ping)
-	if err != nil {
-		t.Fatalf("Failed to do measurement: %v", err)
-	}
-	select {
-	case r := <-rec:
-		if r.UserID != testID {
-			t.Fatalf("UserId did not match %d != %d", testID, r.UserID)
-		}
-	case <-time.After(time.Second * 5):
-		t.Fatal("Timeout running measurement")
-	}
-	soc.Stop()
-}
-*/

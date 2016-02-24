@@ -11,3 +11,5 @@ ENTRYPOINT ["/revtr/revtr"]
 CMD ["-loglevel", "error"]
 
 EXPOSE 8080
+EXPOSE 8181
+EXPOSE 45454
