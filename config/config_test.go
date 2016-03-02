@@ -25,7 +25,16 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-package config
+package config_test
+
+import (
+	"flag"
+	"io/ioutil"
+	"os"
+	"testing"
+
+	"github.com/NEU-SNS/ReverseTraceroute/config"
+)
 
 type SubConfig struct {
 	Name string `flag:"sub_name"`
@@ -38,7 +47,7 @@ type Config struct {
 	SubCon SubConfig
 }
 
-const config = `
+const test_config = `
 name: Rob
 num: 65
 subcon:
@@ -53,4 +62,76 @@ var testConfig = Config{
 		Name: "Rob",
 		Age:  25,
 	},
+}
+
+func TestEnv(t *testing.T) {
+
+	env := map[string]string{
+		"NAME":     "Rob",
+		"NUM":      "65",
+		"SUB_NAME": "Rob",
+		"SUB_AGE":  "25",
+	}
+	for k, v := range env {
+		os.Setenv(k, v)
+	}
+	defer func() {
+		for k, _ := range env {
+			os.Unsetenv(k)
+		}
+	}()
+	var conf Config
+	flags := flag.NewFlagSet("Test", flag.ContinueOnError)
+	flags.StringVar(&conf.Name, "name", "", "")
+	flags.StringVar(&conf.SubCon.Name, "sub-name", "", "")
+	flags.IntVar(&conf.Num, "num", 0, "")
+	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
+	err := config.Parse(flags, &conf)
+	if err != nil {
+		t.Fatalf("Error Parsing flags: ", err)
+	}
+	if testConfig != conf {
+		t.Fatalf("Parseing ENV failed. Expected[%v] got[%v]", testConfig, conf)
+	}
+}
+
+func TestFile(t *testing.T) {
+	fileName := "revtr.Config"
+	tmpfile, err := ioutil.TempFile("", fileName)
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	_, err = tmpfile.Write([]byte(test_config))
+	if err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+	config.AddConfigPath(tmpfile.Name())
+	tmpfile.Close()
+	var conf Config
+	flags := flag.NewFlagSet("Test", flag.ContinueOnError)
+	flags.StringVar(&conf.Name, "name", "", "")
+	flags.StringVar(&conf.SubCon.Name, "sub-name", "", "")
+	flags.IntVar(&conf.Num, "num", 0, "")
+	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
+	err = config.Parse(flags, &conf)
+	if err != nil {
+		t.Fatalf("Error Parsing flags: ", err)
+	}
+	if testConfig != conf {
+		t.Fatalf("Parseing ENV failed. Expected[%v] got[%v]", testConfig, conf)
+	}
+}
+
+func TestParse(t *testing.T) {
+	var conf Config
+	flags := flag.NewFlagSet("Test", flag.ContinueOnError)
+	flags.StringVar(&conf.Name, "name", "", "")
+	flags.StringVar(&conf.SubCon.Name, "sub-name", "", "")
+	flags.IntVar(&conf.Num, "num", 0, "")
+	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
+	err := config.Parse(flags, conf)
+	if err != config.ErrorInvalidType {
+		t.Fatalf("Error parsing config Expected[%v] got[%v]", config.ErrorInvalidType, err)
+	}
 }
