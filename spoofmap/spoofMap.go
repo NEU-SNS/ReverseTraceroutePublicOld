@@ -45,6 +45,7 @@ func New(s Sender) *SpoofMap {
 		quit:      make(chan struct{}),
 	}
 	go sm.sendSpoofs()
+	go sm.cleanOld()
 	return sm
 }
 
@@ -100,6 +101,7 @@ func (s *SpoofMap) sendSpoofs() {
 			for id, spoof := range s.spoofs {
 				if spoof.probe != nil {
 					dests[spoof.probe.SenderIp] = append(dests[spoof.probe.SenderIp], spoof.probe)
+					spoof.probe = nil
 					delete(s.spoofs, id)
 				}
 			}
@@ -112,6 +114,33 @@ func (s *SpoofMap) sendSpoofs() {
 				delete(dests, ip)
 			}
 			s.Unlock()
+		}
+	}
+}
+
+// run this in a goroutine
+// spoofed probes may never get responses
+// clean out old ones so the memory doesn't grow quite as much
+func (s *SpoofMap) cleanOld() {
+	t := time.NewTicker(time.Minute * 2)
+	var count int
+	for {
+		select {
+		case <-s.quit:
+			return
+		case <-t.C:
+			s.Lock()
+			count = 0
+			for id, spoof := range s.spoofs {
+				if time.Since(spoof.t) > time.Second*60 {
+					spoof.probe = nil
+					delete(s.spoofs, id)
+				}
+				count++
+				if count == 200 {
+					break
+				}
+			}
 		}
 	}
 }

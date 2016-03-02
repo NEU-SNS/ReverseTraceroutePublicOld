@@ -120,6 +120,10 @@ func TestSendSpoofs(t *testing.T) {
 			[]datamodel.Probe{datamodel.Probe{ProbeId: 1}, datamodel.Probe{ProbeId: 2}, datamodel.Probe{ProbeId: 3}}, nil,
 			[]datamodel.Probe{datamodel.Probe{ProbeId: 1}, datamodel.Probe{ProbeId: 2}, datamodel.Probe{ProbeId: 3}},
 		},
+		{[]datamodel.Spoof{datamodel.Spoof{Id: 1}, datamodel.Spoof{Id: 2}, datamodel.Spoof{Id: 3}, datamodel.Spoof{Id: 4}}, nil,
+			[]datamodel.Probe{datamodel.Probe{ProbeId: 1}, datamodel.Probe{ProbeId: 2}, datamodel.Probe{ProbeId: 3}}, nil,
+			[]datamodel.Probe{datamodel.Probe{ProbeId: 1}, datamodel.Probe{ProbeId: 2}, datamodel.Probe{ProbeId: 3}},
+		},
 	} {
 		s := &sender{}
 		sm := spoofmap.New(s)
@@ -133,6 +137,7 @@ func TestSendSpoofs(t *testing.T) {
 				t.Fatalf("Receiving probe. execpted[%v], got[%v]", test.addErr, err)
 			}
 		}
+		// Sending happens every 2 seconds
 		<-time.After(time.Second * 3)
 		pr := s.getProbes()
 		if len(pr) != len(test.expectedSent) {

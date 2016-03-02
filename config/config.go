@@ -30,7 +30,14 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"reflect"
+)
+
+var (
+	// ErrorInvalidType is returned when Parse is passed a bad opts object
+	ErrorInvalidType = fmt.Errorf("Parse must be passed a non-nil pointer")
 )
 
 func merge(f *flag.FlagSet, fn func(string) *string) error {
@@ -54,6 +61,10 @@ func merge(f *flag.FlagSet, fn func(string) *string) error {
 // Parse fills in the flag set using environment variables and config files
 // opts is an object that will represent the format of the config files being parsed
 func Parse(f *flag.FlagSet, opts interface{}) error {
+	ov := reflect.ValueOf(opts)
+	if ov.Kind() != reflect.Ptr || ov.IsNil() {
+		return ErrorInvalidType
+	}
 	f.Parse(os.Args[1:])
 	err := mergeEnvironment(f)
 	if err != nil {

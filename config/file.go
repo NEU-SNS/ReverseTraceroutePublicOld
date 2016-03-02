@@ -36,15 +36,12 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/NEU-SNS/ReverseTraceroute/log"
-
 	"gopkg.in/yaml.v2"
 )
 
 func parseYamlConfig(path string, opts interface{}) error {
 	f, err := os.Open(path)
 	if err != nil && os.IsNotExist(err) {
-		log.Infof("Error opening config file: %s, %v", path, err)
 		var ret error
 		if os.IsNotExist(err) {
 			// Return nil, not a problem if we don't find a config file
@@ -91,9 +88,6 @@ func (cp configPathOrder) Less(i, j int) bool { return cp[i].Order < cp[j].Order
 
 func mergeFiles(f *flag.FlagSet, opts interface{}) error {
 	ov := reflect.ValueOf(opts)
-	if ov.Kind() != reflect.Ptr || ov.IsNil() {
-		return fmt.Errorf("mergeFiles, opts invalid type")
-	}
 	paths := make([]configPath, len(configPaths))
 	var i int
 	for _, val := range configPaths {
@@ -108,7 +102,6 @@ func mergeFiles(f *flag.FlagSet, opts interface{}) error {
 		}
 		ops, err := buildMap(ov)
 		if err != nil {
-			log.Errorf("Failed to build map: %v", err)
 			return nil
 		}
 		err = handleFile(f, ops)
@@ -146,10 +139,16 @@ func buildMap(opts reflect.Value) (map[string]string, error) {
 		if name == "" {
 			continue
 		}
-		if opts.Elem().Field(i).IsNil() {
-			continue
+		var val string
+		switch opts.Elem().Field(i).Kind() {
+		case reflect.Ptr:
+			if opts.Elem().Field(i).IsNil() {
+				continue
+			}
+			val = fmt.Sprintf("%v", opts.Elem().Field(i).Elem())
+		default:
+			val = fmt.Sprintf("%v", opts.Elem().Field(i).Interface())
 		}
-		val := fmt.Sprintf("%v", opts.Elem().Field(i).Elem())
 		res[name] = val
 	}
 	return res, nil

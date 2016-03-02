@@ -225,7 +225,7 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequ
 					close(in)
 					return
 				}
-				go a.fillAtlas(ir.Dest)
+				go a.fillAtlas(ir.Dest, ir.Staleness)
 			}
 
 			close(in)
@@ -313,7 +313,7 @@ func (a *Atlas) connect() bool {
 	return true
 }
 
-func (a *Atlas) fillAtlas(dest uint32) {
+func (a *Atlas) fillAtlas(dest uint32, stale int64) {
 	if !a.connect() {
 		return
 	}
@@ -328,6 +328,9 @@ func (a *Atlas) fillAtlas(dest uint32) {
 			Attempts:   "1",
 			LoopAction: "1",
 			Loops:      "3",
+			CheckCache: true,
+			CheckDb:    true,
+			Staleness:  stale,
 		}
 		traces = append(traces, curr)
 	}

@@ -99,11 +99,11 @@ func uudecodeBytes(by []byte) ([]byte, error) {
 		(by[1] > 96 || by[1] < 32) ||
 		(by[2] > 96 || by[2] < 32) ||
 		(by[3] > 96 || by[3] < 32) {
-		return bytes, ErrorInvalidByte
+		return nil, ErrorInvalidByte
 	}
 	bytes[0] = (((by[0] - 32) & 0x3F) << 2 & 0xFC) | (((by[1] - 32) & 0x3F) >> 4 & 0x3)
 	bytes[1] = (((by[1] - 32) & 0x3F) << 4 & 0xF0) | (((by[2] - 32) & 0x3F) >> 2 & 0xF)
-	bytes[2] = (((by[2] - 32) & 0x3F) << 6 & 0xC0) | ((by[3] - 32) & 0x3f)
+	bytes[2] = (((by[2] - 32) & 0x3F) << 6 & 0xC0) | ((by[3] - 32) & 0x3F)
 
 	return bytes, nil
 }

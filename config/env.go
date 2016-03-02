@@ -34,10 +34,6 @@ import (
 
 // Order of options are command line flag -> environment -> config file
 
-func mergeConfigFile(f *flag.FlagSet) error {
-	return nil
-}
-
 var envPrefix string
 
 // SetEnvPrefix Sets the prefix to environment variables
@@ -67,12 +63,16 @@ func (e *env) Get(key string) *string {
 func mergeEnvironment(f *flag.FlagSet) error {
 	env := newEnv()
 	fn := func(name string) *string {
+		sep := "_"
+		if envPrefix == "" {
+			sep = ""
+		}
 		key := strings.ToUpper(strings.Join(
 			[]string{
 				envPrefix,
 				strings.Replace(name, "-", "_", -1),
 			},
-			"_",
+			sep,
 		))
 		return env.Get(key)
 	}
