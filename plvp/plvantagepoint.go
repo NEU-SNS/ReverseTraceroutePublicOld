@@ -128,6 +128,9 @@ func (vp *plVantagepointT) stop() {
 	if vp.spoofmon != nil {
 		vp.spoofmon.Quit()
 	}
+	if vp.conn != nil {
+		vp.conn.Close()
+	}
 }
 
 // HandleSig handles signals
@@ -212,6 +215,7 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 			return
 		}
 		addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		log.Debugf("Dialing %s\n", addr)
 		cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
 		if err != nil {
 			log.Errorf("Failed to send spoofs: %v", err)

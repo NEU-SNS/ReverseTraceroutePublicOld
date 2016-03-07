@@ -30,68 +30,75 @@ package plcontroller
 
 import (
 	"net"
-	"os"
 	"path"
 	"strings"
-	"syscall"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"gopkg.in/fsnotify.v1"
+	"github.com/NEU-SNS/ReverseTraceroute/watcher"
 )
 
-func (c *plControllerT) handlEvents() {
-	log.Info("Started event handling loop")
+func (c *PlController) handlEvents() {
 	for {
-		select {
-		case <-c.shutdown:
+		event, err := c.w.GetEvent()
+		if err == watcher.ErrWatcherClosed {
 			return
-		case e := <-c.w.Events:
-			if e.Op&fsnotify.Create == fsnotify.Create {
-				s, err := scamper.NewSocket(
-					e.Name,
-					net.Dial)
-				if err != nil {
-					log.Error(err)
-					continue
-				}
-				ip, err := util.IPStringToInt32(s.IP())
-				if err != nil {
-					log.Errorf("Failed to convert socket IP: %v", err)
-					continue
-				}
-				err = c.db.UpdateController(ip, c.ip, c.ip)
-				if err != nil {
-					log.Errorf("Failed to update controller  %v", err)
-					continue
-				}
-				c.client.AddSocket(s)
-				vpsConnected.Add(1)
-				break
+		}
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		switch event.Type() {
+		case watcher.Create:
+			con, err := net.Dial("unix", event.Name())
+			if err != nil {
+				log.Error(err)
+				continue
 			}
-			if e.Op&fsnotify.Remove == fsnotify.Remove {
-				ip := strings.Split(path.Base(e.Name), ":")[0]
-				nip, err := util.IPStringToInt32(ip)
-				if err != nil {
-					log.Errorf("Failed to convert socket IP: %v", err)
-					continue
-				}
-				err = c.db.UpdateController(nip, 0, c.ip)
-				if err != nil {
-					log.Errorf("Failed to update controller  %v", err)
-					continue
-				}
-				c.client.RemoveSocket(ip)
-				vpsConnected.Sub(1)
-				break
+			s, err := scamper.NewSocket(
+				event.Name(),
+				con)
+			if err != nil {
+				log.Error(err)
+				continue
 			}
+			ip, err := util.IPStringToInt32(s.IP())
+			if err != nil {
+				log.Errorf("Failed to convert socket IP: %v", err)
+				s.Stop()
+				continue
+			}
+			err = c.db.UpdateController(ip, c.ip, c.ip)
+			if err != nil {
+				log.Errorf("Failed to update controller  %v", err)
+				s.Stop()
+				continue
+			}
+			c.client.AddSocket(s)
+			vpsConnected.Add(1)
+		case watcher.Remove:
+			ip := strings.Split(path.Base(event.Name()), ":")[0]
+			nip, err := util.IPStringToInt32(ip)
+			if err != nil {
+				log.Errorf("Failed to convert socket IP: %v", err)
+				continue
+			}
+			err = c.db.UpdateController(nip, 0, c.ip)
+			if err != nil {
+				log.Errorf("Failed to update controller  %v", err)
+			}
+			c.client.RemoveSocket(ip)
+			vpsConnected.Sub(1)
 		}
 	}
 }
 
 //This is only for use when a server is going down
-func (c *plControllerT) removeAllVps() {
+func (c *PlController) removeAllVps() {
+	if c.client == nil {
+		return
+	}
 	for sock := range c.client.GetAllSockets() {
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
@@ -101,64 +108,5 @@ func (c *plControllerT) removeAllVps() {
 		if err != nil {
 			log.Error(err)
 		}
-	}
-}
-
-func cleanDir(dir string) error {
-	d, err := os.Lstat(dir)
-	if err != nil {
-		return nil
-	}
-	if err != nil {
-		if err, ok := err.(*os.PathError); ok &&
-			(os.IsNotExist(err.Err) || err.Err == syscall.ENOTDIR) {
-			return nil
-		}
-		return err
-	}
-	if !d.IsDir() {
-		return nil
-	}
-	dc, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	files, err := dc.Readdirnames(-1)
-	for _, fname := range files {
-		err := os.RemoveAll(dir + string(os.PathSeparator) + fname)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *plControllerT) watchDir(dir string, ec chan error) {
-	err := cleanDir(dir)
-	if err != nil {
-		log.Errorf("Failed to clean watch directory: %v", err)
-		ec <- err
-		return
-	}
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Errorf("Failed to create watcher: %v", err)
-		ec <- err
-		return
-	}
-	c.w = w
-	go c.handlEvents()
-	err = w.Add(dir)
-	if err != nil {
-		log.Errorf("Failed to add dir: %s, %v", dir, err)
-		ec <- err
-		return
-	}
-}
-
-func (c *plControllerT) closeWatcher() {
-	err := c.w.Close()
-	if err != nil {
-		log.Error(err)
 	}
 }

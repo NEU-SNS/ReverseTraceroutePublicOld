@@ -27,6 +27,11 @@
 
 package plcontroller
 
+import (
+	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+)
+
 // Config is the config struct for the plc
 type Config struct {
 	Local   LocalConfig
@@ -98,4 +103,28 @@ func NewConfig() Config {
 			Db:       new(string),
 		},
 	}
+}
+
+type Sender interface {
+	Send([]*datamodel.Probe, uint32) error
+	Close() error
+}
+
+// Client is the measurment client interface
+type Client interface {
+	AddSocket(*scamper.Socket)
+	RemoveSocket(string)
+	GetSocket(string) (*scamper.Socket, error)
+	RemoveMeasurement(string, uint32) error
+	DoMeasurement(string, interface{}) (<-chan scamper.Response, uint32, error)
+	GetAllSockets() <-chan *scamper.Socket
+}
+
+// VPStore is the interface for the vpstore needed by the plc
+type VPStore interface {
+	UpdateController(uint32, uint32, uint32) error
+	GetVPs() ([]*datamodel.VantagePoint, error)
+	GetActiveVPs() ([]*datamodel.VantagePoint, error)
+	UpdateCheckStatus(uint32, string) error
+	Close() error
 }

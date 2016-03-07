@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"google.golang.org/grpc/grpclog"
+
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/plvp"
@@ -54,6 +56,7 @@ func init() {
 		"The port scamper will try to connect to.")
 	flag.StringVar(conf.Scamper.Host, "scamper-host", "plcontroller.revtr.ccs.neu.edu",
 		"The host that the sc_remoted process is running, should most likely match the host arg")
+	grpclog.SetLogger(log.GetLogger())
 }
 
 func main() {

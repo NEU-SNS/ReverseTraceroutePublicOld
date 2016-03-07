@@ -36,14 +36,19 @@ import (
 	"os/signal"
 	"syscall"
 
+	"google.golang.org/grpc/grpclog"
+
 	"golang.org/x/net/trace"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/mproc"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/watcher"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -119,20 +124,33 @@ func init() {
 			return false, false
 		}
 	}
-
+	grpclog.SetLogger(log.GetLogger())
 }
 
 func main() {
-	go sigHandle()
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
-		log.Fatalf("Failed to parse config: %v", err)
-		exit(1)
+		log.Fatalf("Failed to parse config: %v\n", err)
 	}
-	util.CloseStdFiles(*conf.Local.CloseStdDesc)
 	if showVersion {
 		fmt.Printf("Build: %s\nVersion: %s\n", Build, Version)
-		exit(0)
+		return
+	}
+	util.CloseStdFiles(*conf.Local.CloseStdDesc)
+	var sc scamper.Config
+	sc.Port = *conf.Scamper.Port
+	sc.Path = *conf.Scamper.SockDir
+	sc.ScPath = *conf.Scamper.BinPath
+	sc.ScParserPath = *conf.Scamper.ConverterPath
+	err = scamper.ParseConfig(sc)
+	if err != nil {
+		log.Fatalf("Invalid scamper configuration: %v\n", err)
+	}
+	proc := scamper.GetProc(sc.Path, sc.Port, sc.ScPath)
+	mp := mproc.New()
+	_, err = mp.ManageProcess(proc, true, 1000, nil)
+	if err != nil {
+		log.Fatal("Could not start scamper: %v\n", err)
 	}
 	db, err := da.New(da.DbConfig{
 		WriteConfigs: []da.Config{
@@ -155,28 +173,36 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatalf("Failed to create db: %v", err)
-		exit(1)
+		log.Fatalf("Failed to create db: %v\n", err)
 	}
-	err = <-plcontroller.Start(conf, false, db, scamper.NewClient(), &plcontroller.ControllerSender{RootCA: *conf.Local.RootCA})
-
+	fw, err := watcher.New(*conf.Scamper.SockDir)
 	if err != nil {
-		log.Fatalf("PLController Start returned with error: %v", err)
-		exit(1)
+		log.Fatalf("Failed to created file watcher: %v\n", err)
 	}
-}
-
-func sigHandle() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
-		syscall.SIGQUIT, syscall.SIGSTOP)
-	for sig := range c {
-		log.Infof("Got signal: %v", sig)
-		plcontroller.HandleSig(sig)
-		exit(1)
+	plc, err := plcontroller.New(plcontroller.WithConfig(conf), plcontroller.WithVPStore(db), plcontroller.WithClient(scamper.NewClient()), plcontroller.WithWatcher(fw))
+	if err != nil {
+		log.Fatalf("Failed to create plcontroller: %v\n", err)
 	}
-}
 
-func exit(status int) {
-	os.Exit(status)
+	http.Handle("/metrics", prometheus.Handler())
+	go func() {
+		log.Error(http.ListenAndServe(*conf.Local.PProfAddr, nil))
+	}()
+	var sigHandle = func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
+			syscall.SIGQUIT, syscall.SIGSTOP)
+		for sig := range c {
+			log.Infof("Got signal: %v\n", sig)
+			plc.Stop()
+			mp.IntAll()
+			db.Close()
+			fw.Close()
+		}
+	}
+	go sigHandle()
+	err = plc.Start()
+	if err != nil {
+		log.Error(err)
+	}
 }

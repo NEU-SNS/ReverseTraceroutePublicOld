@@ -38,22 +38,16 @@ import (
 
 	"golang.org/x/net/context"
 
-	da "github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
-	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/spoofmap"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
+	"github.com/NEU-SNS/ReverseTraceroute/watcher"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"gopkg.in/fsnotify.v1"
-
-	"net/http"
 )
 
 var (
@@ -132,43 +126,146 @@ func init() {
 	prometheus.MustRegister(tracerouteResponseTimes)
 }
 
-type plControllerT struct {
+type PlController struct {
 	server   *grpc.Server
 	config   Config
-	sc       scamper.Config
-	mp       mproc.MProc
-	db       *da.DataAccess
-	w        *fsnotify.Watcher
+	db       VPStore
+	w        watcher.Watcher
 	client   Client
-	spoofs   *spoofmap.SpoofMap
+	spoofs   spoofmap.SpoofMap
+	send     Sender
 	ip       uint32
 	shutdown chan struct{}
+	ec       chan error
+	started  chan struct{}
 }
 
-// Client is the measurment client interface
-// TODO: Remove interface dependency on scamper
-type Client interface {
-	AddSocket(*scamper.Socket)
-	RemoveSocket(string)
-	GetSocket(string) (*scamper.Socket, error)
-	RemoveMeasurement(string, uint32) error
-	DoMeasurement(string, interface{}) (<-chan scamper.Response, uint32, error)
-	GetAllSockets() <-chan *scamper.Socket
+type options struct {
+	c     Config
+	db    VPStore
+	cl    Client
+	send  Sender
+	watch watcher.Watcher
 }
 
-func handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	switch err.(type) {
-	default:
-		return false
-	case *os.PathError:
-		return true
+type ServerOption func(*options)
+
+func WithConfig(c Config) ServerOption {
+	return func(o *options) {
+		o.c = c
 	}
-
 }
 
-var plController plControllerT
+func WithVPStore(vps VPStore) ServerOption {
+	return func(o *options) {
+		o.db = vps
+	}
+}
 
-func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
+func WithClient(cl Client) ServerOption {
+	return func(o *options) {
+		o.cl = cl
+	}
+}
+
+func WithSender(s Sender) ServerOption {
+	return func(o *options) {
+		o.send = s
+	}
+}
+
+func WithWatcher(w watcher.Watcher) ServerOption {
+	return func(o *options) {
+		o.watch = w
+	}
+}
+
+func New(opts ...ServerOption) (*PlController, error) {
+	var o options
+	for _, op := range opts {
+		op(&o)
+	}
+	if o.send == nil {
+		o.send = &ControllerSender{RootCA: *o.c.Local.RootCA}
+	}
+	if o.cl == nil {
+		return nil, fmt.Errorf("No Client Provided")
+	}
+	if o.db == nil {
+		return nil, fmt.Errorf("No VPStore Provided")
+	}
+	if o.watch == nil {
+		return nil, fmt.Errorf("No Watcher Provided")
+	}
+	var pl PlController
+	pl.client = o.cl
+	pl.db = o.db
+	pl.send = o.send
+	pl.config = o.c
+	pl.w = o.watch
+	ips, err := util.GetBindAddr()
+	if err != nil {
+		return nil, err
+	}
+	ip, err := util.IPStringToInt32(ips)
+	if err != nil {
+		return nil, err
+	}
+	pl.ip = ip
+	pl.shutdown = make(chan struct{})
+	pl.spoofs = spoofmap.New(pl.send)
+	pl.started = make(chan struct{})
+	return &pl, nil
+}
+
+// Start starts a plcontroller with the given configuration
+func (c *PlController) Start() error {
+	return c.run()
+}
+
+// When this returns the server is essentially dead, so call stop before any return
+func (c *PlController) run() error {
+	creds, err := credentials.NewServerTLSFromFile(*c.config.Local.CertFile, *c.config.Local.KeyFile)
+	if err != nil {
+		return err
+	}
+	c.server = grpc.NewServer(grpc.Creds(creds))
+	plc.RegisterPLControllerServer(c.server, c)
+	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
+		*c.config.Local.Port)
+	l, e := net.Listen("tcp", addr)
+	if e != nil {
+		log.Errorf("Failed to listen: %v", e)
+		c.Stop()
+		return e
+	}
+	go c.handlEvents()
+	go c.maintain()
+	close(c.started)
+	return c.server.Serve(l)
+}
+
+func (c *PlController) Stop() {
+	<-c.started
+	if c.shutdown != nil {
+		close(c.shutdown)
+	}
+	if c.w != nil {
+		err := c.w.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}
+	c.removeAllVps()
+	if c.spoofs != nil {
+		c.spoofs.Quit()
+	}
+	if c.server != nil {
+		c.server.Stop()
+	}
+}
+
+func (c *PlController) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
 	resp := &dm.NotifyRecSpoofResponse{}
 	dummy := &dm.PingMeasurement{
 		Src:     rs.Sip,
@@ -183,15 +280,17 @@ func (c *plControllerT) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, erro
 	_, _, err := c.client.DoMeasurement(src, dummy)
 	if err != nil {
 		log.Error(err)
+		return resp, err
 	}
 	err = c.spoofs.Register(*rs)
 	if err != nil {
 		log.Error(err)
+		return nil, err
 	}
-	return resp, err
+	return resp, nil
 }
 
-func (c *plControllerT) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm.Ping, error) {
+func (c *PlController) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm.Ping, error) {
 	log.Debugf("Running ping for: %v", pa)
 	timeout := pa.Timeout
 	if timeout == 0 {
@@ -228,11 +327,11 @@ func (c *plControllerT) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm
 	}
 }
 
-func (c *plControllerT) acceptProbe(probe *dm.Probe) error {
+func (c *PlController) acceptProbe(probe *dm.Probe) error {
 	return c.spoofs.Receive(probe)
 }
 
-func (c *plControllerT) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
+func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
 	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -275,66 +374,7 @@ func convertWarts(path string, b []byte) ([]byte, error) {
 	return res, err
 }
 
-// When this returns the server is essentially dead, so call stop before any return
-func (c *plControllerT) run(ec chan error, con Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Sender) {
-	if db == nil {
-		c.stop()
-		ec <- fmt.Errorf("Nil db in plController")
-		return
-	}
-	var sc scamper.Config
-	sc.Port = *con.Scamper.Port
-	sc.Path = *con.Scamper.SockDir
-	sc.ScPath = *con.Scamper.BinPath
-	sc.ScParserPath = *con.Scamper.ConverterPath
-	err := scamper.ParseConfig(sc)
-	if err != nil {
-		log.Errorf("Invalid scamper args: %v", err)
-
-		c.stop()
-		ec <- err
-		return
-	}
-	ips, err := util.GetBindAddr()
-	if err != nil {
-		log.Errorf("Failed to get bind address: %v", err)
-		c.stop()
-		ec <- err
-		return
-	}
-	ip, err := util.IPStringToInt32(ips)
-	if err != nil {
-		log.Errorf("Failed to convert ip string: %v", err)
-		c.stop()
-		ec <- err
-		return
-	}
-	c.db = db
-	c.ip = ip
-	c.shutdown = make(chan struct{})
-	c.spoofs = spoofmap.New(s)
-	c.config = con
-	c.mp = mproc.New()
-	c.sc = sc
-	if !noScamp {
-		c.startScamperProc()
-	}
-	c.client = cl
-	c.watchDir(sc.Path, ec)
-	creds, err := credentials.NewServerTLSFromFile(*con.Local.CertFile, *con.Local.KeyFile)
-	if err != nil {
-		log.Error(err)
-		c.stop()
-		ec <- err
-		return
-	}
-	c.server = grpc.NewServer(grpc.Creds(creds))
-	plc.RegisterPLControllerServer(c.server, c)
-	go c.startRPC(ec)
-	go c.maintain()
-}
-
-func (c *plControllerT) maintain() {
+func (c *PlController) maintain() {
 	for {
 		select {
 		case <-c.shutdown:
@@ -359,76 +399,4 @@ func (c *plControllerT) maintain() {
 			}
 		}
 	}
-}
-
-func startHTTP(addr string) {
-	for {
-		log.Error(http.ListenAndServe(addr, nil))
-	}
-}
-
-// Start starts a plcontroller with the given configuration
-func Start(c Config, noScamp bool, db *da.DataAccess, cl Client, s spoofmap.Sender) chan error {
-	http.Handle("/metrics", prometheus.Handler())
-	go startHTTP(*c.Local.PProfAddr)
-	errChan := make(chan error, 2)
-	go plController.run(errChan, c, noScamp, db, cl, s)
-	return errChan
-}
-
-func (c *plControllerT) startRPC(eChan chan error) {
-	addr := fmt.Sprintf("%s:%d", *c.config.Local.Addr,
-		*c.config.Local.Port)
-	l, e := net.Listen("tcp", addr)
-	if e != nil {
-		log.Errorf("Failed to listen: %v", e)
-		eChan <- e
-		return
-	}
-	err := c.server.Serve(l)
-	if err != nil {
-		eChan <- err
-	}
-}
-
-func (c *plControllerT) startScamperProc() {
-	sp := scamper.GetProc(c.sc.Path, c.sc.Port, c.sc.ScPath)
-	_, err := c.mp.ManageProcess(sp, true, 1000, handleScamperStop)
-	if err != nil {
-		log.Error(err)
-	}
-}
-
-// HandleSig allows the plController to react appropriately to signals
-func HandleSig(s os.Signal) {
-	plController.handleSig(s)
-}
-
-func (c *plControllerT) stop() {
-	if c.shutdown != nil {
-		close(c.shutdown)
-	}
-	if c.w != nil {
-		err := c.w.Close()
-		if err != nil {
-			log.Error(err)
-		}
-	}
-	if c.mp != nil {
-		c.mp.IntAll()
-	}
-	c.removeAllVps()
-	err := c.db.Close()
-	if err != nil {
-		log.Error(err)
-	}
-	if c.spoofs != nil {
-		c.spoofs.Quit()
-	}
-	// Wait 5 seconds... I think sc_remoted needs time to properly clean-up
-	<-time.After(time.Second * 5)
-}
-
-func (c *plControllerT) handleSig(s os.Signal) {
-	c.stop()
 }
