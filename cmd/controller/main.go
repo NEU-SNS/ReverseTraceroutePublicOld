@@ -36,6 +36,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"google.golang.org/grpc/grpclog"
+
 	"golang.org/x/net/trace"
 
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
@@ -80,6 +82,7 @@ func init() {
 			return false, false
 		}
 	}
+	grpclog.SetLogger(log.GetLogger())
 }
 
 func main() {

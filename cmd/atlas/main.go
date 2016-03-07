@@ -13,6 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/grpclog"
 
 	"github.com/NEU-SNS/ReverseTraceroute/atlas"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
@@ -43,6 +44,7 @@ func init() {
 			return false, false
 		}
 	}
+	grpclog.SetLogger(log.GetLogger())
 }
 
 func main() {

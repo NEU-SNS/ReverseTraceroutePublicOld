@@ -29,8 +29,14 @@ type spoof struct {
 	spoof dm.Spoof
 }
 
+type SpoofMap interface {
+	Quit()
+	Register(dm.Spoof) error
+	Receive(*dm.Probe) error
+}
+
 // SpoofMap is used to track spoofed measurement requests
-type SpoofMap struct {
+type spoofMap struct {
 	sync.Mutex
 	spoofs    map[uint32]*spoof
 	quit      chan struct{}
@@ -38,8 +44,8 @@ type SpoofMap struct {
 }
 
 // New creates a SpoofMap
-func New(s Sender) *SpoofMap {
-	sm := &SpoofMap{
+func New(s Sender) SpoofMap {
+	sm := &spoofMap{
 		spoofs:    make(map[uint32]*spoof),
 		transport: s,
 		quit:      make(chan struct{}),
@@ -50,12 +56,12 @@ func New(s Sender) *SpoofMap {
 }
 
 // Quit ends the sending loop of the spoofMap
-func (s *SpoofMap) Quit() {
+func (s *spoofMap) Quit() {
 	close(s.quit)
 }
 
 // Register is called when a spoof is desired
-func (s *SpoofMap) Register(sp dm.Spoof) error {
+func (s *spoofMap) Register(sp dm.Spoof) error {
 	s.Lock()
 	defer s.Unlock()
 	if spf, ok := s.spoofs[sp.Id]; ok {
@@ -76,7 +82,7 @@ func (s *SpoofMap) Register(sp dm.Spoof) error {
 }
 
 // Receive is used when a probe for a spoof is gotten
-func (s *SpoofMap) Receive(p *dm.Probe) error {
+func (s *spoofMap) Receive(p *dm.Probe) error {
 	s.Lock()
 	defer s.Unlock()
 	if sp, ok := s.spoofs[p.ProbeId]; ok {
@@ -88,7 +94,7 @@ func (s *SpoofMap) Receive(p *dm.Probe) error {
 }
 
 // call in a goroutine
-func (s *SpoofMap) sendSpoofs() {
+func (s *spoofMap) sendSpoofs() {
 	t := time.NewTicker(time.Second * 2)
 	var dests map[uint32][]*dm.Probe
 	for {
@@ -109,7 +115,7 @@ func (s *SpoofMap) sendSpoofs() {
 				if err := s.transport.Send(probes, ip); err != nil {
 					log.Error(err)
 					s.Unlock()
-					return
+					continue
 				}
 				delete(dests, ip)
 			}
@@ -121,7 +127,7 @@ func (s *SpoofMap) sendSpoofs() {
 // run this in a goroutine
 // spoofed probes may never get responses
 // clean out old ones so the memory doesn't grow quite as much
-func (s *SpoofMap) cleanOld() {
+func (s *spoofMap) cleanOld() {
 	t := time.NewTicker(time.Minute * 2)
 	var count int
 	for {
@@ -141,6 +147,7 @@ func (s *SpoofMap) cleanOld() {
 					break
 				}
 			}
+			s.Unlock()
 		}
 	}
 }

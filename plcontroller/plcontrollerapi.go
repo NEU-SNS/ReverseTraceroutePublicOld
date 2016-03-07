@@ -51,7 +51,7 @@ var (
 	ErrorTimeout = fmt.Errorf("Measurement timed out.")
 )
 
-func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
+func (c *PlController) Ping(server plc.PLController_PingServer) error {
 	ctx, cancel := con.WithCancel(server.Context())
 	defer cancel()
 	for {
@@ -115,7 +115,7 @@ func (c *plControllerT) Ping(server plc.PLController_PingServer) error {
 	}
 }
 
-func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) error {
+func (c *PlController) Traceroute(server plc.PLController_TracerouteServer) error {
 	ctx, cancel := con.WithCancel(server.Context())
 	defer cancel()
 	for {
@@ -180,7 +180,7 @@ func (c *plControllerT) Traceroute(server plc.PLController_TracerouteServer) err
 	}
 }
 
-func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {
+func (c *PlController) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {
 	spoofs := rs.GetSpoofs()
 	if spoofs == nil {
 		return ErrorNilArgList
@@ -200,7 +200,7 @@ func (c *plControllerT) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Re
 	return nil
 }
 
-func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
+func (c *PlController) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (*dm.SpoofedProbesResponse, error) {
 	ps := probes.GetProbes()
 	if ps == nil {
 		return nil, ErrorNilArgList
@@ -217,7 +217,7 @@ func (c *plControllerT) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) 
 	return &dm.SpoofedProbesResponse{}, nil
 }
 
-func (c *plControllerT) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
+func (c *PlController) GetVPs(vpr *dm.VPRequest, stream plc.PLController_GetVPsServer) error {
 	vps, err := c.db.GetActiveVPs()
 	if err != nil {
 		return nil

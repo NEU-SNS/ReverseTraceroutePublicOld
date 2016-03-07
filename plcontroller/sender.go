@@ -88,3 +88,7 @@ func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	}
 	return err
 }
+
+func (cs *ControllerSender) Close() error {
+	return cs.conn.Close()
+}

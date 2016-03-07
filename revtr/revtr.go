@@ -1333,6 +1333,8 @@ var (
 	ErrNoHopFound = fmt.Errorf("No Hop Found")
 	// ErrNoAdj is used when there are no adjacents found
 	ErrNoAdj = fmt.Errorf("No Adjacents found")
+	// ErrPrivateIP is used what the requested target is a private IP addr
+	ErrPrivateIP = fmt.Errorf("The target is a private IP addr")
 )
 
 func (rt *ReverseTraceroute) reverseHopsRR() error {
@@ -1373,16 +1375,18 @@ func (rt *ReverseTraceroute) reverseHopsRR() error {
 		vps = nvps
 		srcs, _ := util.IPStringToInt32(rt.Src)
 		dsts, _ := util.IPStringToInt32(target)
-		pings = append(pings, &datamodel.PingMeasurement{
-			Src:        srcs,
-			Dst:        dsts,
-			RR:         true,
-			Timeout:    30,
-			Count:      "1",
-			CheckDb:    true,
-			CheckCache: true,
-			Staleness:  rt.Staleness,
-		})
+		if !isInPrivatePrefix(net.ParseIP(target)) {
+			pings = append(pings, &datamodel.PingMeasurement{
+				Src:        srcs,
+				Dst:        dsts,
+				RR:         true,
+				Timeout:    30,
+				Count:      "1",
+				CheckDb:    true,
+				CheckCache: true,
+				Staleness:  rt.Staleness,
+			})
+		}
 	}
 	for _, vp := range vps {
 		init(rt.Src)
@@ -1429,6 +1433,9 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 	for rec, spoofToTarg := range recvToSpooferToTarget {
 		for spoofer, targets := range spoofToTarg {
 			for _, target := range targets {
+				if isInPrivatePrefix(net.ParseIP(target)) {
+					continue
+				}
 				sspoofer, _ := util.IPStringToInt32(spoofer)
 				sdst, _ := util.IPStringToInt32(target)
 				pings = append(pings, &datamodel.PingMeasurement{
@@ -1763,6 +1770,9 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 func (rt *ReverseTraceroute) issueTraceroute() error {
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.LastHop())
+	if isInPrivatePrefix(net.ParseIP(rt.LastHop())) {
+		return Err
+	}
 	tr := datamodel.TracerouteMeasurement{
 		Src:        src,
 		Dst:        dst,
@@ -2257,6 +2267,9 @@ func (rt *ReverseTraceroute) issueTimestamps(issue map[string][][]string, fn fun
 			}
 			tss := tsString.String()
 			log.Debug("tss string: ", tss)
+			if isInPrivatePrefix(net.ParseIP(probe[0])) {
+				continue
+			}
 			p := &datamodel.PingMeasurement{
 				Src:        srcip,
 				Dst:        dstip,
@@ -2311,6 +2324,9 @@ func (rt *ReverseTraceroute) issueSpoofedTimestamps(issue map[string]map[string]
 					if i != len(probe)-1 {
 						tsString.WriteString(",")
 					}
+				}
+				if isInPrivatePrefix(net.ParseIP(probe[0])) {
+					continue
 				}
 				p := &datamodel.PingMeasurement{
 					Src:         spoofip,

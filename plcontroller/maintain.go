@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/httpupdate"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -70,7 +69,7 @@ var (
 		"-o", "UserKnownHostsFile=/dev/null"}
 )
 
-func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateURL string, db *dataaccess.DataAccess, dc chan struct{}) error {
+func maintainVPs(vps []*dm.VantagePoint, uname, certpath, updateURL string, db VPStore, dc chan struct{}) error {
 	var wg sync.WaitGroup
 	for _, vp := range vps {
 		wg.Add(1)

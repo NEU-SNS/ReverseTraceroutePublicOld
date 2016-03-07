@@ -32,16 +32,17 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 
+	"sync/atomic"
+
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/uuencode"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
-	"github.com/prometheus/log"
 )
 
 var (
@@ -65,7 +66,8 @@ type cmdResponse struct {
 func (cm *cmdMap) forEach() <-chan cmdResponse {
 	c := make(chan cmdResponse)
 	go func() {
-		for _, sock := range cm.cmds {
+		for key, sock := range cm.cmds {
+			delete(cm.cmds, key)
 			c <- sock
 		}
 		close(c)
@@ -103,10 +105,6 @@ func newCmdMap() *cmdMap {
 	return &cmdMap{cmds: m}
 }
 
-type userID struct {
-	UserID uint32 `json:"userid"`
-}
-
 // Socket represents a scamper control socket
 type Socket struct {
 	fname       string
@@ -117,24 +115,16 @@ type Socket struct {
 	cmdChan     chan *Cmd
 	respChan    chan Response
 	cmds        *cmdMap
-	con         net.Conn
+	con         io.ReadWriteCloser
 	wartsHeader [2]Response
 	rc          uint32
-	df          DialFunc
-	// Protects userID
-	mu     sync.Mutex
+	rw          *bufio.ReadWriter
+	// Access atomically
 	userID uint32
 }
 
-//DialFunc is a function to connect to a network
-type DialFunc func(network, address string) (net.Conn, error)
-
 // NewSocket creates a new scamper socket
-func NewSocket(fname string, dial DialFunc) (*Socket, error) {
-	con, err := dial("unix", fname)
-	if err != nil {
-		return nil, err
-	}
+func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
 	cc := make(chan *Cmd, 10)
 	rc := make(chan Response, 10)
 	clc := make(chan struct{})
@@ -145,10 +135,11 @@ func NewSocket(fname string, dial DialFunc) (*Socket, error) {
 		respChan:  rc,
 		closeChan: clc,
 		con:       con,
-		df:        dial,
+		rw:        bufio.NewReadWriter(bufio.NewReader(con), bufio.NewWriter(con)),
 	}
 
 	go sock.monitorConn()
+	go sock.readConn()
 	return sock, nil
 }
 
@@ -160,6 +151,7 @@ func (s *Socket) Stop() {
 	for cmd := range s.cmds.forEach() {
 		close(cmd.done)
 	}
+	s.con.Close()
 	select {
 	case <-s.closeChan:
 		return
@@ -168,114 +160,84 @@ func (s *Socket) Stop() {
 	}
 }
 
-func (s *Socket) reconnect() error {
-	con, err := s.df("unix", s.fname)
-	if err != nil {
-		return err
-	}
-	s.con = con
-	return nil
-}
-
 func (s *Socket) readConn() {
-	rw := bufio.NewReadWriter(bufio.NewReader(s.con), bufio.NewWriter(s.con))
 	for {
-		select {
-		case <-s.closeChan:
-			s.con.Close()
+		line, err := s.rw.ReadString('\n')
+		if err != nil {
+			log.Error(err)
 			return
-		default:
-			line, err := rw.ReadString('\n')
-
+		}
+		resp, err := parseResponse(line, s.rw)
+		if err != nil {
+			log.Errorf("Error parsing response: %s", line)
+			continue
+		}
+		if resp.RType != data {
+			continue
+		}
+		// The first two data messages received are the header of the warts format
+		if s.rc < 2 {
+			s.wartsHeader[s.rc] = resp
+			s.rc++
+			continue
+		}
+		dec := &uuencode.UUDecodingWriter{}
+		s.wartsHeader[0].WriteTo(dec)
+		s.wartsHeader[1].WriteTo(dec)
+		resp.WriteTo(dec)
+		go func() {
+			var filter []warts.WartsT
+			filter = append(filter, warts.PingT, warts.TracerouteT)
+			res, err := warts.Parse(dec.Bytes(), filter)
+			resp.Err = err
 			if err != nil {
-				s.con.Close()
-				if err = s.reconnect(); err != nil {
-					log.Error(err)
+				log.Errorf("Could not parse response: %s", err)
+			}
+			if len(res) != 1 {
+				log.Errorf("Wrong number of objects parsed from warts, expected 1, got %d", len(res))
+			} else {
+				switch t := res[0].(type) {
+				case warts.Traceroute:
+					resp.UserID = t.Flags.UserID
+				case warts.Ping:
+					resp.UserID = t.Flags.UserID
+				}
+				resp.Ret = res[0]
+				cmdmap, err := s.cmds.getCmd(resp.UserID)
+				if err != nil {
+					log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
 					return
 				}
-				s.rc = 0
-				rw = bufio.NewReadWriter(bufio.NewReader(s.con), bufio.NewWriter(s.con))
-				continue
-			}
-			resp, err := parseResponse(line, rw)
-			if err != nil {
-				log.Errorf("Error parsing response: %s", line)
-				continue
-			}
-			if resp.RType != data {
-				continue
-			}
-			// The first two data messages received are the header of the warts format
-			if s.rc < 2 {
-				s.wartsHeader[s.rc] = resp
-				s.rc++
-				continue
-			}
-			dec := &uuencode.UUDecodingWriter{}
-			s.wartsHeader[0].WriteTo(dec)
-			s.wartsHeader[1].WriteTo(dec)
-			resp.WriteTo(dec)
-			go func() {
-				var filter []warts.WartsT
-				filter = append(filter, warts.PingT, warts.TracerouteT)
-				res, err := warts.Parse(dec.Bytes(), filter)
-				resp.Err = err
-				if err != nil {
-					log.Errorf("Could not parse response: %s", err)
-				}
-				if len(res) != 1 {
-					log.Errorf("Wrong number of objects parsed from warts, expected 1, got %d", len(res))
-				} else {
-					switch t := res[0].(type) {
-					case warts.Traceroute:
-						resp.UserID = t.Flags.UserID
-					case warts.Ping:
-						resp.UserID = t.Flags.UserID
-					}
-					resp.Ret = res[0]
-					cmdmap, err := s.cmds.getCmd(resp.UserID)
-					if err != nil {
-						log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
-						return
-					}
-					s.cmds.rmCmd(resp.UserID)
+				s.cmds.rmCmd(resp.UserID)
 
-					select {
-					case <-s.closeChan:
-					case cmdmap.done <- resp:
-					}
+				select {
+				case <-s.closeChan:
+				case cmdmap.done <- resp:
 				}
-			}()
-		}
-
+			}
+		}()
 	}
 
 }
 
 func (s *Socket) monitorConn() {
-	go s.readConn()
 	for {
 		select {
+		case <-s.closeChan:
+			return
 		case c := <-s.cmdChan:
 			err := c.issueCommand(s.con)
 			if err != nil {
 				log.Errorf("Error issuing command %s", c.Marshal())
 				continue
 			}
-		case <-s.closeChan:
-			s.con.Close()
-			return
 
 		}
 	}
 }
 
 func (s *Socket) getID() uint32 {
-	s.mu.Lock()
-	id := s.userID
-	s.userID++
-	s.mu.Unlock()
-	return id
+	return atomic.AddUint32(&s.userID, 1)
 }
 
 // RemoveMeasurement remove a measurment being run with id id

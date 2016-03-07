@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
+	"github.com/NEU-SNS/ReverseTraceroute/scamper/internal"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
@@ -39,43 +40,32 @@ var sockPath = "/tmp/192.168.1.2:5000"
 var testIP = "192.168.1.2"
 var testPort = "5000"
 
-func setupSocket(t *testing.T) func() {
-	l, err := net.Listen("unix", sockPath)
-	if err != nil {
-		t.Fatalf("Failed to setupSocket: %v", err)
-	}
-	donec := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-donec:
-				l.Close()
-				return
-			default:
-				l.Accept()
-			}
-		}
-	}()
-	return func() {
-		close(donec)
-	}
-}
-
 func TestSocketStop(t *testing.T) {
-	done := setupSocket(t)
 	defer util.LeakCheck(t)()
-	sock, err := scamper.NewSocket(sockPath, net.Dial)
+	s := internal.NewServer(sockPath, nil)
+	s.Start()
+	defer s.Stop()
+	c, err := net.Dial("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Failed to Dial socket: %v", err)
+	}
+	sock, err := scamper.NewSocket(sockPath, c)
 	if err != nil {
 		t.Fatalf("Failed to create a socket: %v", err)
 	}
 	sock.Stop()
-	done()
 }
 
 func TestSocketIP_Port(t *testing.T) {
-	done := setupSocket(t)
 	defer util.LeakCheck(t)()
-	sock, err := scamper.NewSocket(sockPath, net.Dial)
+	s := internal.NewServer(sockPath, nil)
+	s.Start()
+	defer s.Stop()
+	c, err := net.Dial("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Failed to Dial socket: %v", err)
+	}
+	sock, err := scamper.NewSocket(sockPath, c)
 	if err != nil {
 		t.Fatalf("Failed to create a socket: %v", err)
 	}
@@ -86,5 +76,4 @@ func TestSocketIP_Port(t *testing.T) {
 		t.Fatalf("Failed getting socket Port expected[5000] got [%s]", sock.Port())
 	}
 	sock.Stop()
-	done()
 }
