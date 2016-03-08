@@ -31,6 +31,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper/internal"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
@@ -76,4 +77,50 @@ func TestSocketIP_Port(t *testing.T) {
 		t.Fatalf("Failed getting socket Port expected[5000] got [%s]", sock.Port())
 	}
 	sock.Stop()
+}
+
+func TestDisconnectSocket(t *testing.T) {
+	defer util.LeakCheck(t)()
+	s := internal.NewServer(sockPath, nil)
+	s.Start()
+	c, err := net.Dial("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Failed to Dial socket: %v", err)
+	}
+	s.Stop()
+	sock, err := scamper.NewSocket(sockPath, c)
+	if err != nil {
+		t.Fatalf("Failed to create a socket: %v", err)
+	}
+	_, _, err = sock.DoMeasurement(&datamodel.PingMeasurement{
+		Src: 1111111111,
+		Dst: 2222222222,
+	})
+	if err != scamper.ErrFailedToIssueCmd {
+		t.Fatalf("TestDisconnectSocket, Expected[%v], Got[%v]", scamper.ErrFailedToIssueCmd, err)
+	}
+}
+
+func TestSendOnClosedSocket(t *testing.T) {
+	defer util.LeakCheck(t)()
+	s := internal.NewServer(sockPath, nil)
+	s.Start()
+	c, err := net.Dial("unix", sockPath)
+	if err != nil {
+		t.Fatalf("Failed to Dial socket: %v", err)
+	}
+	defer s.Stop()
+	defer c.Close()
+	sock, err := scamper.NewSocket(sockPath, c)
+	if err != nil {
+		t.Fatalf("Failed to create a socket: %v", err)
+	}
+	sock.Stop()
+	_, _, err = sock.DoMeasurement(&datamodel.PingMeasurement{
+		Src: 1111111111,
+		Dst: 2222222222,
+	})
+	if err != scamper.ErrSocketClosed {
+		t.Fatalf("TestDisconnectSocket, Expected[%v], Got[%v]", scamper.ErrSocketClosed, err)
+	}
 }

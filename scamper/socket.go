@@ -110,10 +110,6 @@ type Socket struct {
 	fname       string
 	ip          string
 	port        string
-	closeChan   chan struct{}
-	errChan     chan error
-	cmdChan     chan *Cmd
-	respChan    chan Response
 	cmds        *cmdMap
 	con         io.ReadWriteCloser
 	wartsHeader [2]Response
@@ -121,30 +117,35 @@ type Socket struct {
 	rw          *bufio.ReadWriter
 	// Access atomically
 	userID uint32
+	mu     sync.Mutex
+	state  sockstate
 }
+
+type sockstate uint32
+
+const (
+	open sockstate = iota
+	closed
+)
 
 // NewSocket creates a new scamper socket
 func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
-	cc := make(chan *Cmd, 10)
-	rc := make(chan Response, 10)
-	clc := make(chan struct{})
 	sock := &Socket{
-		fname:     fname,
-		cmds:      newCmdMap(),
-		cmdChan:   cc,
-		respChan:  rc,
-		closeChan: clc,
-		con:       con,
-		rw:        bufio.NewReadWriter(bufio.NewReader(con), bufio.NewWriter(con)),
+		fname: fname,
+		cmds:  newCmdMap(),
+		con:   con,
+		rw:    bufio.NewReadWriter(bufio.NewReader(con), bufio.NewWriter(con)),
 	}
 
-	go sock.monitorConn()
 	go sock.readConn()
 	return sock, nil
 }
 
 // Stop closes the connection the socket represents
 func (s *Socket) Stop() {
+	log.Error("Close Called")
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s == nil {
 		return
 	}
@@ -152,88 +153,90 @@ func (s *Socket) Stop() {
 		close(cmd.done)
 	}
 	s.con.Close()
-	select {
-	case <-s.closeChan:
-		return
-	default:
-		close(s.closeChan)
+	if s.state == open {
+		s.state = closed
 	}
+
+}
+
+type parseErr struct {
+	err  error
+	line string
+}
+
+func (e parseErr) Error() string {
+	return fmt.Sprintf("Error parsing line %s: %v", e.line, e.err)
+}
+
+func (s *Socket) readResponse() (Response, error) {
+	line, err := s.rw.ReadString('\n')
+	if err != nil {
+		return Response{}, err
+	}
+	resp, err := parseResponse(line, s.rw)
+	if err != nil {
+		return Response{}, parseErr{err: err, line: line}
+	}
+	if resp.RType != data {
+		return resp, nil
+	}
+	// The first two data messages received are the header of the warts format
+	if s.rc < 2 {
+		s.wartsHeader[s.rc] = resp
+		s.rc++
+		resp.Header = true
+	}
+	return resp, nil
 }
 
 func (s *Socket) readConn() {
+	var filter []warts.WartsT
+	filter = append(filter, warts.PingT, warts.TracerouteT)
 	for {
-		line, err := s.rw.ReadString('\n')
+		resp, err := s.readResponse()
 		if err != nil {
-			log.Error(err)
+			s.handleErr(err)
 			return
 		}
-		resp, err := parseResponse(line, s.rw)
-		if err != nil {
-			log.Errorf("Error parsing response: %s", line)
+		if resp.Header {
 			continue
 		}
-		if resp.RType != data {
+		switch resp.RType {
+		case data:
+			go func(r Response) {
+				dec := &uuencode.UUDecodingWriter{}
+				s.wartsHeader[0].WriteTo(dec)
+				s.wartsHeader[1].WriteTo(dec)
+				r.WriteTo(dec)
+				res, err := warts.Parse(dec.Bytes(), filter)
+				r.Err = err
+				var cr cmdResponse
+				if err == nil {
+					switch t := res[0].(type) {
+					case warts.Traceroute:
+						r.UserID = t.Flags.UserID
+					case warts.Ping:
+						r.UserID = t.Flags.UserID
+					}
+					r.Ret = res[0]
+					cr, err = s.cmds.getCmd(r.UserID)
+					if err != nil {
+						log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
+						return
+					}
+					s.cmds.rmCmd(resp.UserID)
+				}
+				cr.done <- r
+			}(resp)
+		default:
 			continue
 		}
-		// The first two data messages received are the header of the warts format
-		if s.rc < 2 {
-			s.wartsHeader[s.rc] = resp
-			s.rc++
-			continue
-		}
-		dec := &uuencode.UUDecodingWriter{}
-		s.wartsHeader[0].WriteTo(dec)
-		s.wartsHeader[1].WriteTo(dec)
-		resp.WriteTo(dec)
-		go func() {
-			var filter []warts.WartsT
-			filter = append(filter, warts.PingT, warts.TracerouteT)
-			res, err := warts.Parse(dec.Bytes(), filter)
-			resp.Err = err
-			if err != nil {
-				log.Errorf("Could not parse response: %s", err)
-			}
-			if len(res) != 1 {
-				log.Errorf("Wrong number of objects parsed from warts, expected 1, got %d", len(res))
-			} else {
-				switch t := res[0].(type) {
-				case warts.Traceroute:
-					resp.UserID = t.Flags.UserID
-				case warts.Ping:
-					resp.UserID = t.Flags.UserID
-				}
-				resp.Ret = res[0]
-				cmdmap, err := s.cmds.getCmd(resp.UserID)
-				if err != nil {
-					log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
-					return
-				}
-				s.cmds.rmCmd(resp.UserID)
-
-				select {
-				case <-s.closeChan:
-				case cmdmap.done <- resp:
-				}
-			}
-		}()
 	}
-
 }
 
-func (s *Socket) monitorConn() {
-	for {
-		select {
-		case <-s.closeChan:
-			return
-		case c := <-s.cmdChan:
-			err := c.issueCommand(s.con)
-			if err != nil {
-				log.Errorf("Error issuing command %s", c.Marshal())
-				continue
-			}
-
-		}
-	}
+func (s *Socket) handleErr(err error) {
+	s.Stop()
+	log.Error(err)
 }
 
 func (s *Socket) getID() uint32 {
@@ -246,25 +249,40 @@ func (s *Socket) RemoveMeasurement(id uint32) error {
 	return nil
 }
 
+var (
+	// ErrSocketClosed is returned when the socket is closed
+	ErrSocketClosed = fmt.Errorf("Socket closed.")
+	// ErrFailedToIssueCmd is returned when issueCmd fails
+	ErrFailedToIssueCmd = fmt.Errorf("Error issuing command.")
+	// ErrSockClosed is returned when a measurement is attempted on a closed socket
+)
+
 // DoMeasurement perform the measurement described by arg
 func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error) {
-	id := s.getID()
-	cmd, err := newCmd(arg, id)
-	if err != nil {
-		return nil, 0, err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	log.Errorf("State: %v", s.state)
+	if s.state == open {
+		id := s.getID()
+		cmd, err := newCmd(arg, id)
+		if err != nil {
+			return nil, 0, err
+		}
+		cr := cmdResponse{cmd: &cmd, done: make(chan Response, 1)}
+		err = s.cmds.addCmd(cr)
+		if err != nil {
+			return nil, 0, err
+		}
+		err = cmd.issueCommand(s.con)
+		if err != nil {
+			s.cmds.rmCmd(id)
+			return nil, 0, ErrFailedToIssueCmd
+		}
+
+		log.Error("Returning nil")
+		return cr.done, id, nil
 	}
-	cr := cmdResponse{cmd: &cmd, done: make(chan Response, 1)}
-	err = s.cmds.addCmd(cr)
-	if err != nil {
-		return nil, 0, err
-	}
-	select {
-	case <-s.closeChan:
-		s.cmds.rmCmd(id)
-		return nil, 0, fmt.Errorf("Socket closed before command could run.")
-	case s.cmdChan <- &cmd:
-	}
-	return cr.done, id, err
+	return nil, 0, ErrSocketClosed
 }
 
 // IP Gets the ip of the remote machine that is connected to the socket

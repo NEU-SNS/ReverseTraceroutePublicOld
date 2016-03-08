@@ -64,6 +64,7 @@ type Response struct {
 	UserID uint32
 	Ret    interface{}
 	Err    error
+	Header bool
 }
 
 // Bytes get the data as bytes from a scamper response
