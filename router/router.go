@@ -34,17 +34,18 @@ import (
 	"golang.org/x/net/context"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 )
 
 type service uint
 
 const (
-	planetLab service = iota + 1
+	// PlanetLab is the Planet lab service
+	PlanetLab service = iota + 1
 )
 
 var (
-	errCantCreateMt = fmt.Errorf("No measurement tool found for the service")
+	// ErrCantCreateMt is returned when an unknown measurement tool is asked for
+	ErrCantCreateMt = fmt.Errorf("No measurement tool found for the service")
 )
 
 // MeasurementTool is the interface for a measurement source the controller can use
@@ -58,10 +59,10 @@ type MeasurementTool interface {
 
 func (r *router) create(s ServiceDef) (MeasurementTool, error) {
 	switch s.Service {
-	case planetLab:
+	case PlanetLab:
 		return createPLMT(s, r)
 	}
-	return nil, errCantCreateMt
+	return nil, ErrCantCreateMt
 }
 
 // ServiceDef is the definition of
@@ -81,7 +82,7 @@ func (s source) Get(dst string) (ServiceDef, error) {
 	return ServiceDef{
 		Addr:    "plcontroller.revtr.ccs.neu.edu",
 		Port:    "4380",
-		Service: planetLab,
+		Service: PlanetLab,
 	}, nil
 }
 
@@ -89,7 +90,7 @@ func (s source) All() []ServiceDef {
 	return []ServiceDef{ServiceDef{
 		Addr:    "plcontroller.revtr.ccs.neu.edu",
 		Port:    "4380",
-		Service: planetLab,
+		Service: PlanetLab,
 	}}
 }
 
@@ -143,7 +144,6 @@ func (r *router) SetSource(s Source) {
 }
 
 func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
-	log.Debug("GetMt: ", s)
 	r.cache.mu.Lock()
 	defer r.cache.mu.Unlock()
 	if mt, ok := r.cache.cache[s.key()]; ok {
@@ -152,7 +152,6 @@ func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
 	}
 	mt, err := r.create(s)
 	if err != nil {
-		log.Error(err, s)
 		return nil, err
 	}
 	nc := &mtCacheItem{
@@ -160,7 +159,6 @@ func (r *router) GetMT(s ServiceDef) (MeasurementTool, error) {
 		refCount: 1,
 	}
 	r.cache.cache[s.key()] = nc
-	log.Debug(r.cache.cache)
 	return mt, nil
 }
 
@@ -174,7 +172,6 @@ func (r *router) All() []MeasurementTool {
 	for _, service := range services {
 		mt, err := r.GetMT(service)
 		if err != nil {
-			log.Error(err)
 			continue
 		}
 		ret = append(ret, mt)

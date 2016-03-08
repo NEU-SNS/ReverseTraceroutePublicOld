@@ -39,10 +39,8 @@ import (
 )
 
 const (
-	// PING represents the ping measurement
-	PING cmdT = "ping"
-	// TRACEROUTE represents the traceroute measurement
-	TRACEROUTE cmdT = "trace"
+	ping       cmdT = "ping"
+	traceroute cmdT = "trace"
 )
 
 var optionMap = map[cmdT]map[string]option{
@@ -148,7 +146,7 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 			}
 			oID := pa.UserId
 			pa.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(*pa, PING)
+			c, err = createCmd(*pa, ping)
 			c.userIDCache = oID
 			c.userID = id
 		}
@@ -156,7 +154,7 @@ func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
 		if ta, ok := arg.(*dm.TracerouteMeasurement); ok {
 			oID := ta.UserId
 			ta.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(*ta, TRACEROUTE)
+			c, err = createCmd(*ta, traceroute)
 			c.userIDCache = oID
 			c.userID = id
 		}
