@@ -3,10 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"golang.org/x/net/trace"
 
 	"google.golang.org/grpc/grpclog"
 
@@ -57,6 +61,17 @@ func init() {
 	flag.StringVar(conf.Scamper.Host, "scamper-host", "plcontroller.revtr.ccs.neu.edu",
 		"The host that the sc_remoted process is running, should most likely match the host arg")
 	grpclog.SetLogger(log.GetLogger())
+	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
+		host, _, err := net.SplitHostPort(req.RemoteAddr)
+		switch {
+		case err != nil:
+			return false, false
+		case host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "syrah.ccs.neu.edu" || host == "129.10.110.48":
+			return true, true
+		default:
+			return false, false
+		}
+	}
 }
 
 func main() {

@@ -462,6 +462,7 @@ FROM
 		LIMIT 1
 	) t left outer join
 	traceroute_hops th on th.traceroute_id = t.id
+WHERE t.start > ?
 ORDER BY
 	t.start DESC
 `
@@ -518,8 +519,8 @@ func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
 func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
-	//minTime := time.Now().Add(s * time.Second)
-	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst)
+	minTime := time.Now().Add(-s)
+	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst, minTime)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +532,7 @@ func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*d
 func (db *DB) GetTraceMulti(in []*dm.TracerouteMeasurement) ([]*dm.Traceroute, error) {
 	var ret []*dm.Traceroute
 	for _, tm := range in {
-		ts, err := db.GetTRBySrcDstWithStaleness(tm.Src, tm.Dst, time.Duration(tm.Staleness))
+		ts, err := db.GetTRBySrcDstWithStaleness(tm.Src, tm.Dst, time.Duration(tm.Staleness)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -736,7 +737,11 @@ func splitPings(rows *sql.Rows) ([]*dm.Ping, error) {
 func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 	var ret []*dm.Ping
 	for _, pm := range in {
-		ps, err := db.GetPingBySrcDst(pm.Src, pm.Dst)
+		var stale int64
+		if pm.Staleness == 0 {
+			stale = 60
+		}
+		ps, err := db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -757,7 +762,7 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
-	minTime := time.Now().Add(time.Duration(s) * time.Second)
+	minTime := time.Now().Add(-s)
 	rows, err := db.getReader().Query(getPing, src, dst, minTime)
 	if err != nil {
 		return nil, err

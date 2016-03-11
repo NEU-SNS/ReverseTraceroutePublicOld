@@ -143,7 +143,6 @@ func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
 
 // Stop closes the connection the socket represents
 func (s *Socket) Stop() {
-	log.Error("Close Called")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s == nil {

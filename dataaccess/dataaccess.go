@@ -87,6 +87,11 @@ func (d *DataAccess) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 	return d.db.GetPingBySrcDst(src, dst)
 }
 
+// GetPingBySrcDstWithStaleness gets a ping
+func (d *DataAccess) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
+	return d.db.GetPingBySrcDstWithStaleness(src, dst, s)
+}
+
 // StorePing stores a ping
 func (d *DataAccess) StorePing(p *dm.Ping) error {
 	return d.db.StorePing(p)

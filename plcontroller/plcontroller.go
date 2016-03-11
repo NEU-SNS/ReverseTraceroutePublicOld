@@ -124,6 +124,7 @@ func init() {
 	prometheus.MustRegister(tracerouteGoroutineGauge)
 	prometheus.MustRegister(pingResponseTimes)
 	prometheus.MustRegister(tracerouteResponseTimes)
+	prometheus.MustRegister(vpsConnected)
 }
 
 type PlController struct {
@@ -223,6 +224,27 @@ func (c *PlController) Start() error {
 	return c.run()
 }
 
+type loggingListener struct {
+	l net.Listener
+}
+
+func (l loggingListener) Accept() (net.Conn, error) {
+	c, err := l.l.Accept()
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("Accepted Conn from: %s\n", c.RemoteAddr().String())
+	return c, nil
+}
+
+func (l loggingListener) Close() error {
+	return l.l.Close()
+}
+
+func (l loggingListener) Addr() net.Addr {
+	return l.l.Addr()
+}
+
 // When this returns the server is essentially dead, so call stop before any return
 func (c *PlController) run() error {
 	creds, err := credentials.NewServerTLSFromFile(*c.config.Local.CertFile, *c.config.Local.KeyFile)
@@ -242,7 +264,7 @@ func (c *PlController) run() error {
 	go c.handlEvents()
 	go c.maintain()
 	close(c.started)
-	return c.server.Serve(l)
+	return c.server.Serve(loggingListener{l})
 }
 
 func (c *PlController) Stop() {
@@ -363,15 +385,6 @@ func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasu
 	case <-ctx.Done():
 		return dm.Traceroute{}, ctx.Err()
 	}
-}
-
-func convertWarts(path string, b []byte) ([]byte, error) {
-	res, err := util.ConvertBytes(path, b)
-	if err != nil {
-		log.Errorf("Failed to converte bytes: %v", err)
-		return []byte{}, err
-	}
-	return res, err
 }
 
 func (c *PlController) maintain() {

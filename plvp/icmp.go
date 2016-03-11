@@ -128,9 +128,7 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 	}
 	// Parse the payload for ICMP stuff
 	mess, err := icmp.ParseMessage(icmpProtocolNum, pload)
-	log.Debug(mess)
 	if err != nil {
-		log.Error(err)
 		return nil, err
 	}
 	if echo, ok := mess.Body.(*icmp.Echo); ok {
@@ -155,18 +153,15 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 		if err != nil {
 			return nil, ErrorSpooferIP
 		}
-		log.Debug("Header: ", header)
 		probe.Dst, err = util.IPtoInt32(header.Dst)
 		probe.Src, err = util.IPtoInt32(header.Src)
 		// Parse the options
 		options, err := opt.Parse(header.Options)
 		if err != nil {
-			log.Errorf("Failed to parse IPv4 options: %v", err)
 			return nil, ErrorFailedToParseOptions
 		}
 		probe.SeqNum = uint32(echo.Seq)
 		probe.Id = uint32(echo.ID)
-		log.Debug("Probe")
 		for _, option := range options {
 			switch option.Type {
 			case opt.RecordRoute:
@@ -199,7 +194,6 @@ func getProbe(conn *ipv4.RawConn) (*dm.Probe, error) {
 func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan error) {
 	c, err := reconnect(addr)
 	if err != nil {
-		log.Errorf("Error starting SpoofPingMonitor: %v", err)
 		ec <- err
 		return
 	}
@@ -213,21 +207,17 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {
-				log.Error(err)
-				log.Info("Got probe ", pr)
 				ec <- err
 				switch err {
 				case ErrorReadError:
 					c, err = reconnect(addr)
 					if err != nil {
-						log.Errorf("Failed to reconnect: %v", err)
 						ec <- err
 						return
 					}
 				}
 				continue
 			}
-			log.Debug("Got Spoofed probe: ", *pr)
 			probes <- *pr
 		}
 	}
@@ -235,7 +225,6 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 
 // Start the SpoofPingMonitor
 func (sm *SpoofPingMonitor) Start(addr string, probes chan<- dm.Probe, ec chan error) {
-	log.Infof("Starting SpoofPingMonitor on addr: %s:", addr)
 	go sm.poll(addr, probes, ec)
 }
 
