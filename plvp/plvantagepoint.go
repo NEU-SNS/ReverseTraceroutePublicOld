@@ -123,7 +123,7 @@ func (vp *plVantagepointT) handleSig(s os.Signal) {
 func (vp *plVantagepointT) stop() {
 	if vp.mp != nil {
 		log.Infoln("Killing all processes")
-		vp.mp.KillAll()
+		vp.mp.IntAll()
 	}
 	if vp.spoofmon != nil {
 		vp.spoofmon.Quit()
@@ -225,7 +225,9 @@ func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
 	}
 	log.Debug("About to send spoofed probes")
 	client := plc.NewPLControllerClient(vp.conn)
-	_, err := client.AcceptProbes(ctx.Background(), &dm.SpoofedProbes{Probes: probes})
+	contx, cancel := ctx.WithTimeout(ctx.Background(), time.Second*2)
+	defer cancel()
+	_, err := client.AcceptProbes(contx, &dm.SpoofedProbes{Probes: probes})
 	if err != nil {
 		log.Errorf("Error sending probes: %v", err)
 	}

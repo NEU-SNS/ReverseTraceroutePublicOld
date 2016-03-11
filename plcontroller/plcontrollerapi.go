@@ -208,12 +208,14 @@ func (c *PlController) AcceptProbes(ctx con.Context, probes *dm.SpoofedProbes) (
 	if len(ps) == 0 {
 		return nil, ErrorEmptyArgList
 	}
-	for _, p := range ps {
-		err := c.acceptProbe(p)
-		if err != nil {
-			log.Errorf("%v %v", err, p)
+	go func() {
+		for _, p := range ps {
+			err := c.acceptProbe(p)
+			if err != nil {
+				log.Errorf("%v %v", err, p)
+			}
 		}
-	}
+	}()
 	return &dm.SpoofedProbesResponse{}, nil
 }
 
