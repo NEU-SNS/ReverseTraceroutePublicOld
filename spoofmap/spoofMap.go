@@ -128,7 +128,7 @@ func (s *spoofMap) sendSpoofs() {
 // spoofed probes may never get responses
 // clean out old ones so the memory doesn't grow quite as much
 func (s *spoofMap) cleanOld() {
-	t := time.NewTicker(time.Minute * 2)
+	t := time.NewTicker(time.Minute)
 	var count int
 	for {
 		select {
@@ -143,7 +143,7 @@ func (s *spoofMap) cleanOld() {
 					delete(s.spoofs, id)
 				}
 				count++
-				if count == 200 {
+				if count == 10000 {
 					break
 				}
 			}

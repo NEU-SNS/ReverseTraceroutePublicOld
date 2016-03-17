@@ -32,163 +32,239 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"reflect"
+	"strconv"
+	"sync"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
-const (
-	ping       cmdT = "ping"
-	traceroute cmdT = "trace"
-)
-
-var optionMap = map[cmdT]map[string]option{
-	"ping":  pingArg,
-	"trace": traceArg,
-}
-
-type option struct {
-	format string
-	opt    OptGetter
-}
-
-func intOpt(f string, arg interface{}) (string, error) {
-	if sarg, ok := arg.(int); ok {
-		return fmt.Sprintf(f, sarg), nil
-	}
-	return "", fmt.Errorf("Invalid arg type in intOpt: %v", arg)
-}
-
-func uint32Opt(f string, arg interface{}) (string, error) {
-	if sarg, ok := arg.(uint32); ok {
-		return fmt.Sprintf(f, sarg), nil
-	}
-	return "", fmt.Errorf("Invalid arg type in uint32Opt: %v", arg)
-}
-
-func ipOpt(f string, arg interface{}) (string, error) {
-	if sarg, ok := arg.(uint32); ok {
-		ip, err := util.Int32ToIPString(sarg)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf(f, ip), nil
-	}
-	return "", fmt.Errorf("Invalid arg type in ipOpt: %v", arg)
-}
-
-func boolOpt(f string, arg interface{}) (string, error) {
-	if barg, ok := arg.(bool); ok {
-		if barg {
-			return f, nil
-		}
-		return "", nil
-	}
-	return "", fmt.Errorf("Invalid arg type in boolOpt: %v", arg)
-}
-
-func stringOpt(f string, arg interface{}) (string, error) {
-	if sarg, ok := arg.(string); ok {
-		if sarg == "" {
-			return sarg, nil
-		}
-		return fmt.Sprintf(f, sarg), nil
-	}
-	return "", fmt.Errorf("Invalid arg type in stringOpt: %v", arg)
-}
-
-// OptGetter is a function for converting an option
-// into a form scamper can understand
-type OptGetter func(f string, arg interface{}) (string, error)
-
-type cmdT string
-
 // Cmd is a command that can run on scamper
 type Cmd struct {
-	ct          cmdT
-	options     []string
-	id          uint32
-	userIDCache string
-	resp        Response
-	userID      uint32
+	ID          uint32
+	userIDCache *string
 }
 
-func (c *Cmd) marshal() []byte {
-	var buf bytes.Buffer
-	buf.WriteString(string(c.ct) + " ")
-	for _, arg := range c.options {
-		buf.WriteString(arg + " ")
+var cmdFree = sync.Pool{
+	New: func() interface{} { return new(bytes.Buffer) },
+}
+
+func (c Cmd) issuePing(w io.Writer, p *dm.PingMeasurement) error {
+	ips, err := util.Int32ToIPString(p.Dst)
+	if err != nil {
+		return err
 	}
-	buf.WriteString("\n")
-	return buf.Bytes()
-}
-
-// Marshal converts the cmd to a form recognized by scamper
-func (c *Cmd) Marshal() []byte {
-	return c.marshal()
-}
-
-// IssueCommand marshals the Cmd and writes it to the provided writer
-func (c *Cmd) issueCommand(w io.Writer) error {
-	cmd := c.marshal()
-	_, err := w.Write(cmd)
+	buf := cmdFree.Get().(*bytes.Buffer)
+	defer cmdFree.Put(buf)
+	buf.Reset()
+	buf.WriteString("ping ")
+	if p.RR {
+		buf.WriteString("-R ")
+	}
+	if p.Spoof {
+		buf.WriteString("-O spoof ")
+		buf.WriteString("-S ")
+		buf.WriteString(p.SAddr)
+		buf.WriteByte(' ')
+		buf.WriteString("-F 61681 ")
+		buf.WriteString("-d 62195 ")
+	}
+	if p.Payload != "" {
+		buf.WriteString("-B ")
+		buf.WriteString(p.Payload)
+		buf.WriteByte(' ')
+	}
+	if p.Count != "" {
+		buf.WriteString("-c ")
+		buf.WriteString(p.Count)
+		buf.WriteByte(' ')
+	}
+	if p.IcmpSum != "" {
+		buf.WriteString("-C ")
+		buf.WriteString(p.IcmpSum)
+		buf.WriteByte(' ')
+	}
+	if p.Wait != "" {
+		buf.WriteString("-i ")
+		buf.WriteString(p.Wait)
+		buf.WriteByte(' ')
+	}
+	if p.Ttl != "" {
+		buf.WriteString("-m ")
+		buf.WriteString(p.Ttl)
+		buf.WriteByte(' ')
+	}
+	if p.Mtu != "" {
+		buf.WriteString("-M ")
+		buf.WriteString(p.Mtu)
+		buf.WriteByte(' ')
+	}
+	if p.ReplyCount != "" {
+		buf.WriteString("-o ")
+		buf.WriteString(p.ReplyCount)
+		buf.WriteByte(' ')
+	}
+	if p.Pattern != "" {
+		buf.WriteString("-p ")
+		buf.WriteString(p.Pattern)
+		buf.WriteByte(' ')
+	}
+	if p.Method != "" {
+		buf.WriteString("-P ")
+		buf.WriteString(p.Method)
+		buf.WriteByte(' ')
+	}
+	if p.Size != "" {
+		buf.WriteString("-s ")
+		buf.WriteString(p.Size)
+		buf.WriteByte(' ')
+	}
+	if p.Tos != "" {
+		buf.WriteString("-z ")
+		buf.WriteString(p.Tos)
+		buf.WriteByte(' ')
+	}
+	if p.TimeStamp != "" {
+		buf.WriteString("-T ")
+		buf.WriteString(p.TimeStamp)
+		buf.WriteByte(' ')
+	}
+	c.userIDCache = new(string)
+	*c.userIDCache = p.UserId
+	buf.WriteString("-U ")
+	uid := strconv.FormatUint(uint64(c.ID), 10)
+	buf.WriteString(uid)
+	buf.WriteByte(' ')
+	buf.WriteString(ips)
+	buf.WriteByte('\n')
+	_, err = w.Write(buf.Bytes())
 	return err
 }
 
-func newCmd(arg interface{}, id uint32) (c Cmd, err error) {
-	switch arg.(type) {
-	case *dm.PingMeasurement:
-		if pa, ok := arg.(*dm.PingMeasurement); ok {
-			if pa.Spoof {
-				pa.Sport = "61681"
-				pa.Dport = "62195"
-			}
-			oID := pa.UserId
-			pa.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(*pa, ping)
-			c.userIDCache = oID
-			c.userID = id
-		}
-	case *dm.TracerouteMeasurement:
-		if ta, ok := arg.(*dm.TracerouteMeasurement); ok {
-			oID := ta.UserId
-			ta.UserId = fmt.Sprintf("%d", id)
-			c, err = createCmd(*ta, traceroute)
-			c.userIDCache = oID
-			c.userID = id
-		}
-	default:
-		err = fmt.Errorf("Failed to create Cmd, type not found")
+func (c Cmd) issueTraceroute(w io.Writer, t *dm.TracerouteMeasurement) error {
+	ips, err := util.Int32ToIPString(t.Dst)
+	if err != nil {
+		return err
 	}
-	return
+	buf := cmdFree.Get().(*bytes.Buffer)
+	defer cmdFree.Put(buf)
+	buf.Reset()
+	buf.WriteString("trace ")
+
+	if t.Confidence != "" {
+		buf.WriteString("-c ")
+		buf.WriteString(t.Confidence)
+		buf.WriteByte(' ')
+	}
+	if t.Dport != "" {
+		buf.WriteString("-d ")
+		buf.WriteString(t.Dport)
+		buf.WriteByte(' ')
+	}
+	if t.FirstHop != "" {
+		buf.WriteString("-f ")
+		buf.WriteString(t.FirstHop)
+		buf.WriteByte(' ')
+	}
+	if t.GapLimit != "" {
+		buf.WriteString("-g ")
+		buf.WriteString(t.GapLimit)
+		buf.WriteByte(' ')
+	}
+	if t.GapAction != "" {
+		buf.WriteString("-G ")
+		buf.WriteString(t.GapAction)
+		buf.WriteByte(' ')
+	}
+	if t.MaxTtl != "" {
+		buf.WriteString("-m ")
+		buf.WriteString(t.MaxTtl)
+		buf.WriteByte(' ')
+	}
+	if t.PathDiscov {
+		buf.WriteString("-M ")
+	}
+	if t.Loops != "" {
+		buf.WriteString("-l ")
+		buf.WriteString(t.Loops)
+		buf.WriteByte(' ')
+	}
+	if t.LoopAction != "" {
+		buf.WriteString("-L ")
+		buf.WriteString(t.LoopAction)
+		buf.WriteByte(' ')
+	}
+	if t.Payload != "" {
+		buf.WriteString("-p ")
+		buf.WriteString(t.Payload)
+		buf.WriteByte(' ')
+	}
+	if t.Method != "" {
+		buf.WriteString("-P ")
+		buf.WriteString(t.Method)
+		buf.WriteByte(' ')
+	}
+	if t.Attempts != "" {
+		buf.WriteString("-q ")
+		buf.WriteString(t.Attempts)
+		buf.WriteByte(' ')
+	}
+	if t.SendAll {
+		buf.WriteString("-Q ")
+	}
+	if t.Sport != "" {
+		buf.WriteString("-s ")
+		buf.WriteString(t.Sport)
+		buf.WriteByte(' ')
+	}
+	if t.Tos != "" {
+		buf.WriteString("-t ")
+		buf.WriteString(t.Tos)
+		buf.WriteByte(' ')
+	}
+	if t.TimeExceeded {
+		buf.WriteString("-T ")
+	}
+	if t.Wait != "" {
+		buf.WriteString("-w ")
+		buf.WriteString(t.Wait)
+		buf.WriteByte(' ')
+	}
+	if t.WaitProbe != "" {
+		buf.WriteString("-W ")
+		buf.WriteString(t.WaitProbe)
+		buf.WriteByte(' ')
+	}
+	if t.GssEntry != "" {
+		buf.WriteString("-z ")
+		buf.WriteString(t.GssEntry)
+		buf.WriteByte(' ')
+	}
+	if t.LssName != "" {
+		buf.WriteString("-Z ")
+		buf.WriteString(t.LssName)
+		buf.WriteByte(' ')
+	}
+	c.userIDCache = new(string)
+	*c.userIDCache = t.UserId
+	buf.WriteString("-U ")
+	uid := strconv.FormatUint(uint64(c.ID), 10)
+	buf.WriteString(uid)
+	buf.WriteByte(' ')
+	buf.WriteString(ips)
+	buf.WriteByte('\n')
+	_, err = w.Write(buf.Bytes())
+	return err
 }
 
-func createCmd(arg interface{}, t cmdT) (Cmd, error) {
-	//This far from handles all possible cases
-	opts := optionMap[t]
-	ty := reflect.TypeOf(arg)
-	v := reflect.ValueOf(arg)
-	n := v.NumField()
-	var fopts []string
-	var targ string
-	for i := 0; i < n; i++ {
-		f := ty.Field(i)
-		if o, ok := opts[f.Name]; ok {
-			str, err := o.opt(o.format, v.FieldByName(f.Name).Interface())
-			if err != nil {
-				return Cmd{}, fmt.Errorf("Error creating option err: %v", err)
-			}
-			if len(str) == 0 {
-				continue
-			}
-			if f.Name == "Dst" {
-				targ = str
-				continue
-			}
-			fopts = append(fopts, str)
-		}
+func (c *Cmd) IssueCommand(w io.Writer, arg interface{}) error {
+	switch arg.(type) {
+	case *dm.PingMeasurement:
+		return c.issuePing(w, arg.(*dm.PingMeasurement))
+	case *dm.TracerouteMeasurement:
+		return c.issueTraceroute(w, arg.(*dm.TracerouteMeasurement))
+	default:
+		fmt.Errorf("Unknown arg type.")
 	}
-	fopts = append(fopts, targ)
-	return Cmd{ct: t, options: fopts}, nil
+	return nil
 }

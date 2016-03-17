@@ -27,6 +27,12 @@ var (
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
 	}, getName())
+	spooferGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "spoofers",
+		Name:      "current_spoofers",
+		Help:      "The current number of spoofing VPS",
+	})
 )
 
 var id = rand.Uint32()
@@ -41,6 +47,7 @@ func getName() string {
 
 func init() {
 	prometheus.MustRegister(procCollector)
+	prometheus.MustRegister(spooferGauge)
 }
 
 type vpMap map[uint32]*dm.VantagePoint
@@ -225,6 +232,7 @@ func (rvp *RVPService) checkCapabilities() {
 			rvp.rw.Lock()
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
+			updateSpoofCount(rvp.vps.DeepCopy())
 		case <-dirty:
 			_, err := rvp.GetVPs(context.Background(), &dm.VPRequest{})
 			if err != nil {
@@ -246,9 +254,21 @@ func (rvp *RVPService) checkCapabilities() {
 			rvp.rw.Lock()
 			rvp.vps.Update(vps)
 			rvp.rw.Unlock()
+			updateSpoofCount(rvp.vps.DeepCopy())
 			dirty = nil
 		}
 	}
+}
+
+func updateSpoofCount(vps vpMap) {
+	vpl := vps.GetAll()
+	var spoofers int
+	for _, vp := range vpl {
+		if vp.CanSpoof {
+			spoofers++
+		}
+	}
+	spooferGauge.Set(float64(spoofers))
 }
 
 func getRandomN(n int, vpm vpMap) []*dm.VantagePoint {

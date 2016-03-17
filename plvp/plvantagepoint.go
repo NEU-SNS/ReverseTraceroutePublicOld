@@ -80,6 +80,47 @@ func init() {
 	prometheus.MustRegister(spoofCounter)
 }
 
+type SendCloser interface {
+	Send([]*dm.Probe) error
+	Close() error
+}
+
+type PLControllerSender struct {
+	RootCA string
+	conn   *grpc.ClientConn
+}
+
+func (cs *PLControllerSender) Send(ps []*dm.Probe) error {
+	if cs.conn == nil {
+		_, srvs, err := net.LookupSRV("plcontroller", "tcp", "revtr.ccs.neu.edu")
+		if err != nil {
+			return err
+		}
+		creds, err := credentials.NewClientTLSFromFile(cs.RootCA, srvs[0].Target)
+		if err != nil {
+			return err
+		}
+		addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+		cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			return err
+		}
+		cs.conn = cc
+	}
+	client := plc.NewPLControllerClient(cs.conn)
+	contx, cancel := ctx.WithTimeout(ctx.Background(), time.Second*2)
+	defer cancel()
+	_, err := client.AcceptProbes(contx, &dm.SpoofedProbes{Probes: ps})
+	return err
+}
+
+func (cs *PLControllerSender) Close() error {
+	if cs.conn != nil {
+		return cs.conn.Close()
+	}
+	return nil
+}
+
 type plVantagepointT struct {
 	sc       scamper.Config
 	spoofmon *SpoofPingMonitor
@@ -90,7 +131,7 @@ type plVantagepointT struct {
 	monip    chan dm.Probe
 	am       sync.Mutex // protect addr
 	addr     string
-	conn     *grpc.ClientConn
+	send     SendCloser
 }
 
 var plVantagepoint plVantagepointT
@@ -128,8 +169,8 @@ func (vp *plVantagepointT) stop() {
 	if vp.spoofmon != nil {
 		vp.spoofmon.Quit()
 	}
-	if vp.conn != nil {
-		vp.conn.Close()
+	if vp.send != nil {
+		vp.send.Close()
 	}
 }
 
@@ -139,11 +180,10 @@ func HandleSig(s os.Signal) {
 }
 
 // The vp is dead if this method needs to return, so call stop() to clean up before returning
-func (vp *plVantagepointT) run(c Config, ec chan error) {
+func (vp *plVantagepointT) run(c Config, s SendCloser, ec chan error) {
 	vp.config = c
 	con := new(scamper.Config)
 	con.ScPath = *c.Scamper.BinPath
-
 	con.IP = *c.Scamper.Host
 	con.Port = *c.Scamper.Port
 	err := scamper.ParseConfig(*con)
@@ -160,6 +200,7 @@ func (vp *plVantagepointT) run(c Config, ec chan error) {
 		ec <- err
 		return
 	}
+	vp.send = s
 	vp.addr = sip
 	vp.sc = *con
 	vp.mp = mproc.New()
@@ -187,51 +228,14 @@ func startHTTP(addr string) {
 }
 
 // Start a plvp with the given config
-func Start(c Config) chan error {
+func Start(c Config, s SendCloser) chan error {
 	log.Info("Starting plvp with config: %v", c)
 	http.Handle("/metrics", prometheus.Handler())
 	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 1)
-	go plVantagepoint.run(c, errChan)
+	go plVantagepoint.run(c, s, errChan)
 	return errChan
 
-}
-
-func (vp *plVantagepointT) sendSpoofs(probes []*dm.Probe) {
-	log.Debug("Sending spoofed probes")
-	if len(probes) == 0 {
-		log.Debug("No Spoofs to send")
-		return
-	}
-	if vp.conn == nil {
-		_, srvs, err := net.LookupSRV("plcontroller", "tcp", "revtr.ccs.neu.edu")
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		creds, err := credentials.NewClientTLSFromFile(*vp.config.Local.RootCA, srvs[0].Target)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		addr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-		log.Debugf("Dialing %s\n", addr)
-		cc, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
-		if err != nil {
-			log.Errorf("Failed to send spoofs: %v", err)
-			return
-		}
-		vp.conn = cc
-	}
-	log.Debug("About to send spoofed probes")
-	client := plc.NewPLControllerClient(vp.conn)
-	contx, cancel := ctx.WithTimeout(ctx.Background(), time.Second*2)
-	defer cancel()
-	_, err := client.AcceptProbes(contx, &dm.SpoofedProbes{Probes: probes})
-	if err != nil {
-		log.Errorf("Error sending probes: %v", err)
-	}
-	log.Info("Done sending spoofs")
 }
 
 func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan error) {
@@ -240,7 +244,6 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 		for {
 			select {
 			case probe := <-probes:
-				log.Infof("Got IP from spoof monitor: %v", probe)
 				spoofCounter.Inc()
 				sprobes = append(sprobes, &probe)
 			case err := <-ec:
@@ -248,9 +251,8 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 				case ErrorNotICMPEcho, ErrorNonSpoofedProbe:
 					continue
 				}
-				log.Errorf("Recieved error from spoof monitor: %v", err)
 			case <-time.After(2 * time.Second):
-				vp.sendSpoofs(sprobes)
+				vp.send.Send(sprobes)
 				sprobes = make([]*dm.Probe, 0)
 			}
 		}
@@ -259,13 +261,11 @@ func (vp *plVantagepointT) monitorSpoofedPings(probes chan dm.Probe, ec chan err
 
 func pickIP(host string) (string, error) {
 
-	log.Infof("Looking up addresses for %s", host)
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return "", err
 	}
 
-	log.Infof("Got IPs: %v", addrs)
 	return addrs[rand.Intn(len(addrs))], nil
 }
 

@@ -232,7 +232,6 @@ func (rv *RevSegment) LastHop() string {
 
 // Reaches ...
 func (rv *RevSegment) Reaches() bool {
-
 	return rv.LastHop() == rv.Src || ipToCluster.Get(rv.LastHop()) == ipToCluster.Get(rv.Src)
 }
 

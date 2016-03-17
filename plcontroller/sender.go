@@ -58,12 +58,10 @@ func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 		saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
 		creds, err := credentials.NewClientTLSFromFile(cs.RootCA, "controller.revtr.ccs.neu.edu")
 		if err != nil {
-			log.Error(err)
 			return err
 		}
 		cc, err := grpc.Dial(saddr, grpc.WithTransportCredentials(creds))
 		if err != nil {
-			log.Error(err)
 			return err
 		}
 		cs.conn = cc
@@ -73,22 +71,20 @@ func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	defer cancel()
 	stream, err := cl.ReceiveSpoofedProbes(ctx)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 	for _, sp := range sps {
 		if err := stream.Send(sp); err != nil {
-			log.Errorf("Error sending spoofed probe: %v", err)
 			return err
 		}
 	}
 	_, err = stream.CloseAndRecv()
-	if err != nil {
-		log.Error(err)
-	}
 	return err
 }
 
 func (cs *ControllerSender) Close() error {
-	return cs.conn.Close()
+	if cs.conn != nil {
+		return cs.conn.Close()
+	}
+	return nil
 }

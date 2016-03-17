@@ -579,6 +579,13 @@ func (rt *ReverseTraceroute) HTML() string {
 func (rt *ReverseTraceroute) resolveHostname(ip string) string {
 	hn, ok := rt.hostnameCache[ip]
 	if !ok {
+		for _, vp := range vps {
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			if ips == ip {
+				rt.hostnameCache[ip] = vp.Hostname
+				return vp.Hostname
+			}
+		}
 		hns, err := net.LookupAddr(ip)
 		if err != nil {
 			log.Error(err)
@@ -1198,6 +1205,12 @@ func (rt *ReverseTraceroute) run() error {
 			return nil
 		}
 		if err == nil {
+			err = rt.revtreiveBackgroundTRS()
+			if rt.Reaches() {
+				rt.EndTime = time.Now()
+				rt.StopReason = "REACHES"
+				return nil
+			}
 			continue
 		}
 		log.Debug(err)
@@ -1215,6 +1228,12 @@ func (rt *ReverseTraceroute) run() error {
 			}
 		}
 		if err == nil {
+			err = rt.revtreiveBackgroundTRS()
+			if rt.Reaches() {
+				rt.EndTime = time.Now()
+				rt.StopReason = "REACHES"
+				return nil
+			}
 			continue
 		}
 		log.Debug("Attempting TS")
@@ -1231,6 +1250,12 @@ func (rt *ReverseTraceroute) run() error {
 			}
 		}
 		if err == nil {
+			err = rt.revtreiveBackgroundTRS()
+			if rt.Reaches() {
+				rt.EndTime = time.Now()
+				rt.StopReason = "REACHES"
+				return nil
+			}
 			continue
 		}
 		log.Debug("Attempting to add from background traceroute")
@@ -1266,7 +1291,7 @@ func (rt *ReverseTraceroute) run() error {
 	}
 }
 
-var dstMustBeReachable = true
+var dstMustBeReachable = false
 
 // ReverseTracerouteReq is a revtr req
 type ReverseTracerouteReq struct {
@@ -1306,12 +1331,12 @@ type ClusterSource interface {
 var once sync.Once
 
 // RunReverseTraceroute runs a reverse traceroute
-func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
+func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
-	rt.backoffEndhost = backoffEndhost
+	rt.backoffEndhost = revtr.BackoffEndhost
 	rt.cl = cl
 	rt.at = at
 	return rt, rt.run()
@@ -1771,7 +1796,7 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.LastHop())
 	if isInPrivatePrefix(net.ParseIP(rt.LastHop())) {
-		return Err
+		return ErrPrivateIP
 	}
 	tr := datamodel.TracerouteMeasurement{
 		Src:        src,

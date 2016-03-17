@@ -77,7 +77,6 @@ func (c *PlController) Ping(server plc.PLController_PingServer) error {
 				defer pingGoroutineGauge.Sub(1)
 				pr, err := c.runPing(ctx, p)
 				if err != nil {
-					log.Debugf("Got ping result: %v, with error %v", pr, err)
 					pr.Error = err.Error()
 					pr.Src = p.Src
 					pr.Dst = p.Dst
@@ -91,6 +90,21 @@ func (c *PlController) Ping(server plc.PLController_PingServer) error {
 				case <-ctx.Done():
 				}
 				done := time.Since(start).Seconds()
+				if p.Spoof {
+					if p.RR {
+						ipOptionsResponseTimes.WithLabelValues("SPOOFED", "RR").Observe(done)
+					}
+					if p.TimeStamp != "" {
+						ipOptionsResponseTimes.WithLabelValues("SPOOFED", "TS").Observe(done)
+					}
+				} else {
+					if p.RR {
+						ipOptionsResponseTimes.WithLabelValues("NON-SPOOFED", "RR").Observe(done)
+					}
+					if p.TimeStamp != "" {
+						ipOptionsResponseTimes.WithLabelValues("NON-SPOOFED", "TS").Observe(done)
+					}
+				}
 				pingResponseTimes.Observe(done)
 			}(ping)
 		}
@@ -182,6 +196,8 @@ func (c *PlController) Traceroute(server plc.PLController_TracerouteServer) erro
 
 func (c *PlController) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_ReceiveSpoofServer) error {
 	spoofs := rs.GetSpoofs()
+	ctx, cancel := con.WithCancel(stream.Context())
+	defer cancel()
 	if spoofs == nil {
 		return ErrorNilArgList
 	}
@@ -189,7 +205,7 @@ func (c *PlController) ReceiveSpoof(rs *dm.RecSpoof, stream plc.PLController_Rec
 		return ErrorEmptyArgList
 	}
 	for _, spoof := range spoofs {
-		ret, err := c.recSpoof(spoof)
+		ret, err := c.recSpoof(ctx, spoof)
 		if err != nil {
 			ret.Error = err.Error()
 		}

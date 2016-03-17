@@ -1048,6 +1048,11 @@ func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 		tx.Rollback()
 		return err
 	}
+	_, err = stmt.Exec(int32(id), trace.Src, 0)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 	for _, hop := range trace.GetHops() {
 		_, err := stmt.Exec(int32(id), hop.Addr, hop.ProbeTtl)
 		if err != nil {
