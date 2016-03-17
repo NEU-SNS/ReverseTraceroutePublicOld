@@ -60,9 +60,9 @@ var (
 type Response struct {
 	RType  responseT
 	Data   []byte
+	Ret    interface{}
 	DS     int
 	UserID uint32
-	Ret    interface{}
 	Err    error
 	Header bool
 }
@@ -106,9 +106,6 @@ func (sm *socketMap) Add(s *Socket) {
 func (sm *socketMap) Remove(addr string) {
 	sm.Lock()
 	defer sm.Unlock()
-	if sock, ok := sm.socks[addr]; ok {
-		sock.Stop()
-	}
 	delete(sm.socks, addr)
 }
 

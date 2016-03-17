@@ -28,6 +28,7 @@ Copyright (c) 2015, Northeastern University
 package scamper_test
 
 import (
+	"bytes"
 	"net"
 	"testing"
 
@@ -123,4 +124,22 @@ func TestSendOnClosedSocket(t *testing.T) {
 	if err != scamper.ErrSocketClosed {
 		t.Fatalf("TestDisconnectSocket, Expected[%v], Got[%v]", scamper.ErrSocketClosed, err)
 	}
+}
+
+func TestCmd(t *testing.T) {
+	pm := &datamodel.PingMeasurement{
+		Src: 1111111111,
+		Dst: 2222222222,
+	}
+	tm := &datamodel.TracerouteMeasurement{
+		Src: 1111111111,
+		Dst: 2222222222,
+	}
+	c := scamper.Cmd{ID: 5}
+	res := &bytes.Buffer{}
+	c.IssueCommand(res, pm)
+	t.Log(res.String())
+	res.Reset()
+	c.IssueCommand(res, tm)
+	t.Log(res.String())
 }

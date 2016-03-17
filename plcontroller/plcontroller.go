@@ -66,12 +66,24 @@ var (
 		Name:      "timeout_count",
 		Help:      "Count of Rpc Timeouts",
 	})
+	timeoutCounterByVPMT = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "timeout_by_vp",
+		Help:      "The count of Rpc timeouts by VP, per measurement type",
+	}, []string{"vp", "measurement_type"})
 	errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: getName(),
 		Subsystem: "rpc",
 		Name:      "error_count",
 		Help:      "Count of Rpc Errors",
 	})
+	errorCounterByVPMT = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: getName(),
+		Subsystem: "rpc",
+		Name:      "error_by_vp",
+		Help:      "The count of Rpc Errors by VP, per measurement type",
+	}, []string{"vp", "measurement_type"})
 	pingGoroutineGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: getName(),
 		Subsystem: "measurements",
@@ -90,12 +102,19 @@ var (
 		Name:      "traceroute_goroutines",
 		Help:      "The current number of goroutines running traceroutes",
 	})
+
 	tracerouteResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: getName(),
 		Subsystem: "measurements",
 		Name:      "traceroute_response_times",
-		Help:      "The time it takes for traceroutes to reponsd",
+		Help:      "The time it takes for traceroutes to respond",
 	})
+	ipOptionsResponseTimes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: getName(),
+		Subsystem: "measurements",
+		Name:      "options_response_times",
+		Help:      "The time it takes for different ip options probes to respond",
+	}, []string{"spoofed", "option"})
 	vpsConnected = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: getName(),
 		Subsystem: "vantage_points",
@@ -116,6 +135,9 @@ func getName() string {
 }
 
 func init() {
+	prometheus.MustRegister(errorCounterByVPMT)
+	prometheus.MustRegister(timeoutCounterByVPMT)
+	prometheus.MustRegister(ipOptionsResponseTimes)
 	prometheus.MustRegister(procCollector)
 	prometheus.MustRegister(rpcCounter)
 	prometheus.MustRegister(timeoutCounter)
@@ -272,12 +294,6 @@ func (c *PlController) Stop() {
 	if c.shutdown != nil {
 		close(c.shutdown)
 	}
-	if c.w != nil {
-		err := c.w.Close()
-		if err != nil {
-			log.Error(err)
-		}
-	}
 	c.removeAllVps()
 	if c.spoofs != nil {
 		c.spoofs.Quit()
@@ -285,9 +301,11 @@ func (c *PlController) Stop() {
 	if c.server != nil {
 		c.server.Stop()
 	}
+	// Time to clean up
+	<-time.After(time.Second * 10)
 }
 
-func (c *PlController) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
+func (c *PlController) recSpoof(ctx context.Context, rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error) {
 	resp := &dm.NotifyRecSpoofResponse{}
 	dummy := &dm.PingMeasurement{
 		Src:     rs.Sip,
@@ -299,7 +317,14 @@ func (c *PlController) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error
 		Dport:   "62195",
 	}
 	src, _ := util.Int32ToIPString(rs.Sip)
-	_, _, err := c.client.DoMeasurement(src, dummy)
+	pr, id, err := c.client.DoMeasurement(src, dummy)
+	go func() {
+		select {
+		case <-pr:
+		case <-ctx.Done():
+			c.client.RemoveMeasurement(src, id)
+		}
+	}()
 	if err != nil {
 		log.Error(err)
 		return resp, err
@@ -313,20 +338,21 @@ func (c *PlController) recSpoof(rs *dm.Spoof) (*dm.NotifyRecSpoofResponse, error
 }
 
 func (c *PlController) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm.Ping, error) {
-	log.Debugf("Running ping for: %v", pa)
+	rpcCounter.Inc()
 	timeout := pa.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
 	}
 	src, err := util.Int32ToIPString(pa.Src)
 	if err != nil {
+		errorCounterByVPMT.WithLabelValues(src, "PING").Inc()
 		return dm.Ping{}, err
 	}
 	resp, id, err := c.client.DoMeasurement(src, pa)
 	if err != nil {
+		errorCounterByVPMT.WithLabelValues(src, "PING").Inc()
 		return dm.Ping{}, err
 	}
-	rpcCounter.Inc()
 	select {
 	case r := <-resp:
 		switch t := r.Ret.(type) {
@@ -334,17 +360,23 @@ func (c *PlController) runPing(ctx context.Context, pa *dm.PingMeasurement) (dm.
 			return dm.ConvertPing(t), nil
 		default:
 			errorCounter.Inc()
+			errorCounterByVPMT.WithLabelValues(src, "PING").Inc()
 			return dm.Ping{}, fmt.Errorf("Wrong type in ping response")
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
-		src, _ := util.Int32ToIPString(pa.Src)
+		timeoutCounterByVPMT.WithLabelValues(src, "PING").Inc()
 		err := c.client.RemoveMeasurement(src, id)
 		if err != nil {
 			log.Error(err)
 		}
 		return dm.Ping{}, fmt.Errorf("Ping timed out")
 	case <-ctx.Done():
+		err := c.client.RemoveMeasurement(src, id)
+		if err != nil {
+			log.Error(err)
+		}
+		errorCounterByVPMT.WithLabelValues(src, "PING").Inc()
 		return dm.Ping{}, ctx.Err()
 	}
 }
@@ -354,6 +386,7 @@ func (c *PlController) acceptProbe(probe *dm.Probe) error {
 }
 
 func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasurement) (dm.Traceroute, error) {
+	rpcCounter.Inc()
 	timeout := ta.Timeout
 	if timeout == 0 {
 		timeout = *c.config.Local.Timeout
@@ -361,13 +394,14 @@ func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasu
 
 	src, err := util.Int32ToIPString(ta.Src)
 	if err != nil {
+		errorCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 		return dm.Traceroute{}, err
 	}
 	resp, id, err := c.client.DoMeasurement(src, ta)
 	if err != nil {
+		errorCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 		return dm.Traceroute{}, err
 	}
-	rpcCounter.Inc()
 	select {
 	case r := <-resp:
 		switch t := r.Ret.(type) {
@@ -375,14 +409,24 @@ func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasu
 			return dm.ConvertTraceroute(t), nil
 		default:
 			errorCounter.Inc()
+			errorCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 			return dm.Traceroute{}, fmt.Errorf("Wrong type in traceroute response")
 		}
 	case <-time.After(time.Second * time.Duration(timeout)):
 		timeoutCounter.Inc()
+		timeoutCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 		src, _ := util.Int32ToIPString(ta.Src)
-		_ = c.client.RemoveMeasurement(src, id)
+		err = c.client.RemoveMeasurement(src, id)
+		if err != nil {
+			log.Error(err)
+		}
 		return dm.Traceroute{}, fmt.Errorf("Traceroute timed out")
 	case <-ctx.Done():
+		err = c.client.RemoveMeasurement(src, id)
+		if err != nil {
+			log.Error(err)
+		}
+		errorCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 		return dm.Traceroute{}, ctx.Err()
 	}
 }

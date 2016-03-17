@@ -47,7 +47,7 @@ type watcher struct {
 // Watcher watches a path
 type Watcher interface {
 	Close() error
-	GetEvent() (Event, error)
+	GetEvent(chan struct{}) (Event, error)
 }
 
 // New creates a n
@@ -70,9 +70,11 @@ func (w watcher) Close() error {
 }
 
 // GetEvent gets the next create/remove event
-func (w watcher) GetEvent() (Event, error) {
+func (w watcher) GetEvent(cancel chan struct{}) (Event, error) {
 	for {
 		select {
+		case <-cancel:
+			return nil, ErrWatcherClosed
 		case ev, ok := <-w.w.Events:
 			if !ok {
 				return nil, ErrWatcherClosed

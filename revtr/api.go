@@ -208,15 +208,15 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 		notIP = true
 	}
 	if notIP {
+		for _, vp := range vps {
+			if vp.Hostname == dst {
+				ips, _ := util.Int32ToIPString(vp.Ip)
+				return ips, true
+			}
+		}
 		res, err := net.LookupHost(dst)
 		if err != nil {
 			log.Error(err)
-			for _, vp := range vps {
-				if vp.Hostname == dst {
-					ips, _ := util.Int32ToIPString(vp.Ip)
-					return ips, true
-				}
-			}
 			return "", false
 		}
 		if len(res) == 0 {
@@ -353,7 +353,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 			Src:       src,
 			Dst:       dst,
 			Staleness: 60,
-		}, true, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
+		}, false, true, serv.cl, serv.at, serv.vpserv, rr.da, rr.da)
 		rr.keyToRevtr[key] = revtrAndService{rt: rt, serv: &serv}
 	}
 	runningTemplate.Execute(rw, &rt)
@@ -585,7 +585,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 				if r.Staleness == 0 {
 					r.Staleness = 60
 				}
-				res, err := RunReverseTraceroute(r, true, servs.cl, servs.at, servs.vpserv, s.da, s.da)
+				res, err := RunReverseTraceroute(r, servs.cl, servs.at, servs.vpserv, s.da, s.da)
 				if err != nil {
 					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
 				}
@@ -603,7 +603,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	err = json.NewEncoder(rw).Encode(struct {
 		ResultURI string `json:"result_uri"`
 	}{
-		ResultURI: fmt.Sprintf("http://%s%s?batchid=%d", req.Host, s.Route, batchID),
+		ResultURI: fmt.Sprintf("https://%s%s?batchid=%d", req.Host, s.Route, batchID),
 	})
 }
 

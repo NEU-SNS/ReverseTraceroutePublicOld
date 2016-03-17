@@ -225,7 +225,7 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequ
 					close(in)
 					return
 				}
-				go a.fillAtlas(ir.Dest, ir.Staleness)
+				go a.fillAtlas(ir.Address, ir.Dest, ir.Staleness)
 			}
 
 			close(in)
@@ -313,11 +313,11 @@ func (a *Atlas) connect() bool {
 	return true
 }
 
-func (a *Atlas) fillAtlas(dest uint32, stale int64) {
+func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 	if !a.connect() {
 		return
 	}
-	srcs := a.getSrcs(dest)
+	srcs := a.getSrcs(hop, dest)
 	var traces []*dm.TracerouteMeasurement
 	for _, src := range srcs {
 		curr := &dm.TracerouteMeasurement{
@@ -363,20 +363,23 @@ func (a *Atlas) fillAtlas(dest uint32, stale int64) {
 	a.curr.Remove(dest, finished)
 }
 
-func (a *Atlas) getSrcs(dest uint32) []uint32 {
+func (a *Atlas) getSrcs(hop, dest uint32) []uint32 {
 	vps, err := a.vpcon.GetVPs()
 	if err != nil {
 		return nil
 	}
 	sites := make(map[string]*dm.VantagePoint)
-	var site string
+	var srcIsVP *dm.VantagePoint
 	for _, vp := range vps.GetVps() {
-		if vp.Ip == dest {
-			site = vp.Site
+		if vp.Ip == hop {
+			srcIsVP = vp
 		}
 		sites[vp.Site] = vp
 	}
-	delete(sites, site)
+	//overwrite site to use the src
+	if srcIsVP != nil {
+		sites[srcIsVP.Site] = srcIsVP
+	}
 	var srcs []uint32
 	for _, vp := range sites {
 		srcs = append(srcs, vp.Ip)

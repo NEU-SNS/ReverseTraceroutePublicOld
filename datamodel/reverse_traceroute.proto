@@ -6,10 +6,11 @@ package datamodel;
 
 
 message RevtrMeasurement {
-    string src       = 1;
-    string dst       = 2;
-    uint32 staleness = 3;
-    uint32 id        = 4;
+    string src             = 1;
+    string dst             = 2;
+    uint32 staleness       = 3;
+    uint32 id              = 4;
+      bool backoff_endhost = 5;
 }
 
 message RevtrRequest {

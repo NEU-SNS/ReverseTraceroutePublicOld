@@ -41,7 +41,7 @@ import (
 
 func (c *PlController) handlEvents() {
 	for {
-		event, err := c.w.GetEvent()
+		event, err := c.w.GetEvent(c.shutdown)
 		if err == watcher.ErrWatcherClosed {
 			return
 		}
@@ -51,6 +51,7 @@ func (c *PlController) handlEvents() {
 		}
 		switch event.Type() {
 		case watcher.Create:
+			log.Debugf("Create socket: %s", event.Name())
 			con, err := net.Dial("unix", event.Name())
 			if err != nil {
 				log.Error(err)
@@ -78,6 +79,7 @@ func (c *PlController) handlEvents() {
 			c.client.AddSocket(s)
 			vpsConnected.Add(1)
 		case watcher.Remove:
+			log.Debugf("Remove socket: %s", event.Name())
 			ip := strings.Split(path.Base(event.Name()), ":")[0]
 			nip, err := util.IPStringToInt32(ip)
 			if err != nil {
@@ -88,6 +90,10 @@ func (c *PlController) handlEvents() {
 			if err != nil {
 				log.Errorf("Failed to update controller  %v", err)
 			}
+			sock, err := c.client.GetSocket(ip)
+			if err != scamper.ErrorSocketNotFound {
+				sock.Stop()
+			}
 			c.client.RemoveSocket(ip)
 			vpsConnected.Sub(1)
 		}
@@ -96,10 +102,14 @@ func (c *PlController) handlEvents() {
 
 //This is only for use when a server is going down
 func (c *PlController) removeAllVps() {
+	log.Debug("Removing all VPS")
 	if c.client == nil {
 		return
 	}
-	for sock := range c.client.GetAllSockets() {
+	vps := c.client.GetAllSockets()
+	log.Debug(vps)
+	for sock := range vps {
+		log.Debugf("Removing %v", sock.IP())
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
 			continue

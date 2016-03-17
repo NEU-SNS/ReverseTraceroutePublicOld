@@ -20,7 +20,7 @@ message PingMeasurement {
     string sport        = 11;
     string wait         = 12;
     string ttl          = 13;
-    string mut          = 14;
+    string mtu          = 14;
     string reply_count  = 15;
     string pattern      = 16;
     string method       = 17;

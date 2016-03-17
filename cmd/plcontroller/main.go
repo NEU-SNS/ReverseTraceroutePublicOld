@@ -193,11 +193,11 @@ func main() {
 		signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
 			syscall.SIGQUIT, syscall.SIGSTOP)
 		for sig := range c {
-			log.Infof("Got signal: %v\n", sig)
-			plc.Stop()
+			log.Infof("Got signal: %v", sig)
 			mp.IntAll()
-			db.Close()
 			fw.Close()
+			plc.Stop()
+			db.Close()
 		}
 	}
 	go sigHandle()

@@ -59,7 +59,7 @@ type cmdMap struct {
 }
 
 type cmdResponse struct {
-	cmd  *Cmd
+	cmd  Cmd
 	done chan Response
 }
 
@@ -87,16 +87,20 @@ func (cm *cmdMap) getCmd(id uint32) (cmdResponse, error) {
 func (cm *cmdMap) rmCmd(id uint32) {
 	cm.Lock()
 	defer cm.Unlock()
-	delete(cm.cmds, id)
+	if _, ok := cm.cmds[id]; ok {
+		delete(cm.cmds, id)
+		return
+	}
+	log.Errorf("rmdCmd no cmd with id: %d", id)
 }
 
 func (cm *cmdMap) addCmd(c cmdResponse) error {
 	cm.Lock()
 	defer cm.Unlock()
-	if _, ok := cm.cmds[c.cmd.userID]; ok {
+	if _, ok := cm.cmds[c.cmd.ID]; ok {
 		return ErrorDupCommand
 	}
-	cm.cmds[c.cmd.userID] = c
+	cm.cmds[c.cmd.ID] = c
 	return nil
 }
 
@@ -115,6 +119,7 @@ type Socket struct {
 	wartsHeader [2]Response
 	rc          uint32
 	rw          *bufio.ReadWriter
+	done        chan struct{}
 	// Access atomically
 	userID uint32
 	mu     sync.Mutex
@@ -135,6 +140,7 @@ func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
 		cmds:  newCmdMap(),
 		con:   con,
 		rw:    bufio.NewReadWriter(bufio.NewReader(con), bufio.NewWriter(con)),
+		done:  make(chan struct{}),
 	}
 
 	go sock.readConn()
@@ -143,6 +149,9 @@ func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
 
 // Stop closes the connection the socket represents
 func (s *Socket) Stop() {
+	if s == nil {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s == nil {
@@ -154,8 +163,13 @@ func (s *Socket) Stop() {
 	s.con.Close()
 	if s.state == open {
 		s.state = closed
+		close(s.done)
 	}
+}
 
+// Done indicates when the socket is closed
+func (s *Socket) Done() <-chan struct{} {
+	return s.done
 }
 
 type parseErr struct {
@@ -220,10 +234,9 @@ func (s *Socket) readConn() {
 					r.Ret = res[0]
 					cr, err = s.cmds.getCmd(r.UserID)
 					if err != nil {
-						log.Warnf("Failed to get command for id: %d, err: %s", resp.UserID, err)
 						return
 					}
-					s.cmds.rmCmd(resp.UserID)
+					s.cmds.rmCmd(r.UserID)
 				}
 				cr.done <- r
 			}(resp)
@@ -260,25 +273,20 @@ var (
 func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	log.Errorf("State: %v", s.state)
 	if s.state == open {
 		id := s.getID()
-		cmd, err := newCmd(arg, id)
+		cmd := Cmd{ID: id}
+		cr := cmdResponse{cmd: cmd, done: make(chan Response, 1)}
+		err := s.cmds.addCmd(cr)
 		if err != nil {
 			return nil, 0, err
 		}
-		cr := cmdResponse{cmd: &cmd, done: make(chan Response, 1)}
-		err = s.cmds.addCmd(cr)
-		if err != nil {
-			return nil, 0, err
-		}
-		err = cmd.issueCommand(s.con)
+		err = cmd.IssueCommand(s.con, arg)
 		if err != nil {
 			s.cmds.rmCmd(id)
 			return nil, 0, ErrFailedToIssueCmd
 		}
 
-		log.Error("Returning nil")
 		return cr.done, id, nil
 	}
 	return nil, 0, ErrSocketClosed
@@ -302,7 +310,7 @@ func (s *Socket) Port() string {
 	return s.port
 }
 
-func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
+func parseResponse(r string, re io.Reader) (Response, error) {
 	resp := Response{}
 	switch {
 	case strings.Contains(r, string(ok)):
@@ -330,7 +338,7 @@ func parseResponse(r string, rw *bufio.ReadWriter) (Response, error) {
 		}
 		resp.DS = n
 		buff := make([]byte, n)
-		_, err = io.ReadFull(rw, buff)
+		_, err = io.ReadFull(re, buff)
 		if err != nil {
 
 			return resp, err

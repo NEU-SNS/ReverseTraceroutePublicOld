@@ -97,7 +97,7 @@ func main() {
 		}
 	}
 	util.CloseStdFiles(*conf.Local.CloseStdDesc)
-	err = <-plvp.Start(conf)
+	err = <-plvp.Start(conf, &plvp.PLControllerSender{RootCA: *conf.Local.RootCA})
 	if err != nil {
 		log.Errorf("PLVP Start returned with error: %v", err)
 		exit(1)
