@@ -2033,6 +2033,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		dsts, _ := util.Int32ToIPString(p.Dst)
 		segClass := "SpoofTSAdjRevSegment"
 		if vp == "non_spoofed" {
+			checksrctohoptosendspoofedmagic(src)
 			tsSrcToHopToSendSpoofed[src][dsts] = false
 			segClass = "TSAdjRevSegment"
 		}
@@ -2076,6 +2077,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		// there should be a uniq thing here but I need to figure out how to do it
 		for src, probes := range tsToIssueSrcToProbe {
 			for _, probe := range probes {
+				checksrctohoptosendspoofedmagic(src)
 				if _, ok := tsSrcToHopToSendSpoofed[src][probe[0]]; ok {
 					continue
 				}
@@ -2090,6 +2092,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			for _, probe := range probes {
 				// if we got a reply, would have set sendspoofed to false
 				// so it is still true, we need to try to find a spoofer
+				checksrctohoptosendspoofedmagic(src)
 				if tsSrcToHopToSendSpoofed[src][probe[0]] {
 					mySpoofers := getTimestampSpoofers(src, probe[0])
 					for _, sp := range mySpoofers {
@@ -2118,7 +2121,12 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			if sdvp.vp == "non_spoofed" {
 				linuxChecksSrcToProbe[sdvp.src] = append(linuxChecksSrcToProbe[sdvp.src], p)
 			} else {
-				linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp] = append(linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp], p)
+				if val, ok := linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src]; ok {
+					val[sdvp.vp] = append(linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp], p)
+				} else {
+					linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src] = make(map[string][][]string)
+					linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp] = append(linuxChecksSpoofedReceiverToSpooferToProbe[sdvp.src][sdvp.vp], p)
+				}
 			}
 		}
 		// once again leaving out a check for uniqness
@@ -2130,6 +2138,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			segClass := "SpoofTSAdjRevSegment"
 			// if I got a response, must not be filtering, so dont need to use spoofing
 			if vp == "non_spoofed" {
+				checksrctohoptosendspoofedmagic(src)
 				tsSrcToHopToSendSpoofed[src][dsts] = false
 				segClass = "TSAdjRevSegment"
 			}
