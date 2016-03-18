@@ -1597,7 +1597,7 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 		hs, _ := util.Int32ToIPString(s)
 		hopss = append(hopss, hs)
 	}
-	rt.debug("Processing RR for src: ", src, " dst ", dst, " hops: ", hopss)
+	log.Debug("Processing RR for src: ", src, " dst ", dst, " hops: ", hopss)
 	if ipToCluster.Get(hopss[len(hopss)-1]) == dstcls {
 		return []string{}
 	}
@@ -1611,7 +1611,7 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 		}
 	}
 	if found {
-		rt.debug("Found hops RR at: ", i)
+		log.Debug("Found hops RR at: ", i)
 		hopss = hopss[i:]
 		// remove cluster level loops
 		if removeLoops {
@@ -1629,10 +1629,10 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 					retHops = append(retHops, hop)
 				}
 			}
-			rt.debug("Got Hops: ", retHops)
+			log.Debug("Got Hops: ", retHops)
 			return retHops
 		}
-		rt.debug("Got Hops: ", hopss)
+		log.Debug("Got Hops: ", hopss)
 		return hopss
 	}
 	return []string{}
