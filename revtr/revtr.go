@@ -1628,18 +1628,22 @@ func processRR(src, dst string, hops []uint32, removeLoops bool) []string {
 		hopss = hopss[i:]
 		// remove cluster level loops
 		if removeLoops {
-			var currIndex int
 			var clusters []string
 			for _, hop := range hopss {
 				clusters = append(clusters, ipToCluster.Get(hop))
 			}
-			for currIndex < len(hopss)-1 {
-				for x := currIndex; currIndex < stringSliceRIndex(clusters, clusters[currIndex]); x++ {
-					hops[x] = hops[currIndex]
-					clusters[x] = clusters[currIndex]
+			var retHops []string
+			for i, hop := range hopss {
+				if i == 0 {
+					retHops = append(retHops, hop)
+					continue
 				}
-				currIndex++
+				if retHops[len(retHops)-1] != hop {
+					retHops = append(retHops, hop)
+				}
 			}
+			log.Debug("Got Hops: ", retHops)
+			return retHops
 		}
 		log.Debug("Got Hops: ", hopss)
 		return hopss
