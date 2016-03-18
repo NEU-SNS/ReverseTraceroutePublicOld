@@ -1970,10 +1970,9 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 	var dstsDoNotStamp [][]string
 
 	checkMapMagic := func(f, s string) {
-		if _, ok := receiverToSpooferToProbe[f]; ok {
-			return
+		if _, ok := receiverToSpooferToProbe[f]; !ok {
+			receiverToSpooferToProbe[f] = make(map[string][][]string)
 		}
-		receiverToSpooferToProbe[f] = make(map[string][][]string)
 	}
 	checksrctohoptosendspoofedmagic := func(f string) {
 
@@ -2174,6 +2173,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 	for _, probe := range destDoesNotStamp {
 		spoofers := getTimestampSpoofers(probe.src, probe.dst)
 		for _, s := range spoofers {
+			checkMapMagic(probe.src, s)
 			receiverToSpooferToProbe[probe.src][s] = append(receiverToSpooferToProbe[probe.src][s], []string{probe.dst, probe.tsip, probe.tsip, probe.tsip, probe.tsip})
 		}
 	}
