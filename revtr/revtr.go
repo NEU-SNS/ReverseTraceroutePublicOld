@@ -1967,7 +1967,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			tsSrcToHopToSendSpoofed[f] = make(map[string]bool)
 		}
 	}
-	initTsSrcToHopToResponseive(rt.Sr)
+	initTsSrcToHopToResponseive(rt.Src)
 	if tsSrcToHopToResponsive[rt.Src][rt.LastHop()] != 0 {
 		rt.debug("No VPS found for ", rt.Src, " last hop: ", rt.LastHop())
 		return ErrNoVPs
