@@ -413,7 +413,7 @@ func (rt *ReverseTraceroute) FailCurrPath() {
 	// keep popping until we find something that is either on a path
 	// we are assuming symmetric (we know it started at src so goes to whole way)
 	// or is not known to be a deadend
-	for !rt.Failed(false) && rt.DeadEnd[rt.LastHop()] && reflect.TypeOf(rt.CurrPath().LastSeg()) !=
+	for !rt.Failed(rt.backoffEndhost) && rt.DeadEnd[rt.LastHop()] && reflect.TypeOf(rt.CurrPath().LastSeg()) !=
 		reflect.TypeOf(&DstSymRevSegment{}) {
 		// Pop
 		*rt.Paths = (*rt.Paths)[:rt.len()-1]
@@ -500,17 +500,19 @@ func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
 		ret.Status = datamodel.RevtrStatus_RUNNING
 	}
 	hopsSeen := make(map[string]bool)
-	for _, s := range *rt.CurrPath().Path {
-		ty := s.Type()
-		for _, hi := range s.Hops() {
-			if hopsSeen[hi] {
-				continue
+	if !rt.Failed(rt.backoffEndhost) {
+		for _, s := range *rt.CurrPath().Path {
+			ty := s.Type()
+			for _, hi := range s.Hops() {
+				if hopsSeen[hi] {
+					continue
+				}
+				hopsSeen[hi] = true
+				var h datamodel.RevtrHop
+				h.Hop = hi
+				h.Type = datamodel.RevtrHopType(ty)
+				ret.Path = append(ret.Path, &h)
 			}
-			hopsSeen[hi] = true
-			var h datamodel.RevtrHop
-			h.Hop = hi
-			h.Type = datamodel.RevtrHopType(ty)
-			ret.Path = append(ret.Path, &h)
 		}
 	}
 	return ret
