@@ -2092,6 +2092,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 					mySpoofers := getTimestampSpoofers(src, probe[0])
 					for _, sp := range mySpoofers {
 						log.Debug("Adding spoofed TS probe to send")
+						checkMapMagic(src, sp)
 						receiverToSpooferToProbe[src][sp] = append(receiverToSpooferToProbe[src][sp], probe)
 					}
 					// if we haven't already decided whether it is responsive
