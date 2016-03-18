@@ -1967,7 +1967,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			tsSrcToHopToSendSpoofed[f] = make(map[string]bool)
 		}
 	}
-	checksrctohoptosendspoofedmagic(rt.Src)
+	initTsSrcToHopToResponseive(rt.Sr)
 	if tsSrcToHopToResponsive[rt.Src][rt.LastHop()] != 0 {
 		rt.debug("No VPS found for ", rt.Src, " last hop: ", rt.LastHop())
 		return ErrNoVPs
@@ -2093,6 +2093,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 					// if we haven't already decided whether it is responsive
 					// we'll set it to false, then change to true if we get one
 					if _, ok := tsSrcToHopToResponsive[src][probe[0]]; !ok {
+						initTsSrcToHopToResponseive(src)
 						tsSrcToHopToResponsive[src][probe[0]] = 1
 					}
 				}
