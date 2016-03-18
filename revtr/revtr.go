@@ -1764,7 +1764,7 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 			for _, h := range resp.Path.GetHops() {
 				hss, _ := util.Int32ToIPString(h.Ip)
 				addr, _ := util.Int32ToIPString(resp.Path.Address)
-				if !found && addr != hss {
+				if !found && ipToCluster.Get(addr) != ipToCluster.Get(hss) {
 					continue
 				}
 				found = true
