@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason) VALUES
-	(?, ?, ?, ?, ?, ?)`
+	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason, status) VALUES
+	(?, ?, ?, ?, ?, ?, ?)`
 	revtrInitRevtr         = `INSERT INTO reverse_traceroutes(src, dst) VALUES (?, ?)`
 	revtrUpdateRevtrStatus = `UPDATE reverse_traceroutes SET status = ? WHERE id = ?`
 	revtrStoreRevtrHop     = "INSERT INTO reverse_traceroute_hops(reverse_traceroute_id, hop, hop_type, `order`) VALUES (?, ?, ?, ?)"
@@ -236,7 +236,7 @@ func (db *DB) StoreRevtr(r dm.ReverseTraceroute) error {
 	}
 	src, _ := util.IPStringToInt32(r.Src)
 	dst, _ := util.IPStringToInt32(r.Dst)
-	res, err := tx.Exec(revtrStoreRevtr, src, dst, r.Runtime, r.RrIssued, r.TsIssued, r.StopReason)
+	res, err := tx.Exec(revtrStoreRevtr, src, dst, r.Runtime, r.RrIssued, r.TsIssued, r.StopReason, r.Status)
 	if err != nil {
 		log.Error(err)
 		tx.Rollback()
