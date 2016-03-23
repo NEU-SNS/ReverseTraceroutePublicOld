@@ -317,7 +317,7 @@ func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 	if !a.connect() {
 		return
 	}
-	srcs := a.getSrcs(hop, dest)
+	srcs := a.getSrcs(hop, dest, stale)
 	var traces []*dm.TracerouteMeasurement
 	for _, src := range srcs {
 		curr := &dm.TracerouteMeasurement{
@@ -352,25 +352,42 @@ func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 			log.Error(err)
 			break
 		}
-		go func() {
-			err = a.da.StoreAtlasTraceroute(t)
+		go func(tr *dm.Traceroute) {
+			hops := tr.GetHops()
+			if len(hops) == 0 {
+				return
+			}
+			if hops[len(hops)-1].Addr != tr.Dst {
+				log.Error("Traceroute did not reach destination")
+				return
+			}
+			err = a.da.StoreAtlasTraceroute(tr)
 			if err != nil {
 				log.Error(err)
 			}
-		}()
+		}(t)
 		finished = append(finished, t.Src)
 	}
 	a.curr.Remove(dest, finished)
 }
 
-func (a *Atlas) getSrcs(hop, dest uint32) []uint32 {
+func (a *Atlas) getSrcs(hop, dest uint32, stale int64) []uint32 {
 	vps, err := a.vpcon.GetVPs()
 	if err != nil {
 		return nil
 	}
+	oldsrcs, err := a.da.GetAtlasSources(dest, time.Minute*time.Duration(stale))
+	os := make(map[uint32]bool)
+	for _, o := range oldsrcs {
+		os[o] = true
+	}
 	sites := make(map[string]*dm.VantagePoint)
 	var srcIsVP *dm.VantagePoint
 	for _, vp := range vps.GetVps() {
+		if os[vp.Ip] {
+			// if the src has been used in interval [now, stale], skip it
+			continue
+		}
 		if vp.Ip == hop {
 			srcIsVP = vp
 		}
