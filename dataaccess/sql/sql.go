@@ -936,24 +936,9 @@ SELECT
 	*
 FROM
 (
-
-(SELECT atr.Id, atr.date, atr.dest FROM
-	(SELECT
-		b.ip_address
-	FROM
-		ip_aliases a INNER JOIN ip_aliases b on a.cluster_id = b.cluster_id
-	WHERE
-		a.ip_address = ? 
-	) alias
-INNER JOIN atlas_traceroutes atr on atr.dest = alias.ip_address
-WHERE atr.date > DATE_SUB(NOW(), interval ?  minute)
-ORDER BY atr.date desc)
-
-UNION
-
 (SELECT atr.Id, atr.date, atr.dest FROM
 atlas_traceroutes atr 
-WHERE atr.dest = ? AND atr.date > DATE_SUB(NOW(), interval ?  minute) 
+WHERE atr.dest = ? AND atr.date >= DATE_SUB(NOW(), interval ?  minute) 
 ORDER BY atr.date desc)
 ) X 
 INNER JOIN atlas_traceroute_hops ath on ath.trace_id = X.Id
@@ -974,6 +959,14 @@ limit 1
 INNER JOIN atlas_traceroute_hops hops on hops.trace_id = A.Id
 ORDER BY hops.ttl
 `
+	getSources = `
+SELECT
+    src
+FROM
+    atlas_traceroutes
+WHERE
+    dest = ? AND date >= DATE_SUB(NOW(), interval ? minute);
+`
 )
 
 type hopRow struct {
@@ -988,11 +981,33 @@ var (
 	ErrNoIntFound = fmt.Errorf("No Intersection Found")
 )
 
+// GetAtlasSources gets all sources that were used for existing atlas traceroutes
+// the set of vps - this would be the sources to use to run traces
+func (db *DB) GetAtlasSources(dst uint32, stale time.Duration) ([]uint32, error) {
+	rows, err := db.getReader().Query(getSources, dst, int64(stale.Minutes()))
+	var srcs []uint32
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var curr uint32
+		rows.Scan(&curr)
+		srcs = append(srcs, curr)
+	}
+	if err = rows.Err(); err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return srcs, nil
+}
+
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
 func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
 	log.Debug("Finding intersecting traceroute ", pairs, " alias: ", alias, "stale: ", int64(stale.Minutes()))
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, int64(stale.Minutes()), pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
+	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -1000,7 +1015,6 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 	defer rows.Close()
 	ret := dm.Path{}
 	for rows.Next() {
-		log.Debug("Parsing hop row")
 		row := hopRow{}
 		rows.Scan(&row.src, &row.dest, &row.hop, &row.ttl)
 		ret.Hops = append(ret.Hops, &dm.Hop{
@@ -1020,7 +1034,7 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 }
 
 const (
-	insertAtlasTrace = `INSERT INTO atlas_traceroutes(dest) VALUES(?)`
+	insertAtlasTrace = `INSERT INTO atlas_traceroutes(dest, src) VALUES(?, ?)`
 	insertAtlasHop   = `
 	INSERT INTO atlas_traceroute_hops(trace_id, hop, ttl) 
 	VALUES (?, ?, ?)`
@@ -1033,7 +1047,7 @@ func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 	if err != nil {
 		return err
 	}
-	res, err := tx.Exec(insertAtlasTrace, trace.Dst)
+	res, err := tx.Exec(insertAtlasTrace, trace.Dst, trace.Src)
 	if err != nil {
 		tx.Rollback()
 		return err
