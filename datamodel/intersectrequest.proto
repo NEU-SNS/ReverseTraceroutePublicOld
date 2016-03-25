@@ -10,7 +10,7 @@ message Hop {
 message Path {
     uint32 address       = 1;
     uint32 dest          = 2;
-    repeated Hop hops    = 3 ;
+    repeated Hop hops    = 3;
 }
 
 enum IResponseType {
@@ -24,7 +24,9 @@ message IntersectionRequest {
     uint32 address    = 1;
     uint32 dest       = 2;
     int64 staleness   = 3;
-    bool  use_aliases = 4;
+     bool use_aliases = 4;
+   bool ignore_source = 5;
+  uint32 src          = 6;
 }
 
 message IntersectionResponse {

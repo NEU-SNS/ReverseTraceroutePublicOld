@@ -136,8 +136,8 @@ func (d *DataAccess) GetAtlasSources(dst uint32, stale time.Duration) ([]uint32,
 }
 
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
-func (d *DataAccess) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
-	res, err := d.db.FindIntersectingTraceroute(pairs, alias, stale)
+func (d *DataAccess) FindIntersectingTraceroute(pairs []dm.SrcDst) ([]*dm.Path, error) {
+	res, err := d.db.FindIntersectingTraceroute(pairs)
 	if err == sql.ErrNoIntFound {
 		return res, ErrNoIntFound
 	}

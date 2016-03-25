@@ -11,6 +11,8 @@ import (
 
 	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	mocks "github.com/NEU-SNS/ReverseTraceroute/revtr/mocks"
+	"github.com/stretchr/testify/mock"
 )
 
 type vpSourceMock struct {
@@ -116,11 +118,20 @@ func (vps vpSourceMock) GetVPs() (*datamodel.VPReturn, error) {
 var myIP = "129.10.113.189"
 
 func TestInitialize(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
+	cs := &mocks.ClusterSource{}
+	initialize(vpSourceMock{}, cs)
 }
 
 func TestNewReverseTraceroute(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return([]datamodel.Adjacency{
+		datamodel.Adjacency{
+			IP1: 111111,
+			IP2: 222222,
+			Cnt: 10,
+		},
+	})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -128,7 +139,7 @@ func TestNewReverseTraceroute(t *testing.T) {
 }
 
 func TestSymmetricAssumptions(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -138,7 +149,7 @@ func TestSymmetricAssumptions(t *testing.T) {
 }
 
 func TestDeadends(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -149,7 +160,7 @@ func TestDeadends(t *testing.T) {
 }
 
 func TestRRVPSInitializedForHop(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -166,7 +177,7 @@ func TestRRVPSInitializedForHop(t *testing.T) {
 }
 
 func TestCurrPath(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -179,7 +190,7 @@ func TestCurrPath(t *testing.T) {
 
 func TestAddSegments(t *testing.T) {
 	t.Skip()
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -191,7 +202,7 @@ func TestAddSegments(t *testing.T) {
 }
 
 func TestReaches(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -304,8 +315,8 @@ func (as adjacencySourceMock) GetAdjacencyToDestByAddrAndDest24(dest24, addr uin
 }
 
 func TestInitializeRRVPs(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -329,8 +340,8 @@ func TestInitializeRRVPs(t *testing.T) {
 }
 
 func TestGetRRVPs(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", nil)
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -350,7 +361,7 @@ func TestGetRRVPs(t *testing.T) {
 }
 
 func TestChooseOneSpooferPerSite(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
 	ps := chooseOneSpooferPerSite()
 	if len(ps) == 0 {
 		t.Fatalf("Failed to get one spoofer per site")
@@ -359,8 +370,8 @@ func TestChooseOneSpooferPerSite(t *testing.T) {
 }
 
 func TestInitializeTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -374,8 +385,8 @@ func TestInitializeTSAdjacents(t *testing.T) {
 }
 
 func TestGetTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -387,8 +398,8 @@ func TestGetTSAdjacents(t *testing.T) {
 }
 
 func TestLength(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -400,8 +411,8 @@ func TestLength(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -414,8 +425,8 @@ func TestPop(t *testing.T) {
 }
 
 func TestHops(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -426,8 +437,8 @@ func TestHops(t *testing.T) {
 }
 
 func TestFailed(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -440,8 +451,8 @@ func TestFailed(t *testing.T) {
 }
 
 func TestFailCurrPath(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -453,8 +464,8 @@ func TestFailCurrPath(t *testing.T) {
 }
 
 func TestAddAndReplaceSegment(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -474,8 +485,8 @@ func TestAddAndReplaceSegment(t *testing.T) {
 }
 
 func TestAddBackgroundTRSegment(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -493,30 +504,28 @@ func TestAddBackgroundTRSegment(t *testing.T) {
 }
 
 func TestReverseHopsAssumeSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	counts := make(map[string]int)
-	err := reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	err := revtr.reverseHopsAssumeSymmetric()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestReverseHopsAssumeSymmetricWithPreviousSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, "./alias_lists.txt")
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", adjacencySourceMock{})
+	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	counts := make(map[string]int)
-	err := reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	err := revtr.reverseHopsAssumeSymmetric()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = reverseHopsAssumeSymmetric(revtr, clientMock{}, counts)
+	err = revtr.reverseHopsAssumeSymmetric()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -122,7 +122,7 @@ type Socket struct {
 	done        chan struct{}
 	// Access atomically
 	userID uint32
-	mu     sync.Mutex
+	mu     sync.Mutex // Protect state
 	state  sockstate
 }
 
@@ -272,8 +272,8 @@ var (
 // DoMeasurement perform the measurement described by arg
 func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.state == open {
+		s.mu.Unlock()
 		id := s.getID()
 		cmd := Cmd{ID: id}
 		cr := cmdResponse{cmd: cmd, done: make(chan Response, 1)}
@@ -289,6 +289,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 
 		return cr.done, id, nil
 	}
+	s.mu.Unlock()
 	return nil, 0, ErrSocketClosed
 }
 
