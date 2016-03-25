@@ -361,8 +361,8 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 }
 
 var (
-	homeTemplate    = template.Must(template.ParseFiles("webroot/templates/home.html"))
-	runningTemplate = template.Must(template.ParseFiles("webroot/templates/running.html"))
+	homeTemplate, _    = template.ParseFiles("webroot/templates/home.html")
+	runningTemplate, _ = template.ParseFiles("webroot/templates/running.html")
 )
 
 type homeModel struct {

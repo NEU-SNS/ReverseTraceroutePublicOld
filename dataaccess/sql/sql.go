@@ -959,6 +959,38 @@ limit 1
 INNER JOIN atlas_traceroute_hops hops on hops.trace_id = A.Id
 ORDER BY hops.ttl
 `
+	findIntersectingIgnoreSource = `
+SELECT 
+	? as src, A.dest, hops.hop, hops.ttl
+FROM 
+(
+SELECT
+	*
+FROM
+(
+(SELECT atr.Id, atr.date, atr.dest FROM
+atlas_traceroutes atr 
+WHERE  atr.src != ? AND atr.dest = ? AND atr.date >= DATE_SUB(NOW(), interval ?  minute) 
+ORDER BY atr.date desc)
+) X 
+INNER JOIN atlas_traceroute_hops ath on ath.trace_id = X.Id
+INNER JOIN
+(
+SELECT ? IP
+UNION
+SELECT
+		b.ip_address
+	FROM
+		ip_aliases a INNER JOIN ip_aliases b on a.cluster_id = b.cluster_id
+	WHERE
+		a.ip_address = ?	
+) Z ON ath.hop = Z.IP
+ORDER BY date desc
+limit 1
+) A
+INNER JOIN atlas_traceroute_hops hops on hops.trace_id = A.Id
+ORDER BY hops.ttl
+`
 	getSources = `
 SELECT
     src
@@ -1004,13 +1036,23 @@ func (db *DB) GetAtlasSources(dst uint32, stale time.Duration) ([]uint32, error)
 }
 
 // FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
-func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale time.Duration) ([]*dm.Path, error) {
-	log.Debug("Finding intersecting traceroute ", pairs, " alias: ", alias, "stale: ", int64(stale.Minutes()))
+func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst) ([]*dm.Path, error) {
+	log.Debug("Finding intersecting traceroute ", pairs)
 	pair := pairs[0]
-	rows, err := db.getReader().Query(findIntersecting, pair.Src, pair.Dst, int64(stale.Minutes()), pair.Src, pair.Src)
-	if err != nil {
-		log.Error(err)
-		return nil, err
+	var rows *sql.Rows
+	var err error
+	if pair.IgnoreSource {
+		rows, err = db.getReader().Query(findIntersectingIgnoreSource, pair.Addr, pair.Src, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+	} else {
+		rows, err = db.getReader().Query(findIntersecting, pair.Addr, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
 	}
 	defer rows.Close()
 	ret := dm.Path{}
@@ -1023,7 +1065,7 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst, alias bool, stale ti
 		})
 		ret.Address = row.src
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		log.Error(err)
 		return nil, err
 	}

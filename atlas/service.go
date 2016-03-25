@@ -102,13 +102,16 @@ func (a *Atlas) GetPathsWithToken(ctx context.Context, in *dm.TokenRequest) ([]*
 		a.tc.Remove(in.Token)
 		pair := []dm.SrcDst{
 			dm.SrcDst{
-				Src: req.Address,
-				Dst: req.Dest,
+				Addr:         req.Address,
+				Dst:          req.Dest,
+				Src:          req.Src,
+				Stale:        time.Duration(req.Staleness) * time.Minute,
+				IgnoreSource: req.IgnoreSource,
+				Alias:        req.UseAliases,
 			},
 		}
-		st := time.Duration(req.Staleness)
 		log.Debug("Looking for intesection for: ", req)
-		path, err := a.da.FindIntersectingTraceroute(pair, req.UseAliases, st*time.Minute)
+		path, err := a.da.FindIntersectingTraceroute(pair)
 		log.Debug("FindIntersectingTraceroute resp: ", path)
 		if err != nil {
 			log.Debug("Found no intersection")
@@ -190,15 +193,18 @@ func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequ
 		log.Debug("Looing for intersect for ", ir)
 		req := []dm.SrcDst{
 			dm.SrcDst{
-				Src: ir.Address,
-				Dst: ir.Dest,
+				Addr:         ir.Address,
+				Dst:          ir.Dest,
+				Src:          ir.Src,
+				Stale:        time.Duration(ir.Staleness) * time.Minute,
+				Alias:        ir.UseAliases,
+				IgnoreSource: ir.IgnoreSource,
 			},
 		}
 		if ir.Staleness == 0 {
 			ir.Staleness = 60
 		}
-		st := time.Duration(ir.Staleness)
-		res, err := a.da.FindIntersectingTraceroute(req, ir.UseAliases, st*time.Minute)
+		res, err := a.da.FindIntersectingTraceroute(req)
 		log.Debug("FindIntersectingTraceroute resp ", res)
 		if err != nil {
 			if err != dataaccess.ErrNoIntFound {
