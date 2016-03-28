@@ -268,7 +268,21 @@ SET
 WHERE
 	ip = ?
 `
+	clearAllVps string = `
+UPDATE
+        vantage_point
+SET
+        controller = NULL
+`
 )
+
+func (db *DB) ClearAllVPs() error {
+	_, err := db.getWriter().Exec(clearAllVps)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // UpdateController updates a vantage point's controller
 func (db *DB) UpdateController(ip, newc, con uint32) error {

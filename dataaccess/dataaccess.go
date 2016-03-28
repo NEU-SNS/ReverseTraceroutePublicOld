@@ -117,6 +117,11 @@ func (d *DataAccess) GetVPs() ([]*dm.VantagePoint, error) {
 	return d.db.GetVPs()
 }
 
+// ClearAllVPs nulls the controller of all VPS
+func (d *DataAccess) ClearAllVPs() error {
+	return d.db.ClearAllVPs()
+}
+
 // GetActiveVPs get the vps which are currently connected to the controller
 func (d *DataAccess) GetActiveVPs() ([]*dm.VantagePoint, error) {
 	return d.db.GetActiveVPs()

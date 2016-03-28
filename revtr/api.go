@@ -526,7 +526,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	for _, r := range rs {
 		_, valid := validSrc(r.Src, vps.GetVps())
 		if !valid {
-			log.Error(err)
+			log.Error("Invalid source")
 			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
