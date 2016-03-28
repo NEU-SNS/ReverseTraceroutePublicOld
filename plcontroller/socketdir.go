@@ -40,6 +40,7 @@ import (
 )
 
 func (c *PlController) handlEvents() {
+	c.clearAllVps()
 	for {
 		event, err := c.w.GetEvent(c.shutdown)
 		if err == watcher.ErrWatcherClosed {
@@ -97,6 +98,13 @@ func (c *PlController) handlEvents() {
 			c.client.RemoveSocket(ip)
 			vpsConnected.Sub(1)
 		}
+	}
+}
+
+func (c *PlController) clearAllVps() {
+	err := c.db.ClearAllVPs()
+	if err != nil {
+		log.Error(err)
 	}
 }
 

@@ -122,6 +122,7 @@ type Client interface {
 
 // VPStore is the interface for the vpstore needed by the plc
 type VPStore interface {
+	ClearAllVPs() error
 	UpdateController(uint32, uint32, uint32) error
 	GetVPs() ([]*datamodel.VantagePoint, error)
 	GetActiveVPs() ([]*datamodel.VantagePoint, error)
