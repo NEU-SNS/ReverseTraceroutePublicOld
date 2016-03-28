@@ -1,8 +1,11 @@
 package revtr
 
 import (
+	"flag"
+	"fmt"
 	"io"
 	"log"
+	"os"
 	"testing"
 
 	"google.golang.org/grpc/metadata"
@@ -14,6 +17,18 @@ import (
 	mocks "github.com/NEU-SNS/ReverseTraceroute/revtr/mocks"
 	"github.com/stretchr/testify/mock"
 )
+
+var cs = &mocks.ClusterSource{}
+
+func initTests() {
+	cs.On("GetClusterIDByIP", mock.AnythingOfType("uint32")).Return(0, fmt.Errorf("None found"))
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	initTests()
+	os.Exit(m.Run())
+}
 
 type vpSourceMock struct {
 }
@@ -118,7 +133,6 @@ func (vps vpSourceMock) GetVPs() (*datamodel.VPReturn, error) {
 var myIP = "129.10.113.189"
 
 func TestInitialize(t *testing.T) {
-	cs := &mocks.ClusterSource{}
 	initialize(vpSourceMock{}, cs)
 }
 
@@ -131,6 +145,8 @@ func TestNewReverseTraceroute(t *testing.T) {
 			Cnt: 10,
 		},
 	})
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
 	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
@@ -139,7 +155,11 @@ func TestNewReverseTraceroute(t *testing.T) {
 }
 
 func TestSymmetricAssumptions(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -149,7 +169,11 @@ func TestSymmetricAssumptions(t *testing.T) {
 }
 
 func TestDeadends(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -160,7 +184,11 @@ func TestDeadends(t *testing.T) {
 }
 
 func TestRRVPSInitializedForHop(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -177,7 +205,11 @@ func TestRRVPSInitializedForHop(t *testing.T) {
 }
 
 func TestCurrPath(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -190,7 +222,11 @@ func TestCurrPath(t *testing.T) {
 
 func TestAddSegments(t *testing.T) {
 	t.Skip()
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -202,7 +238,11 @@ func TestAddSegments(t *testing.T) {
 }
 
 func TestReaches(t *testing.T) {
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -219,9 +259,6 @@ func TestReaches(t *testing.T) {
 		t.Fatal("Failed to reach after adding reaching segment LastHop: ", revtr.LastHop(), " Got ", revtr.CurrPath().LastSeg())
 	}
 	t.Log(revtr)
-}
-
-type adjacencySourceMock struct {
 }
 
 var adjs = []datamodel.Adjacency{
@@ -257,26 +294,6 @@ var adjs = []datamodel.Adjacency{
 	},
 }
 
-func (as adjacencySourceMock) GetAdjacenciesByIP1(ip uint32) ([]datamodel.Adjacency, error) {
-	var ret []datamodel.Adjacency
-	for _, a := range adjs {
-		if a.IP1 == ip {
-			ret = append(ret, a)
-		}
-	}
-	return ret, nil
-}
-
-func (as adjacencySourceMock) GetAdjacenciesByIP2(ip uint32) ([]datamodel.Adjacency, error) {
-	var ret []datamodel.Adjacency
-	for _, a := range adjs {
-		if a.IP2 == ip {
-			ret = append(ret, a)
-		}
-	}
-	return ret, nil
-}
-
 var adjstodst = []datamodel.AdjacencyToDest{
 	datamodel.AdjacencyToDest{
 		Dest24:   134744072 >> 8,
@@ -304,19 +321,13 @@ var adjstodst = []datamodel.AdjacencyToDest{
 	},
 }
 
-func (as adjacencySourceMock) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]datamodel.AdjacencyToDest, error) {
-	var ret []datamodel.AdjacencyToDest
-	for _, i := range adjstodst {
-		if i.Dest24 == dest24 && i.Address == addr {
-			ret = append(ret, i)
-		}
-	}
-	return ret, nil
-}
-
 func TestInitializeRRVPs(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	initialize(vpSourceMock{}, cs)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -340,8 +351,12 @@ func TestInitializeRRVPs(t *testing.T) {
 }
 
 func TestGetRRVPs(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, &mocks.AdjacencySource{})
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	initialize(vpSourceMock{}, cs)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -361,7 +376,7 @@ func TestGetRRVPs(t *testing.T) {
 }
 
 func TestChooseOneSpooferPerSite(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
+	initialize(vpSourceMock{}, cs)
 	ps := chooseOneSpooferPerSite()
 	if len(ps) == 0 {
 		t.Fatalf("Failed to get one spoofer per site")
@@ -370,8 +385,12 @@ func TestChooseOneSpooferPerSite(t *testing.T) {
 }
 
 func TestInitializeTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -385,8 +404,12 @@ func TestInitializeTSAdjacents(t *testing.T) {
 }
 
 func TestGetTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -398,8 +421,12 @@ func TestGetTSAdjacents(t *testing.T) {
 }
 
 func TestLength(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -411,8 +438,12 @@ func TestLength(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -425,8 +456,12 @@ func TestPop(t *testing.T) {
 }
 
 func TestHops(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -437,8 +472,12 @@ func TestHops(t *testing.T) {
 }
 
 func TestFailed(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -451,8 +490,12 @@ func TestFailed(t *testing.T) {
 }
 
 func TestFailCurrPath(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -464,8 +507,12 @@ func TestFailCurrPath(t *testing.T) {
 }
 
 func TestAddAndReplaceSegment(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -485,8 +532,12 @@ func TestAddAndReplaceSegment(t *testing.T) {
 }
 
 func TestAddBackgroundTRSegment(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -504,8 +555,12 @@ func TestAddBackgroundTRSegment(t *testing.T) {
 }
 
 func TestReverseHopsAssumeSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -516,8 +571,12 @@ func TestReverseHopsAssumeSymmetric(t *testing.T) {
 }
 
 func TestReverseHopsAssumeSymmetricWithPreviousSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, &mocks.ClusterSource{})
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, adjacencySourceMock{})
+	initialize(vpSourceMock{}, cs)
+	as := &mocks.AdjacencySource{}
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
+	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
