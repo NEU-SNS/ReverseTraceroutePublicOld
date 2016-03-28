@@ -294,8 +294,14 @@ type ReverseTraceroute struct {
 	rrsSrcToDstToVPToRevHops map[string]map[string]map[string][]string
 	trsSrcToDstToPath        map[string]map[string][]string
 	tsSrcToProbeToVPToResult map[string]map[string]map[string][]string
-	errorDetails             bytes.Buffer
-	lastResponsive           string
+	tsDstToStampsZero        map[string]bool
+	tsSrcToHopToSendSpoofed  map[string]map[string]bool
+	// whether this hop is thought to be responsive at all to this src
+	// Since I can't intialize to true, I'm going to use an int and say 0 is true
+	// anythign else will be false
+	tsSrcToHopToResponsive map[string]map[string]int
+	errorDetails           bytes.Buffer
+	lastResponsive         string
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -310,6 +316,9 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 		Dst:                      dst,
 		Paths:                    &[]*ReversePath{NewReversePath(src, dst, nil)},
 		DeadEnd:                  make(map[string]bool),
+		tsSrcToHopToResponsive:   make(map[string]map[string]int),
+		tsDstToStampsZero:        make(map[string]bool),
+		tsSrcToHopToSendSpoofed:  make(map[string]map[string]bool),
 		RRHop2RateLimit:          make(map[string]int),
 		RRHop2VPSLeft:            make(map[string][]string),
 		TSHop2RateLimit:          make(map[string]int),
@@ -1962,14 +1971,12 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		}
 	}
 	checksrctohoptosendspoofedmagic := func(f string) {
-		tssthmu.Lock()
-		defer tssthmu.Unlock()
-		if _, ok := tsSrcToHopToSendSpoofed[f]; !ok {
-			tsSrcToHopToSendSpoofed[f] = make(map[string]bool)
+		if _, ok := rt.tsSrcToHopToSendSpoofed[f]; !ok {
+			rt.tsSrcToHopToSendSpoofed[f] = make(map[string]bool)
 		}
 	}
-	initTsSrcToHopToResponseive(rt.Src)
-	if tsSrcToHopToResponsive[rt.Src][rt.LastHop()] != 0 {
+	rt.initTsSrcToHopToResponseive(rt.Src)
+	if rt.tsSrcToHopToResponsive[rt.Src][rt.LastHop()] != 0 {
 		rt.debug("No VPS found for ", rt.Src, " last hop: ", rt.LastHop())
 		return ErrNoVPs
 	}
@@ -1979,13 +1986,12 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		rt.debug("No adjacents found")
 		return ErrNoAdj
 	}
-	tssthmu.Lock()
-	if tsDstToStampsZero[rt.LastHop()] {
+	if rt.tsDstToStampsZero[rt.LastHop()] {
 		rt.debug("tsDstToStampsZero wtf")
 		for _, adj := range adjacents {
 			dstsDoNotStamp = append(dstsDoNotStamp, []string{rt.Src, rt.LastHop(), adj})
 		}
-	} else if !tsSrcToHopToSendSpoofed[rt.Src][rt.LastHop()] {
+	} else if !rt.tsSrcToHopToSendSpoofed[rt.Src][rt.LastHop()] {
 		rt.debug("Adding Spoofed TS to send")
 		for _, adj := range adjacents {
 			tsToIssueSrcToProbe[rt.Src] = append(tsToIssueSrcToProbe[rt.Src], []string{rt.LastHop(), rt.LastHop(), adj, adj, dummyIP})
@@ -2001,12 +2007,11 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		}
 		// if we haven't already decided whether it is responsive,
 		// we'll set it to false, then change to true if we get one
-		initTsSrcToHopToResponseive(rt.Src)
-		if _, ok := tsSrcToHopToResponsive[rt.Src][rt.LastHop()]; !ok {
-			tsSrcToHopToResponsive[rt.Src][rt.LastHop()] = 1
+		rt.initTsSrcToHopToResponseive(rt.Src)
+		if _, ok := rt.tsSrcToHopToResponsive[rt.Src][rt.LastHop()]; !ok {
+			rt.tsSrcToHopToResponsive[rt.Src][rt.LastHop()] = 1
 		}
 	}
-	tssthmu.Unlock()
 
 	type pair struct {
 		src, dst string
@@ -2027,13 +2032,11 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		segClass := "SpoofTSAdjRevSegment"
 		if vp == "non_spoofed" {
 			checksrctohoptosendspoofedmagic(src)
-			tssthmu.Lock()
-			tsSrcToHopToSendSpoofed[src][dsts] = false
-			tssthmu.Unlock()
+			rt.tsSrcToHopToSendSpoofed[src][dsts] = false
 			segClass = "TSAdjRevSegment"
 		}
-		initTsSrcToHopToResponseive(src)
-		tsSrcToHopToResponsive[src][dsts] = 1
+		rt.initTsSrcToHopToResponseive(src)
+		rt.tsSrcToHopToResponsive[src][dsts] = 1
 		rps := p.GetResponses()
 		if len(rps) > 0 {
 			rt.debug("Response ", rps[0].Tsandaddr)
@@ -2060,7 +2063,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			} else if ts1.Ts == 0 {
 				// if dst responds, does not stamp, can try advanced techniques
 				ts2ips, _ := util.Int32ToIPString(ts2.Ip)
-				tsDstToStampsZero[dsts] = true
+				rt.tsDstToStampsZero[dsts] = true
 				destDoesNotStamp = append(destDoesNotStamp, tripletTs{src: src, dst: dsts, tsip: ts2ips})
 			} else {
 				rt.debug("TS probe is ", vp, p, "no reverse hop found")
@@ -2073,14 +2076,11 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		for src, probes := range tsToIssueSrcToProbe {
 			for _, probe := range probes {
 				checksrctohoptosendspoofedmagic(src)
-				tssthmu.Lock()
-				if _, ok := tsSrcToHopToSendSpoofed[src][probe[0]]; ok {
-					tssthmu.Unlock()
+				if _, ok := rt.tsSrcToHopToSendSpoofed[src][probe[0]]; ok {
 					continue
 				}
 				// set it to true, then change it to false if we get a response
-				tsSrcToHopToSendSpoofed[src][probe[0]] = true
-				tssthmu.Unlock()
+				rt.tsSrcToHopToSendSpoofed[src][probe[0]] = true
 			}
 		}
 		rt.debug("Issuing TS probes")
@@ -2091,8 +2091,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 				// if we got a reply, would have set sendspoofed to false
 				// so it is still true, we need to try to find a spoofer
 				checksrctohoptosendspoofedmagic(src)
-				tssthmu.Lock()
-				if tsSrcToHopToSendSpoofed[src][probe[0]] {
+				if rt.tsSrcToHopToSendSpoofed[src][probe[0]] {
 					mySpoofers := getTimestampSpoofers(src, probe[0])
 					for _, sp := range mySpoofers {
 						rt.debug("Adding spoofed TS probe to send")
@@ -2101,12 +2100,11 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 					}
 					// if we haven't already decided whether it is responsive
 					// we'll set it to false, then change to true if we get one
-					if _, ok := tsSrcToHopToResponsive[src][probe[0]]; !ok {
-						initTsSrcToHopToResponseive(src)
-						tsSrcToHopToResponsive[src][probe[0]] = 1
+					if _, ok := rt.tsSrcToHopToResponsive[src][probe[0]]; !ok {
+						rt.initTsSrcToHopToResponseive(src)
+						rt.tsSrcToHopToResponsive[src][probe[0]] = 1
 					}
 				}
-				tssthmu.Unlock()
 			}
 		}
 	}
@@ -2140,9 +2138,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 			// if I got a response, must not be filtering, so dont need to use spoofing
 			if vp == "non_spoofed" {
 				checksrctohoptosendspoofedmagic(src)
-				tssthmu.Lock()
-				tsSrcToHopToSendSpoofed[src][dsts] = false
-				tssthmu.Unlock()
+				rt.tsSrcToHopToSendSpoofed[src][dsts] = false
 				segClass = "TSAdjRevSegment"
 			}
 			if ts2.Ts != 0 {
@@ -2270,24 +2266,11 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 	return ErrNoHopFound
 }
 
-// whether this destination is repsonsive but with ts=0
-var tsDstToStampsZero = make(map[string]bool)
-
-var tssthmu sync.Mutex
-
-// whether this particular src should use spoofed ts to that hop
-var tsSrcToHopToSendSpoofed = make(map[string]map[string]bool)
-
-// whether this hop is thought to be responsive at all to this src
-// Since I can't intialize to true, I'm going to use an int and say 0 is true
-// anythign else will be false
-var tsSrcToHopToResponsive = make(map[string]map[string]int)
-
-func initTsSrcToHopToResponseive(s string) {
-	if _, ok := tsSrcToHopToResponsive[s]; ok {
+func (rt *ReverseTraceroute) initTsSrcToHopToResponseive(s string) {
+	if _, ok := rt.tsSrcToHopToResponsive[s]; ok {
 		return
 	}
-	tsSrcToHopToResponsive[s] = make(map[string]int)
+	rt.tsSrcToHopToResponsive[s] = make(map[string]int)
 }
 
 func (rt *ReverseTraceroute) issueTimestamps(issue map[string][][]string, fn func(string, string, *datamodel.Ping)) error {
