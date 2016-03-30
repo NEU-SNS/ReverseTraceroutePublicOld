@@ -12,16 +12,81 @@ import (
 
 	"golang.org/x/net/context"
 
+	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
+	am "github.com/NEU-SNS/ReverseTraceroute/atlas/mocks"
+	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
+	cm "github.com/NEU-SNS/ReverseTraceroute/controller/mocks"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	mocks "github.com/NEU-SNS/ReverseTraceroute/revtr/mocks"
+	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	vpm "github.com/NEU-SNS/ReverseTraceroute/vpservice/mocks"
 	"github.com/stretchr/testify/mock"
 )
 
+var vp = []*datamodel.VantagePoint{
+	&datamodel.VantagePoint{
+		Hostname:     "test1.fake.com",
+		Ip:           1239139955,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake.com",
+	},
+	&datamodel.VantagePoint{
+		Hostname:     "test2.fake.com",
+		Ip:           1239139958,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake.com",
+	},
+	&datamodel.VantagePoint{
+		Hostname:     "test1.fake1.com",
+		Ip:           1239139959,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake1.com",
+	},
+	&datamodel.VantagePoint{
+		Hostname:     "test2.fake1.com",
+		Ip:           1239139956,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake1.com",
+	},
+	&datamodel.VantagePoint{
+		Hostname:     "test1.fake2.com",
+		Ip:           1239139960,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake2.com",
+	},
+	&datamodel.VantagePoint{
+		Hostname:     "test2.fake2.com",
+		Ip:           1239139957,
+		Timestamp:    true,
+		RecordRoute:  true,
+		CanSpoof:     true,
+		ReceiveSpoof: true,
+		Site:         "fake2.com",
+	},
+}
+
 var cs = &mocks.ClusterSource{}
+var mvps = &vpm.VPSource{}
 
 func initTests() {
 	cs.On("GetClusterIDByIP", mock.AnythingOfType("uint32")).Return(0, fmt.Errorf("None found"))
+	mvps.On("GetVPs").Return(&datamodel.VPReturn{Vps: vp}, nil)
 }
 
 func TestMain(m *testing.M) {
@@ -68,75 +133,9 @@ func (vps vpSourceMock) GetOneVPPerSite() (*datamodel.VPReturn, error) {
 	}, nil
 }
 
-func (vps vpSourceMock) GetVPs() (*datamodel.VPReturn, error) {
-	vp := []*datamodel.VantagePoint{
-		&datamodel.VantagePoint{
-			Hostname:     "test1.fake.com",
-			Ip:           1239139955,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake.com",
-		},
-		&datamodel.VantagePoint{
-			Hostname:     "test2.fake.com",
-			Ip:           1239139958,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake.com",
-		},
-		&datamodel.VantagePoint{
-			Hostname:     "test1.fake1.com",
-			Ip:           1239139959,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake1.com",
-		},
-		&datamodel.VantagePoint{
-			Hostname:     "test2.fake1.com",
-			Ip:           1239139956,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake1.com",
-		},
-		&datamodel.VantagePoint{
-			Hostname:     "test1.fake2.com",
-			Ip:           1239139960,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake2.com",
-		},
-		&datamodel.VantagePoint{
-			Hostname:     "test2.fake2.com",
-			Ip:           1239139957,
-			Timestamp:    true,
-			RecordRoute:  true,
-			CanSpoof:     true,
-			ReceiveSpoof: true,
-			Site:         "fake2.com",
-		},
-	}
-	return &datamodel.VPReturn{
-		Vps: vp,
-	}, nil
-}
-
 var myIP = "129.10.113.189"
 
-func TestInitialize(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
-}
-
-func TestNewReverseTraceroute(t *testing.T) {
+func TestCreateReverseTraceroute(t *testing.T) {
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return([]datamodel.Adjacency{
 		datamodel.Adjacency{
@@ -147,7 +146,13 @@ func TestNewReverseTraceroute(t *testing.T) {
 	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -156,10 +161,23 @@ func TestNewReverseTraceroute(t *testing.T) {
 
 func TestSymmetricAssumptions(t *testing.T) {
 	as := &mocks.AdjacencySource{}
-	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return([]datamodel.Adjacency{
+		datamodel.Adjacency{
+			IP1: 111111,
+			IP2: 222222,
+			Cnt: 10,
+		},
+	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -170,10 +188,23 @@ func TestSymmetricAssumptions(t *testing.T) {
 
 func TestDeadends(t *testing.T) {
 	as := &mocks.AdjacencySource{}
-	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
+	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return([]datamodel.Adjacency{
+		datamodel.Adjacency{
+			IP1: 111111,
+			IP2: 222222,
+			Cnt: 10,
+		},
+	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -188,7 +219,13 @@ func TestRRVPSInitializedForHop(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -209,7 +246,13 @@ func TestCurrPath(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -221,16 +264,21 @@ func TestCurrPath(t *testing.T) {
 }
 
 func TestAddSegments(t *testing.T) {
-	t.Skip()
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	segs := []Segment{NewTrtoSrcRevSegment([]string{myIP, "8.8.8.8"}, myIP, "8.8.8.8")}
+	segs := []Segment{NewTrtoSrcRevSegment([]string{"8.8.8.8", myIP}, "8.8.8.8", myIP)}
 	added := revtr.AddSegments(segs)
 	if !added {
 		t.Fatal("Failed to add Segments")
@@ -242,7 +290,13 @@ func TestReaches(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -258,7 +312,7 @@ func TestReaches(t *testing.T) {
 	if !reaches {
 		t.Fatal("Failed to reach after adding reaching segment LastHop: ", revtr.LastHop(), " Got ", revtr.CurrPath().LastSeg())
 	}
-	t.Log(revtr)
+	t.Log(revtr.CurrPath())
 }
 
 var adjs = []datamodel.Adjacency{
@@ -326,13 +380,21 @@ func TestInitializeRRVPs(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	initialize(vpSourceMock{}, cs)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
 	testIP := "8.8.8.8"
-	revtr.InitializeRRVPs(testIP)
+	err := revtr.InitializeRRVPs(testIP)
+	if err != nil {
+		t.Fatalf("Failed to initialize RRVPs Expected[<nil>], Got[%v]", err)
+	}
 	if rl, ok := revtr.RRHop2RateLimit[testIP]; ok {
 		if rl != RateLimit {
 			t.Fatalf("Failed to init RR Rate limit, Epected %d, Got %d", RateLimit, rl)
@@ -355,8 +417,13 @@ func TestGetRRVPs(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	initialize(vpSourceMock{}, cs)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -375,22 +442,18 @@ func TestGetRRVPs(t *testing.T) {
 	}
 }
 
-func TestChooseOneSpooferPerSite(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
-	ps := chooseOneSpooferPerSite()
-	if len(ps) == 0 {
-		t.Fatalf("Failed to get one spoofer per site")
-	}
-	t.Log(ps)
-}
-
 func TestInitializeTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -404,12 +467,17 @@ func TestInitializeTSAdjacents(t *testing.T) {
 }
 
 func TestGetTSAdjacents(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(adjs, nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -421,12 +489,17 @@ func TestGetTSAdjacents(t *testing.T) {
 }
 
 func TestLength(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -438,12 +511,17 @@ func TestLength(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -456,12 +534,17 @@ func TestPop(t *testing.T) {
 }
 
 func TestHops(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -472,12 +555,17 @@ func TestHops(t *testing.T) {
 }
 
 func TestFailed(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -490,12 +578,17 @@ func TestFailed(t *testing.T) {
 }
 
 func TestFailCurrPath(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -507,12 +600,17 @@ func TestFailCurrPath(t *testing.T) {
 }
 
 func TestAddAndReplaceSegment(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -532,12 +630,18 @@ func TestAddAndReplaceSegment(t *testing.T) {
 }
 
 func TestAddBackgroundTRSegment(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	c := &cm.Client{}
+	revtr := CreateReverseTraceroute(rm, false, false, c, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -554,29 +658,76 @@ func TestAddBackgroundTRSegment(t *testing.T) {
 	t.Log(revtr.CurrPath())
 }
 
+type testConfig struct {
+	as      AdjacencySource
+	rm      datamodel.RevtrMeasurement
+	exp     error
+	backoff bool
+	print   bool
+	cl      client.Client
+	a       at.Atlas
+	vps     vpservice.VPSource
+	cs      ClusterSource
+	doInit  func(t *testConfig) error
+}
+
+func (t *testConfig) init() error {
+	return t.doInit(t)
+}
+
 func TestReverseHopsAssumeSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
-	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
-	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
-	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
-	if revtr == nil {
-		t.Fatalf("Failed to create ReverseTraceroute")
-	}
-	err := revtr.reverseHopsAssumeSymmetric()
-	if err != nil {
-		t.Fatal(err)
+	for _, test := range []*testConfig{
+		&testConfig{as: as, rm: datamodel.RevtrMeasurement{
+			Src:       "8.8.8.8",
+			Dst:       "10.0.0.1",
+			Id:        1,
+			Staleness: 60,
+		}, exp: ErrNoHopFound, cl: &clientMock{}, a: &am.Atlas{}, vps: mvps, cs: cs,
+			doInit: func(tc *testConfig) error {
+				return nil
+			}},
+		&testConfig{
+			as: as, rm: datamodel.RevtrMeasurement{
+				Src:       "8.8.8.8",
+				Dst:       myIP,
+				Id:        2,
+				Staleness: 60,
+			}, exp: nil, cl: &clientMock{}, a: &am.Atlas{}, vps: mvps, cs: cs,
+			doInit: func(tc *testConfig) error {
+				return nil
+			},
+		},
+	} {
+		err := test.doInit(test)
+		if err != nil {
+			t.Fatalf("Failed to init test: Expected[<nil>], Got[%v]", err)
+		}
+		revtr := CreateReverseTraceroute(test.rm, test.backoff, test.print, test.cl, test.a, test.vps, test.as, test.cs)
+		if revtr == nil {
+			t.Fatalf("Failed to create ReverseTraceroute")
+		}
+		err = revtr.reverseHopsAssumeSymmetric()
+		if err != test.exp {
+			t.Fatalf("reverseHopsAssumeSymmetric failed: Expected[%v], Got[%v]", test.exp, err)
+		}
+		revtr = nil
 	}
 }
 
+/*
 func TestReverseHopsAssumeSymmetricWithPreviousSymmetric(t *testing.T) {
-	initialize(vpSourceMock{}, cs)
 	as := &mocks.AdjacencySource{}
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	revtr := NewReverseTraceroute(myIP, "8.8.8.8", 1, 60, as)
+	rm := datamodel.RevtrMeasurement{
+		Src:       myIP,
+		Dst:       "8.8.8.8",
+		Id:        1,
+		Staleness: 60,
+	}
+	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
@@ -589,8 +740,11 @@ func TestReverseHopsAssumeSymmetricWithPreviousSymmetric(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-type clientMock struct{}
+*/
+type clientMock struct {
+	traces []*datamodel.Traceroute
+	pings  []*datamodel.Ping
+}
 
 type clientPingClientStreamFake struct {
 	last  int
@@ -651,62 +805,66 @@ func (c *clientTracerouteClientStreamFake) Recv() (*datamodel.Traceroute, error)
 	return c.traces[idx], nil
 }
 
-func (c clientMock) Traceroute(arg *datamodel.TracerouteArg) (controllerapi.Controller_TracerouteClient, error) {
-	var traces []*datamodel.Traceroute
-	meas := arg.GetTraceroutes()
-	for _, trace := range meas {
-		var t datamodel.Traceroute
-		t.Dst = trace.Dst
-		t.Src = trace.Src
-		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
-			Addr: 167772162,
-		})
-		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
-			Addr: 167772163,
-		})
-		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
-			Addr: 167772164,
-		})
-		t.Hops = append(t.Hops, &datamodel.TracerouteHop{
-			Addr: trace.Dst,
-		})
-		traces = append(traces, &t)
-	}
-	return &clientTracerouteClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, traces: traces}, nil
-}
-
-func (c clientMock) Ping(arg *datamodel.PingArg) (controllerapi.Controller_PingClient, error) {
-	var pings []*datamodel.Ping
-	meas := arg.GetPings()
-	for _, ping := range meas {
-		p := datamodel.Ping{}
-		p.Dst = ping.Dst
-		p.Src = ping.Src
-		pr := datamodel.PingResponse{}
-		pr.From = p.Dst
-		if ping.RR {
-			pr.RR = []uint32{
-				3232235777,
-				3232235777,
-				3232235777,
-				3232235777,
-				3232235777,
-				3232235777,
-				134744072,
-				167772162,
-				167772163,
-			}
+func (c clientMock) Traceroute(con context.Context, arg *datamodel.TracerouteArg) (controllerapi.Controller_TracerouteClient, error) {
+	/*
+		var traces []*datamodel.Traceroute
+		meas := arg.GetTraceroutes()
+		for _, trace := range meas {
+			var t datamodel.Traceroute
+			t.Dst = trace.Dst
+			t.Src = trace.Src
+			t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+				Addr: 167772162,
+			})
+			t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+				Addr: 167772163,
+			})
+			t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+				Addr: 167772164,
+			})
+			t.Hops = append(t.Hops, &datamodel.TracerouteHop{
+				Addr: trace.Dst,
+			})
+			traces = append(traces, &t)
 		}
-		pings = append(pings, &p)
-	}
-	return clientPingClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, pings: pings}, nil
+	*/
+	return &clientTracerouteClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, traces: c.traces}, nil
 }
 
-func (c clientMock) GetVps(args *datamodel.VPRequest) (*datamodel.VPReturn, error) {
+func (c clientMock) Ping(con context.Context, arg *datamodel.PingArg) (controllerapi.Controller_PingClient, error) {
+	/*
+		var pings []*datamodel.Ping
+		meas := arg.GetPings()
+		for _, ping := range meas {
+			p := datamodel.Ping{}
+			p.Dst = ping.Dst
+			p.Src = ping.Src
+			pr := datamodel.PingResponse{}
+			pr.From = p.Dst
+			if ping.RR {
+				pr.RR = []uint32{
+					3232235777,
+					3232235777,
+					3232235777,
+					3232235777,
+					3232235777,
+					3232235777,
+					134744072,
+					167772162,
+					167772163,
+				}
+			}
+			pings = append(pings, &p)
+		}
+	*/
+	return clientPingClientStreamFake{clientStreamFake: clientStreamFake{ctx: context.Background()}, pings: c.pings}, nil
+}
+
+func (c clientMock) GetVps(con context.Context, args *datamodel.VPRequest) (*datamodel.VPReturn, error) {
 	return nil, nil
 }
 
-func (c clientMock) ReceiveSpoofedProbes() (controllerapi.Controller_ReceiveSpoofedProbesClient, error) {
+func (c clientMock) ReceiveSpoofedProbes(con context.Context) (controllerapi.Controller_ReceiveSpoofedProbesClient, error) {
 	return nil, nil
 }
 
