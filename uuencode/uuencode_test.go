@@ -45,3 +45,13 @@ func TestDecode(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkEncode(b *testing.B) {
+	enc := []byte("This is a much longer test which should make for multiple lines")
+	for i := 0; i < b.N; i++ {
+		_, err := uuencode.UUEncode(enc)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
