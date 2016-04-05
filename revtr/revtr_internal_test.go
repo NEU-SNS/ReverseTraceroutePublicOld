@@ -645,8 +645,9 @@ func TestAddBackgroundTRSegment(t *testing.T) {
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	seg1 := NewRRRevSegment([]string{"8.8.8.8", "10.0.0.1", "192.168.1.1"}, myIP, "8.8.8.8")
-	revtr.AddSegments([]Segment{seg1})
+	seg1 := NewRRRevSegment([]string{"8.8.8.8", "10.0.0.1"}, myIP, "8.8.8.8")
+	seg2 := NewRRRevSegment([]string{"10.0.0.1", "10.0.0.4"}, myIP, "8.8.8.8")
+	revtr.AddSegments([]Segment{seg1, seg2})
 	seg := NewTrtoSrcRevSegment([]string{"10.0.0.1", "10.0.0.2", myIP}, myIP, "10.0.0.1")
 	res := revtr.AddBackgroundTRSegment(seg)
 	if !res {
