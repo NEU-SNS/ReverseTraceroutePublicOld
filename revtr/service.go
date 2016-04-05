@@ -58,11 +58,11 @@ func (ss stringSet) union(s stringSet) []string {
 	mm = make(map[string]bool)
 	var ret []string
 	for _, c := range ss {
-		mm[c] = false
+		mm[ipToCluster.Get(c)] = false
 	}
 	for _, c := range s {
-		if _, ok := mm[c]; ok {
-			mm[c] = true
+		if _, ok := mm[ipToCluster.Get(c)]; ok {
+			mm[ipToCluster.Get(c)] = true
 		}
 	}
 	var foundNonSpoofed *bool
@@ -143,7 +143,7 @@ func (rv *RevSegment) SetHop(hop string) {
 func rIndex(ss []string, s string) int {
 	index := -1
 	for i, st := range ss {
-		if s == st {
+		if ipToCluster.Get(s) == ipToCluster.Get(st) {
 			index = i
 		}
 	}
