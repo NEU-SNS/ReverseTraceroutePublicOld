@@ -429,7 +429,9 @@ func (rt *ReverseTraceroute) HTML() string {
 	var out bytes.Buffer
 	out.WriteString(`<table class="table">`)
 	out.WriteString(`<caption class="text-center">Reverse Traceroute from `)
-	out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Hops()[0], rt.resolveHostname(rt.Hops()[0])))
+	if len(rt.Hops()) >= 1 {
+		out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Hops()[0], rt.resolveHostname(rt.Hops()[0])))
+	}
 	out.WriteString(rt.Src)
 	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.Src)))
 	out.WriteString("</caption>")
@@ -1539,8 +1541,8 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 			var hs []string
 			var found bool
 			for _, h := range tr.Path.GetHops() {
-				rt.debug("Fixing up hop: ", h)
 				hss, _ := util.Int32ToIPString(h.Ip)
+				rt.debug("Fixing up hop: ", hss)
 				addr, _ := util.Int32ToIPString(tr.Path.Address)
 				if !found && ipToCluster.Get(addr) != ipToCluster.Get(hss) {
 					continue
