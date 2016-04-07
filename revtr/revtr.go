@@ -743,8 +743,8 @@ func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
 		// This is the case for using smarter results for vp selection
 		// currently we don't have this so nothing is gunna happen
 	}
-	if len(spoofersForTarget) > 10 {
-		rt.RRHop2VPSLeft[cls] = spoofersForTarget[:10]
+	if len(spoofersForTarget) > maxUnresponsive {
+		rt.RRHop2VPSLeft[cls] = spoofersForTarget[:maxUnresponsive]
 	} else {
 		rt.RRHop2VPSLeft[cls] = spoofersForTarget
 	}
