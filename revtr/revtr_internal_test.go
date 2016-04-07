@@ -21,6 +21,7 @@ import (
 	mocks "github.com/NEU-SNS/ReverseTraceroute/revtr/mocks"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	vpm "github.com/NEU-SNS/ReverseTraceroute/vpservice/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -146,17 +147,31 @@ func TestCreateReverseTraceroute(t *testing.T) {
 	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	rm := datamodel.RevtrMeasurement{
-		Src:       myIP,
-		Dst:       "8.8.8.8",
-		Id:        1,
-		Staleness: 60,
+
+	for _, test := range []struct {
+		rm        datamodel.RevtrMeasurement
+		expectNil bool
+	}{
+		{rm: datamodel.RevtrMeasurement{
+			Src:       myIP,
+			Dst:       "8.8.8.8",
+			Id:        1,
+			Staleness: 60,
+		},
+			expectNil: false},
+	} {
+
+		revtr := CreateReverseTraceroute(test.rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
+		if test.expectNil {
+			if revtr != nil {
+				t.Fatalf("CreateReverseTraceroute(%v): Expected[<nil>], Got[!<nil>]", test.rm)
+			}
+		} else {
+			if revtr == nil {
+				t.Fatalf("CreateReverseTraceroute(%v): Expected[!<nil>], Got[<nil>]", test.rm)
+			}
+		}
 	}
-	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
-	if revtr == nil {
-		t.Fatalf("Failed to create ReverseTraceroute")
-	}
-	t.Log(revtr)
 }
 
 func TestSymmetricAssumptions(t *testing.T) {
@@ -170,19 +185,26 @@ func TestSymmetricAssumptions(t *testing.T) {
 	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-
-	rm := datamodel.RevtrMeasurement{
-		Src:       myIP,
-		Dst:       "8.8.8.8",
-		Id:        1,
-		Staleness: 60,
-	}
-	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
-	if revtr == nil {
-		t.Fatalf("Failed to create ReverseTraceroute")
-	}
-	if revtr.SymmetricAssumptions() != 0 {
-		t.Errorf("SymmetricAssumptions, Expected: 0, Got: %d", revtr.SymmetricAssumptions())
+	for _, test := range []struct {
+		rm       datamodel.RevtrMeasurement
+		expected int
+		add      []Segment
+	}{
+		{rm: datamodel.RevtrMeasurement{
+			Src:       myIP,
+			Dst:       "8.8.8.8",
+			Id:        1,
+			Staleness: 60,
+		}, expected: 0},
+	} {
+		revtr := CreateReverseTraceroute(test.rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
+		if revtr == nil {
+			t.Fatalf("Failed to create ReverseTraceroute")
+		}
+		revtr.AddSegments(test.add)
+		if revtr.SymmetricAssumptions() != test.expected {
+			t.Fatalf("SymmetricAssumptions, Expected: %d, Got: %d", test.expected, revtr.SymmetricAssumptions())
+		}
 	}
 }
 
@@ -197,21 +219,26 @@ func TestDeadends(t *testing.T) {
 	})
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
+	for _, test := range []struct {
+		rm     datamodel.RevtrMeasurement
+		expect []string
+	}{
+		{rm: datamodel.RevtrMeasurement{
+			Src:       myIP,
+			Dst:       "8.8.8.8",
+			Id:        1,
+			Staleness: 60,
+		}, expect: nil,
+		},
+	} {
+		revtr := CreateReverseTraceroute(test.rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
+		if revtr == nil {
+			t.Fatalf("Failed to create ReverseTraceroute")
+		}
+		deadends := revtr.Deadends()
+		assert.Equal(t, deadends, test.expect)
+	}
 
-	rm := datamodel.RevtrMeasurement{
-		Src:       myIP,
-		Dst:       "8.8.8.8",
-		Id:        1,
-		Staleness: 60,
-	}
-	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
-	if revtr == nil {
-		t.Fatalf("Failed to create ReverseTraceroute")
-	}
-	deadends := revtr.Deadends()
-	if len(deadends) != 0 {
-		t.Fatalf("Deadends, Expected: 0, Got: %d", len(revtr.Deadends()))
-	}
 }
 
 func TestRRVPSInitializedForHop(t *testing.T) {
@@ -268,20 +295,29 @@ func TestAddSegments(t *testing.T) {
 	as.On("GetAdjacenciesByIP1", mock.AnythingOfType("uint32")).Return(nil)
 	as.On("GetAdjacenciesByIP2", mock.AnythingOfType("uint32")).Return(nil, nil)
 	as.On("GetAdjacencyToDestByAddrAndDest24", mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return(nil, nil)
-	rm := datamodel.RevtrMeasurement{
-		Src:       myIP,
-		Dst:       "8.8.8.8",
-		Id:        1,
-		Staleness: 60,
-	}
-	revtr := CreateReverseTraceroute(rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
-	if revtr == nil {
-		t.Fatalf("Failed to create ReverseTraceroute")
-	}
-	segs := []Segment{NewTrtoSrcRevSegment([]string{"8.8.8.8", myIP}, "8.8.8.8", myIP)}
-	added := revtr.AddSegments(segs)
-	if !added {
-		t.Fatal("Failed to add Segments")
+
+	for _, test := range []struct {
+		rm       datamodel.RevtrMeasurement
+		add      []Segment
+		expected bool
+	}{
+		{rm: datamodel.RevtrMeasurement{
+			Src:       myIP,
+			Dst:       "8.8.8.8",
+			Id:        1,
+			Staleness: 60,
+		}, add: []Segment{NewTrtoSrcRevSegment([]string{"8.8.8.8", myIP}, "8.8.8.8", myIP)},
+			expected: true,
+		},
+	} {
+		revtr := CreateReverseTraceroute(test.rm, false, false, &cm.Client{}, &am.Atlas{}, mvps, as, cs)
+		if revtr == nil {
+			t.Fatalf("Failed to create ReverseTraceroute")
+		}
+		added := revtr.AddSegments(test.add)
+		if added != test.expected {
+			t.Fatalf("Failed to added segments: Got[%v] Expected[%v]", added, test.expected)
+		}
 	}
 }
 
