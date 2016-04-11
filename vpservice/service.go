@@ -105,8 +105,8 @@ type RVPService struct {
 	rootCA     string
 }
 
-// GetSpoofers gets spoofers for a destination address
-func (rvp *RVPService) GetSpoofers(ctx context.Context, req *dm.SpooferRequest) (*dm.SpooferResponse, error) {
+// GetRRSpoofers gets spoofers for a destination address
+func (rvp *RVPService) GetRRSpoofers(ctx context.Context, req *dm.RRSpooferRequest) (*dm.RRSpooferResponse, error) {
 	resp := make(chan []*dm.VantagePoint)
 	go func() {
 		rvp.rw.RLock()
@@ -117,7 +117,9 @@ func (rvp *RVPService) GetSpoofers(ctx context.Context, req *dm.SpooferRequest) 
 			if req.Addr == vp.Ip {
 				continue
 			}
-			ops[vp.Site] = vp
+			if vp.CanSpoof && vp.RecordRoute {
+				ops[vp.Site] = vp
+			}
 		}
 		var usevps []*dm.VantagePoint
 		for _, v := range ops {
@@ -134,8 +136,43 @@ func (rvp *RVPService) GetSpoofers(ctx context.Context, req *dm.SpooferRequest) 
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case vps := <-resp:
-		return &dm.SpooferResponse{
+		return &dm.RRSpooferResponse{
 			Addr:     req.Addr,
+			Max:      req.Max,
+			Spoofers: vps,
+		}, nil
+	}
+}
+
+// GetTSSpoofers gets spoofers for a destination address
+func (rvp *RVPService) GetTSSpoofers(ctx context.Context, req *dm.TSSpooferRequest) (*dm.TSSpooferResponse, error) {
+	resp := make(chan []*dm.VantagePoint)
+	go func() {
+		rvp.rw.RLock()
+		vps := rvp.vps.GetAll()
+		rvp.rw.RUnlock()
+		ops := make(map[string]*dm.VantagePoint)
+		for _, vp := range vps {
+			if vp.CanSpoof && vp.Timestamp {
+				ops[vp.Site] = vp
+			}
+		}
+		var usevps []*dm.VantagePoint
+		for _, v := range ops {
+			usevps = append(usevps, v)
+		}
+		if req.Max == 0 || uint32(len(usevps)) < req.Max {
+			resp <- usevps
+		} else {
+			resp <- usevps[:req.Max]
+		}
+		close(resp)
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case vps := <-resp:
+		return &dm.TSSpooferResponse{
 			Max:      req.Max,
 			Spoofers: vps,
 		}, nil
