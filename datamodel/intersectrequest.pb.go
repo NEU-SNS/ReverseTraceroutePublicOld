@@ -55,6 +55,8 @@ It has these top-level messages:
 	VantagePoint
 	VPRequest
 	VPReturn
+	SpooferRequest
+	SpooferResponse
 */
 package datamodel
 

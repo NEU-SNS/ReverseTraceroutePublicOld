@@ -1,6 +1,8 @@
 package client
 
 import (
+	"time"
+
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
@@ -17,6 +19,7 @@ type client struct {
 type VPSource interface {
 	GetVPs() (*dm.VPReturn, error)
 	GetOneVPPerSite() (*dm.VPReturn, error)
+	GetSpoofers(addr, max uint32) ([]*dm.VantagePoint, error)
 }
 
 // New returns a VPSource
@@ -25,7 +28,9 @@ func New(ctx context.Context, cc *grpc.ClientConn) VPSource {
 }
 
 func (c client) GetVPs() (*dm.VPReturn, error) {
-	vpr, err := c.VPServiceClient.GetVPs(c.Context, &dm.VPRequest{})
+	ctx, cancel := context.WithTimeout(c.Context, time.Second*30)
+	defer cancel()
+	vpr, err := c.VPServiceClient.GetVPs(ctx, &dm.VPRequest{})
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -34,7 +39,9 @@ func (c client) GetVPs() (*dm.VPReturn, error) {
 }
 
 func (c client) GetOneVPPerSite() (*dm.VPReturn, error) {
-	vpr, err := c.VPServiceClient.GetVPs(c.Context, &dm.VPRequest{})
+	ctx, cancel := context.WithTimeout(c.Context, time.Second*30)
+	defer cancel()
+	vpr, err := c.VPServiceClient.GetVPs(ctx, &dm.VPRequest{})
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -50,4 +57,18 @@ func (c client) GetOneVPPerSite() (*dm.VPReturn, error) {
 	}
 	vpr.Vps = ret
 	return vpr, nil
+}
+
+func (c client) GetSpoofers(addr, max uint32) ([]*dm.VantagePoint, error) {
+	ctx, cancel := context.WithTimeout(c.Context, time.Second*30)
+	defer cancel()
+	arg := &dm.SpooferRequest{
+		Addr: addr,
+		Max:  max,
+	}
+	sr, err := c.VPServiceClient.GetSpoofers(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	return sr.Spoofers, nil
 }

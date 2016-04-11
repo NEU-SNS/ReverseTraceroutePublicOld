@@ -26,3 +26,14 @@ message VPRequest {
 message VPReturn {
     repeated VantagePoint vps = 1;
 }
+
+message SpooferRequest {
+  uint32 addr =  1;
+  uint32 max  =  2;
+}
+
+message SpooferResponse {
+  uint32 addr =  1;
+  uint32 max  =  2;
+  repeated VantagePoint spoofers = 3;
+}
