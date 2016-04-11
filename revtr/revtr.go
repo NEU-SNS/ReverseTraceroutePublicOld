@@ -152,6 +152,7 @@ type ReverseTraceroute struct {
 	tsSrcToHopToResponsive map[string]map[string]int
 	errorDetails           bytes.Buffer
 	lastResponsive         string
+	vps                    vpservice.VPSource
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -685,35 +686,17 @@ func (rt *ReverseTraceroute) GetTSAdjacents(hop string) []string {
 	return adjacents
 }
 
-func chooseOneSpooferPerSite() map[string]*datamodel.VantagePoint {
-	ret := make(map[string]*datamodel.VantagePoint)
-	for _, vp := range vps {
-		if vp.CanSpoof {
-			ret[vp.Site] = vp
-		}
-	}
-	return ret
-}
-
-func getRRSpoofers() map[string]*datamodel.VantagePoint {
-	ret := make(map[string]*datamodel.VantagePoint)
-	for _, vp := range vps {
-		if vp.CanSpoof && vp.RecordRoute {
-			ret[vp.Site] = vp
-		}
-	}
-	return ret
-}
-
 // for now we're just ignoring the src dst and choosing randomly
-func getTimestampSpoofers(src, dst string) []string {
-	siteToSpoofer := chooseOneSpooferPerSite()
+func (rt *ReverseTraceroute) getTimestampSpoofers(src, dst string) []string {
 	var spoofers []string
-	for _, val := range siteToSpoofer {
-		if val.Timestamp && val.CanSpoof {
-			ips, _ := util.Int32ToIPString(val.Ip)
-			spoofers = append(spoofers, ips)
-		}
+	vps, err := rt.vps.GetTSSpoofers(0)
+	if err != nil {
+		rt.error(err)
+		return nil
+	}
+	for _, vp := range vps {
+		ips, _ := util.Int32ToIPString(vp.Ip)
+		spoofers = append(spoofers, ips)
 	}
 	return spoofers
 }
@@ -722,33 +705,17 @@ func getTimestampSpoofers(src, dst string) []string {
 func (rt *ReverseTraceroute) InitializeRRVPs(cls string) error {
 	rt.debug("Initializing RR VPs individually for spoofers for ", cls)
 	rt.RRHop2RateLimit[cls] = RateLimit
-	siteToSpoofer := getRRSpoofers()
-	var sitesForTarget []*datamodel.VantagePoint
-	sitesForTarget = nil
 	spoofersForTarget := []string{"non_spoofed"}
-	var tempSpoofers []string
-	if sitesForTarget == nil {
-		for _, val := range siteToSpoofer {
-			ipsrc, _ := util.Int32ToIPString(val.Ip)
-			if ipsrc == rt.Src {
-				continue
-			}
-			tempSpoofers = append(tempSpoofers, ipsrc)
-		}
-		random := rand.Perm(len(tempSpoofers))
-		for _, r := range random {
-			spoofersForTarget = append(spoofersForTarget, tempSpoofers[r])
-		}
-	} else {
-		// TODO
-		// This is the case for using smarter results for vp selection
-		// currently we don't have this so nothing is gunna happen
+	clsi, _ := util.IPStringToInt32(cls)
+	vps, err := rt.vps.GetRRSpoofers(clsi, 0)
+	if err != nil {
+		return err
 	}
-	if len(spoofersForTarget) > maxUnresponsive {
-		rt.RRHop2VPSLeft[cls] = spoofersForTarget[:maxUnresponsive]
-	} else {
-		rt.RRHop2VPSLeft[cls] = spoofersForTarget
+	for _, vp := range vps {
+		ips, _ := util.Int32ToIPString(vp.Ip)
+		spoofersForTarget = append(spoofersForTarget, ips)
 	}
+	rt.RRHop2VPSLeft[cls] = spoofersForTarget
 	return nil
 }
 
@@ -1015,6 +982,7 @@ func CreateReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost, p
 	rt.print = print
 	rt.cl = cl
 	rt.at = at
+	rt.vps = vpserv
 	return rt
 }
 
