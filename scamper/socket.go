@@ -283,6 +283,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 		}
 		err = cmd.IssueCommand(s.con, arg)
 		if err != nil {
+			log.Error(err)
 			s.cmds.rmCmd(id)
 			return nil, 0, ErrFailedToIssueCmd
 		}
