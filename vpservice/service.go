@@ -105,6 +105,43 @@ type RVPService struct {
 	rootCA     string
 }
 
+// GetSpoofers gets spoofers for a destination address
+func (rvp *RVPService) GetSpoofers(ctx context.Context, req *dm.SpooferRequest) (*dm.SpooferResponse, error) {
+	resp := make(chan []*dm.VantagePoint)
+	go func() {
+		rvp.rw.RLock()
+		vps := rvp.vps.GetAll()
+		rvp.rw.RUnlock()
+		ops := make(map[string]*dm.VantagePoint)
+		for _, vp := range vps {
+			if req.Addr == vp.Ip {
+				continue
+			}
+			ops[vp.Site] = vp
+		}
+		var usevps []*dm.VantagePoint
+		for _, v := range ops {
+			usevps = append(usevps, v)
+		}
+		if req.Max == 0 || uint32(len(usevps)) < req.Max {
+			resp <- usevps
+		} else {
+			resp <- usevps[:req.Max]
+		}
+		close(resp)
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case vps := <-resp:
+		return &dm.SpooferResponse{
+			Addr:     req.Addr,
+			Max:      req.Max,
+			Spoofers: vps,
+		}, nil
+	}
+}
+
 // GetVPs satisfies the VPService interface
 func (rvp *RVPService) GetVPs(ctx context.Context, req *dm.VPRequest) (*dm.VPReturn, error) {
 	rvp.rw.RLock()

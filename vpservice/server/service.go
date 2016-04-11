@@ -8,4 +8,5 @@ import (
 // VPService is the service that handles VPs
 type VPService interface {
 	GetVPs(context.Context, *dm.VPRequest) (*dm.VPReturn, error)
+	GetSpoofers(context.Context, *dm.SpooferRequest) (*dm.SpooferResponse, error)
 }
