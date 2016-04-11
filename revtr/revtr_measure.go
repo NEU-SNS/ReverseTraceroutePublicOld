@@ -487,7 +487,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 		}
 	} else {
 		rt.debug("TS Non of the above")
-		spfs := getTimestampSpoofers(rt.Src, rt.LastHop())
+		spfs := rt.getTimestampSpoofers(rt.Src, rt.LastHop())
 		for _, adj := range adjacents {
 			for _, spf := range spfs {
 				checkMapMagic(rt.Src, spf)
@@ -581,7 +581,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 				// so it is still true, we need to try to find a spoofer
 				checksrctohoptosendspoofedmagic(src)
 				if rt.tsSrcToHopToSendSpoofed[src][probe[0]] {
-					mySpoofers := getTimestampSpoofers(src, probe[0])
+					mySpoofers := rt.getTimestampSpoofers(src, probe[0])
 					for _, sp := range mySpoofers {
 						rt.debug("Adding spoofed TS probe to send")
 						checkMapMagic(src, sp)
@@ -656,7 +656,7 @@ func (rt *ReverseTraceroute) reverseHopsTS() error {
 	}
 	receiverToSpooferToProbe = make(map[string]map[string][][]string)
 	for _, probe := range destDoesNotStamp {
-		spoofers := getTimestampSpoofers(probe.src, probe.dst)
+		spoofers := rt.getTimestampSpoofers(probe.src, probe.dst)
 		for _, s := range spoofers {
 			checkMapMagic(probe.src, s)
 			receiverToSpooferToProbe[probe.src][s] = append(receiverToSpooferToProbe[probe.src][s], []string{probe.dst, probe.tsip, probe.tsip, probe.tsip, probe.tsip})
