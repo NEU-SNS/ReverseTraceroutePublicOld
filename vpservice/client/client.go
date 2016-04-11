@@ -19,7 +19,8 @@ type client struct {
 type VPSource interface {
 	GetVPs() (*dm.VPReturn, error)
 	GetOneVPPerSite() (*dm.VPReturn, error)
-	GetSpoofers(addr, max uint32) ([]*dm.VantagePoint, error)
+	GetRRSpoofers(addr, max uint32) ([]*dm.VantagePoint, error)
+	GetTSSpoofers(max uint32) ([]*dm.VantagePoint, error)
 }
 
 // New returns a VPSource
@@ -59,14 +60,27 @@ func (c client) GetOneVPPerSite() (*dm.VPReturn, error) {
 	return vpr, nil
 }
 
-func (c client) GetSpoofers(addr, max uint32) ([]*dm.VantagePoint, error) {
+func (c client) GetRRSpoofers(addr, max uint32) ([]*dm.VantagePoint, error) {
 	ctx, cancel := context.WithTimeout(c.Context, time.Second*30)
 	defer cancel()
-	arg := &dm.SpooferRequest{
+	arg := &dm.RRSpooferRequest{
 		Addr: addr,
 		Max:  max,
 	}
-	sr, err := c.VPServiceClient.GetSpoofers(ctx, arg)
+	sr, err := c.VPServiceClient.GetRRSpoofers(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	return sr.Spoofers, nil
+}
+
+func (c client) GetTSSpoofers(max uint32) ([]*dm.VantagePoint, error) {
+	ctx, cancel := context.WithTimeout(c.Context, time.Second*30)
+	defer cancel()
+	arg := &dm.TSSpooferRequest{
+		Max: max,
+	}
+	sr, err := c.VPServiceClient.GetTSSpoofers(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
