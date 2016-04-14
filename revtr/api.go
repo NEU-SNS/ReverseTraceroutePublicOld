@@ -24,6 +24,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/golang/protobuf/jsonpb"
@@ -41,6 +42,8 @@ var (
 		Name:      "running_revtrs",
 		Help:      "The count of currently running reverse traceroutes.",
 	})
+
+	ErrInvalidBatchId = fmt.Errorf("invalid batch id")
 )
 
 var id = rand.Uint32()
@@ -58,6 +61,74 @@ func getName() string {
 	}
 	r := strings.NewReplacer(".", "_", "-", "")
 	return fmt.Sprintf("revtr_%s", r.Replace(name))
+}
+
+// RTStore is the interface for storing/loading/allowing revtrs to be run
+type RTStore interface {
+	GetUserByKey(string) (datamodel.RevtrUser, error)
+	StoreRevtr(pb.ReverseTraceroute) error
+	GetRevtrsInBatch(uint32, uint32) ([]*pb.ReverseTraceroute, error)
+	CreateRevtrBatch([]pb.RevtrMeasurement, string) ([]*pb.RevtrMeasurement, uint32, error)
+	StoreBatchedRevtrs([]pb.ReverseTraceroute) error
+}
+
+// Server in the interface for the revtr server
+type Server interface {
+	RunRevtr(*pb.RunRevtrReq, string) (*pb.RunRevtrResp, error)
+	GetRevtr(*pb.GetRevtrReq, string) (*pb.GetRevtrResp, error)
+	GetSources(*pb.GetSourcesReq, string) (*pb.GetSourcesResp, error)
+}
+
+type revtrServer struct {
+	rts RTStore
+	vps vpservice.VPSource
+}
+
+func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq, id string) (*pb.RunRevtrResp, error) {
+	_, err := rs.rts.GetUserByKey(id)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq, id string) (*pb.GetRevtrResp, error) {
+	usr, err := rs.rts.GetUserByKey(id)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	if req.BatchId == 0 {
+		return nil, ErrInvalidBatchId
+	}
+	revtrs, err := rs.rts.GetRevtrsInBatch(usr.ID, req.BatchId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetRevtrResp{
+		Revtrs: revtrs,
+	}, nil
+}
+
+func (rs revtrServer) GetSources(req *pb.GetSourcesReq, id string) (*pb.GetSourcesResp, error) {
+	_, err := rs.rts.GetUserByKey(id)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	vps, err := rs.vps.GetVPs()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	sr := &pb.GetSourcesResp{}
+	for _, vp := range vps.GetVps() {
+		s := new(pb.Source)
+		s.Hostname = vp.Hostname
+		s.Ip, _ = util.Int32ToIPString(vp.Ip)
+		sr.Srcs = append(sr.Srcs, s)
+	}
+	return sr, nil
 }
 
 // V1Revtr is the api endpoint for interacting with revtrs
@@ -350,7 +421,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 		}
 		// At this point we need to run the revtr and redirect approprately
 		log.Debug("Running RTR with src: ", src, " ", "dst: ", dst)
-		rt := CreateReverseTraceroute(datamodel.RevtrMeasurement{
+		rt := CreateReverseTraceroute(pb.RevtrMeasurement{
 			Src:       src,
 			Dst:       dst,
 			Staleness: 60,
@@ -493,7 +564,7 @@ func (s V1Revtr) retreiveRevtr(rw http.ResponseWriter, req *http.Request, user d
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	ret := &datamodel.RevtrResponse{}
+	ret := &pb.RevtrResponse{}
 	ret.Revtrs = revtrs
 	var m jsonpb.Marshaler
 	err = m.Marshal(rw, ret)
@@ -523,7 +594,7 @@ func (s V1Revtr) submitRevtr(rw http.ResponseWriter, req *http.Request, user dat
 	}
 	rs := revtrr.GetRevtrs()
 	log.Debug("revtrr: ", revtrr)
-	var reqToRun []datamodel.RevtrMeasurement
+	var reqToRun []pb.RevtrMeasurement
 	for _, r := range rs {
 		_, valid := validSrc(r.Src, vps.GetVps())
 		if !valid {
