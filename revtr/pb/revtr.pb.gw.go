@@ -42,6 +42,10 @@ func request_Revtr_RunRevtr_0(ctx context.Context, client RevtrClient, req *http
 
 }
 
+var (
+	filter_Revtr_GetRevtr_0 = &utilities.DoubleArray{Encoding: map[string]int{"batch_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+)
+
 func request_Revtr_GetRevtr_0(ctx context.Context, client RevtrClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq GetRevtrReq
 	var metadata runtime.ServerMetadata
@@ -64,14 +68,26 @@ func request_Revtr_GetRevtr_0(ctx context.Context, client RevtrClient, req *http
 		return nil, metadata, err
 	}
 
+	if err := runtime.PopulateQueryParameters(&protoReq, req.URL.Query(), filter_Revtr_GetRevtr_0); err != nil {
+		return nil, metadata, grpc.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
 	msg, err := client.GetRevtr(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
+var (
+	filter_Revtr_GetSources_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+)
+
 func request_Revtr_GetSources_0(ctx context.Context, client RevtrClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq GetSourcesReq
 	var metadata runtime.ServerMetadata
+
+	if err := runtime.PopulateQueryParameters(&protoReq, req.URL.Query(), filter_Revtr_GetSources_0); err != nil {
+		return nil, metadata, grpc.Errorf(codes.InvalidArgument, "%v", err)
+	}
 
 	msg, err := client.GetSources(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err

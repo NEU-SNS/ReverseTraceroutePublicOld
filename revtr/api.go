@@ -54,7 +54,6 @@ func init() {
 }
 
 func getName() string {
-
 	name, err := os.Hostname()
 	if err != nil {
 		return fmt.Sprintf("revtr_%d", id)
@@ -74,9 +73,9 @@ type RTStore interface {
 
 // Server in the interface for the revtr server
 type Server interface {
-	RunRevtr(*pb.RunRevtrReq, string) (*pb.RunRevtrResp, error)
-	GetRevtr(*pb.GetRevtrReq, string) (*pb.GetRevtrResp, error)
-	GetSources(*pb.GetSourcesReq, string) (*pb.GetSourcesResp, error)
+	RunRevtr(*pb.RunRevtrReq) (*pb.RunRevtrResp, error)
+	GetRevtr(*pb.GetRevtrReq) (*pb.GetRevtrResp, error)
+	GetSources(*pb.GetSourcesReq) (*pb.GetSourcesResp, error)
 }
 
 type revtrServer struct {
@@ -84,16 +83,16 @@ type revtrServer struct {
 	vps vpservice.VPSource
 }
 
-func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq, id string) (*pb.RunRevtrResp, error) {
-	_, err := rs.rts.GetUserByKey(id)
+func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
+	_, err := rs.rts.GetUserByKey(req.Auth)
 	if err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq, id string) (*pb.GetRevtrResp, error) {
-	usr, err := rs.rts.GetUserByKey(id)
+func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
+	usr, err := rs.rts.GetUserByKey(req.Auth)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -110,8 +109,8 @@ func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq, id string) (*pb.GetRevtrResp
 	}, nil
 }
 
-func (rs revtrServer) GetSources(req *pb.GetSourcesReq, id string) (*pb.GetSourcesResp, error) {
-	_, err := rs.rts.GetUserByKey(id)
+func (rs revtrServer) GetSources(req *pb.GetSourcesReq) (*pb.GetSourcesResp, error) {
+	_, err := rs.rts.GetUserByKey(req.Auth)
 	if err != nil {
 		log.Error(err)
 		return nil, err
