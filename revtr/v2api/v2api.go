@@ -55,40 +55,49 @@ func checkAuth(m metadata.MD) (string, bool) {
 func (a api) RunRevtr(ctx context.Context, req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 	if md, hasMD := metadata.FromContext(ctx); hasMD {
 		if key, auth := checkAuth(md); auth {
-			ret, err := a.s.RunRevtr(req, key)
-			if err != nil {
-				return nil, rpcError(err)
-			}
-			return ret, nil
+			req.Auth = key
 		}
 	}
-	return nil, ErrUnauthorizedRequest
+	if req.Auth == "" {
+		return nil, ErrUnauthorizedRequest
+	}
+	ret, err := a.s.RunRevtr(req)
+	if err != nil {
+		return nil, rpcError(err)
+	}
+	return ret, nil
 }
 
 func (a api) GetRevtr(ctx context.Context, req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
 	if md, hasMD := metadata.FromContext(ctx); hasMD {
 		if key, auth := checkAuth(md); auth {
-			ret, err := a.s.GetRevtr(req, key)
-			if err != nil {
-				return nil, rpcError(err)
-			}
-			return ret, nil
+			req.Auth = key
 		}
 	}
-	return nil, ErrUnauthorizedRequest
+	if req.Auth == "" {
+		return nil, ErrUnauthorizedRequest
+	}
+	ret, err := a.s.GetRevtr(req)
+	if err != nil {
+		return nil, rpcError(err)
+	}
+	return ret, nil
 }
 
 func (a api) GetSources(ctx context.Context, req *pb.GetSourcesReq) (*pb.GetSourcesResp, error) {
 	if md, hasMD := metadata.FromContext(ctx); hasMD {
 		if key, auth := checkAuth(md); auth {
-			ret, err := a.s.GetSources(req, key)
-			if err != nil {
-				return nil, rpcError(err)
-			}
-			return ret, nil
+			req.Auth = key
 		}
 	}
-	return nil, ErrUnauthorizedRequest
+	if req.Auth == "" {
+		return nil, ErrUnauthorizedRequest
+	}
+	ret, err := a.s.GetSources(req)
+	if err != nil {
+		return nil, rpcError(err)
+	}
+	return ret, nil
 }
 
 func rpcError(err error) error {

@@ -34,7 +34,8 @@ message RevtrMeasurement {
 }
 
 message RunRevtrReq {
-    repeated RevtrMeasurement revtrs  = 1;
+  repeated RevtrMeasurement revtrs  = 1;
+  string auth = 2;
 }
 
 message RunRevtrResp {
@@ -44,6 +45,7 @@ message RunRevtrResp {
 
 message GetRevtrReq {
   uint32 batch_id =  1;
+  string auth = 2;
 }
 
 message GetRevtrResp {
@@ -51,7 +53,7 @@ message GetRevtrResp {
 }
 
 message GetSourcesReq {
-  
+  string auth = 1;
 }
 
 message GetSourcesResp {
