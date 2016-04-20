@@ -30,22 +30,23 @@ package sql
 import (
 	"database/sql"
 	"fmt"
-	"math/rand"
 	"net"
 	"time"
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/respository"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/go-sql-driver/mysql"
 )
-import "github.com/go-sql-driver/mysql"
 
-// DB represents a database collection
+/*
+This is just duplicate code while for the period of transition
+*/
+
+// DB is the data access object
 type DB struct {
-	wdb []*sql.DB
-	rdb []*sql.DB
-	rr  *rand.Rand
-	wr  *rand.Rand
+	*repository.DB
 }
 
 // DbConfig is the database config
@@ -63,66 +64,20 @@ type Config struct {
 	Db       string
 }
 
-var conFmt = "%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local"
-
-func makeDb(conf Config) (*sql.DB, error) {
-	conString := fmt.Sprintf(conFmt, conf.User, conf.Password, conf.Host, conf.Port, conf.Db)
-	db, err := sql.Open("mysql", conString)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	if err = db.Ping(); err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	db.SetMaxOpenConns(24)
-	db.SetMaxIdleConns(4)
-	db.SetConnMaxLifetime(time.Hour)
-	return db, nil
-}
-
-// NewDB creates a new DB with the given config
+// NewDB creates a db object with the given config
 func NewDB(con DbConfig) (*DB, error) {
-	ret := &DB{}
-	ret.rr = rand.New(rand.NewSource(time.Now().UnixNano()))
-	ret.wr = rand.New(rand.NewSource(time.Now().UnixNano()))
-	for _, conf := range con.WriteConfigs {
-		db, err := makeDb(conf)
-		if err != nil {
-			return nil, err
-		}
-		ret.wdb = append(ret.wdb, db)
+	var conf repository.DbConfig
+	for _, wc := range con.WriteConfigs {
+		conf.WriteConfigs = append(conf.WriteConfigs, repository.Config(wc))
 	}
-	for _, conf := range con.ReadConfigs {
-		db, err := makeDb(conf)
-		if err != nil {
-			return nil, err
-		}
-		ret.rdb = append(ret.rdb, db)
+	for _, rc := range con.ReadConfigs {
+		conf.ReadConfigs = append(conf.ReadConfigs, repository.Config(rc))
 	}
-	return ret, nil
-}
-
-/*
-	getReader and getWriter are fine because
-	we just get pointers to thread safe sql.DBs
-*/
-
-func (db *DB) getReader() *sql.DB {
-	l := len(db.rdb)
-	if l == 1 {
-		return db.rdb[0]
+	db, err := repository.NewDB(conf)
+	if err != nil {
+		return nil, err
 	}
-	return db.rdb[db.rr.Intn(len(db.rdb))]
-}
-
-func (db *DB) getWriter() *sql.DB {
-	l := len(db.wdb)
-	if l == 1 {
-		return db.wdb[0]
-	}
-	return db.wdb[db.wr.Intn(len(db.wdb))]
+	return &DB{db}, nil
 }
 
 // VantagePoint represents a vantage point
@@ -185,7 +140,7 @@ WHERE
 
 // GetVPs gets all the VPs in the database
 func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
-	rows, err := db.getReader().Query(getVpsQuery)
+	rows, err := db.GetReader().Query(getVpsQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +174,7 @@ func (db *DB) GetVPs() ([]*dm.VantagePoint, error) {
 
 // GetActiveVPs gets all the VPs in the database that are connected
 func (db *DB) GetActiveVPs() ([]*dm.VantagePoint, error) {
-	rows, err := db.getReader().Query(getActiveVpsQuery)
+	rows, err := db.GetReader().Query(getActiveVpsQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +232,7 @@ SET
 )
 
 func (db *DB) ClearAllVPs() error {
-	_, err := db.getWriter().Exec(clearAllVps)
+	_, err := db.GetWriter().Exec(clearAllVps)
 	if err != nil {
 		return err
 	}
@@ -295,7 +250,7 @@ func (db *DB) UpdateController(ip, newc, con uint32) error {
 		args = append(args, newc)
 	}
 	args = append(args, ip)
-	_, err := db.getWriter().Exec(query, args...)
+	_, err := db.GetWriter().Exec(query, args...)
 	return err
 }
 
@@ -312,7 +267,7 @@ WHERE
 
 // UpdateActive updates the acive flag of a vantage point
 func (db *DB) UpdateActive(ip uint32, active bool) error {
-	_, err := db.getWriter().Exec(updateActiveQuery, active, ip)
+	_, err := db.GetWriter().Exec(updateActiveQuery, active, ip)
 	return err
 }
 
@@ -330,7 +285,7 @@ WHERE
 
 // UpdateCanSpoof updates the can spoof flag for a vantage point
 func (db *DB) UpdateCanSpoof(ip uint32, canSpoof bool) error {
-	_, err := db.getWriter().Exec(updateCanSpoofQuery, canSpoof, ip)
+	_, err := db.GetWriter().Exec(updateCanSpoofQuery, canSpoof, ip)
 	return err
 }
 
@@ -347,19 +302,8 @@ WHERE
 
 // UpdateCheckStatus updates the result of the health check for a vantage point
 func (db *DB) UpdateCheckStatus(ip uint32, result string) error {
-	_, err := db.getReader().Exec(updateCheckStatus, result, ip)
+	_, err := db.GetReader().Exec(updateCheckStatus, result, ip)
 	return err
-}
-
-// Close closes the DB connections
-func (db *DB) Close() error {
-	for _, d := range db.wdb {
-		d.Close()
-	}
-	for _, d := range db.rdb {
-		d.Close()
-	}
-	return nil
 }
 
 const (
@@ -414,7 +358,7 @@ func storeTraceHop(tx *sql.Tx, id int64, hop uint32, in *dm.TracerouteHop) error
 
 // StoreTraceroute saves a traceroute to the DB
 func (db *DB) StoreTraceroute(in *dm.Traceroute) error {
-	conn := db.getWriter()
+	conn := db.GetWriter()
 	tx, err := conn.Begin()
 	if err != nil {
 		return err
@@ -523,7 +467,7 @@ func splitTraces(rows *sql.Rows) ([]*dm.Traceroute, error) {
 
 // GetTRBySrcDst gets traceroutes with the given src, dst
 func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
-	rows, err := db.getReader().Query(getTraceBySrcDst, src, dst)
+	rows, err := db.GetReader().Query(getTraceBySrcDst, src, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -534,7 +478,7 @@ func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
 func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
 	minTime := time.Now().Add(-s)
-	rows, err := db.getReader().Query(getTraceBySrcDstStale, src, dst, minTime)
+	rows, err := db.GetReader().Query(getTraceBySrcDstStale, src, dst, minTime)
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +710,7 @@ func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 
 // GetPingBySrcDst gets pings with the given src/dst
 func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
-	rows, err := db.getReader().Query(getPing, src, dst)
+	rows, err := db.GetReader().Query(getPing, src, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -777,7 +721,7 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
 	minTime := time.Now().Add(-s)
-	rows, err := db.getReader().Query(getPing, src, dst, minTime)
+	rows, err := db.GetReader().Query(getPing, src, dst, minTime)
 	if err != nil {
 		return nil, err
 	}
@@ -919,7 +863,7 @@ func storePingResponse(trx *sql.Tx, id int64, r *dm.PingResponse) error {
 
 // StorePing saves a ping to the DB
 func (db *DB) StorePing(in *dm.Ping) error {
-	conn := db.getWriter()
+	conn := db.GetWriter()
 	tx, err := conn.Begin()
 	if err != nil {
 		return err
@@ -1030,7 +974,7 @@ var (
 // GetAtlasSources gets all sources that were used for existing atlas traceroutes
 // the set of vps - this would be the sources to use to run traces
 func (db *DB) GetAtlasSources(dst uint32, stale time.Duration) ([]uint32, error) {
-	rows, err := db.getReader().Query(getSources, dst, int64(stale.Minutes()))
+	rows, err := db.GetReader().Query(getSources, dst, int64(stale.Minutes()))
 	var srcs []uint32
 	if err != nil {
 		log.Error(err)
@@ -1056,13 +1000,13 @@ func (db *DB) FindIntersectingTraceroute(pairs []dm.SrcDst) ([]*dm.Path, error) 
 	var rows *sql.Rows
 	var err error
 	if pair.IgnoreSource {
-		rows, err = db.getReader().Query(findIntersectingIgnoreSource, pair.Addr, pair.Src, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
+		rows, err = db.GetReader().Query(findIntersectingIgnoreSource, pair.Addr, pair.Src, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
 	} else {
-		rows, err = db.getReader().Query(findIntersecting, pair.Addr, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
+		rows, err = db.GetReader().Query(findIntersecting, pair.Addr, pair.Dst, int64(pair.Stale.Minutes()), pair.Addr, pair.Addr)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -1098,7 +1042,7 @@ const (
 
 // StoreAtlasTraceroute stores a traceroute in a form that the Atlas requires
 func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
-	conn := db.getWriter()
+	conn := db.GetWriter()
 	tx, err := conn.Begin()
 	if err != nil {
 		return err
@@ -1149,7 +1093,7 @@ const (
 
 // StoreAdjacency stores an adjacency
 func (db *DB) StoreAdjacency(l, r net.IP) error {
-	con := db.getWriter()
+	con := db.GetWriter()
 	ip1, err := util.IPtoInt32(l)
 	if err != nil {
 		return err
@@ -1167,7 +1111,7 @@ func (db *DB) StoreAdjacency(l, r net.IP) error {
 
 // GetAdjacenciesByIP1 gets ajds by ip1
 func (db *DB) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
-	con := db.getReader()
+	con := db.GetReader()
 	res, err := con.Query(selectByIP1AdjQuery, ip)
 	if err != nil {
 		return nil, err
@@ -1190,7 +1134,7 @@ func (db *DB) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
 
 // GetAdjacenciesByIP2 gets ajds by ip2
 func (db *DB) GetAdjacenciesByIP2(ip uint32) ([]dm.Adjacency, error) {
-	con := db.getReader()
+	con := db.GetReader()
 	res, err := con.Query(selectByIP2AdjQuery, ip)
 	if err != nil {
 		return nil, err
@@ -1225,7 +1169,7 @@ const (
 
 // StoreAdjacencyToDest stores an adjacencies to dest
 func (db *DB) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
-	con := db.getWriter()
+	con := db.GetWriter()
 	destip, _ := util.IPtoInt32(dest24)
 	destip = destip >> 8
 	addrip, _ := util.IPtoInt32(addr)
@@ -1239,7 +1183,7 @@ func (db *DB) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
 
 // GetAdjacencyToDestByAddrAndDest24 does what it says
 func (db *DB) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.AdjacencyToDest, error) {
-	con := db.getReader()
+	con := db.GetReader()
 	res, err := con.Query(selectByAddressAndDest24AdjDstQuery, addr, dest24)
 	if err != nil {
 		return nil, err
@@ -1266,7 +1210,7 @@ const (
 
 // StoreAlias stores an IP alias
 func (db *DB) StoreAlias(id int, ips []net.IP) error {
-	con := db.getWriter()
+	con := db.GetWriter()
 	tx, err := con.Begin()
 	if err != nil {
 		return err
@@ -1294,7 +1238,7 @@ var (
 
 // GetClusterIDByIP gets a the cluster ID for a give ip
 func (db *DB) GetClusterIDByIP(ip uint32) (int, error) {
-	con := db.getReader()
+	con := db.GetReader()
 	var ret int
 	err := con.QueryRow(aliasGetByIP, ip).Scan(&ret)
 	switch {
@@ -1309,7 +1253,7 @@ func (db *DB) GetClusterIDByIP(ip uint32) (int, error) {
 
 // GetIPsForClusterID gets all IPs associated with the given cluster id
 func (db *DB) GetIPsForClusterID(id int) ([]uint32, error) {
-	con := db.getReader()
+	con := db.GetReader()
 	var scan uint32
 	var ret []uint32
 	res, err := con.Query(aliasGetByIP, id)
