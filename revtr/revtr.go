@@ -19,6 +19,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/gorilla/websocket"
@@ -391,7 +392,7 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
 }
 
 // ToStorable returns a storble form of a ReverseTraceroute
-func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
+func (rt *ReverseTraceroute) ToStorable() pb.ReverseTraceroute {
 	var ret datamodel.ReverseTraceroute
 	ret.Id = rt.ID
 	ret.Src = rt.Src

@@ -42,9 +42,40 @@ var (
 		Name:      "running_revtrs",
 		Help:      "The count of currently running reverse traceroutes.",
 	})
-
-	ErrInvalidBatchId = fmt.Errorf("invalid batch id")
+	// ErrNoRevtrsToRun is returned when there are no revtrs given in a batch
+	ErrNoRevtrsToRun = fmt.Errorf("no runnable revtrs in the batch")
+	// ErrConnectFailed is returned when connecting to the services failed
+	ErrConnectFailed = fmt.Errorf("could not connect to services")
+	// ErrFailedToCreateBatch is returned when creating the batch of revtrs fails
+	ErrFailedToCreateBatch = fmt.Errorf("could not create batch")
 )
+
+// BatchIDError is returned when an invalid batch id is sent
+type BatchIDError struct {
+	batchID uint32
+}
+
+func (be BatchIDError) Error() string {
+	return fmt.Sprintf("invalid batch id %d", be.batchID)
+}
+
+// SrcError is returned when an invalid src address is given
+type SrcError struct {
+	src string
+}
+
+func (se SrcError) Error() string {
+	return fmt.Sprintf("invalid src address %s", se.src)
+}
+
+// DstError is returned when an invalid src address is given
+type DstError struct {
+	dst string
+}
+
+func (de DstError) Error() string {
+	return fmt.Sprintf("invalid dst address %s", de.dst)
+}
 
 var id = rand.Uint32()
 
@@ -62,12 +93,74 @@ func getName() string {
 	return fmt.Sprintf("revtr_%s", r.Replace(name))
 }
 
+func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
+	for _, vp := range vps {
+		s, _ := util.Int32ToIPString(vp.Ip)
+		if vp.Hostname == src || s == src {
+			return s, true
+		}
+	}
+	return "", false
+}
+
+func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
+	var notIP bool
+	ip := net.ParseIP(dst)
+	if ip == nil {
+		notIP = true
+	}
+	if notIP {
+		for _, vp := range vps {
+			if vp.Hostname == dst {
+				ips, _ := util.Int32ToIPString(vp.Ip)
+				return ips, true
+			}
+		}
+		res, err := net.LookupHost(dst)
+		if err != nil {
+			log.Error(err)
+			return "", false
+		}
+		if len(res) == 0 {
+			return "", false
+		}
+		return res[0], true
+	}
+	if isInPrivatePrefix(ip) {
+		return "", false
+	}
+	return dst, true
+}
+
+func verifyAddrs(src, dst string, vps []*datamodel.VantagePoint) error {
+	nsrc, valid := validSrc(src, vps)
+	if !valid {
+		log.Errorf("Invalid source: %s", src)
+		return SrcError{src: src}
+	}
+	ndst, valid := validDest(dst, vps)
+	if !valid {
+		log.Errorf("Invalid destination: %s", dst)
+		return DstError{dst: dst}
+	}
+	// ensure they're valid ips
+	if net.ParseIP(nsrc) == nil {
+		log.Errorf("Invalid source: %s", nsrc)
+		return SrcError{src: nsrc}
+	}
+	if net.ParseIP(ndst) == nil {
+		log.Errorf("Invalid destination: %s", ndst)
+		return DstError{dst: ndst}
+	}
+	return nil
+}
+
 // RTStore is the interface for storing/loading/allowing revtrs to be run
 type RTStore interface {
 	GetUserByKey(string) (datamodel.RevtrUser, error)
 	StoreRevtr(pb.ReverseTraceroute) error
 	GetRevtrsInBatch(uint32, uint32) ([]*pb.ReverseTraceroute, error)
-	CreateRevtrBatch([]pb.RevtrMeasurement, string) ([]*pb.RevtrMeasurement, uint32, error)
+	CreateRevtrBatch([]*pb.RevtrMeasurement, string) ([]*pb.RevtrMeasurement, uint32, error)
 	StoreBatchedRevtrs([]pb.ReverseTraceroute) error
 }
 
@@ -78,17 +171,120 @@ type Server interface {
 	GetSources(*pb.GetSourcesReq) (*pb.GetSourcesResp, error)
 }
 
-type revtrServer struct {
+type serverOptions struct {
 	rts RTStore
 	vps vpservice.VPSource
+	as  AdjacencySource
+	cs  ClusterSource
+}
+
+// ServerOption configures the server
+type ServerOption func(*serverOptions)
+
+// WithRTStore returns a ServerOption that sets the RTStore to rts
+func WithRTStore(rts RTStore) ServerOption {
+	return func(so *serverOptions) {
+		so.rts = rts
+	}
+}
+
+// WithVPSource returns a ServerOption that sets the VPSource to vps
+func WithVPSource(vps vpservice.VPSource) ServerOption {
+	return func(so *serverOptions) {
+		so.vps = vps
+	}
+}
+
+// WithAdjacencySource returns a ServerOption that sets the AdjacencySource to as
+func WithAdjacencySource(as AdjacencySource) ServerOption {
+	return func(so *serverOptions) {
+		so.as = as
+	}
+}
+
+// WithClusterSource returns a ServerOption that sets the ClusterSource to cs
+func WithClusterSource(cs ClusterSource) ServerOption {
+	return func(so *serverOptions) {
+		so.cs = cs
+	}
+}
+
+// NewServer creates a new Server
+func NewServer(opts ...ServerOption) Server {
+	var serv revtrServer
+	for _, opt := range opts {
+		opt(&serv.opts)
+	}
+	return serv
+}
+
+type revtrServer struct {
+	rts  RTStore
+	vps  vpservice.VPSource
+	as   AdjacencySource
+	cs   ClusterSource
+	conf Config
+	opts serverOptions
 }
 
 func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
-	_, err := rs.rts.GetUserByKey(req.Auth)
+	user, err := rs.rts.GetUserByKey(req.Auth)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	vps, err := rs.vps.GetVPs()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	var reqToRun []*pb.RevtrMeasurement
+	for _, r := range req.GetRevtrs() {
+		err := verifyAddrs(r.Src, r.Dst, vps.GetVps())
+		if err != nil {
+			return nil, err
+		}
+		reqToRun = append(reqToRun, r)
+	}
+	if len(reqToRun) == 0 {
+		return nil, ErrNoRevtrsToRun
+	}
+	servs, err := connectToServices(*rs.opts.RootCA)
+	if err != nil {
+		log.Error(err)
+		return nil, ErrConnectFailed
+	}
+	reqToRun, batchID, err := rs.rts.CreateRevtrBatch(reqToRun, user.Key)
+	if err == dataaccess.ErrCannotAddRevtrBatch {
+		log.Error(err)
+		return nil, ErrFailedToCreateBatch
+	}
+	// run these guys
+	go func() {
+		var wg sync.WaitGroup
+		defer servs.Close()
+		wg.Add(len(reqToRun))
+		for _, rtr := range reqToRun {
+			runningRevtrs.Add(1)
+			go func(r *pb.RevtrMeasurement) {
+				defer runningRevtrs.Sub(1)
+				defer wg.Done()
+				if r.Staleness == 0 {
+					r.Staleness = 60
+				}
+				res, err := RunReverseTraceroute(r, servs.cl, servs.at, servs.vpserv, rs.as, rs.cs)
+				if err != nil {
+					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
+				}
+				err = rs.rts.StoreBatchedRevtrs([]pb.ReverseTraceroute{res.ToStorable()})
+				if err != nil {
+					log.Errorf("Error storing Revtr(%d): %v", res.ID, err)
+				}
+			}(rtr)
+		}
+	}()
+	return &pb.RunRevtrResp{
+		BatchId: batchID,
+	}, nil
 }
 
 func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
@@ -98,7 +294,7 @@ func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
 		return nil, err
 	}
 	if req.BatchId == 0 {
-		return nil, ErrInvalidBatchId
+		return nil, BatchIDError{batchID: req.BatchId}
 	}
 	revtrs, err := rs.rts.GetRevtrsInBatch(usr.ID, req.BatchId)
 	if err != nil {
@@ -260,45 +456,6 @@ func NewRunRevtr(da *dataaccess.DataAccess, rootCa string) RunRevtr {
 		rootCa:     rootCa,
 		next:       new(uint32),
 	}
-}
-
-func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
-	for _, vp := range vps {
-		s, _ := util.Int32ToIPString(vp.Ip)
-		if vp.Hostname == src || s == src {
-			return s, true
-		}
-	}
-	return "", false
-}
-
-func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
-	var notIP bool
-	ip := net.ParseIP(dst)
-	if ip == nil {
-		notIP = true
-	}
-	if notIP {
-		for _, vp := range vps {
-			if vp.Hostname == dst {
-				ips, _ := util.Int32ToIPString(vp.Ip)
-				return ips, true
-			}
-		}
-		res, err := net.LookupHost(dst)
-		if err != nil {
-			log.Error(err)
-			return "", false
-		}
-		if len(res) == 0 {
-			return "", false
-		}
-		return res[0], true
-	}
-	if isInPrivatePrefix(ip) {
-		return "", false
-	}
-	return dst, true
 }
 
 // WS is the endpoint for websockets

@@ -40,7 +40,6 @@ message RunRevtrReq {
 
 message RunRevtrResp {
   uint32 batch_id   =  1;
-  string result_url =  2;
 }
 
 message GetRevtrReq {
