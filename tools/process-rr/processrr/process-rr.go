@@ -90,6 +90,8 @@ func Main() int {
 			log.Println(err)
 			return 1
 		}
+		wdb.SetMaxIdleConns(24)
+		wdb.SetMaxOpenConns(24)
 	}
 	var rdb *sql.DB
 	rdb, err = sql.Open("mysql", rconString)
@@ -101,7 +103,16 @@ func Main() int {
 		log.Println(err)
 		return 1
 	}
-	defer rdb.Close()
+	rdb.SetMaxIdleConns(24)
+	rdb.SetMaxOpenConns(24)
+	defer func() {
+		if rdb != nil {
+			err := rdb.Close()
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}()
 	defer func() {
 		if wdb != nil {
 			err := wdb.Close()
@@ -158,29 +169,11 @@ func copyOld(db *sql.DB) error {
 	return nil
 }
 
-func processPing(wg *sync.WaitGroup, wdb, db *sql.DB, inp <-chan *Ping) {
+func processPing(wg *sync.WaitGroup, wdb, db *sql.DB, inp <-chan *Ping, resp, rrs, res *sql.Stmt) {
 	defer wg.Done()
-	respState, err := db.Prepare(getResponseForPing)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	rrsState, err := db.Prepare(getRRForResponse)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	var resState *sql.Stmt
-	if !dryRun {
-		resState, err = wdb.Prepare(insertRes)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
 	for p := range inp {
 		var responses []*PingResponse
-		rows, err := respState.Query(p.ID)
+		rows, err := resp.Query(p.ID)
 		if err != nil {
 			log.Println(err)
 			return
@@ -194,7 +187,7 @@ func processPing(wg *sync.WaitGroup, wdb, db *sql.DB, inp <-chan *Ping) {
 				return
 			}
 			if resp.From == p.Dst {
-				r, err := rrsState.Query(resp.ID)
+				r, err := rrs.Query(resp.ID)
 				if err != nil {
 					log.Println(err)
 					rows.Close()
@@ -238,7 +231,7 @@ func processPing(wg *sync.WaitGroup, wdb, db *sql.DB, inp <-chan *Ping) {
 					fmt.Printf("Src: %d Dst: %d Dist: %d /24: %d\n", result.Src, result.Dst, result.Dist, result.Slash24)
 					continue
 				}
-				_, err := resState.Exec(result.Src, result.Dst, result.Dist, result.Slash24)
+				_, err := res.Exec(result.Src, result.Dst, result.Dist, result.Slash24)
 				if err != nil {
 					log.Println(err)
 					return
@@ -264,6 +257,8 @@ func getResults(p *PingResponse) []Result {
 	return results
 }
 
+const routineCount = 12
+
 func processPings(db, wdb *sql.DB, ec chan error) chan struct{} {
 	var wg sync.WaitGroup
 	done := make(chan struct{})
@@ -275,9 +270,36 @@ func processPings(db, wdb *sql.DB, ec chan error) chan struct{} {
 		case ec <- err:
 		}
 	}
-	wg.Add(24)
-	for i := 0; i < 24; i++ {
-		go processPing(&wg, wdb, db, pc)
+	respState, err := db.Prepare(getResponseForPing)
+	if err != nil {
+		log.Println(err)
+		select {
+		case <-done:
+		case ec <- err:
+		}
+	}
+	rrsState, err := db.Prepare(getRRForResponse)
+	if err != nil {
+		log.Println(err)
+		select {
+		case <-done:
+		case ec <- err:
+		}
+	}
+	var resState *sql.Stmt
+	if !dryRun {
+		resState, err = wdb.Prepare(insertRes)
+		if err != nil {
+			log.Println(err)
+			select {
+			case <-done:
+			case ec <- err:
+			}
+		}
+	}
+	wg.Add(routineCount)
+	for i := 0; i < routineCount; i++ {
+		go processPing(&wg, wdb, db, pc, respState, rrsState, resState)
 	}
 	go func() {
 		wg.Wait()
