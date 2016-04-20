@@ -777,7 +777,7 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
 	minTime := time.Now().Add(-s)
-	rows, err := db.getReader().Query(getPing, src, dst, minTime)
+	rows, err := db.getReader().Query(getPingStaleness, src, dst, minTime)
 	if err != nil {
 		return nil, err
 	}
