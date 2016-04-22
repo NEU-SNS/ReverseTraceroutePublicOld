@@ -6,8 +6,8 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
-	"github.com/NEU-SNS/ReverseTraceroute/revtr"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -15,7 +15,7 @@ import (
 )
 
 // CreateServer creates a grpc Server that serves the v2api
-func CreateServer(s revtr.Server, conf *tls.Config) *grpc.Server {
+func CreateServer(s server.RevtrServer, conf *tls.Config) *grpc.Server {
 	opts := []grpc.ServerOption{
 		grpc.Creds(credentials.NewTLS(conf)),
 	}
@@ -25,12 +25,12 @@ func CreateServer(s revtr.Server, conf *tls.Config) *grpc.Server {
 }
 
 // CreateAPI returns pb.RevtrServer that uses the revtr.Server s
-func CreateAPI(s revtr.Server) pb.RevtrServer {
+func CreateAPI(s server.RevtrServer) pb.RevtrServer {
 	return api{s: s}
 }
 
 type api struct {
-	s revtr.Server
+	s server.RevtrServer
 }
 
 const (
@@ -40,6 +40,8 @@ const (
 var (
 	ErrUnauthorizedRequest = grpc.Errorf(codes.Unauthenticated, "unauthorized request")
 	ErrInvalidBatchId      = grpc.Errorf(codes.FailedPrecondition, "invalid batch id")
+	ErrNoRevtrsToRun       = grpc.Errorf(codes.FailedPrecondition, "no revtrs to run")
+	ErrFailedToCreateBatch = grpc.Errorf(codes.Internal, "failed to create batch")
 )
 
 func checkAuth(m metadata.MD) (string, bool) {
@@ -104,8 +106,6 @@ func rpcError(err error) error {
 	switch err {
 	case dataaccess.ErrNoRevtrUserFound:
 		return ErrUnauthorizedRequest
-	case revtr.ErrInvalidBatchId:
-		return ErrInvalidBatchId
 	default:
 		return err
 	}

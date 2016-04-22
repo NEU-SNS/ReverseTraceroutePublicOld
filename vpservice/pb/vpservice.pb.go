@@ -37,7 +37,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion1
+const _ = grpc.SupportPackageIsVersion2
 
 // Client API for VPService service
 
@@ -94,40 +94,58 @@ func RegisterVPServiceServer(s *grpc.Server, srv VPServiceServer) {
 	s.RegisterService(&_VPService_serviceDesc, srv)
 }
 
-func _VPService_GetVPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _VPService_GetVPs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(datamodel.VPRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(VPServiceServer).GetVPs(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(VPServiceServer).GetVPs(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.VPService/GetVPs",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VPServiceServer).GetVPs(ctx, req.(*datamodel.VPRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-func _VPService_GetRRSpoofers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _VPService_GetRRSpoofers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(datamodel.RRSpooferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(VPServiceServer).GetRRSpoofers(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(VPServiceServer).GetRRSpoofers(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.VPService/GetRRSpoofers",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VPServiceServer).GetRRSpoofers(ctx, req.(*datamodel.RRSpooferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-func _VPService_GetTSSpoofers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _VPService_GetTSSpoofers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(datamodel.TSSpooferRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(VPServiceServer).GetTSSpoofers(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(VPServiceServer).GetTSSpoofers(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.VPService/GetTSSpoofers",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VPServiceServer).GetTSSpoofers(ctx, req.(*datamodel.TSSpooferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 var _VPService_serviceDesc = grpc.ServiceDesc{

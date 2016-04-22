@@ -1,4 +1,4 @@
-package revtr
+package reversetraceroute
 
 import (
 	"bytes"
@@ -154,6 +154,7 @@ type ReverseTraceroute struct {
 	errorDetails           bytes.Buffer
 	lastResponsive         string
 	vps                    vpservice.VPSource
+	opc                    chan Status
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
@@ -184,8 +185,14 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 		rrsSrcToDstToVPToRevHops: make(map[string]map[string]map[string][]string),
 		trsSrcToDstToPath:        make(map[string]map[string][]string),
 		tsSrcToProbeToVPToResult: make(map[string]map[string]map[string][]string),
+		opc: make(chan Status, 5),
 	}
 	return &ret
+}
+
+// GetOutputChan retreives the output channel of the ReverseTraceroute
+func (rt *ReverseTraceroute) GetOutputChan() <-chan Status {
+	return rt.opc
 }
 
 func (rt *ReverseTraceroute) debug(args ...interface{}) {
@@ -231,6 +238,14 @@ func (rt *ReverseTraceroute) errorf(s string, args ...interface{}) {
 
 type wsMessage struct {
 	HTML   string
+	Status bool
+	Error  string
+}
+
+// Status represents the current running state of a reverse traceroute
+// it is use for the web interface. Something better is probably needed
+type Status struct {
+	Rep    string
 	Status bool
 	Error  string
 }
@@ -987,13 +1002,15 @@ func CreateReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost, p
 	return rt
 }
 
-func (rt *ReverseTraceroute) isRunning() bool {
+// IsRunning returns true if the ReverseTraceroute is running
+func (rt *ReverseTraceroute) IsRunning() bool {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	return rt.running
 }
 
-func (rt *ReverseTraceroute) run() error {
+// Run runs the ReverseTraceroute
+func (rt *ReverseTraceroute) Run() error {
 	rt.mu.Lock()
 	rt.running = true
 	rt.mu.Unlock()
