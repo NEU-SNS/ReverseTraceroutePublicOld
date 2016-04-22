@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-option go_package = "datamodel";
-
-package datamodel;
-
-enum ServiceT {
-    PLANET_LAB = 0;
-} 

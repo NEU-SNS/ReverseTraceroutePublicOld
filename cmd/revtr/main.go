@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -15,15 +17,30 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
-	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/revtr"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/v1api"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/v2api"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/gengo/grpc-gateway/runtime"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rhansen2/ReverseTraceroute/revtr"
 )
 
-var conf = revtr.NewConfig()
+var (
+	conf            = revtr.NewConfig()
+	homeTemplate    = template.Must(template.ParseFiles("webroot/templates/home.html"))
+	runningTemplate = template.Must(template.ParseFiles("webroot/templates/running.html"))
+)
+
+// AppConfig for the app
+type AppConfig struct {
+	ServerConfig types.Config
+	DB           dataaccess.DbConfig
+}
 
 func init() {
 	config.SetEnvPrefix("REVTR")
@@ -42,51 +59,76 @@ func init() {
 	grpclog.SetLogger(log.GetLogger())
 }
 
+func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}, nil
+}
+
 func main() {
+	conf := AppConfig{
+		ServerConfig: types.NewConfig(),
+	}
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Error(err)
 	}
-	da, err := dataaccess.New(conf.Db)
+	da, err := dataaccess.New(conf.DB)
 	if err != nil {
 		panic(err)
 	}
-	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+	_, srvs, err := net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
 		panic(err)
-	}
-	ccreds, err := credentials.NewClientTLSFromFile(*conf.RootCA, srvs[0].Target)
-	if err != nil {
-		panic(err)
-	}
-	connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-	cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(ccreds))
-	if err != nil {
-		panic(err)
-	}
 
-	_, srvs, err = net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
-	if err != nil {
-		panic(err)
 	}
-	vpcreds, err := credentials.NewClientTLSFromFile(*conf.RootCA, srvs[0].Target)
+	vpcreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, srvs[0].Target)
 	if err != nil {
 		panic(err)
+
 	}
 	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
 	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	vps := vpservice.New(context.Background(), c3)
-	cli := client.New(context.Background(), cc)
-	sr := revtr.NewV1Revtr(da, vps, *conf.RootCA)
-	h := revtr.NewHome(da, cli, vps)
-	srcs := revtr.NewV1Sources(da, *conf.RootCA, vps)
-	runrtr := revtr.NewRunRevtr(da, *conf.RootCA)
-	http.Handle("/styles/", http.StripPrefix("/styles/", http.FileServer(http.Dir("webroot/style"))))
-	http.HandleFunc(sr.Route, sr.Handle)
-	http.HandleFunc(h.Route, h.Home)
-	http.HandleFunc(runrtr.Route, runrtr.RunRevtr)
-	http.HandleFunc(srcs.Route, srcs.Handle)
-	http.HandleFunc("/ws", runrtr.WS)
+
+	tlsConf, err := tlsConfig(*conf.ServerConfig.CertFile, *conf.ServerConfig.KeyFile)
+	if err != nil {
+		panic(err)
+	}
+	serv := server.NewRevtrServer(server.WithVPSource(vps),
+		server.WithAdjacencySource(da),
+		server.WithClusterSource(da),
+		server.WithRootCA(*conf.ServerConfig.RootCA),
+		server.WithCertFile(*conf.ServerConfig.CertFile),
+		server.WithKeyFile(*conf.ServerConfig.KeyFile))
+	mux := http.NewServeMux()
+	mux.Handle("/styles/", http.StripPrefix("/styles", http.FileServer(http.Dir("webroot/style"))))
+	v1api.NewV1Api(serv, mux)
+	v2serv := v2api.CreateServer(serv, tlsConf)
+	gatewayMux := runtime.NewServeMux()
+	selfCreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, "revtr.ccs.neu.edu")
+	if err != nil {
+		panic(err)
+	}
+	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(selfCreds)}
+	err = pb.RegisterRevtrHandlerFromEndpoint(context.Background(), gatewayMux, ":8080", dialOpts)
+	if err != nil {
+		panic(err)
+	}
+	conn, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		panic(err)
+	}
+	s := &http.Server{
+		Addr:      ":8080",
+		TLSConfig: tlsConf,
+		Handler:   directRequest(v2serv, mux),
+	}
+
 	metricsServ := http.NewServeMux()
 	metricsServ.Handle("/metrics", prometheus.Handler())
 	go func() {
@@ -100,8 +142,18 @@ func main() {
 		}
 	}()
 	for {
-		log.Error(http.ListenAndServeTLS(":8080", *conf.CertFile, *conf.KeyFile, nil))
+		log.Error(s.Serve(tls.NewListener(conn, tlsConf)))
 	}
+}
+
+func directRequest(grpcServer *grpc.Server, handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+			grpcServer.ServeHTTP(w, r)
+		} else {
+			handler.ServeHTTP(w, r)
+		}
+	})
 }
 
 func redirect(w http.ResponseWriter, req *http.Request) {

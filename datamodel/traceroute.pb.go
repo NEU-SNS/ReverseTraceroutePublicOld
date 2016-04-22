@@ -46,7 +46,7 @@ type TracerouteMeasurement struct {
 func (m *TracerouteMeasurement) Reset()                    { *m = TracerouteMeasurement{} }
 func (m *TracerouteMeasurement) String() string            { return proto.CompactTextString(m) }
 func (*TracerouteMeasurement) ProtoMessage()               {}
-func (*TracerouteMeasurement) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (*TracerouteMeasurement) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 type TracerouteArg struct {
 	Traceroutes []*TracerouteMeasurement `protobuf:"bytes,1,rep,name=traceroutes" json:"traceroutes,omitempty"`
@@ -55,7 +55,7 @@ type TracerouteArg struct {
 func (m *TracerouteArg) Reset()                    { *m = TracerouteArg{} }
 func (m *TracerouteArg) String() string            { return proto.CompactTextString(m) }
 func (*TracerouteArg) ProtoMessage()               {}
-func (*TracerouteArg) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
+func (*TracerouteArg) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func (m *TracerouteArg) GetTraceroutes() []*TracerouteMeasurement {
 	if m != nil {
@@ -84,7 +84,7 @@ type TracerouteHop struct {
 func (m *TracerouteHop) Reset()                    { *m = TracerouteHop{} }
 func (m *TracerouteHop) String() string            { return proto.CompactTextString(m) }
 func (*TracerouteHop) ProtoMessage()               {}
-func (*TracerouteHop) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2} }
+func (*TracerouteHop) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{2} }
 
 func (m *TracerouteHop) GetRtt() *RTT {
 	if m != nil {
@@ -121,7 +121,7 @@ type Traceroute struct {
 func (m *Traceroute) Reset()                    { *m = Traceroute{} }
 func (m *Traceroute) String() string            { return proto.CompactTextString(m) }
 func (*Traceroute) ProtoMessage()               {}
-func (*Traceroute) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{3} }
+func (*Traceroute) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{3} }
 
 func (m *Traceroute) GetStart() *TracerouteTime {
 	if m != nil {
@@ -146,7 +146,7 @@ type TracerouteTime struct {
 func (m *TracerouteTime) Reset()                    { *m = TracerouteTime{} }
 func (m *TracerouteTime) String() string            { return proto.CompactTextString(m) }
 func (*TracerouteTime) ProtoMessage()               {}
-func (*TracerouteTime) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{4} }
+func (*TracerouteTime) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{4} }
 
 func init() {
 	proto.RegisterType((*TracerouteMeasurement)(nil), "datamodel.TracerouteMeasurement")
@@ -156,7 +156,7 @@ func init() {
 	proto.RegisterType((*TracerouteTime)(nil), "datamodel.TracerouteTime")
 }
 
-var fileDescriptor5 = []byte{
+var fileDescriptor4 = []byte{
 	// 733 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x54, 0xc1, 0x72, 0xd3, 0x30,
 	0x10, 0x9d, 0xd6, 0x69, 0x9a, 0x28, 0x71, 0xda, 0xba, 0xa4, 0xa8, 0x2d, 0x87, 0x4e, 0x0e, 0x4c,
