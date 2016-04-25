@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 )
 
 const (
@@ -159,7 +160,7 @@ func (rv *RevSegment) RemoveLocalHops() error {
 	var ns []string
 	for _, h := range rv.Segment {
 		ip := net.ParseIP(h)
-		if !isInPrivatePrefix(ip) {
+		if !iputil.IsPrivate(ip) {
 			ns = append(ns, h)
 		}
 	}

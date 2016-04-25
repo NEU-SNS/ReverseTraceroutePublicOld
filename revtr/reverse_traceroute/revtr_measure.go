@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/prometheus/log"
 	"golang.org/x/net/context"
@@ -286,7 +287,7 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 func (rt *ReverseTraceroute) issueTraceroute() error {
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.LastHop())
-	if isInPrivatePrefix(net.ParseIP(rt.LastHop())) {
+	if iputil.IsPrivate(net.ParseIP(rt.LastHop())) {
 		return ErrPrivateIP
 	}
 	tr := datamodel.TracerouteMeasurement{
@@ -782,7 +783,7 @@ func (rt *ReverseTraceroute) issueTimestamps(issue map[string][][]string, fn fun
 			}
 			tss := tsString.String()
 			rt.debug("tss string: ", tss)
-			if isInPrivatePrefix(net.ParseIP(probe[0])) {
+			if iputil.IsPrivate(net.ParseIP(probe[0])) {
 				continue
 			}
 			p := &datamodel.PingMeasurement{
@@ -840,7 +841,7 @@ func (rt *ReverseTraceroute) issueSpoofedTimestamps(issue map[string]map[string]
 						tsString.WriteString(",")
 					}
 				}
-				if isInPrivatePrefix(net.ParseIP(probe[0])) {
+				if iputil.IsPrivate(net.ParseIP(probe[0])) {
 					continue
 				}
 				p := &datamodel.PingMeasurement{
