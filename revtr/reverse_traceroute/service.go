@@ -1,4 +1,4 @@
-package revtr
+package reversetraceroute
 
 import (
 	"fmt"
@@ -7,10 +7,7 @@ import (
 	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-)
-
-var (
-	pn1, pn2, pn3 *net.IPNet
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 )
 
 const (
@@ -24,33 +21,6 @@ const (
 	spoofTSAdjRevSegmentTSZero            = 8
 	spoofTSAdjRevSegmentTSZeroDoubleStamp = 9
 )
-
-func init() {
-	var err error
-
-	_, pn1, err = net.ParseCIDR("192.168.0.0/16")
-	if err != nil {
-		panic(err)
-	}
-	_, pn2, err = net.ParseCIDR("10.0.0.0/8")
-	if err != nil {
-		panic(err)
-	}
-	_, pn3, err = net.ParseCIDR("172.16.0.0/12")
-	if err != nil {
-		panic(err)
-	}
-}
-
-func isInPrivatePrefix(ip net.IP) bool {
-	if pn1.Contains(ip) {
-		return true
-	}
-	if pn2.Contains(ip) {
-		return true
-	}
-	return pn3.Contains(ip)
-}
 
 type stringSet []string
 
@@ -190,7 +160,7 @@ func (rv *RevSegment) RemoveLocalHops() error {
 	var ns []string
 	for _, h := range rv.Segment {
 		ip := net.ParseIP(h)
-		if !isInPrivatePrefix(ip) {
+		if !iputil.IsPrivate(ip) {
 			ns = append(ns, h)
 		}
 	}

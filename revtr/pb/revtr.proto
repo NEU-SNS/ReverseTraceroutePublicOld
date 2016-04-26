@@ -1,9 +1,29 @@
 syntax = "proto3";
 
-option go_package = "datamodel";
+package pb;
 
-package datamodel;
+option go_package = "pb";
 
+import "google/api/annotations.proto";
+
+service Revtr {
+  rpc RunRevtr(RunRevtrReq) returns (RunRevtrResp) {
+    option(google.api.http) = {
+      post: "/api/v2/revtr"
+      body: "*"
+    };
+  }
+  rpc GetRevtr(GetRevtrReq) returns (GetRevtrResp) {
+    option(google.api.http) = {
+      get: "/api/v2/revtr/{batch_id}",
+    };
+  }
+  rpc GetSources(GetSourcesReq) returns (GetSourcesResp) {
+    option(google.api.http) = {
+      get: "/api/v2/sources",
+    };
+  }
+}
 
 message RevtrMeasurement {
     string src             = 1;
@@ -13,8 +33,35 @@ message RevtrMeasurement {
       bool backoff_endhost = 5;
 }
 
-message RevtrRequest {
-    repeated RevtrMeasurement revtrs  = 1;
+message RunRevtrReq {
+  repeated RevtrMeasurement revtrs  = 1;
+  string auth = 2;
+}
+
+message RunRevtrResp {
+  uint32 batch_id   =  1;
+}
+
+message GetRevtrReq {
+  uint32 batch_id =  1;
+  string auth = 2;
+}
+
+message GetRevtrResp {
+  repeated ReverseTraceroute revtrs = 1; 
+}
+
+message GetSourcesReq {
+  string auth = 1;
+}
+
+message GetSourcesResp {
+  repeated Source srcs =  1;
+}
+
+message Source {
+  string hostname =  1;
+  string ip       =  2;
 }
 
 message ReverseTraceroute {
@@ -54,7 +101,11 @@ enum RevtrStatus {
     COMPLETED   = 2;
 }
 
-message RevtrResponse {
-    repeated ReverseTraceroute revtrs = 1;    
+message RevtrUser {
+  uint32 id    =  1;
+  string name  =  2;
+  string email =  3;
+  uint32 max   =  4;
+  uint32 delay =  5;
+  string key   =  6; 
 }
-
