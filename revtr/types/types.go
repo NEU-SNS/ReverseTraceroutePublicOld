@@ -1,12 +1,10 @@
 package types
 
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-
 // AdjacencySource is the interface for something that provides adjacnecies
 type AdjacencySource interface {
-	GetAdjacenciesByIP1(uint32) ([]datamodel.Adjacency, error)
-	GetAdjacenciesByIP2(uint32) ([]datamodel.Adjacency, error)
-	GetAdjacencyToDestByAddrAndDest24(uint32, uint32) ([]datamodel.AdjacencyToDest, error)
+	GetAdjacenciesByIP1(uint32) ([]Adjacency, error)
+	GetAdjacenciesByIP2(uint32) ([]Adjacency, error)
+	GetAdjacencyToDestByAddrAndDest24(uint32, uint32) ([]AdjacencyToDest, error)
 }
 
 // ClusterSource is the interface for something that provides cluster data
@@ -29,4 +27,18 @@ func NewConfig() Config {
 		CertFile: new(string),
 		KeyFile:  new(string),
 	}
+}
+
+// Adjacency represents the adjacency of 2 ips
+type Adjacency struct {
+	IP1, IP2 uint32
+	Cnt      int
+}
+
+// AdjacencyToDest is ...
+type AdjacencyToDest struct {
+	Dest24   uint32
+	Address  uint32
+	Adjacent uint32
+	Cnt      int
 }

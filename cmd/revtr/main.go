@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	_ "net/http/pprof"
+
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
@@ -22,9 +24,9 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/reverse_traceroute"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
@@ -45,7 +47,7 @@ var (
 // AppConfig for the app
 type AppConfig struct {
 	ServerConfig types.Config
-	DB           dataaccess.DbConfig
+	DB           repo.Configs
 }
 
 func init() {
@@ -83,7 +85,14 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
-	da, err := dataaccess.New(conf.DB)
+	var repoOpts []repo.Option
+	for _, c := range conf.DB.WriteConfigs {
+		repoOpts = append(repoOpts, repo.WithWriteConfig(c))
+	}
+	for _, c := range conf.DB.ReadConfigs {
+		repoOpts = append(repoOpts, repo.WithReadConfig(c))
+	}
+	da, err := repo.NewRepo(repoOpts...)
 	if err != nil {
 		panic(err)
 	}
@@ -108,16 +117,18 @@ func main() {
 	serv := server.NewRevtrServer(server.WithVPSource(vps),
 		server.WithAdjacencySource(da),
 		server.WithClusterSource(da),
+		server.WithRTStore(da),
 		server.WithRootCA(*conf.ServerConfig.RootCA),
 		server.WithCertFile(*conf.ServerConfig.CertFile),
 		server.WithKeyFile(*conf.ServerConfig.KeyFile))
 	mux := http.NewServeMux()
-	mux.Handle("/", NewHome(vps))
+	RegisterHome(vps, mux)
+	RegisterRunRevtr(serv, mux)
 	mux.Handle("/styles/", http.StripPrefix("/styles", http.FileServer(http.Dir("webroot/style"))))
 	v1api.NewV1Api(serv, mux)
 	v2serv := v2api.CreateServer(serv, tlsConf)
 	gatewayMux := runtime.NewServeMux()
-	selfCreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, "revtr.ccs.neu.edu")
+	selfCreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, "revtr.revtr.ccs.neu.edu")
 	if err != nil {
 		panic(err)
 	}
@@ -136,11 +147,10 @@ func main() {
 		Handler:   directRequest(v2serv, mux),
 	}
 
-	metricsServ := http.NewServeMux()
-	metricsServ.Handle("/metrics", prometheus.Handler())
+	http.Handle("/metrics", prometheus.Handler())
 	go func() {
 		for {
-			log.Error(http.ListenAndServe(":45454", metricsServ))
+			log.Error(http.ListenAndServe(":45454", nil))
 		}
 	}()
 	go func() {
@@ -196,11 +206,12 @@ type Home struct {
 	vps vpservice.VPSource
 }
 
-// NewHome creates a new home
-func NewHome(vps vpservice.VPSource) Home {
-	return Home{
+// RegisterHome wires up a new home handler
+func RegisterHome(vps vpservice.VPSource, mux *http.ServeMux) {
+	h := Home{
 		vps: vps,
 	}
+	mux.HandleFunc("/", h.Home)
 }
 
 // Home handles the "/" route
@@ -245,14 +256,6 @@ func (h Home) Home(rw http.ResponseWriter, req *http.Request) {
 type runningModel struct {
 	Key string
 	URL string
-}
-
-// RunRevtr handles /runrevtr
-type RunRevtr struct {
-	s *server.RevtrServer
-	// protects map of id -> Status chan
-	mu  *sync.Mutex
-	rts map[uint32]*outputChan
 }
 
 type msgFunc func(msg reversetraceroute.Status) error
@@ -316,13 +319,23 @@ func (oc *outputChan) removeLocked(mf *msgFunc) {
 	delete(oc.funcs, mf)
 }
 
-// NewRunRevtr creates a new RunRevtr
-func NewRunRevtr(s *server.RevtrServer) RunRevtr {
-	return RunRevtr{
+// RunRevtr handles /runrevtr
+type RunRevtr struct {
+	s server.RevtrServer
+	// protects map of id -> Status chan
+	mu  *sync.Mutex
+	rts map[uint32]*outputChan
+}
+
+// RegisterRunRevtr wires up a new runrevtr
+func RegisterRunRevtr(s server.RevtrServer, mux *http.ServeMux) {
+	rr := RunRevtr{
 		s:   s,
 		mu:  &sync.Mutex{},
 		rts: make(map[uint32]*outputChan),
 	}
+	mux.HandleFunc("/ws", rr.WS)
+	mux.HandleFunc("/runrevtr", rr.RunRevtr)
 }
 
 type wsConnection struct {
@@ -416,6 +429,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		return nil
 	})
 	oc.register(mf)
+	go oc.monitor()
 }
 
 // RunRevtr handles /runrevtr

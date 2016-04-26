@@ -35,7 +35,7 @@ import (
 
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/respository"
+	"github.com/NEU-SNS/ReverseTraceroute/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/go-sql-driver/mysql"
 )
@@ -1085,10 +1085,6 @@ func (db *DB) StoreAtlasTraceroute(trace *dm.Traceroute) error {
 const (
 	insertAdjQuery = `INSERT INTO adjacencies(ip1, ip2) VALUES (?, ?)
 	ON DUPLICATE KEY UPDATE cnt = cnt+1`
-	selectByIP1AdjQuery = `SELECT ip1, ip2, cnt from adjacencies WHERE ip1 = ?
-							ORDER BY cnt DESC LIMIT 500`
-	selectByIP2AdjQuery = `SELECT ip1, ip2, cnt from adjacencies WHERE ip2 = ?
-							ORDER BY cnt DESC LIMIT 500`
 )
 
 // StoreAdjacency stores an adjacency
@@ -1109,62 +1105,11 @@ func (db *DB) StoreAdjacency(l, r net.IP) error {
 	return nil
 }
 
-// GetAdjacenciesByIP1 gets ajds by ip1
-func (db *DB) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
-	con := db.GetReader()
-	res, err := con.Query(selectByIP1AdjQuery, ip)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Close()
-	var adjs []dm.Adjacency
-	for res.Next() {
-		var adj dm.Adjacency
-		err := res.Scan(&adj.IP1, &adj.IP2, &adj.Cnt)
-		if err != nil {
-			return nil, err
-		}
-		adjs = append(adjs, adj)
-	}
-	if err = res.Err(); err != nil {
-		return nil, err
-	}
-	return adjs, nil
-}
-
-// GetAdjacenciesByIP2 gets ajds by ip2
-func (db *DB) GetAdjacenciesByIP2(ip uint32) ([]dm.Adjacency, error) {
-	con := db.GetReader()
-	res, err := con.Query(selectByIP2AdjQuery, ip)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Close()
-	var adjs []dm.Adjacency
-	for res.Next() {
-		var adj dm.Adjacency
-		err := res.Scan(&adj.IP1, &adj.IP2, &adj.Cnt)
-		if err != nil {
-			return nil, err
-		}
-		adjs = append(adjs, adj)
-	}
-	if err = res.Err(); err != nil {
-		return nil, err
-	}
-	return adjs, nil
-}
-
 const (
 	insertAdjDstQuery = `
 	INSERT INTO adjacencies_to_dest(dest24, address, adjacent) VALUES(?, ?, ?)
 	ON DUPLICATE KEY UPDATE cnt = cnt + 1
 	`
-	selectByAddressAndDest24AdjDstQuery = `
-	SELECT dest24, address, adjacent, cnt
-	FROM adjacencies_to_dest 
-	WHERE address = ? AND dest24 = ?
-	ORDER BY cnt DESC LIMIT 500`
 )
 
 // StoreAdjacencyToDest stores an adjacencies to dest
@@ -1181,31 +1126,9 @@ func (db *DB) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
 	return nil
 }
 
-// GetAdjacencyToDestByAddrAndDest24 does what it says
-func (db *DB) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.AdjacencyToDest, error) {
-	con := db.GetReader()
-	res, err := con.Query(selectByAddressAndDest24AdjDstQuery, addr, dest24)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Close()
-	var adjs []dm.AdjacencyToDest
-	for res.Next() {
-		var adj dm.AdjacencyToDest
-		err = res.Scan(&adj.Dest24, &adj.Address, &adj.Adjacent, &adj.Cnt)
-		if err != nil {
-			return nil, err
-		}
-		adjs = append(adjs, adj)
-	}
-	return adjs, nil
-}
-
 const (
-	removeAliasCluster    = `DELETE FROM ip_aliases WHERE cluster_id = ?`
-	storeAlias            = `INSERT INTO ip_aliases(cluster_id, ip_address) VALUES(?, ?)`
-	aliasGetByIP          = `SELECT cluster_id FROM ip_aliases WHERE ip_address = ? LIMIT 1`
-	aliasGetIPsForCluster = `SELECT ip_address FROM ip_aliases WHERE cluster_id = ? LIMIT 2000`
+	removeAliasCluster = `DELETE FROM ip_aliases WHERE cluster_id = ?`
+	storeAlias         = `INSERT INTO ip_aliases(cluster_id, ip_address) VALUES(?, ?)`
 )
 
 // StoreAlias stores an IP alias
@@ -1229,47 +1152,4 @@ func (db *DB) StoreAlias(id int, ips []net.IP) error {
 		}
 	}
 	return tx.Commit()
-}
-
-var (
-	// ErrNoAlias is returned when no alias is found for an ip
-	ErrNoAlias = fmt.Errorf("No alias found")
-)
-
-// GetClusterIDByIP gets a the cluster ID for a give ip
-func (db *DB) GetClusterIDByIP(ip uint32) (int, error) {
-	con := db.GetReader()
-	var ret int
-	err := con.QueryRow(aliasGetByIP, ip).Scan(&ret)
-	switch {
-	case err == sql.ErrNoRows:
-		return ret, ErrNoAlias
-	case err != nil:
-		return ret, err
-	default:
-		return ret, nil
-	}
-}
-
-// GetIPsForClusterID gets all IPs associated with the given cluster id
-func (db *DB) GetIPsForClusterID(id int) ([]uint32, error) {
-	con := db.GetReader()
-	var scan uint32
-	var ret []uint32
-	res, err := con.Query(aliasGetByIP, id)
-	defer res.Close()
-	if err != nil {
-		return nil, err
-	}
-	for res.Next() {
-		err := res.Scan(&scan)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, scan)
-	}
-	if err = res.Err(); err != nil {
-		return nil, err
-	}
-	return ret, nil
 }

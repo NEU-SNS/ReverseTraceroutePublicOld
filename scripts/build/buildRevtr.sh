@@ -10,9 +10,9 @@ cp ./certs/* ./docker
 cp -r ./webroot ./docker
 cd docker
 
-docker build --rm=true -t revtr/revtr .
-docker save -o revtr.tar revtr/revtr
-docker rmi revtr/revtr
+docker build --rm=true -t revtr/new .
+docker save -o newrtr.tar revtr/new
+docker rmi revtr/new
 
 rm revtr
 rm root.crt

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
 	"github.com/gogo/protobuf/jsonpb"
 )
@@ -42,7 +42,7 @@ func (v1 V1Api) sources(r http.ResponseWriter, req *http.Request) {
 		Auth: key,
 	}
 	resp, err := v1.s.GetSources(pbr)
-	if err != dataaccess.ErrNoRevtrUserFound {
+	if err != repo.ErrNoRevtrUserFound {
 		http.Error(r, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
@@ -89,7 +89,7 @@ func (v1 V1Api) retreiveRevtr(r http.ResponseWriter, req *http.Request) {
 		Auth:    key,
 	}
 	revtrs, err := v1.s.GetRevtr(grr)
-	if err != dataaccess.ErrNoRevtrUserFound {
+	if err != repo.ErrNoRevtrUserFound {
 		http.Error(r, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}

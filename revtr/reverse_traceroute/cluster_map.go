@@ -5,13 +5,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
 type clusterMap struct {
 	ipc map[string]cmItem
 	mu  *sync.Mutex
-	cs  ClusterSource
+	cs  types.ClusterSource
 }
 
 type cmItem struct {
@@ -49,7 +50,7 @@ func (cm clusterMap) Get(s string) string {
 	return cm.fetchCluster(s)
 }
 
-func newClusterMap(cs ClusterSource) clusterMap {
+func newClusterMap(cs types.ClusterSource) clusterMap {
 	i := make(map[string]cmItem)
 	return clusterMap{
 		ipc: i,
