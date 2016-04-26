@@ -1,4 +1,4 @@
-package revtr
+package reversetraceroute
 
 import "fmt"
 

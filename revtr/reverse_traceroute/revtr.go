@@ -1,8 +1,7 @@
-package revtr
+package reversetraceroute
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -19,9 +18,11 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
-	"github.com/gorilla/websocket"
 )
 
 var plHost2IP map[string]string
@@ -38,31 +39,6 @@ const (
 	RateLimit int = 5
 )
 
-type wsConnection struct {
-	c *websocket.Conn
-}
-
-func (ws wsConnection) Close() error {
-	if ws.c == nil {
-		return nil
-	}
-	return ws.c.Close()
-}
-
-func (ws wsConnection) Write(in []byte) error {
-	if ws.c == nil {
-		return nil
-	}
-	err := ws.c.SetWriteDeadline(time.Now().Add(time.Second * 10))
-	if err != nil {
-		return err
-	}
-	return ws.c.WriteMessage(websocket.TextMessage, in)
-
-}
-
-type wsConns []wsConnection
-
 type multiError []error
 
 func (m multiError) Error() string {
@@ -71,38 +47,6 @@ func (m multiError) Error() string {
 		buf.WriteString(e.Error() + "\n")
 	}
 	return buf.String()
-}
-
-func (wc wsConns) Close() error {
-	var err multiError
-	for _, w := range wc {
-		e2 := w.Close()
-		if e2 != nil {
-			err = append(err, e2)
-		}
-	}
-	if len(err) == 0 {
-		return nil
-	}
-	return err
-}
-
-func (wc wsConns) Write(in []byte) error {
-	var err multiError
-	for _, w := range wc {
-		e2 := w.c.SetWriteDeadline(time.Now().Add(time.Second * 10))
-		if e2 != nil {
-			err = append(err, e2)
-		}
-		e2 = w.c.WriteMessage(websocket.TextMessage, []byte(in))
-		if e2 != nil {
-			err = append(err, e2)
-		}
-	}
-	if len(err) == 0 {
-		return nil
-	}
-	return err
 }
 
 // ReverseTraceroute is a reverse traceroute
@@ -130,8 +74,7 @@ type ReverseTraceroute struct {
 	StartTime, EndTime       time.Time
 	Staleness                int64
 	ProbeCount               map[string]int
-	as                       AdjacencySource
-	ws                       wsConns
+	as                       types.AdjacencySource
 	backoffEndhost           bool
 	cl                       client.Client
 	at                       at.Atlas
@@ -153,10 +96,11 @@ type ReverseTraceroute struct {
 	errorDetails           bytes.Buffer
 	lastResponsive         string
 	vps                    vpservice.VPSource
+	opc                    chan Status
 }
 
 // NewReverseTraceroute creates a new reverse traceroute
-func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource) *ReverseTraceroute {
+func NewReverseTraceroute(src, dst string, id, stale uint32, as types.AdjacencySource) *ReverseTraceroute {
 	if id == 0 {
 		id = rand.Uint32()
 	}
@@ -183,8 +127,14 @@ func NewReverseTraceroute(src, dst string, id, stale uint32, as AdjacencySource)
 		rrsSrcToDstToVPToRevHops: make(map[string]map[string]map[string][]string),
 		trsSrcToDstToPath:        make(map[string]map[string][]string),
 		tsSrcToProbeToVPToResult: make(map[string]map[string]map[string][]string),
+		opc: make(chan Status, 5),
 	}
 	return &ret
+}
+
+// GetOutputChan retreives the output channel of the ReverseTraceroute
+func (rt *ReverseTraceroute) GetOutputChan() <-chan Status {
+	return rt.opc
 }
 
 func (rt *ReverseTraceroute) debug(args ...interface{}) {
@@ -228,31 +178,29 @@ func (rt *ReverseTraceroute) errorf(s string, args ...interface{}) {
 	log.Errorf(news, args...)
 }
 
-type wsMessage struct {
-	HTML   string
+// Status represents the current running state of a reverse traceroute
+// it is use for the web interface. Something better is probably needed
+type Status struct {
+	Rep    string
 	Status bool
 	Error  string
 }
 
-func (rt *ReverseTraceroute) output() error {
-
+func (rt *ReverseTraceroute) output() {
 	st := fmt.Sprintf("%s\n%s", rt.HTML(), rt.StopReason)
 	var showError = !rt.Reaches()
 	var errorText string
 	if showError {
 		errorText = strings.Replace(rt.errorDetails.String(), "\n", "<br>", -1)
 	}
-	res, err := json.Marshal(&wsMessage{
-		HTML: strings.Replace(st, "\n", "<br>", -1),
-		// Either we're done because we reached or we're done for some other reason
-		// so signal the brower that we're gunna disconnect
-		Status: rt.Reaches() || rt.StopReason != "",
-		Error:  errorText,
-	})
-	if err != nil {
-		return err
+	var stat Status
+	stat.Rep = strings.Replace(st, "\n", "<br>", -1)
+	stat.Status = rt.Reaches() || rt.StopReason != ""
+	stat.Error = errorText
+	select {
+	case rt.opc <- stat:
+	default:
 	}
-	return rt.ws.Write(res)
 }
 
 func (rt *ReverseTraceroute) len() int {
@@ -304,6 +252,9 @@ func (rt *ReverseTraceroute) LastHop() string {
 // Reaches checks if the last path reaches
 func (rt *ReverseTraceroute) Reaches() bool {
 	// Assume that any path reaches if and only if the last one reaches
+	if len(*rt.Paths) == 0 {
+		return false
+	}
 	return (*rt.Paths)[rt.len()-1].Reaches()
 }
 
@@ -391,8 +342,8 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
 }
 
 // ToStorable returns a storble form of a ReverseTraceroute
-func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
-	var ret datamodel.ReverseTraceroute
+func (rt *ReverseTraceroute) ToStorable() pb.ReverseTraceroute {
+	var ret pb.ReverseTraceroute
 	ret.Id = rt.ID
 	ret.Src = rt.Src
 	ret.Dst = rt.Dst
@@ -401,9 +352,9 @@ func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
 	ret.TsIssued = int32(rt.ProbeCount["ts"] + rt.ProbeCount["spoof-ts"])
 	ret.StopReason = rt.StopReason
 	if rt.StopReason != "" {
-		ret.Status = datamodel.RevtrStatus_COMPLETED
+		ret.Status = pb.RevtrStatus_COMPLETED
 	} else {
-		ret.Status = datamodel.RevtrStatus_RUNNING
+		ret.Status = pb.RevtrStatus_RUNNING
 	}
 	hopsSeen := make(map[string]bool)
 	if !rt.Failed(rt.backoffEndhost) {
@@ -414,9 +365,9 @@ func (rt *ReverseTraceroute) ToStorable() datamodel.ReverseTraceroute {
 					continue
 				}
 				hopsSeen[hi] = true
-				var h datamodel.RevtrHop
+				var h pb.RevtrHop
 				h.Hop = hi
-				h.Type = datamodel.RevtrHopType(ty)
+				h.Type = pb.RevtrHopType(ty)
 				ret.Path = append(ret.Path, &h)
 			}
 		}
@@ -440,46 +391,49 @@ func (rt *ReverseTraceroute) HTML() string {
 	out.WriteString(`<tbody>`)
 	first := true
 	var i int
-	for _, segment := range *rt.CurrPath().Path {
-		symbol := new(string)
-		switch segment.(type) {
-		case *DstSymRevSegment:
-			*symbol = "sym"
-		case *DstRevSegment:
-			*symbol = "dst"
-		case *TRtoSrcRevSegment:
-			*symbol = "tr"
-		case *SpoofRRRevSegment:
-			*symbol = "rr"
-		case *RRRevSegment:
-			*symbol = "rr"
-		case *SpoofTSAdjRevSegmentTSZeroDoubleStamp:
-			*symbol = "ts"
-		case *SpoofTSAdjRevSegmentTSZero:
-			*symbol = "ts"
-		case *SpoofTSAdjRevSegment:
-			*symbol = "ts"
-		case *TSAdjRevSegment:
-			*symbol = "ts"
-		}
-		for _, hop := range segment.Hops() {
-			if hopsSeen[hop] {
-				continue
+	if len(*rt.Paths) > 0 {
+
+		for _, segment := range *rt.CurrPath().Path {
+			symbol := new(string)
+			switch segment.(type) {
+			case *DstSymRevSegment:
+				*symbol = "sym"
+			case *DstRevSegment:
+				*symbol = "dst"
+			case *TRtoSrcRevSegment:
+				*symbol = "tr"
+			case *SpoofRRRevSegment:
+				*symbol = "rr"
+			case *RRRevSegment:
+				*symbol = "rr"
+			case *SpoofTSAdjRevSegmentTSZeroDoubleStamp:
+				*symbol = "ts"
+			case *SpoofTSAdjRevSegmentTSZero:
+				*symbol = "ts"
+			case *SpoofTSAdjRevSegment:
+				*symbol = "ts"
+			case *TSAdjRevSegment:
+				*symbol = "ts"
 			}
-			hopsSeen[hop] = true
-			tech := new(string)
-			if first {
-				*tech = *symbol
-				first = false
-			} else {
-				*tech = "-" + *symbol
+			for _, hop := range segment.Hops() {
+				if hopsSeen[hop] {
+					continue
+				}
+				hopsSeen[hop] = true
+				tech := new(string)
+				if first {
+					*tech = *symbol
+					first = false
+				} else {
+					*tech = "-" + *symbol
+				}
+				if hop == "0.0.0.0" || hop == "*" {
+					out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s</td><td></td><td>%s</td></tr>", i, "* * *", *tech))
+				} else {
+					out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s (%s)</td><td>%.3fms</td><td>%s</td></tr>", i, hop, rt.resolveHostname(hop), rt.getRTT(hop), *tech))
+				}
+				i++
 			}
-			if hop == "0.0.0.0" || hop == "*" {
-				out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s</td><td></td><td>%s</td></tr>", i, "* * *", *tech))
-			} else {
-				out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s (%s)</td><td>%.3fms</td><td>%s</td></tr>", i, hop, rt.resolveHostname(hop), rt.getRTT(hop), *tech))
-			}
-			i++
 		}
 	}
 	out.WriteString("</tbody></table>")
@@ -568,19 +522,19 @@ func defaultAdjSettings() *adjSettings {
 	return &ret
 }
 
-type byCount []datamodel.AdjacencyToDest
+type byCount []types.AdjacencyToDest
 
 func (b byCount) Len() int           { return len(b) }
 func (b byCount) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b byCount) Less(i, j int) bool { return b[i].Cnt < b[j].Cnt }
 
-type aByCount []datamodel.Adjacency
+type aByCount []types.Adjacency
 
 func (b aByCount) Len() int           { return len(b) }
 func (b aByCount) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b aByCount) Less(i, j int) bool { return b[i].Cnt < b[j].Cnt }
 
-func getAdjacenciesForIPToSrc(ip string, src string, as AdjacencySource, settings *adjSettings) ([]string, error) {
+func getAdjacenciesForIPToSrc(ip string, src string, as types.AdjacencySource, settings *adjSettings) ([]string, error) {
 	if settings == nil {
 		settings = defaultAdjSettings()
 	}
@@ -973,7 +927,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 }
 
 // CreateReverseTraceroute creates a reverse traceroute for the web interface
-func CreateReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost, print bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) *ReverseTraceroute {
+func CreateReverseTraceroute(revtr pb.RevtrMeasurement, backoffEndhost, print bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) *ReverseTraceroute {
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
@@ -986,16 +940,23 @@ func CreateReverseTraceroute(revtr datamodel.RevtrMeasurement, backoffEndhost, p
 	return rt
 }
 
-func (rt *ReverseTraceroute) isRunning() bool {
+// IsRunning returns true if the ReverseTraceroute is running
+func (rt *ReverseTraceroute) IsRunning() bool {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	return rt.running
 }
 
-func (rt *ReverseTraceroute) run() error {
+// Run runs the ReverseTraceroute
+func (rt *ReverseTraceroute) Run() error {
 	rt.mu.Lock()
 	rt.running = true
 	rt.mu.Unlock()
+	defer func() {
+		rt.output()
+		close(rt.opc)
+	}()
+	rt.output()
 	if rt.backoffEndhost || dstMustBeReachable {
 		err := rt.reverseHopsAssumeSymmetric()
 		if err != nil {
@@ -1111,19 +1072,13 @@ func (rt *ReverseTraceroute) run() error {
 
 var dstMustBeReachable = false
 
-// ReverseTracerouteReq is a revtr req
-type ReverseTracerouteReq struct {
-	Src, Dst  uint32
-	Staleness uint32
-}
-
 type stringInt int
 
 func (si stringInt) String() string {
 	return fmt.Sprintf("%d", int(si))
 }
 
-func initialize(cl vpservice.VPSource, cs ClusterSource) {
+func initialize(cl vpservice.VPSource, cs types.ClusterSource) {
 	clusterToIps = make(map[string][]string)
 	vpr, err := cl.GetVPs()
 	if err != nil {
@@ -1133,23 +1088,10 @@ func initialize(cl vpservice.VPSource, cs ClusterSource) {
 	ipToCluster = newClusterMap(cs)
 }
 
-// AdjacencySource is the interface for something that provides adjacnecies
-type AdjacencySource interface {
-	GetAdjacenciesByIP1(uint32) ([]datamodel.Adjacency, error)
-	GetAdjacenciesByIP2(uint32) ([]datamodel.Adjacency, error)
-	GetAdjacencyToDestByAddrAndDest24(uint32, uint32) ([]datamodel.AdjacencyToDest, error)
-}
-
-// ClusterSource is the interface for something that provides cluster data
-type ClusterSource interface {
-	GetClusterIDByIP(uint32) (int, error)
-	GetIPsForClusterID(int) ([]uint32, error)
-}
-
 var once sync.Once
 
 // RunReverseTraceroute runs a reverse traceroute
-func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as AdjacencySource, cs ClusterSource) (*ReverseTraceroute, error) {
+func RunReverseTraceroute(revtr pb.RevtrMeasurement, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) (*ReverseTraceroute, error) {
 	once.Do(func() {
 		initialize(vpserv, cs)
 	})
@@ -1157,7 +1099,7 @@ func RunReverseTraceroute(revtr datamodel.RevtrMeasurement, cl client.Client, at
 	rt.backoffEndhost = revtr.BackoffEndhost
 	rt.cl = cl
 	rt.at = at
-	return rt, rt.run()
+	return rt, rt.Run()
 }
 
 func stringInSlice(ss []string, s string) bool {
@@ -1218,7 +1160,8 @@ func (rt *ReverseTraceroute) reverseHopsRR() error {
 		vps = nvps
 		srcs, _ := util.IPStringToInt32(rt.Src)
 		dsts, _ := util.IPStringToInt32(target)
-		if !isInPrivatePrefix(net.ParseIP(target)) {
+
+		if !iputil.IsPrivate(net.ParseIP(target)) {
 			pings = append(pings, &datamodel.PingMeasurement{
 				Src:        srcs,
 				Dst:        dsts,
@@ -1276,7 +1219,7 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 	for rec, spoofToTarg := range recvToSpooferToTarget {
 		for spoofer, targets := range spoofToTarg {
 			for _, target := range targets {
-				if isInPrivatePrefix(net.ParseIP(target)) {
+				if iputil.IsPrivate(net.ParseIP(target)) {
 					continue
 				}
 				sspoofer, _ := util.IPStringToInt32(spoofer)

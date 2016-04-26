@@ -38,6 +38,10 @@ const _ = proto.ProtoPackageIsVersion1
 var _ context.Context
 var _ grpc.ClientConn
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion2
+
 // Client API for PLController service
 
 type PLControllerClient interface {
@@ -299,16 +303,22 @@ func (x *pLControllerGetVPsServer) Send(m *datamodel3.VPReturn) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+func _PLController_AcceptProbes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(datamodel4.SpoofedProbes)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(PLControllerServer).AcceptProbes(ctx, in)
-	if err != nil {
-		return nil, err
+	if interceptor == nil {
+		return srv.(PLControllerServer).AcceptProbes(ctx, in)
 	}
-	return out, nil
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.PLController/AcceptProbes",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PLControllerServer).AcceptProbes(ctx, req.(*datamodel4.SpoofedProbes))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 var _PLController_serviceDesc = grpc.ServiceDesc{
