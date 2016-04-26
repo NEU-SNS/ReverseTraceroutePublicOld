@@ -15,11 +15,11 @@ import (
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/reverse_traceroute"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
@@ -127,32 +127,32 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 	return dst, true
 }
 
-func verifyAddrs(src, dst string, vps []*datamodel.VantagePoint) error {
+func verifyAddrs(src, dst string, vps []*datamodel.VantagePoint) (string, string, error) {
 	nsrc, valid := validSrc(src, vps)
 	if !valid {
 		log.Errorf("Invalid source: %s", src)
-		return SrcError{src: src}
+		return "", "", SrcError{src: src}
 	}
 	ndst, valid := validDest(dst, vps)
 	if !valid {
 		log.Errorf("Invalid destination: %s", dst)
-		return DstError{dst: dst}
+		return "", "", DstError{dst: dst}
 	}
 	// ensure they're valid ips
 	if net.ParseIP(nsrc) == nil {
 		log.Errorf("Invalid source: %s", nsrc)
-		return SrcError{src: nsrc}
+		return "", "", SrcError{src: nsrc}
 	}
 	if net.ParseIP(ndst) == nil {
 		log.Errorf("Invalid destination: %s", ndst)
-		return DstError{dst: ndst}
+		return "", "", DstError{dst: ndst}
 	}
-	return nil
+	return nsrc, ndst, nil
 }
 
 // RTStore is the interface for storing/loading/allowing revtrs to be run
 type RTStore interface {
-	GetUserByKey(string) (datamodel.RevtrUser, error)
+	GetUserByKey(string) (pb.RevtrUser, error)
 	StoreRevtr(pb.ReverseTraceroute) error
 	GetRevtrsInBatch(uint32, uint32) ([]*pb.ReverseTraceroute, error)
 	CreateRevtrBatch([]*pb.RevtrMeasurement, string) ([]*pb.RevtrMeasurement, uint32, error)
@@ -240,6 +240,10 @@ func NewRevtrServer(opts ...Option) RevtrServer {
 		log.Fatalf("Could not connect to services: %v", err)
 	}
 	serv.s = s
+	serv.vps = serv.opts.vps
+	serv.cs = serv.opts.cs
+	serv.rts = serv.opts.rts
+	serv.as = serv.opts.as
 	serv.mu = &sync.Mutex{}
 	serv.revtrs = make(map[uint32]*reversetraceroute.ReverseTraceroute)
 	return serv
@@ -275,10 +279,12 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 	}
 	var reqToRun []*pb.RevtrMeasurement
 	for _, r := range req.GetRevtrs() {
-		err := verifyAddrs(r.Src, r.Dst, vps.GetVps())
+		src, dst, err := verifyAddrs(r.Src, r.Dst, vps.GetVps())
 		if err != nil {
 			return nil, err
 		}
+		r.Src = src
+		r.Dst = dst
 		reqToRun = append(reqToRun, r)
 	}
 	if len(reqToRun) == 0 {
@@ -290,7 +296,7 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 		return nil, ErrConnectFailed
 	}
 	reqToRun, batchID, err := rs.rts.CreateRevtrBatch(reqToRun, user.Key)
-	if err == dataaccess.ErrCannotAddRevtrBatch {
+	if err == repo.ErrCannotAddRevtrBatch {
 		log.Error(err)
 		return nil, ErrFailedToCreateBatch
 	}
@@ -307,7 +313,7 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 				if r.Staleness == 0 {
 					r.Staleness = 60
 				}
-				res, err := reversetraceroute.RunReverseTraceroute(r, servs.cl, servs.at, servs.vpserv, rs.as, rs.cs)
+				res, err := reversetraceroute.RunReverseTraceroute(*r, servs.cl, servs.at, servs.vpserv, rs.as, rs.cs)
 				if err != nil {
 					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
 				}
@@ -332,7 +338,7 @@ func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
 	if req.BatchId == 0 {
 		return nil, BatchIDError{batchID: req.BatchId}
 	}
-	revtrs, err := rs.rts.GetRevtrsInBatch(usr.ID, req.BatchId)
+	revtrs, err := rs.rts.GetRevtrsInBatch(usr.Id, req.BatchId)
 	if err != nil {
 		return nil, err
 	}
@@ -368,10 +374,12 @@ func (rs revtrServer) AddRevtr(rtm pb.RevtrMeasurement) (uint32, error) {
 		log.Error(err)
 		return 0, err
 	}
-	err = verifyAddrs(rtm.Src, rtm.Dst, vps.GetVps())
+	src, dst, err := verifyAddrs(rtm.Src, rtm.Dst, vps.GetVps())
 	if err != nil {
 		return 0, err
 	}
+	rtm.Src = src
+	rtm.Dst = dst
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	id := rs.getID()
@@ -407,6 +415,7 @@ func (rs revtrServer) StartRevtr(id uint32) (<-chan reversetraceroute.Status, er
 			runningRevtrs.Sub(1)
 			rs.mu.Lock()
 			delete(rs.revtrs, id)
+			rs.mu.Unlock()
 			rs.rts.StoreRevtr(rt.ToStorable())
 		}()
 		return rt.GetOutputChan(), nil

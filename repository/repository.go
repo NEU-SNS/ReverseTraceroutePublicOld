@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	// import the mysql driver
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/prometheus/log"
 )
 
 // DB represents a database collection

@@ -5,8 +5,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -104,7 +104,7 @@ func (a api) GetSources(ctx context.Context, req *pb.GetSourcesReq) (*pb.GetSour
 
 func rpcError(err error) error {
 	switch err {
-	case dataaccess.ErrNoRevtrUserFound:
+	case repo.ErrNoRevtrUserFound:
 		return ErrUnauthorizedRequest
 	default:
 		return err

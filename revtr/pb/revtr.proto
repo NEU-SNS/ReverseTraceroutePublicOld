@@ -100,3 +100,12 @@ enum RevtrStatus {
     RUNNING     = 1;
     COMPLETED   = 2;
 }
+
+message RevtrUser {
+  uint32 id    =  1;
+  string name  =  2;
+  string email =  3;
+  uint32 max   =  4;
+  uint32 delay =  5;
+  string key   =  6; 
+}
