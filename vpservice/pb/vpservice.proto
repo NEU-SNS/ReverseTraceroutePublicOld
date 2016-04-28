@@ -1,11 +1,48 @@
 syntax = "proto3";
 
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto";
-
 package pb;
 
 service VPService {
-  rpc GetVPs(datamodel.VPRequest) returns (datamodel.VPReturn) {}
-  rpc GetRRSpoofers(datamodel.RRSpooferRequest) returns (datamodel.RRSpooferResponse) {}
-  rpc GetTSSpoofers(datamodel.TSSpooferRequest) returns (datamodel.TSSpooferResponse) {}
+  rpc GetVPs(VPRequest) returns (VPReturn) {}
+  rpc GetRRSpoofers(RRSpooferRequest) returns (RRSpooferResponse) {}
+  rpc GetTSSpoofers(TSSpooferRequest) returns (TSSpooferResponse) {}
+}
+
+message VantagePoint {
+  uint32 ip         =  1;
+  string hostname   =  2;
+  string site       =  3;
+  bool timestamp    =  4;
+  bool record_route =  5;
+  bool spoof        =  6;
+  bool rec_spoof    =  7;
+}
+
+message VPRequest {
+}
+
+message VPReturn {
+    repeated VantagePoint vps = 1;
+}
+
+message RRSpooferRequest {
+  uint32 addr =  1;
+  uint32 max  =  2;
+}
+
+message RRSpooferResponse {
+  uint32 addr =  1;
+  uint32 max  =  2;
+  repeated VantagePoint spoofers = 3;
+}
+
+message TSSpooferRequest {
+  uint32 addr =  1;
+  uint32 max  =  2;
+}
+
+message TSSpooferResponse {
+  uint32 addr =  1;
+  uint32 max  =  2;
+  repeated VantagePoint spoofers = 3;
 }
