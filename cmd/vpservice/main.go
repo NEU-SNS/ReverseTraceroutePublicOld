@@ -2,33 +2,37 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
-	"syscall"
 
+	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
+	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
+	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/vpservice"
-	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/api"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/filters"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/repo"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/server"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
 )
 
-// Config is the config struct for the atlas
-type Config struct {
-	KeyFile  string
-	CertFile string
-	RootCA   string
+// AppConfig is the config struct for the atlas
+type AppConfig struct {
+	ServerConfig types.Config
+	DB           repo.Configs
 }
 
 func init() {
-	config.SetEnvPrefix("ATLAS")
+	config.SetEnvPrefix("VPS")
 	config.AddConfigPath("./vpservice.config")
 	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
 		host, _, err := net.SplitHostPort(req.RemoteAddr)
@@ -44,43 +48,80 @@ func init() {
 	grpclog.SetLogger(log.GetLogger())
 }
 
-func main() {
-	conf := Config{}
-	err := config.Parse(flag.CommandLine, &conf)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	svc := vpservice.NewRVPService(conf.RootCA)
-	go sigHandle(svc)
-	svc.LoadFromFile("./backup.txt")
-	ln, err := net.Listen("tcp", "0.0.0.0:45000")
-	if err != nil {
-		panic(err)
-	}
-	defer ln.Close()
-	creds, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.KeyFile)
-	if err != nil {
-		log.Error(err)
-		log.Error(conf)
-		ln.Close()
-		os.Exit(1)
-	}
-	serv := grpc.NewServer(grpc.Creds(creds))
-	pb.RegisterVPServiceServer(serv, vpservice.GRPCServ{VPService: svc})
-	err = serv.Serve(ln)
-	if err != nil {
+type errorf func() error
+
+func logError(f errorf) {
+	if err := f(); err != nil {
 		log.Error(err)
 	}
 }
 
-func sigHandle(s *vpservice.RVPService) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
-		syscall.SIGQUIT, syscall.SIGSTOP)
-	for sig := range c {
-		log.Infof("Got signal: %v", sig)
-		s.StoreInFile("./backup.txt")
+func main() {
+	conf := AppConfig{
+		ServerConfig: types.NewConfig(),
+	}
+	err := config.Parse(flag.CommandLine, &conf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var repoOpts []repo.Option
+	for _, c := range conf.DB.WriteConfigs {
+		repoOpts = append(repoOpts, repo.WithWriteConfig(c))
+	}
+	for _, c := range conf.DB.ReadConfigs {
+		repoOpts = append(repoOpts, repo.WithReadConfig(c))
+	}
+	da, err := repo.NewRepo(repoOpts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, srvs, err := net.LookupSRV("ccontroller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ccreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, srvs[0].Target)
+	if err != nil {
+		log.Fatal(err)
+	}
+	connst := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	c, err := grpc.Dial(connst, grpc.WithTransportCredentials(ccreds))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logError(c.Close)
+	cl := client.New(context.Background(), c)
+	rrf, tsf := makeFilters()
+	s, err := server.NewServer(server.WithVPProvider(da),
+		server.WithClient(cl),
+		server.WithRRFilter(rrf),
+		server.WithTSFilter(tsf))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ln, err := net.Listen("tcp", ":45000")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logError(ln.Close)
+	tlsc, err := httputil.TLSConfig(*conf.ServerConfig.CertFile, *conf.ServerConfig.KeyFile)
+	if err != nil {
+		log.Error(err)
+		log.Error(conf)
+		if err := ln.Close(); err != nil {
+			log.Error(err)
+		}
 		os.Exit(1)
 	}
+	apiServ := api.CreateServer(s, tlsc)
+	err = apiServ.Serve(ln)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func makeFilters() (filters.RRFilter, filters.TSFilter) {
+	rrf := filters.ComposeRRFilter(filters.MakeRRDistanceFilter(9, 9), filters.OnePerSiteRR)
+	return rrf, filters.OnePerSiteTS
 }
