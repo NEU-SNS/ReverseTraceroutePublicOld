@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
+	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
@@ -67,23 +68,13 @@ func init() {
 	grpclog.SetLogger(log.GetLogger())
 }
 
-func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return nil, err
-	}
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}, nil
-}
-
 func main() {
 	conf := AppConfig{
 		ServerConfig: types.NewConfig(),
 	}
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 	}
 	var repoOpts []repo.Option
 	for _, c := range conf.DB.WriteConfigs {
@@ -94,25 +85,23 @@ func main() {
 	}
 	da, err := repo.NewRepo(repoOpts...)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	_, srvs, err := net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
-		panic(err)
-
+		log.Fatal(err)
 	}
 	vpcreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, srvs[0].Target)
 	if err != nil {
-		panic(err)
-
+		log.Fatal(err)
 	}
 	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
 	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	vps := vpservice.New(context.Background(), c3)
 
-	tlsConf, err := tlsConfig(*conf.ServerConfig.CertFile, *conf.ServerConfig.KeyFile)
+	tlsConf, err := httputil.TLSConfig(*conf.ServerConfig.CertFile, *conf.ServerConfig.KeyFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	serv := server.NewRevtrServer(server.WithVPSource(vps),
 		server.WithAdjacencySource(da),
@@ -130,16 +119,16 @@ func main() {
 	gatewayMux := runtime.NewServeMux()
 	selfCreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, "revtr.revtr.ccs.neu.edu")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(selfCreds)}
 	err = pb.RegisterRevtrHandlerFromEndpoint(context.Background(), gatewayMux, ":8080", dialOpts)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	conn, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	s := &http.Server{
 		Addr:      ":8080",

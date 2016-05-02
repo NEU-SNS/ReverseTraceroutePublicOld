@@ -31,13 +31,31 @@ func CreateAPI(s server.VPServer) pb.VPServiceServer {
 }
 
 func (a api) GetVPs(ctx context.Context, req *pb.VPRequest) (*pb.VPReturn, error) {
-	return a.s.GetVPs(req)
+	resp, err := a.s.GetVPs(req)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return resp, err
+	}
 }
 
 func (a api) GetRRSpoofers(ctx context.Context, req *pb.RRSpooferRequest) (*pb.RRSpooferResponse, error) {
-	return nil, nil
+	resp, err := a.s.GetRRSpoofers(req)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return resp, err
+	}
 }
 
 func (a api) GetTSSpoofers(ctx context.Context, req *pb.TSSpooferRequest) (*pb.TSSpooferResponse, error) {
-	return nil, nil
+	resp, err := a.s.GetTSSpoofers(req)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return resp, err
+	}
 }

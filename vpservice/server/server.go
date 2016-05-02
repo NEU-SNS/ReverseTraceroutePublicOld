@@ -14,6 +14,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/filters"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,9 +26,15 @@ var (
 	}, getName())
 	spooferGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: getName(),
-		Subsystem: "spoofers",
+		Subsystem: "vantage_points",
 		Name:      "current_spoofers",
 		Help:      "The current number of spoofing VPS",
+	})
+	onlineVPGuage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: getName(),
+		Subsystem: "vantage_points",
+		Name:      "online_vps",
+		Help:      "The current number of online vps",
 	})
 )
 
@@ -41,6 +48,7 @@ var id = rand.Uint32()
 func init() {
 	prometheus.MustRegister(procCollector)
 	prometheus.MustRegister(spooferGauge)
+	prometheus.MustRegister(onlineVPGuage)
 }
 
 func getName() string {
@@ -75,9 +83,25 @@ func WithClient(c client.Client) Option {
 	}
 }
 
+// WithRRFilter configures the server with the given RRFilter
+func WithRRFilter(rrf filters.RRFilter) Option {
+	return func(so *serverOptions) {
+		so.rrf = rrf
+	}
+}
+
+// WithTSFilter configures the server with the given TSFilter
+func WithTSFilter(tsf filters.TSFilter) Option {
+	return func(so *serverOptions) {
+		so.tsf = tsf
+	}
+}
+
 type serverOptions struct {
 	vpp types.VPProvider
 	cl  client.Client
+	rrf filters.RRFilter
+	tsf filters.TSFilter
 }
 
 // NewServer creates a VPServer configured with the given options
@@ -86,17 +110,53 @@ func NewServer(opts ...Option) (VPServer, error) {
 	for _, opt := range opts {
 		opt(&so)
 	}
-	s := server{opts: so}
+	s := server{opts: so, rrf: makeRRF(so.rrf), tsf: makeTSF(so.tsf)}
 	go s.checkCapabilitiesAndUpdate()
+	go s.updateGauges()
 	return s, nil
 }
 
+func makeTSF(f filters.TSFilter) tsFilter {
+	return func(vps []types.TSVantagePoint) []*pb.VantagePoint {
+		var fvps []types.TSVantagePoint
+		fvps = vps
+		if f != nil {
+			fvps = f(vps)
+		}
+		var final []*pb.VantagePoint
+		for _, vp := range fvps {
+			final = append(final, &vp.VantagePoint)
+		}
+		return final
+	}
+}
+
+func makeRRF(f filters.RRFilter) rrFilter {
+	return func(vps []types.RRVantagePoint) []*pb.VantagePoint {
+		var fvps []types.RRVantagePoint
+		fvps = vps
+		if f != nil {
+			fvps = f(vps)
+		}
+		var final []*pb.VantagePoint
+		for _, vp := range fvps {
+			final = append(final, &vp.VantagePoint)
+		}
+		return final
+	}
+}
+
+type tsFilter func([]types.TSVantagePoint) []*pb.VantagePoint
+type rrFilter func([]types.RRVantagePoint) []*pb.VantagePoint
+
 type server struct {
 	opts serverOptions
+	tsf  tsFilter
+	rrf  rrFilter
 }
 
 func (s server) GetVPs(pbr *pb.VPRequest) (*pb.VPReturn, error) {
-	vps, err := s.opts.vpp.GetAllVPs()
+	vps, err := s.opts.vpp.GetVPs()
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -117,7 +177,7 @@ func (s server) GetRRSpoofers(rrs *pb.RRSpooferRequest) (*pb.RRSpooferResponse, 
 	var resp pb.RRSpooferResponse
 	resp.Addr = rrs.Addr
 	resp.Max = rrs.Max
-	resp.Spoofers = vps
+	resp.Spoofers = s.rrf(vps)
 	return &resp, nil
 }
 
@@ -132,7 +192,7 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 	var resp pb.TSSpooferResponse
 	resp.Addr = tsr.Addr
 	resp.Max = tsr.Max
-	resp.Spoofers = vps
+	resp.Spoofers = s.tsf(vps)
 	return &resp, nil
 }
 
@@ -150,17 +210,19 @@ func (s server) checkCapabilitiesAndUpdate() {
 				log.Error(err)
 				cancel()
 				continue
+			} else {
+				s.addOrUpdateVPs(vps.GetVps())
+				cancel()
 			}
-			s.addOrUpdateVPs(vps.GetVps())
-			cancel()
+			s.checkCapabilities()
 		}
 	}
 }
 
 func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
-	var aVps []pb.VantagePoint
+	var aVps []*pb.VantagePoint
 	for _, vp := range vps {
-		var cvp pb.VantagePoint
+		cvp := new(pb.VantagePoint)
 		cvp.Hostname = vp.Hostname
 		cvp.Ip = vp.Ip
 		cvp.Site = vp.Site
@@ -200,6 +262,29 @@ func (s server) checkCapabilities() {
 		err := s.opts.vpp.UpdateVP(*vp)
 		if err != nil {
 			log.Error(err)
+		}
+	}
+}
+
+// call in a goroutine
+func (s server) updateGauges() {
+	tick := time.NewTicker(time.Hour * 1)
+	for {
+		select {
+		case <-tick.C:
+			vps, err := s.opts.vpp.GetVPs()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			onlineVPGuage.Set(float64(len(vps)))
+			var spoofCnt float64
+			for _, vp := range vps {
+				if vp.Spoof {
+					spoofCnt++
+				}
+			}
+			spooferGauge.Set(spoofCnt)
 		}
 	}
 }
