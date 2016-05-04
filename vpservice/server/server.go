@@ -200,7 +200,7 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 // loop forever checking the capabilities of vantage points
 // as well checking for new vps/vps being removed
 func (s server) checkCapabilitiesAndUpdate() {
-	vpsTimer := time.NewTicker(time.Minute * 1)
+	vpsTimer := time.NewTicker(time.Minute * 5)
 	for {
 		select {
 		case <-vpsTimer.C:
