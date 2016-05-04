@@ -200,7 +200,7 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 // loop forever checking the capabilities of vantage points
 // as well checking for new vps/vps being removed
 func (s server) checkCapabilitiesAndUpdate() {
-	vpsTimer := time.NewTicker(time.Minute * 5)
+	vpsTimer := time.NewTicker(time.Minute * 1)
 	for {
 		select {
 		case <-vpsTimer.C:
@@ -238,10 +238,15 @@ func (s server) checkCapabilities() {
 	vps, err := s.opts.vpp.GetVPsForTesting(testSize)
 	if err != nil {
 		log.Error(err)
+		return
 	}
 	vpm := make(map[uint32]*pb.VantagePoint)
 	var tests []*datamodel.PingMeasurement
 	for _, vp := range vps {
+		vp.RecSpoof = false
+		vp.Spoof = false
+		vp.RecordRoute = false
+		vp.Timestamp = false
 		vpm[vp.Ip] = vp
 		for _, d := range vps {
 			if d.Ip == vp.Ip {
@@ -315,14 +320,46 @@ func (s server) testRR(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 			log.Error(err)
 			break
 		}
-		vp := vps[p.Src]
-		vp.RecordRoute = false
-		if len(p.Responses) > 0 {
+
+		// Some of the PLE nodes are using dhcp and have addresses
+		// in private ranges. For some of these cases, the public
+		// ips that are mapped to the nodes are the first address
+		// in the RR option. This next section looks for that case
+		// as well as just checking the Src of the probe
+		if len(p.Responses) == 0 {
+			continue
+		}
+		r1 := p.Responses[0]
+		addr1 := new(uint32)
+		if len(r1.RR) > 0 {
+			*addr1 = r1.RR[0]
+		}
+		if vp, ok := vps[p.Src]; ok {
 			vp.RecordRoute = true
+			continue
+		}
+		if vp, ok := vps[*addr1]; ok {
+			vp.RecordRoute = true
+			continue
+		}
+		if p.Statistics.Loss != 1 {
+			log.Error("Got rr response with invalid src: ", p)
 		}
 	}
 }
 
+type ipaddress uint32
+
+func (ip ipaddress) String() string {
+	ips, _ := util.Int32ToIPString(uint32(ip))
+	return ips
+}
+
+// like the RR tests, the src of the measurement might not match the src of the returned probe struct
+// this is because some PLE nodes have private ips. In order to match things back together,
+// im setting tsprespec with the public src address as the first address and the dst as the second
+// with that I can match off of the first ts and address in the response if the src doesn't match
+// any probe that I sent
 func (s server) testTS(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.VantagePoint) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -330,7 +367,7 @@ func (s server) testTS(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 	for _, pm := range pms {
 		tspm := new(datamodel.PingMeasurement)
 		*tspm = *pm
-		tspm.TimeStamp = "tsonly"
+		tspm.TimeStamp = fmt.Sprintf("tsprespec=%v,%v", ipaddress(pm.Src), ipaddress(pm.Dst))
 		tests = append(tests, tspm)
 	}
 	ps, err := s.opts.cl.Ping(ctx, &datamodel.PingArg{
@@ -349,10 +386,27 @@ func (s server) testTS(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 			log.Error(err)
 			break
 		}
-		vp := vps[p.Src]
-		vp.Timestamp = false
-		if len(p.Responses) > 0 {
+		if len(p.Responses) == 0 {
+			continue
+		}
+		r1 := p.Responses[0]
+		addr1 := new(uint32)
+		if len(r1.Tsandaddr) > 0 {
+			*addr1 = r1.Tsandaddr[0].Ip
+		}
+		if vp, ok := vps[p.Src]; ok {
 			vp.Timestamp = true
+			if len(p.Responses) > 0 {
+				vp.RecordRoute = true
+			}
+			continue
+		}
+		if vp, ok := vps[*addr1]; ok {
+			vp.Timestamp = true
+			continue
+		}
+		if p.Statistics.Loss != 1 {
+			log.Error("Got timestamp with wrong source: ", p)
 		}
 	}
 }
@@ -387,10 +441,15 @@ func (s server) testSpoof(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.V
 			log.Error(err)
 			break
 		}
-		vp := vps[p.SpoofedFrom]
-		vp.Spoof = false
-		if len(p.Responses) > 0 {
+		if vp, ok := vps[p.SpoofedFrom]; ok {
 			vp.Spoof = true
+			if vp, ok := vps[p.Dst]; ok {
+				vp.RecSpoof = true
+			}
+			continue
+		}
+		if p.Statistics.Loss != 1 {
+			log.Error("Got spoofed probe with invalid spoofed from addr: ", p)
 		}
 	}
 }

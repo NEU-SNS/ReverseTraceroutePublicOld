@@ -164,34 +164,9 @@ func (d *DataAccess) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
 	return d.db.StoreAdjacencyToDest(dest24, addr, adj)
 }
 
-// GetAdjacenciesByIP1 gets ajd by ip1
-func (d *DataAccess) GetAdjacenciesByIP1(ip uint32) ([]dm.Adjacency, error) {
-	return d.db.GetAdjacenciesByIP1(ip)
-}
-
-// GetAdjacenciesByIP2 gets ajd by ip2
-func (d *DataAccess) GetAdjacenciesByIP2(ip uint32) ([]dm.Adjacency, error) {
-	return d.db.GetAdjacenciesByIP2(ip)
-}
-
-// GetAdjacencyToDestByAddrAndDest24 returns adjstodest based on dest24 and addr
-func (d *DataAccess) GetAdjacencyToDestByAddrAndDest24(dest24, addr uint32) ([]dm.AdjacencyToDest, error) {
-	return d.db.GetAdjacencyToDestByAddrAndDest24(dest24, addr)
-}
-
 // StoreAlias stores an alias with id id
 func (d *DataAccess) StoreAlias(id int, ips []net.IP) error {
 	return d.db.StoreAlias(id, ips)
-}
-
-// GetClusterIDByIP gets the cluster id for a given ip
-func (d *DataAccess) GetClusterIDByIP(ip uint32) (int, error) {
-	return d.db.GetClusterIDByIP(ip)
-}
-
-// GetIPsForClusterID gets all the ips associated with the given cluster id
-func (d *DataAccess) GetIPsForClusterID(id int) ([]uint32, error) {
-	return d.db.GetIPsForClusterID(id)
 }
 
 // New create a new dataAccess with the given config
