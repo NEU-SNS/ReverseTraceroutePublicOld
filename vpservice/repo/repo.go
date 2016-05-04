@@ -93,19 +93,19 @@ const (
 	updateVP = `
 update vantage_points
   set hostname = ?,
-  set site = ?,
-  set timestamp = ?,
-  set record_route = ?,
-  set spoof = ?,
-  set rec_spoof = ?
-where ip = ? 
+  site = ?,
+  timestamp = ?,
+  record_route = ?,
+  spoof = ?,
+  rec_spoof = ?
+where ip = ?;
 `
 	getVPSForTesting = `
 select 
   ip, hostname, site, timestamp, record_route, spoof, rec_spoof 
 from 
  vantage_points
-order by last_check desc
+order by last_check
 limit ?
 `
 )
@@ -158,7 +158,7 @@ func (vpe vpError) Error() string {
 
 // UpdateVP updates the given vp matched by IP
 func (r *Repo) UpdateVP(vp pb.VantagePoint) error {
-	res, err := r.repo.GetWriter().Exec(updateVP,
+	_, err := r.repo.GetWriter().Exec(updateVP,
 		vp.Hostname,
 		vp.Site,
 		vp.Timestamp,
@@ -166,23 +166,22 @@ func (r *Repo) UpdateVP(vp pb.VantagePoint) error {
 		vp.Spoof,
 		vp.RecSpoof,
 		vp.Ip)
-	if n, _ := res.RowsAffected(); n != 1 {
-		return vpError{vp: vp}
-	}
+
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func vpNotIn(in, comp map[*pb.VantagePoint]bool) []*pb.VantagePoint {
+func vpNotIn(in, comp map[pb.VantagePoint]bool) []*pb.VantagePoint {
 	var notIn []*pb.VantagePoint
 	for vp, i := range comp {
 		if !i {
 			continue
 		}
 		if !in[vp] {
-			notIn = append(notIn, vp)
+			add := vp
+			notIn = append(notIn, &add)
 		}
 	}
 	return notIn
@@ -190,13 +189,20 @@ func vpNotIn(in, comp map[*pb.VantagePoint]bool) []*pb.VantagePoint {
 
 func generateChanges(new, old []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint) {
 	var remove, add []*pb.VantagePoint
-	oldm := make(map[*pb.VantagePoint]bool)
-	newm := make(map[*pb.VantagePoint]bool)
+	oldm := make(map[pb.VantagePoint]bool)
+	newm := make(map[pb.VantagePoint]bool)
 	for _, vp := range new {
-		newm[vp] = true
+		newm[*vp] = true
 	}
 	for _, vp := range old {
-		oldm[vp] = true
+		// the already existings vps might have spoof/rr/ts set to true
+		// set them back to false so they can be used as a key (new will have all false)
+		curr := *vp
+		curr.Spoof = false
+		curr.Timestamp = false
+		curr.RecSpoof = false
+		curr.RecordRoute = false
+		oldm[curr] = true
 	}
 	add = vpNotIn(oldm, newm)
 	remove = vpNotIn(newm, oldm)

@@ -75,7 +75,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, srvs, err := net.LookupSRV("ccontroller", "tcp", "revtr.ccs.neu.edu")
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
 		log.Fatal(err)
 	}
