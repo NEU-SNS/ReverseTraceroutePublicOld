@@ -343,7 +343,7 @@ func (r *Repo) StoreRevtr(rt pb.ReverseTraceroute) error {
 	}
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.Dst)
-	res, err := tx.Exec(revtrStoreRevtr, src, dst, rt.Runtime, rt.RrIssued, rt.TsIssued, rt.StopReason, rt.Status)
+	res, err := tx.Exec(revtrStoreRevtr, src, dst, rt.Runtime, rt.RrIssued, rt.TsIssued, rt.StopReason, rt.Status.String())
 	if err != nil {
 		log.Error(err)
 		logError(tx.Rollback)
