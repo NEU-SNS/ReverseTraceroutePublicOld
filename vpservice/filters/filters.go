@@ -1,6 +1,10 @@
 package filters
 
-import "github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
+import (
+	"sort"
+
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
+)
 
 // RRFilter  is a function for prividing addition filtering the
 // VPs returned from the VPProvider for RRSpoofing
@@ -49,4 +53,16 @@ func OnePerSiteTS(tsvps []types.TSVantagePoint) []types.TSVantagePoint {
 		ops = append(ops, vp)
 	}
 	return ops
+}
+
+type rrvpsDist []types.RRVantagePoint
+
+func (rrdist rrvpsDist) Len() int           { return len(rrdist) }
+func (rrdist rrvpsDist) Swap(i, j int)      { rrdist[i], rrdist[j] = rrdist[j], rrdist[i] }
+func (rrdist rrvpsDist) Less(i, j int) bool { return rrdist[i].Dist < rrdist[j].Dist }
+
+// OrderRRDistanceFilter sorts rrvps by distance desc
+func OrderRRDistanceFilter(rrvps []types.RRVantagePoint) []types.RRVantagePoint {
+	sort.Sort(rrvpsDist(rrvps))
+	return rrvps
 }

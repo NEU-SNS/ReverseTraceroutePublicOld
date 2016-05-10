@@ -178,6 +178,9 @@ func (s server) GetRRSpoofers(rrs *pb.RRSpooferRequest) (*pb.RRSpooferResponse, 
 	resp.Addr = rrs.Addr
 	resp.Max = rrs.Max
 	resp.Spoofers = s.rrf(vps)
+	if uint32(len(resp.Spoofers)) > rrs.Max {
+		resp.Spoofers = resp.Spoofers[:rrs.Max]
+	}
 	return &resp, nil
 }
 
@@ -193,6 +196,9 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 	resp.Addr = tsr.Addr
 	resp.Max = tsr.Max
 	resp.Spoofers = s.tsf(vps)
+	if uint32(len(resp.Spoofers)) > tsr.Max {
+		resp.Spoofers = resp.Spoofers[:tsr.Max]
+	}
 	return &resp, nil
 }
 

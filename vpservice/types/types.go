@@ -5,8 +5,8 @@ import "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 // VPProvider is the interface for a provider for vantage points
 type VPProvider interface {
 	GetVPs() ([]*pb.VantagePoint, error)
-	GetRRSpoofers(target, limit uint32) ([]RRVantagePoint, error)
-	GetTSSpoofers(target, limit uint32) ([]TSVantagePoint, error)
+	GetRRSpoofers(target uint32) ([]RRVantagePoint, error)
+	GetTSSpoofers(target uint32) ([]TSVantagePoint, error)
 	UpdateVP(vp pb.VantagePoint) error
 	GetVPsForTesting(limit int) ([]*pb.VantagePoint, error)
 	UpdateActiveVPs(vps []*pb.VantagePoint) error
