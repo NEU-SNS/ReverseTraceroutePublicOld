@@ -928,9 +928,6 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 
 // CreateReverseTraceroute creates a reverse traceroute for the web interface
 func CreateReverseTraceroute(revtr pb.RevtrMeasurement, backoffEndhost, print bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) *ReverseTraceroute {
-	once.Do(func() {
-		initialize(vpserv, cs)
-	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	rt.backoffEndhost = backoffEndhost
 	rt.print = print
@@ -1078,23 +1075,8 @@ func (si stringInt) String() string {
 	return fmt.Sprintf("%d", int(si))
 }
 
-func initialize(cl vpservice.VPSource, cs types.ClusterSource) {
-	clusterToIps = make(map[string][]string)
-	vpr, err := cl.GetVPs()
-	if err != nil {
-		panic(err)
-	}
-	vps = vpr.GetVps()
-	ipToCluster = newClusterMap(cs)
-}
-
-var once sync.Once
-
 // RunReverseTraceroute runs a reverse traceroute
 func RunReverseTraceroute(revtr pb.RevtrMeasurement, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) (*ReverseTraceroute, error) {
-	once.Do(func() {
-		initialize(vpserv, cs)
-	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	rt.backoffEndhost = revtr.BackoffEndhost
 	rt.cl = cl
