@@ -1,12 +1,55 @@
 syntax = "proto3";
 
-import "github.com/NEU-SNS/ReverseTraceroute/datamodel/intersectrequest.proto";
-
 package atlas.pb;
 
 option go_package = "pb";
 
 service Atlas {
-    rpc GetIntersectingPath(stream datamodel.IntersectionRequest) returns (stream datamodel.IntersectionResponse) {}
-    rpc GetPathsWithToken(stream datamodel.TokenRequest) returns (stream datamodel.TokenResponse) {}
+    rpc GetIntersectingPath(stream IntersectionRequest) returns (stream IntersectionResponse) {}
+    rpc GetPathsWithToken(stream TokenRequest) returns (stream TokenResponse) {}
+}
+
+message Hop {
+    uint32 Ip  = 1;
+    uint32 ttl = 2;
+}
+
+message Path {
+    uint32 address       = 1;
+    uint32 dest          = 2;
+    repeated Hop hops    = 3;
+}
+
+enum IResponseType {
+    NONE_FOUND     = 0;
+    TOKEN          = 1;
+    PATH           = 2;
+    ERROR          = 3;
+}
+
+message IntersectionRequest {
+    uint32 address    = 1;
+    uint32 dest       = 2;
+    int64 staleness   = 3;
+     bool use_aliases = 4;
+   bool ignore_source = 5;
+  uint32 src          = 6;
+}
+
+message IntersectionResponse {
+    IResponseType   type = 1;
+    uint32         token = 2;
+    Path            path = 3;
+    string         error = 4; 
+}
+
+message TokenRequest {
+    uint32 token = 1;
+}
+
+message TokenResponse {
+    uint32 token        = 1;
+    IResponseType type  = 2; 
+    Path          path  = 3;
+    string error        = 4;
 }

@@ -1,4 +1,4 @@
-package atlas
+package server
 
 import (
 	"fmt"
@@ -13,16 +13,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
-	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -45,8 +43,13 @@ func init() {
 	prometheus.MustRegister(procCollector)
 }
 
-// Atlas is the atlas
-type Atlas struct {
+// AtlasServer is the interface for the atlas
+type AtlasServer interface {
+	GetIntersectingPath(*dm.IntersectionRequest) ([]*dm.IntersectionResponse, error)
+	GetPathsWithToken(*dm.TokenRequest) ([]*dm.TokenResponse, error)
+}
+
+type server struct {
 	da     *dataaccess.DataAccess
 	donec  chan struct{}
 	rootCA string
@@ -56,8 +59,8 @@ type Atlas struct {
 	tc     *tokenCache
 }
 
-// NewAtlasService creates a new Atlas
-func NewAtlasService(da *dataaccess.DataAccess, rootCA string) *Atlas {
+// NewServer creates a
+func NewServer(da *dataaccess.DataAccess, rootCA string) *Atlas {
 	log.Debug("Creating New Atlas Service")
 	ret := &Atlas{
 		da:     da,
