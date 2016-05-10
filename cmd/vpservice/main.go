@@ -122,6 +122,8 @@ func main() {
 }
 
 func makeFilters() (filters.RRFilter, filters.TSFilter) {
-	rrf := filters.ComposeRRFilter(filters.MakeRRDistanceFilter(9, 9), filters.OnePerSiteRR)
+	rrf := filters.ComposeRRFilter(filters.MakeRRDistanceFilter(9, 9),
+		filters.OnePerSiteRR,
+		filters.OrderRRDistanceFilter)
 	return rrf, filters.OnePerSiteTS
 }

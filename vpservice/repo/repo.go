@@ -290,8 +290,7 @@ FROM
     vantage_points vps 
     LEFT OUTER JOIN dist_to_dest dtd ON dtd.src = vps.ip
 WHERE
-    NOT EXISTS(SELECT ut.ip FROM unresponsive_targets ut WHERE ut.ip = ?) 
-    AND (dtd.dist IS NULL OR dtd.slash_24 = (? >> 8)) 
+    (dtd.dist IS NULL OR dtd.slash_24 = (? >> 8)) 
     AND vps.record_route 
     AND vps.spoof
 GROUP BY
@@ -304,8 +303,6 @@ GROUP BY
     vps.rec_spoof
 ORDER BY
     dist
-LIMIT
-    ?
 `
 	getTSSpoofers = `
 SELECT
@@ -319,17 +316,14 @@ SELECT
 FROM
     vantage_points vps
 WHERE
-    NOT EXISTS(SELECT ut.ip FROM unresponsive_targets ut WHERE ut.ip = ?)
-    AND vps.timestamp 
+    vps.timestamp 
     AND vps.spoof
-LIMIT
-    ?
 `
 )
 
-// GetRRSpoofers gets vantage points usable for target target up to limit vps
-func (r *Repo) GetRRSpoofers(target, limit uint32) ([]types.RRVantagePoint, error) {
-	res, err := r.repo.GetReader().Query(getRRSpoofers, target, target, limit)
+// GetRRSpoofers gets vantage points usable for target target
+func (r *Repo) GetRRSpoofers(target uint32) ([]types.RRVantagePoint, error) {
+	res, err := r.repo.GetReader().Query(getRRSpoofers, target)
 	if err != nil {
 		return nil, err
 	}
@@ -358,8 +352,8 @@ func (r *Repo) GetRRSpoofers(target, limit uint32) ([]types.RRVantagePoint, erro
 }
 
 // GetTSSpoofers gets vantage points usable for target target up to limit vps
-func (r *Repo) GetTSSpoofers(target, limit uint32) ([]types.TSVantagePoint, error) {
-	res, err := r.repo.GetReader().Query(getTSSpoofers, target, limit)
+func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
+	res, err := r.repo.GetReader().Query(getTSSpoofers, target)
 	if err != nil {
 		return nil, err
 	}
