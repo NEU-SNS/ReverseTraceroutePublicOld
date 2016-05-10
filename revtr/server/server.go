@@ -15,7 +15,6 @@ import (
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
-	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
@@ -24,6 +23,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -61,6 +61,14 @@ func getName() string {
 	return fmt.Sprintf("revtr_%s", r.Replace(name))
 }
 
+type errorf func() error
+
+func logError(ef errorf) {
+	if err := ef(); err != nil {
+		log.Error(err)
+	}
+}
+
 // BatchIDError is returned when an invalid batch id is sent
 type BatchIDError struct {
 	batchID uint32
@@ -88,7 +96,7 @@ func (de DstError) Error() string {
 	return fmt.Sprintf("invalid dst address %s", de.dst)
 }
 
-func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
+func validSrc(src string, vps []*vppb.VantagePoint) (string, bool) {
 	for _, vp := range vps {
 		s, _ := util.Int32ToIPString(vp.Ip)
 		if vp.Hostname == src || s == src {
@@ -98,7 +106,7 @@ func validSrc(src string, vps []*datamodel.VantagePoint) (string, bool) {
 	return "", false
 }
 
-func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
+func validDest(dst string, vps []*vppb.VantagePoint) (string, bool) {
 	var notIP bool
 	ip := net.ParseIP(dst)
 	if ip == nil {
@@ -127,7 +135,7 @@ func validDest(dst string, vps []*datamodel.VantagePoint) (string, bool) {
 	return dst, true
 }
 
-func verifyAddrs(src, dst string, vps []*datamodel.VantagePoint) (string, string, error) {
+func verifyAddrs(src, dst string, vps []*vppb.VantagePoint) (string, string, error) {
 	nsrc, valid := validSrc(src, vps)
 	if !valid {
 		log.Errorf("Invalid source: %s", src)
@@ -303,7 +311,7 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 	// run these guys
 	go func() {
 		var wg sync.WaitGroup
-		defer servs.Close()
+		defer logError(servs.Close)
 		wg.Add(len(reqToRun))
 		for _, rtr := range reqToRun {
 			runningRevtrs.Add(1)
@@ -416,7 +424,10 @@ func (rs revtrServer) StartRevtr(id uint32) (<-chan reversetraceroute.Status, er
 			rs.mu.Lock()
 			delete(rs.revtrs, id)
 			rs.mu.Unlock()
-			rs.rts.StoreRevtr(rt.ToStorable())
+			err := rs.rts.StoreRevtr(rt.ToStorable())
+			if err != nil {
+				log.Error(err)
+			}
 		}()
 		return rt.GetOutputChan(), nil
 	}
@@ -464,18 +475,18 @@ func connectToServices(rootCA string) (services, error) {
 	cli := client.New(context.Background(), cc)
 	_, srvs, err = net.LookupSRV("atlas", "tcp", "revtr.ccs.neu.edu")
 	if err != nil {
-		cc.Close()
+		logError(cc.Close)
 		return ret, err
 	}
 	atcreds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
 	if err != nil {
-		cc.Close()
+		logError(cc.Close)
 		return ret, err
 	}
 	connstrat := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
 	c2, err := grpc.Dial(connstrat, grpc.WithTransportCredentials(atcreds))
 	if err != nil {
-		cc.Close()
+		logError(cc.Close)
 		return ret, err
 	}
 	atl := at.New(context.Background(), c2)
@@ -485,15 +496,15 @@ func connectToServices(rootCA string) (services, error) {
 	}
 	vpcreds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
 	if err != nil {
-		cc.Close()
-		c2.Close()
+		logError(cc.Close)
+		logError(c2.Close)
 		return ret, err
 	}
 	connvp := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
 	c3, err := grpc.Dial(connvp, grpc.WithTransportCredentials(vpcreds))
 	if err != nil {
-		cc.Close()
-		c2.Close()
+		logError(cc.Close)
+		logError(c2.Close)
 		return ret, err
 	}
 	vps := vpservice.New(context.Background(), c3)
