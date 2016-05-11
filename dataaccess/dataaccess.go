@@ -132,28 +132,6 @@ func (d *DataAccess) UpdateController(ip, old, nc uint32) error {
 	return d.db.UpdateController(ip, old, nc)
 }
 
-// ErrNoIntFound is returned when no intersection is found
-var ErrNoIntFound = sql.ErrNoIntFound
-
-// GetAtlasSources gets the sources used for the current dst and staleness
-func (d *DataAccess) GetAtlasSources(dst uint32, stale time.Duration) ([]uint32, error) {
-	return d.db.GetAtlasSources(dst, stale)
-}
-
-// FindIntersectingTraceroute finds a traceroute that intersects hop towards the dst
-func (d *DataAccess) FindIntersectingTraceroute(pairs []dm.SrcDst) ([]*dm.Path, error) {
-	res, err := d.db.FindIntersectingTraceroute(pairs)
-	if err == sql.ErrNoIntFound {
-		return res, ErrNoIntFound
-	}
-	return res, err
-}
-
-// StoreAtlasTraceroute stores a traceroute in a form that the Atlas requires
-func (d *DataAccess) StoreAtlasTraceroute(trace *dm.Traceroute) error {
-	return d.db.StoreAtlasTraceroute(trace)
-}
-
 // StoreAdjacency stores an ajacienty
 func (d *DataAccess) StoreAdjacency(l, r net.IP) error {
 	return d.db.StoreAdjacency(l, r)
