@@ -97,7 +97,8 @@ update vantage_points
   timestamp = ?,
   record_route = ?,
   spoof = ?,
-  rec_spoof = ?
+  rec_spoof = ?,
+  last_check = now()
 where ip = ?;
 `
 	getVPSForTesting = `

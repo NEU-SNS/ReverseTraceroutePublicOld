@@ -170,7 +170,7 @@ func (s server) GetRRSpoofers(rrs *pb.RRSpooferRequest) (*pb.RRSpooferResponse, 
 	if rrs.Max == 0 {
 		rrs.Max = defaultLimit
 	}
-	vps, err := s.opts.vpp.GetRRSpoofers(rrs.Addr, rrs.Max)
+	vps, err := s.opts.vpp.GetRRSpoofers(rrs.Addr)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 	if tsr.Max == 0 {
 		tsr.Max = defaultLimit
 	}
-	vps, err := s.opts.vpp.GetTSSpoofers(tsr.Addr, tsr.Max)
+	vps, err := s.opts.vpp.GetTSSpoofers(tsr.Addr)
 	if err != nil {
 		return nil, err
 	}
