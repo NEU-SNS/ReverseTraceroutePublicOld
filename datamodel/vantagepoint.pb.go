@@ -31,7 +31,7 @@ type VantagePoint struct {
 func (m *VantagePoint) Reset()                    { *m = VantagePoint{} }
 func (m *VantagePoint) String() string            { return proto.CompactTextString(m) }
 func (*VantagePoint) ProtoMessage()               {}
-func (*VantagePoint) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
+func (*VantagePoint) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
 
 type VPRequest struct {
 }
@@ -39,7 +39,7 @@ type VPRequest struct {
 func (m *VPRequest) Reset()                    { *m = VPRequest{} }
 func (m *VPRequest) String() string            { return proto.CompactTextString(m) }
 func (*VPRequest) ProtoMessage()               {}
-func (*VPRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{1} }
+func (*VPRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
 
 type VPReturn struct {
 	Vps []*VantagePoint `protobuf:"bytes,1,rep,name=vps" json:"vps,omitempty"`
@@ -48,7 +48,7 @@ type VPReturn struct {
 func (m *VPReturn) Reset()                    { *m = VPReturn{} }
 func (m *VPReturn) String() string            { return proto.CompactTextString(m) }
 func (*VPReturn) ProtoMessage()               {}
-func (*VPReturn) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{2} }
+func (*VPReturn) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2} }
 
 func (m *VPReturn) GetVps() []*VantagePoint {
 	if m != nil {
@@ -65,7 +65,7 @@ type RRSpooferRequest struct {
 func (m *RRSpooferRequest) Reset()                    { *m = RRSpooferRequest{} }
 func (m *RRSpooferRequest) String() string            { return proto.CompactTextString(m) }
 func (*RRSpooferRequest) ProtoMessage()               {}
-func (*RRSpooferRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{3} }
+func (*RRSpooferRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{3} }
 
 type RRSpooferResponse struct {
 	Addr     uint32          `protobuf:"varint,1,opt,name=addr" json:"addr,omitempty"`
@@ -76,7 +76,7 @@ type RRSpooferResponse struct {
 func (m *RRSpooferResponse) Reset()                    { *m = RRSpooferResponse{} }
 func (m *RRSpooferResponse) String() string            { return proto.CompactTextString(m) }
 func (*RRSpooferResponse) ProtoMessage()               {}
-func (*RRSpooferResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{4} }
+func (*RRSpooferResponse) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{4} }
 
 func (m *RRSpooferResponse) GetSpoofers() []*VantagePoint {
 	if m != nil {
@@ -92,7 +92,7 @@ type TSSpooferRequest struct {
 func (m *TSSpooferRequest) Reset()                    { *m = TSSpooferRequest{} }
 func (m *TSSpooferRequest) String() string            { return proto.CompactTextString(m) }
 func (*TSSpooferRequest) ProtoMessage()               {}
-func (*TSSpooferRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{5} }
+func (*TSSpooferRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{5} }
 
 type TSSpooferResponse struct {
 	Max      uint32          `protobuf:"varint,1,opt,name=max" json:"max,omitempty"`
@@ -102,7 +102,7 @@ type TSSpooferResponse struct {
 func (m *TSSpooferResponse) Reset()                    { *m = TSSpooferResponse{} }
 func (m *TSSpooferResponse) String() string            { return proto.CompactTextString(m) }
 func (*TSSpooferResponse) ProtoMessage()               {}
-func (*TSSpooferResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{6} }
+func (*TSSpooferResponse) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{6} }
 
 func (m *TSSpooferResponse) GetSpoofers() []*VantagePoint {
 	if m != nil {
@@ -121,7 +121,7 @@ func init() {
 	proto.RegisterType((*TSSpooferResponse)(nil), "datamodel.TSSpooferResponse")
 }
 
-var fileDescriptor6 = []byte{
+var fileDescriptor5 = []byte{
 	// 382 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x92, 0x51, 0xcf, 0x93, 0x30,
 	0x14, 0x86, 0xb3, 0xf1, 0xb9, 0xc1, 0x81, 0xc5, 0xad, 0xd1, 0xd8, 0x3b, 0x0d, 0xf1, 0x62, 0x5e,
