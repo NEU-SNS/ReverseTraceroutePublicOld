@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -13,14 +11,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/types"
+	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -45,287 +45,139 @@ func init() {
 
 // AtlasServer is the interface for the atlas
 type AtlasServer interface {
-	GetIntersectingPath(*dm.IntersectionRequest) ([]*dm.IntersectionResponse, error)
-	GetPathsWithToken(*dm.TokenRequest) ([]*dm.TokenResponse, error)
+	GetIntersectingPath(*pb.IntersectionRequest) (*pb.IntersectionResponse, error)
+	GetPathsWithToken(*pb.TokenRequest) (*pb.TokenResponse, error)
 }
 
 type server struct {
-	da     *dataaccess.DataAccess
-	donec  chan struct{}
-	rootCA string
-	curr   runningTraces
-	ccon   cclient.Client
-	vpcon  client.VPSource
-	tc     *tokenCache
+	donec chan struct{}
+	curr  runningTraces
+	tc    *tokenCache
+	opts  serverOptions
 }
 
-// NewServer creates a
-func NewServer(da *dataaccess.DataAccess, rootCA string) *Atlas {
-	log.Debug("Creating New Atlas Service")
-	ret := &Atlas{
-		da:     da,
-		rootCA: rootCA,
-		curr:   newRunningTraces(),
-		tc:     newTokenCache(),
-	}
-	ret.startHTTP()
-	return ret
+type serverOptions struct {
+	cl  cclient.Client
+	vps client.VPSource
+	trs types.TRStore
 }
 
-func startHTTP(addr string) {
-	for {
-		log.Error(http.ListenAndServe(addr, nil))
+// Option sets an option to configure the server
+type Option func(*serverOptions)
+
+// WithClient configures the server with client c
+func WithClient(c cclient.Client) Option {
+	return func(opts *serverOptions) {
+		opts.cl = c
 	}
 }
 
-func (a *Atlas) startHTTP() {
-	http.Handle("/metrics", prometheus.Handler())
-	go startHTTP(":8080")
+// WithVPS configures the server with the given VPSource
+func WithVPS(vps client.VPSource) Option {
+	return func(opts *serverOptions) {
+		opts.vps = vps
+	}
+}
+
+// WithTRS configures the server with the given TRStore
+func WithTRS(trs types.TRStore) Option {
+	return func(opts *serverOptions) {
+		opts.trs = trs
+	}
+}
+
+// NewServer creates a server
+func NewServer(opts ...Option) AtlasServer {
+	atlas := &server{
+		curr: newRunningTraces(),
+		tc:   newTokenCache(),
+	}
+	for _, opt := range opts {
+		opt(&atlas.opts)
+	}
+	return atlas
 }
 
 // GetPathsWithToken satisfies the server interface
-func (a *Atlas) GetPathsWithToken(ctx context.Context, in *dm.TokenRequest) ([]*dm.TokenResponse, error) {
-	out := make(chan *dm.TokenResponse, 1)
-	go func() {
-		log.Debug("Looking for intersection from token: ", in)
-		req := a.tc.Get(in.Token)
-		if req == nil {
-			select {
-			case out <- &dm.TokenResponse{
-				Token: in.Token,
-				Type:  dm.IResponseType_ERROR,
-				Error: fmt.Sprintf("No request found matching: %d", in.Token),
-			}:
-			case <-ctx.Done():
-				log.Error(ctx.Err())
-			}
-			close(out)
-			return
-		}
-		a.tc.Remove(in.Token)
-		pair := []dm.SrcDst{
-			dm.SrcDst{
-				Addr:         req.Address,
-				Dst:          req.Dest,
-				Src:          req.Src,
-				Stale:        time.Duration(req.Staleness) * time.Minute,
-				IgnoreSource: req.IgnoreSource,
-				Alias:        req.UseAliases,
-			},
-		}
-		log.Debug("Looking for intesection for: ", req)
-		path, err := a.da.FindIntersectingTraceroute(pair)
-		log.Debug("FindIntersectingTraceroute resp: ", path)
-		if err != nil {
-			log.Debug("Found no intersection")
-			if err != dataaccess.ErrNoIntFound {
-				log.Error(err)
-				select {
-				case out <- &dm.TokenResponse{
-					Type:  dm.IResponseType_ERROR,
-					Error: err.Error(),
-				}:
-				case <-ctx.Done():
-					log.Error(ctx.Err())
-				}
-			} else {
-				intr := &dm.TokenResponse{
-					Token: in.Token,
-					Type:  dm.IResponseType_NONE_FOUND,
-				}
-				select {
-				case out <- intr:
-				case <-ctx.Done():
-					log.Error(ctx.Err())
-				}
-			}
-			close(out)
-			return
-		}
-		if len(path) == 0 {
-			log.Debug("Found no path")
-			intr := &dm.TokenResponse{
-				Token: in.Token,
-				Type:  dm.IResponseType_NONE_FOUND,
-			}
-			select {
-			case out <- intr:
-			case <-ctx.Done():
-				log.Error(ctx.Err())
-			}
-			close(out)
-			return
-		}
-		for _, resp := range path {
-			log.Debug("Got path: ", path, " for token ", in.Token)
-			intr := &dm.TokenResponse{
-				Token: in.Token,
-				Type:  dm.IResponseType_PATH,
-				Path:  resp,
-			}
-			select {
-			case out <- intr:
-			case <-ctx.Done():
-				log.Error(ctx.Err())
-				break
-			}
-		}
-		close(out)
-		return
-	}()
-	var results []*dm.TokenResponse
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case r, ok := <-out:
-			log.Debug("Token intersection get result: ", r)
-			if !ok {
-				log.Debug("Out was closed")
-				return results, nil
-			}
-			results = append(results, r)
-		}
+func (a *server) GetPathsWithToken(tr *pb.TokenRequest) (*pb.TokenResponse, error) {
+	log.Debug("Looking for intersection from token: ", tr)
+	req := a.tc.Get(tr.Token)
+	if req == nil {
+		return &pb.TokenResponse{
+			Token: tr.Token,
+			Type:  pb.IResponseType_ERROR,
+			Error: fmt.Sprintf("No request found matching: %d", tr.Token),
+		}, nil
 	}
+	a.tc.Remove(tr.Token)
+
+	ir := types.IntersectionQuery{
+		Addr:         req.Address,
+		Dst:          req.Dest,
+		Src:          req.Src,
+		Stale:        time.Duration(req.Staleness) * time.Minute,
+		IgnoreSource: req.IgnoreSource,
+		Alias:        req.UseAliases,
+	}
+	log.Debug("Looking for intesection for: ", req)
+	path, err := a.opts.trs.FindIntersectingTraceroute(ir)
+	log.Debug("FindIntersectingTraceroute resp: ", path)
+	if err != nil {
+		log.Debug("Found no intersection")
+		if err != repo.ErrNoIntFound {
+			log.Error(err)
+			return nil, err
+		}
+		return &pb.TokenResponse{
+			Token: tr.Token,
+			Type:  pb.IResponseType_NONE_FOUND,
+		}, nil
+	}
+	log.Debug("Got path: ", path, " for token ", tr.Token)
+	intr := &pb.TokenResponse{
+		Token: tr.Token,
+		Type:  pb.IResponseType_PATH,
+		Path:  path,
+	}
+	return intr, nil
 }
 
 // GetIntersectingPath satisfies the server interface
-func (a *Atlas) GetIntersectingPath(ctx context.Context, ir *dm.IntersectionRequest) ([]*dm.IntersectionResponse, error) {
-	in := make(chan *dm.IntersectionResponse, 1)
-	go func() {
-		log.Debug("Looing for intersect for ", ir)
-		req := []dm.SrcDst{
-			dm.SrcDst{
-				Addr:         ir.Address,
-				Dst:          ir.Dest,
-				Src:          ir.Src,
-				Stale:        time.Duration(ir.Staleness) * time.Minute,
-				Alias:        ir.UseAliases,
-				IgnoreSource: ir.IgnoreSource,
-			},
-		}
-		if ir.Staleness == 0 {
-			ir.Staleness = 60
-		}
-		res, err := a.da.FindIntersectingTraceroute(req)
-		log.Debug("FindIntersectingTraceroute resp ", res)
-		if err != nil {
-			if err != dataaccess.ErrNoIntFound {
-				log.Error(err)
-				iresp := &dm.IntersectionResponse{
-					Type:  dm.IResponseType_ERROR,
-					Error: err.Error(),
-				}
-				log.Error(err)
-				select {
-				case in <- iresp:
-				case <-ctx.Done():
-					close(in)
-					return
-				}
-			} else {
-				iresp := &dm.IntersectionResponse{
-					Type:  dm.IResponseType_TOKEN,
-					Token: a.tc.Add(ir),
-				}
-				select {
-				case in <- iresp:
-				case <-ctx.Done():
-					close(in)
-					return
-				}
-				go a.fillAtlas(ir.Address, ir.Dest, ir.Staleness)
-			}
-
-			close(in)
-			return
-		}
-		if len(res) == 0 {
-			intr := &dm.IntersectionResponse{
-				Type: dm.IResponseType_NONE_FOUND,
-			}
-			select {
-			case in <- intr:
-			case <-ctx.Done():
-			}
-			close(in)
-			return
-		}
-		for _, resp := range res {
-			intr := &dm.IntersectionResponse{
-				Type: dm.IResponseType_PATH,
-				Path: resp,
-			}
-			select {
-			case in <- intr:
-			case <-ctx.Done():
-				break
-			}
-		}
-		close(in)
-		return
-	}()
-	var ret []*dm.IntersectionResponse
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case ir, ok := <-in:
-			log.Debug("Got: ", ir, " ", ok)
-			if !ok {
-				return ret, nil
-			}
-			ret = append(ret, ir)
-		}
+func (a *server) GetIntersectingPath(ir *pb.IntersectionRequest) (*pb.IntersectionResponse, error) {
+	log.Debug("Looing for intersection for ", ir)
+	if ir.Staleness == 0 {
+		ir.Staleness = 60
 	}
+	iq := types.IntersectionQuery{
+		Addr:         ir.Address,
+		Dst:          ir.Dest,
+		Src:          ir.Src,
+		Stale:        time.Duration(ir.Staleness) * time.Minute,
+		Alias:        ir.UseAliases,
+		IgnoreSource: ir.IgnoreSource,
+	}
+	res, err := a.opts.trs.FindIntersectingTraceroute(iq)
+	log.Debug("FindIntersectingTraceroute resp ", res)
+	if err != nil {
+		if err != repo.ErrNoIntFound {
+			log.Error(err)
+			return nil, err
+		}
+		iresp := &pb.IntersectionResponse{
+			Type:  pb.IResponseType_TOKEN,
+			Token: a.tc.Add(ir),
+		}
+		go a.fillAtlas(ir.Address, ir.Dest, ir.Staleness)
+		return iresp, nil
+	}
+	intr := &pb.IntersectionResponse{
+		Type: pb.IResponseType_PATH,
+		Path: res,
+	}
+	return intr, nil
 }
 
-func (a *Atlas) connect() bool {
-	if a.ccon == nil {
-		_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-		creds, err := credentials.NewClientTLSFromFile(a.rootCA, srvs[0].Target)
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		a.ccon = cclient.New(context.Background(), cc)
-	}
-	if a.vpcon == nil {
-		_, srvs, err := net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		connstr := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
-		creds, err := credentials.NewClientTLSFromFile(a.rootCA, srvs[0].Target)
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		cc, err := grpc.Dial(connstr, grpc.WithTransportCredentials(creds))
-		if err != nil {
-			log.Error(err)
-			return false
-		}
-		a.vpcon = client.New(context.Background(), cc)
-	}
-	return true
-}
-
-func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
-	if !a.connect() {
-		return
-	}
+func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	srcs := a.getSrcs(hop, dest, stale)
 	var traces []*dm.TracerouteMeasurement
 	for _, src := range srcs {
@@ -345,7 +197,7 @@ func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
-	st, err := a.ccon.Traceroute(ctx, &dm.TracerouteArg{Traceroutes: traces})
+	st, err := a.opts.cl.Traceroute(ctx, &dm.TracerouteArg{Traceroutes: traces})
 	if err != nil {
 		log.Error(err)
 		a.curr.Remove(dest, srcs)
@@ -370,7 +222,7 @@ func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 				log.Error("Traceroute did not reach destination")
 				return
 			}
-			err = a.da.StoreAtlasTraceroute(tr)
+			err = a.opts.trs.StoreAtlasTraceroute(tr)
 			if err != nil {
 				log.Error(err)
 			}
@@ -380,18 +232,18 @@ func (a *Atlas) fillAtlas(hop, dest uint32, stale int64) {
 	a.curr.Remove(dest, finished)
 }
 
-func (a *Atlas) getSrcs(hop, dest uint32, stale int64) []uint32 {
-	vps, err := a.vpcon.GetVPs()
+func (a *server) getSrcs(hop, dest uint32, stale int64) []uint32 {
+	vps, err := a.opts.vps.GetVPs()
 	if err != nil {
 		return nil
 	}
-	oldsrcs, err := a.da.GetAtlasSources(dest, time.Minute*time.Duration(stale))
+	oldsrcs, err := a.opts.trs.GetAtlasSources(dest, time.Minute*time.Duration(stale))
 	os := make(map[uint32]bool)
 	for _, o := range oldsrcs {
 		os[o] = true
 	}
-	sites := make(map[string]*dm.VantagePoint)
-	var srcIsVP *dm.VantagePoint
+	sites := make(map[string]*vppb.VantagePoint)
+	var srcIsVP *vppb.VantagePoint
 	for _, vp := range vps.GetVps() {
 		if os[vp.Ip] {
 			// if the src has been used in interval [now, stale], skip it
@@ -506,12 +358,12 @@ func (rt runningTraces) TryAdd(ip uint32, dsts []uint32) []uint32 {
 
 type tokenCache struct {
 	mu    sync.Mutex
-	cache map[uint32]*dm.IntersectionRequest
+	cache map[uint32]*pb.IntersectionRequest
 	// Should only be accessed atomicaly
 	nextID uint32
 }
 
-func (tc *tokenCache) Add(ir *dm.IntersectionRequest) uint32 {
+func (tc *tokenCache) Add(ir *pb.IntersectionRequest) uint32 {
 	new := atomic.AddUint32(&tc.nextID, 1)
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
@@ -519,7 +371,7 @@ func (tc *tokenCache) Add(ir *dm.IntersectionRequest) uint32 {
 	return new
 }
 
-func (tc *tokenCache) Get(id uint32) *dm.IntersectionRequest {
+func (tc *tokenCache) Get(id uint32) *pb.IntersectionRequest {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 	return tc.cache[id]
@@ -537,7 +389,7 @@ func (tc *tokenCache) Remove(id uint32) error {
 
 func newTokenCache() *tokenCache {
 	tc := &tokenCache{
-		cache: make(map[uint32]*dm.IntersectionRequest),
+		cache: make(map[uint32]*pb.IntersectionRequest),
 	}
 	return tc
 }

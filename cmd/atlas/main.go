@@ -2,32 +2,34 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"syscall"
 
+	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
-	"github.com/NEU-SNS/ReverseTraceroute/atlas"
-	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/api"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
-	"github.com/NEU-SNS/ReverseTraceroute/dataaccess"
+	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
+	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	vpsclient "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 )
 
 // Config is the config for the atlas
 type Config struct {
-	Db       dataaccess.DbConfig
-	KeyFile  string
-	CertFile string
-	RootCA   string
+	DB       repo.Configs
+	RootCA   string `flag:"root-ca"`
+	CertFile string `flag:"cert-file"`
+	KeyFile  string `flag:"key-file"`
 }
 
 func init() {
@@ -47,49 +49,85 @@ func init() {
 	grpclog.SetLogger(log.GetLogger())
 }
 
-func main() {
-	go sigHandle()
-	conf := Config{}
-	err := config.Parse(flag.CommandLine, &conf)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	da, err := dataaccess.New(conf.Db)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	cres, err := credentials.NewServerTLSFromFile(conf.CertFile, conf.KeyFile)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	svc := atlas.NewAtlasService(da, conf.RootCA)
-	serv := grpc.NewServer(grpc.Creds(cres))
-	pb.RegisterAtlasServer(serv, atlas.GRPCServ{AtlasService: svc})
-	ln, err := net.Listen("tcp", "0.0.0.0:55000")
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	defer func() {
-		err := ln.Close()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
-	err = serv.Serve(ln)
-	if err != nil {
+type errorf func() error
+
+func logError(f errorf) {
+	if err := f(); err != nil {
 		log.Error(err)
 	}
 }
 
-func sigHandle() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM,
-		syscall.SIGQUIT, syscall.SIGSTOP)
-	for _ = range c {
-		os.Exit(1)
+func main() {
+	conf := Config{}
+	err := config.Parse(flag.CommandLine, &conf)
+	if err != nil {
+		log.Fatal(err)
 	}
+	var repoOpts []repo.Option
+	for _, c := range conf.DB.WriteConfigs {
+		repoOpts = append(repoOpts, repo.WithWriteConfig(c))
+	}
+	for _, c := range conf.DB.ReadConfigs {
+		repoOpts = append(repoOpts, repo.WithReadConfig(c))
+	}
+	r, err := repo.NewRepo(repoOpts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	vps, err := makeVPS(conf.RootCA)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cc, err := makeClient(conf.RootCA)
+	if err != nil {
+		log.Fatal(err)
+	}
+	serv := server.NewServer(server.WithVPS(vps),
+		server.WithTRS(r),
+		server.WithClient(cc))
+	ln, err := net.Listen("tcp", ":55000")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logError(ln.Close)
+	tlsc, err := httputil.TLSConfig(conf.CertFile, conf.KeyFile)
+	s := api.CreateServer(serv, tlsc)
+	err = s.Serve(ln)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func makeVPS(rootCA string) (vpsclient.VPSource, error) {
+	_, srvs, err := net.LookupSRV("vpservice", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		return nil, err
+	}
+	creds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		return nil, err
+	}
+	conn := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	c, err := grpc.Dial(conn, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+	return vpsclient.New(context.Background(), c), nil
+}
+
+func makeClient(rootCA string) (cclient.Client, error) {
+	_, srvs, err := net.LookupSRV("controller", "tcp", "revtr.ccs.neu.edu")
+	if err != nil {
+		return nil, err
+	}
+	creds, err := credentials.NewClientTLSFromFile(rootCA, srvs[0].Target)
+	if err != nil {
+		return nil, err
+	}
+	conn := fmt.Sprintf("%s:%d", srvs[0].Target, srvs[0].Port)
+	c, err := grpc.Dial(conn, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+	return cclient.New(context.Background(), c), nil
 }
