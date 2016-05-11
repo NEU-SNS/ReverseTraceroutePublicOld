@@ -21,7 +21,7 @@ type Time struct {
 func (m *Time) Reset()                    { *m = Time{} }
 func (m *Time) String() string            { return proto.CompactTextString(m) }
 func (*Time) ProtoMessage()               {}
-func (*Time) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (*Time) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
 
 type RTT struct {
 	Sec  int64 `protobuf:"varint,1,opt,name=sec" json:"sec,omitempty"`
@@ -31,14 +31,14 @@ type RTT struct {
 func (m *RTT) Reset()                    { *m = RTT{} }
 func (m *RTT) String() string            { return proto.CompactTextString(m) }
 func (*RTT) ProtoMessage()               {}
-func (*RTT) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
+func (*RTT) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
 
 func init() {
 	proto.RegisterType((*Time)(nil), "datamodel.Time")
 	proto.RegisterType((*RTT)(nil), "datamodel.RTT")
 }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor2 = []byte{
 	// 136 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xb2, 0x4c, 0xcf, 0x2c, 0xc9,
 	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0xf7, 0x73, 0x0d, 0xd5, 0x0d, 0xf6, 0x0b, 0xd6, 0x0f,

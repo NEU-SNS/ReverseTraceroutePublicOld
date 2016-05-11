@@ -9,13 +9,18 @@ It is generated from these files:
 	github.com/NEU-SNS/ReverseTraceroute/atlas/pb/atlas.proto
 
 It has these top-level messages:
+	Hop
+	Path
+	IntersectionRequest
+	IntersectionResponse
+	TokenRequest
+	TokenResponse
 */
 package pb
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import datamodel "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 
 import (
 	context "golang.org/x/net/context"
@@ -30,6 +35,132 @@ var _ = math.Inf
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
 const _ = proto.ProtoPackageIsVersion1
+
+type IResponseType int32
+
+const (
+	IResponseType_NONE_FOUND IResponseType = 0
+	IResponseType_TOKEN      IResponseType = 1
+	IResponseType_PATH       IResponseType = 2
+	IResponseType_ERROR      IResponseType = 3
+)
+
+var IResponseType_name = map[int32]string{
+	0: "NONE_FOUND",
+	1: "TOKEN",
+	2: "PATH",
+	3: "ERROR",
+}
+var IResponseType_value = map[string]int32{
+	"NONE_FOUND": 0,
+	"TOKEN":      1,
+	"PATH":       2,
+	"ERROR":      3,
+}
+
+func (x IResponseType) String() string {
+	return proto.EnumName(IResponseType_name, int32(x))
+}
+func (IResponseType) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+type Hop struct {
+	Ip  uint32 `protobuf:"varint,1,opt,name=Ip" json:"Ip,omitempty"`
+	Ttl uint32 `protobuf:"varint,2,opt,name=ttl" json:"ttl,omitempty"`
+}
+
+func (m *Hop) Reset()                    { *m = Hop{} }
+func (m *Hop) String() string            { return proto.CompactTextString(m) }
+func (*Hop) ProtoMessage()               {}
+func (*Hop) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+type Path struct {
+	Address uint32 `protobuf:"varint,1,opt,name=address" json:"address,omitempty"`
+	Dest    uint32 `protobuf:"varint,2,opt,name=dest" json:"dest,omitempty"`
+	Hops    []*Hop `protobuf:"bytes,3,rep,name=hops" json:"hops,omitempty"`
+}
+
+func (m *Path) Reset()                    { *m = Path{} }
+func (m *Path) String() string            { return proto.CompactTextString(m) }
+func (*Path) ProtoMessage()               {}
+func (*Path) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *Path) GetHops() []*Hop {
+	if m != nil {
+		return m.Hops
+	}
+	return nil
+}
+
+type IntersectionRequest struct {
+	Address      uint32 `protobuf:"varint,1,opt,name=address" json:"address,omitempty"`
+	Dest         uint32 `protobuf:"varint,2,opt,name=dest" json:"dest,omitempty"`
+	Staleness    int64  `protobuf:"varint,3,opt,name=staleness" json:"staleness,omitempty"`
+	UseAliases   bool   `protobuf:"varint,4,opt,name=use_aliases" json:"use_aliases,omitempty"`
+	IgnoreSource bool   `protobuf:"varint,5,opt,name=ignore_source" json:"ignore_source,omitempty"`
+	Src          uint32 `protobuf:"varint,6,opt,name=src" json:"src,omitempty"`
+}
+
+func (m *IntersectionRequest) Reset()                    { *m = IntersectionRequest{} }
+func (m *IntersectionRequest) String() string            { return proto.CompactTextString(m) }
+func (*IntersectionRequest) ProtoMessage()               {}
+func (*IntersectionRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+type IntersectionResponse struct {
+	Type  IResponseType `protobuf:"varint,1,opt,name=type,enum=atlas.pb.IResponseType" json:"type,omitempty"`
+	Token uint32        `protobuf:"varint,2,opt,name=token" json:"token,omitempty"`
+	Path  *Path         `protobuf:"bytes,3,opt,name=path" json:"path,omitempty"`
+	Error string        `protobuf:"bytes,4,opt,name=error" json:"error,omitempty"`
+}
+
+func (m *IntersectionResponse) Reset()                    { *m = IntersectionResponse{} }
+func (m *IntersectionResponse) String() string            { return proto.CompactTextString(m) }
+func (*IntersectionResponse) ProtoMessage()               {}
+func (*IntersectionResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *IntersectionResponse) GetPath() *Path {
+	if m != nil {
+		return m.Path
+	}
+	return nil
+}
+
+type TokenRequest struct {
+	Token uint32 `protobuf:"varint,1,opt,name=token" json:"token,omitempty"`
+}
+
+func (m *TokenRequest) Reset()                    { *m = TokenRequest{} }
+func (m *TokenRequest) String() string            { return proto.CompactTextString(m) }
+func (*TokenRequest) ProtoMessage()               {}
+func (*TokenRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+
+type TokenResponse struct {
+	Token uint32        `protobuf:"varint,1,opt,name=token" json:"token,omitempty"`
+	Type  IResponseType `protobuf:"varint,2,opt,name=type,enum=atlas.pb.IResponseType" json:"type,omitempty"`
+	Path  *Path         `protobuf:"bytes,3,opt,name=path" json:"path,omitempty"`
+	Error string        `protobuf:"bytes,4,opt,name=error" json:"error,omitempty"`
+}
+
+func (m *TokenResponse) Reset()                    { *m = TokenResponse{} }
+func (m *TokenResponse) String() string            { return proto.CompactTextString(m) }
+func (*TokenResponse) ProtoMessage()               {}
+func (*TokenResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
+func (m *TokenResponse) GetPath() *Path {
+	if m != nil {
+		return m.Path
+	}
+	return nil
+}
+
+func init() {
+	proto.RegisterType((*Hop)(nil), "atlas.pb.Hop")
+	proto.RegisterType((*Path)(nil), "atlas.pb.Path")
+	proto.RegisterType((*IntersectionRequest)(nil), "atlas.pb.IntersectionRequest")
+	proto.RegisterType((*IntersectionResponse)(nil), "atlas.pb.IntersectionResponse")
+	proto.RegisterType((*TokenRequest)(nil), "atlas.pb.TokenRequest")
+	proto.RegisterType((*TokenResponse)(nil), "atlas.pb.TokenResponse")
+	proto.RegisterEnum("atlas.pb.IResponseType", IResponseType_name, IResponseType_value)
+}
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
@@ -64,8 +195,8 @@ func (c *atlasClient) GetIntersectingPath(ctx context.Context, opts ...grpc.Call
 }
 
 type Atlas_GetIntersectingPathClient interface {
-	Send(*datamodel.IntersectionRequest) error
-	Recv() (*datamodel.IntersectionResponse, error)
+	Send(*IntersectionRequest) error
+	Recv() (*IntersectionResponse, error)
 	grpc.ClientStream
 }
 
@@ -73,12 +204,12 @@ type atlasGetIntersectingPathClient struct {
 	grpc.ClientStream
 }
 
-func (x *atlasGetIntersectingPathClient) Send(m *datamodel.IntersectionRequest) error {
+func (x *atlasGetIntersectingPathClient) Send(m *IntersectionRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *atlasGetIntersectingPathClient) Recv() (*datamodel.IntersectionResponse, error) {
-	m := new(datamodel.IntersectionResponse)
+func (x *atlasGetIntersectingPathClient) Recv() (*IntersectionResponse, error) {
+	m := new(IntersectionResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -95,8 +226,8 @@ func (c *atlasClient) GetPathsWithToken(ctx context.Context, opts ...grpc.CallOp
 }
 
 type Atlas_GetPathsWithTokenClient interface {
-	Send(*datamodel.TokenRequest) error
-	Recv() (*datamodel.TokenResponse, error)
+	Send(*TokenRequest) error
+	Recv() (*TokenResponse, error)
 	grpc.ClientStream
 }
 
@@ -104,12 +235,12 @@ type atlasGetPathsWithTokenClient struct {
 	grpc.ClientStream
 }
 
-func (x *atlasGetPathsWithTokenClient) Send(m *datamodel.TokenRequest) error {
+func (x *atlasGetPathsWithTokenClient) Send(m *TokenRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *atlasGetPathsWithTokenClient) Recv() (*datamodel.TokenResponse, error) {
-	m := new(datamodel.TokenResponse)
+func (x *atlasGetPathsWithTokenClient) Recv() (*TokenResponse, error) {
+	m := new(TokenResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -132,8 +263,8 @@ func _Atlas_GetIntersectingPath_Handler(srv interface{}, stream grpc.ServerStrea
 }
 
 type Atlas_GetIntersectingPathServer interface {
-	Send(*datamodel.IntersectionResponse) error
-	Recv() (*datamodel.IntersectionRequest, error)
+	Send(*IntersectionResponse) error
+	Recv() (*IntersectionRequest, error)
 	grpc.ServerStream
 }
 
@@ -141,12 +272,12 @@ type atlasGetIntersectingPathServer struct {
 	grpc.ServerStream
 }
 
-func (x *atlasGetIntersectingPathServer) Send(m *datamodel.IntersectionResponse) error {
+func (x *atlasGetIntersectingPathServer) Send(m *IntersectionResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *atlasGetIntersectingPathServer) Recv() (*datamodel.IntersectionRequest, error) {
-	m := new(datamodel.IntersectionRequest)
+func (x *atlasGetIntersectingPathServer) Recv() (*IntersectionRequest, error) {
+	m := new(IntersectionRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -158,8 +289,8 @@ func _Atlas_GetPathsWithToken_Handler(srv interface{}, stream grpc.ServerStream)
 }
 
 type Atlas_GetPathsWithTokenServer interface {
-	Send(*datamodel.TokenResponse) error
-	Recv() (*datamodel.TokenRequest, error)
+	Send(*TokenResponse) error
+	Recv() (*TokenRequest, error)
 	grpc.ServerStream
 }
 
@@ -167,12 +298,12 @@ type atlasGetPathsWithTokenServer struct {
 	grpc.ServerStream
 }
 
-func (x *atlasGetPathsWithTokenServer) Send(m *datamodel.TokenResponse) error {
+func (x *atlasGetPathsWithTokenServer) Send(m *TokenResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *atlasGetPathsWithTokenServer) Recv() (*datamodel.TokenRequest, error) {
-	m := new(datamodel.TokenRequest)
+func (x *atlasGetPathsWithTokenServer) Recv() (*TokenRequest, error) {
+	m := new(TokenRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -200,19 +331,34 @@ var _Atlas_serviceDesc = grpc.ServiceDesc{
 }
 
 var fileDescriptor0 = []byte{
-	// 211 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xb2, 0x4c, 0xcf, 0x2c, 0xc9,
-	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0xf7, 0x73, 0x0d, 0xd5, 0x0d, 0xf6, 0x0b, 0xd6, 0x0f,
-	0x4a, 0x2d, 0x4b, 0x2d, 0x2a, 0x4e, 0x0d, 0x29, 0x4a, 0x4c, 0x4e, 0x2d, 0xca, 0x2f, 0x2d, 0x49,
-	0xd5, 0x4f, 0x2c, 0xc9, 0x49, 0x2c, 0xd6, 0x2f, 0x48, 0x82, 0x30, 0xf4, 0x0a, 0x8a, 0xf2, 0x4b,
-	0xf2, 0x85, 0x38, 0xa0, 0x9c, 0x24, 0x29, 0x57, 0xa2, 0x0c, 0x49, 0x49, 0x2c, 0x49, 0xcc, 0xcd,
-	0x4f, 0x49, 0xcd, 0xd1, 0xcf, 0xcc, 0x2b, 0x01, 0xc9, 0x25, 0x97, 0x14, 0xa5, 0x16, 0x96, 0xa6,
-	0x16, 0x97, 0x40, 0x0c, 0x34, 0xda, 0xcc, 0xc8, 0xc5, 0xea, 0x08, 0x32, 0x53, 0x28, 0x86, 0x4b,
-	0xd8, 0x3d, 0xb5, 0xc4, 0x13, 0xa6, 0x2c, 0x33, 0x2f, 0x3d, 0x20, 0xb1, 0x24, 0x43, 0x48, 0x4e,
-	0x0f, 0x6e, 0x86, 0x1e, 0x42, 0x32, 0x3f, 0x2f, 0x08, 0x62, 0x8c, 0x94, 0x3c, 0x4e, 0xf9, 0xe2,
-	0x82, 0xfc, 0xbc, 0xe2, 0x54, 0x25, 0x06, 0x0d, 0x46, 0x03, 0x46, 0x21, 0x1f, 0x2e, 0x41, 0xa0,
-	0xe9, 0x20, 0x13, 0x8b, 0xc3, 0x81, 0x0e, 0x0f, 0xc9, 0xcf, 0x4e, 0xcd, 0x13, 0x12, 0x47, 0xd2,
-	0x0b, 0x16, 0x81, 0x19, 0x2a, 0x81, 0x29, 0x81, 0x6c, 0x9a, 0x13, 0x4b, 0x14, 0x53, 0x41, 0x52,
-	0x12, 0x1b, 0xd8, 0x0b, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0x16, 0x13, 0x14, 0xaa, 0x50,
-	0x01, 0x00, 0x00,
+	// 458 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x92, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0x86, 0xeb, 0x8f, 0x94, 0x64, 0x52, 0x87, 0x74, 0x03, 0xd4, 0x2a, 0xb4, 0xaa, 0x2c, 0x21,
+	0x45, 0x48, 0x24, 0x28, 0x9c, 0x38, 0xa1, 0x56, 0x04, 0x1a, 0x90, 0x1c, 0xe4, 0xba, 0x42, 0xea,
+	0x25, 0x5a, 0x3b, 0xa3, 0x24, 0xc2, 0x78, 0x97, 0xdd, 0x35, 0x52, 0x6f, 0xfc, 0x23, 0xfe, 0x22,
+	0xeb, 0x8d, 0x53, 0x27, 0xaa, 0x00, 0x71, 0xf3, 0xce, 0xc7, 0x3b, 0xcf, 0xbc, 0x1e, 0x78, 0xb3,
+	0x58, 0xa9, 0x65, 0x91, 0x0c, 0x52, 0xf6, 0x6d, 0x18, 0x8e, 0xaf, 0x5f, 0x5e, 0x85, 0x57, 0xc3,
+	0x08, 0x7f, 0xa0, 0x90, 0x18, 0x0b, 0x9a, 0xa2, 0x60, 0x85, 0xc2, 0x21, 0x55, 0x19, 0x95, 0x43,
+	0x9e, 0xac, 0x3f, 0x06, 0x5c, 0x30, 0xc5, 0x48, 0xb3, 0x7a, 0x24, 0xc1, 0x29, 0x38, 0x97, 0x8c,
+	0x13, 0x00, 0x7b, 0xc2, 0x7d, 0xeb, 0xcc, 0xea, 0x7b, 0xa4, 0x0d, 0x8e, 0x52, 0x99, 0x6f, 0x97,
+	0x8f, 0xe0, 0x02, 0xdc, 0xcf, 0x54, 0x2d, 0xc9, 0x43, 0x78, 0x40, 0xe7, 0x73, 0x81, 0x52, 0x56,
+	0x55, 0x07, 0xe0, 0xce, 0x51, 0xaa, 0x75, 0x19, 0x79, 0x0a, 0xee, 0x92, 0x71, 0xe9, 0x3b, 0x67,
+	0x4e, 0xbf, 0x3d, 0xf2, 0x06, 0x1b, 0xfd, 0x81, 0x16, 0x0f, 0x7e, 0x5a, 0xd0, 0x9b, 0xe4, 0xaa,
+	0x04, 0x4b, 0xd5, 0x8a, 0xe5, 0x11, 0x7e, 0x2f, 0x74, 0xeb, 0xbf, 0x34, 0x0f, 0xa1, 0x25, 0x15,
+	0xcd, 0x30, 0x2f, 0x0b, 0x1c, 0x1d, 0x72, 0x48, 0x0f, 0xda, 0x85, 0xc4, 0x19, 0xcd, 0x56, 0x54,
+	0xa2, 0xf4, 0x5d, 0x1d, 0x6c, 0x92, 0xc7, 0xe0, 0xad, 0x16, 0x39, 0x13, 0x38, 0x93, 0xac, 0x10,
+	0x29, 0xfa, 0x0d, 0x13, 0xd6, 0x6b, 0x48, 0x91, 0xfa, 0xfb, 0x66, 0x8d, 0x5b, 0x78, 0xb4, 0x4b,
+	0x20, 0x39, 0xcb, 0x25, 0x92, 0xe7, 0xe0, 0xaa, 0x5b, 0x8e, 0x66, 0x7e, 0x67, 0x74, 0x54, 0x73,
+	0x4f, 0x36, 0x25, 0xb1, 0x4e, 0x13, 0x0f, 0x1a, 0x8a, 0x7d, 0xc5, 0xbc, 0x22, 0x7b, 0x06, 0x2e,
+	0xd7, 0xa6, 0x18, 0xa8, 0xf6, 0xa8, 0x53, 0x77, 0x19, 0xab, 0x74, 0x31, 0x0a, 0xc1, 0x84, 0xc1,
+	0x6b, 0x05, 0x27, 0x70, 0x10, 0x97, 0xbd, 0x9b, 0xad, 0xef, 0xb4, 0xcc, 0xce, 0x81, 0x00, 0xaf,
+	0x4a, 0x57, 0x48, 0xbb, 0xf9, 0x3b, 0x42, 0xfb, 0xef, 0x84, 0xff, 0x83, 0xf4, 0xe2, 0x2d, 0x78,
+	0xbb, 0xdd, 0x1d, 0x80, 0x70, 0x1a, 0x8e, 0x67, 0xef, 0xa7, 0xd7, 0xe1, 0xbb, 0xee, 0x1e, 0x69,
+	0x41, 0x23, 0x9e, 0x7e, 0x1a, 0x87, 0x5d, 0x8b, 0x34, 0xf5, 0x01, 0x9c, 0xc7, 0x97, 0x5d, 0xbb,
+	0x0c, 0x8e, 0xa3, 0x68, 0x1a, 0x75, 0x9d, 0xd1, 0x2f, 0x0b, 0x1a, 0xe7, 0xe5, 0x04, 0x72, 0x03,
+	0xbd, 0x0f, 0xa8, 0x6a, 0x6f, 0xf3, 0x85, 0x19, 0x78, 0xb2, 0xc5, 0x79, 0xff, 0xcf, 0x1f, 0x9f,
+	0xfe, 0x29, 0xbd, 0x66, 0x0a, 0xf6, 0xfa, 0xd6, 0x2b, 0x8b, 0x7c, 0x84, 0x43, 0xad, 0x5d, 0xea,
+	0xc9, 0x2f, 0xfa, 0xd4, 0x8d, 0x4d, 0xe4, 0x49, 0xdd, 0xba, 0x6d, 0xeb, 0xf1, 0xd1, 0xbd, 0xf8,
+	0xb6, 0xd6, 0x85, 0x7b, 0x63, 0xf3, 0x24, 0xd9, 0x37, 0xe7, 0xff, 0xfa, 0x77, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0x31, 0xd5, 0xba, 0x93, 0x3b, 0x03, 0x00, 0x00,
 }

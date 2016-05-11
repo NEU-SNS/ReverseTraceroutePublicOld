@@ -2,6 +2,50 @@
 // source: github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
 // DO NOT EDIT!
 
+/*
+Package datamodel is a generated protocol buffer package.
+
+It is generated from these files:
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/recspoof.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/traceroute.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/update.proto
+	github.com/NEU-SNS/ReverseTraceroute/datamodel/vantagepoint.proto
+
+It has these top-level messages:
+	PingMeasurement
+	PingArg
+	PingStats
+	PingResponse
+	TsAndAddr
+	Ping
+	RecSpoof
+	Spoof
+	SpoofedProbes
+	SpoofedProbesResponse
+	Probe
+	RecordRoute
+	TimeStamp
+	Stamp
+	NotifyRecSpoofResponse
+	ReceiveSpoofedProbesResponse
+	Time
+	RTT
+	TracerouteMeasurement
+	TracerouteArg
+	TracerouteHop
+	Traceroute
+	TracerouteTime
+	UpdateResponse
+	VantagePoint
+	VPRequest
+	VPReturn
+	RRSpooferRequest
+	RRSpooferResponse
+	TSSpooferRequest
+	TSSpooferResponse
+*/
 package datamodel
 
 import proto "github.com/golang/protobuf/proto"
@@ -12,6 +56,10 @@ import math "math"
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto.ProtoPackageIsVersion1
 
 type PingMeasurement struct {
 	Src         uint32 `protobuf:"varint,1,opt,name=src" json:"src,omitempty"`
@@ -44,7 +92,7 @@ type PingMeasurement struct {
 func (m *PingMeasurement) Reset()                    { *m = PingMeasurement{} }
 func (m *PingMeasurement) String() string            { return proto.CompactTextString(m) }
 func (*PingMeasurement) ProtoMessage()               {}
-func (*PingMeasurement) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (*PingMeasurement) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 type PingArg struct {
 	Pings []*PingMeasurement `protobuf:"bytes,1,rep,name=pings" json:"pings,omitempty"`
@@ -53,7 +101,7 @@ type PingArg struct {
 func (m *PingArg) Reset()                    { *m = PingArg{} }
 func (m *PingArg) String() string            { return proto.CompactTextString(m) }
 func (*PingArg) ProtoMessage()               {}
-func (*PingArg) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{1} }
+func (*PingArg) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
 func (m *PingArg) GetPings() []*PingMeasurement {
 	if m != nil {
@@ -74,7 +122,7 @@ type PingStats struct {
 func (m *PingStats) Reset()                    { *m = PingStats{} }
 func (m *PingStats) String() string            { return proto.CompactTextString(m) }
 func (*PingStats) ProtoMessage()               {}
-func (*PingStats) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{2} }
+func (*PingStats) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
 type PingResponse struct {
 	From       uint32       `protobuf:"varint,1,opt,name=from" json:"from,omitempty"`
@@ -97,7 +145,7 @@ type PingResponse struct {
 func (m *PingResponse) Reset()                    { *m = PingResponse{} }
 func (m *PingResponse) String() string            { return proto.CompactTextString(m) }
 func (*PingResponse) ProtoMessage()               {}
-func (*PingResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{3} }
+func (*PingResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
 func (m *PingResponse) GetTx() *Time {
 	if m != nil {
@@ -128,7 +176,7 @@ type TsAndAddr struct {
 func (m *TsAndAddr) Reset()                    { *m = TsAndAddr{} }
 func (m *TsAndAddr) String() string            { return proto.CompactTextString(m) }
 func (*TsAndAddr) ProtoMessage()               {}
-func (*TsAndAddr) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
+func (*TsAndAddr) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
 type Ping struct {
 	Type        string          `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
@@ -153,7 +201,7 @@ type Ping struct {
 func (m *Ping) Reset()                    { *m = Ping{} }
 func (m *Ping) String() string            { return proto.CompactTextString(m) }
 func (*Ping) ProtoMessage()               {}
-func (*Ping) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
+func (*Ping) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
 
 func (m *Ping) GetStart() *Time {
 	if m != nil {
@@ -185,7 +233,7 @@ func init() {
 	proto.RegisterType((*Ping)(nil), "datamodel.Ping")
 }
 
-var fileDescriptor1 = []byte{
+var fileDescriptor0 = []byte{
 	// 732 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x54, 0xc1, 0x6e, 0xdb, 0x38,
 	0x10, 0x45, 0x64, 0x3b, 0xb6, 0x28, 0x2b, 0x4e, 0x94, 0xec, 0x86, 0x9b, 0x05, 0x16, 0x0b, 0xf7,

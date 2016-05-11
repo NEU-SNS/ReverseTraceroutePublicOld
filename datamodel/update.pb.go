@@ -19,13 +19,13 @@ type UpdateResponse struct {
 func (m *UpdateResponse) Reset()                    { *m = UpdateResponse{} }
 func (m *UpdateResponse) String() string            { return proto.CompactTextString(m) }
 func (*UpdateResponse) ProtoMessage()               {}
-func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (*UpdateResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 func init() {
 	proto.RegisterType((*UpdateResponse)(nil), "datamodel.UpdateResponse")
 }
 
-var fileDescriptor5 = []byte{
+var fileDescriptor4 = []byte{
 	// 112 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xb2, 0x4e, 0xcf, 0x2c, 0xc9,
 	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0xf7, 0x73, 0x0d, 0xd5, 0x0d, 0xf6, 0x0b, 0xd6, 0x0f,
