@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	apb "github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
@@ -149,7 +150,7 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 		dest, _ := util.IPStringToInt32(rt.Src)
 		hops, _ := util.IPStringToInt32(hop)
 		rt.debug("Attempting to find TR for hop: ", hop, "(", hops, ")", " to ", dest)
-		is := datamodel.IntersectionRequest{
+		is := apb.IntersectionRequest{
 			UseAliases: true,
 			Staleness:  rt.Staleness,
 			Dest:       dest,
@@ -175,7 +176,7 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 		}
 		rt.debug("Received response: ", tr)
 		switch tr.Type {
-		case datamodel.IResponseType_PATH:
+		case apb.IResponseType_PATH:
 			rt.debug("Got PATH Response")
 			var hs []string
 			var found bool
@@ -197,11 +198,11 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 			} else {
 				return nil
 			}
-		case datamodel.IResponseType_NONE_FOUND:
+		case apb.IResponseType_NONE_FOUND:
 			errs = append(errs, fmt.Errorf("None Found"))
-		case datamodel.IResponseType_ERROR:
+		case apb.IResponseType_ERROR:
 			errs = append(errs, fmt.Errorf(tr.Error))
-		case datamodel.IResponseType_TOKEN:
+		case apb.IResponseType_TOKEN:
 			rt.tokens = append(rt.tokens, tr)
 			errs = append(errs, fmt.Errorf("Token Received: %v", tr))
 		}
@@ -226,7 +227,7 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 	}
 	for _, token := range rt.tokens {
 		rt.debug("Sending for token: ", token)
-		err := as.Send(&datamodel.TokenRequest{
+		err := as.Send(&apb.TokenRequest{
 			Token: token.Token,
 		})
 		if err != nil {
@@ -250,7 +251,7 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 		}
 		rt.debug("Received token response: ", resp)
 		switch resp.Type {
-		case datamodel.IResponseType_PATH:
+		case apb.IResponseType_PATH:
 			var hs []string
 			var found bool
 			for _, h := range resp.Path.GetHops() {
@@ -267,9 +268,9 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 			if !rt.AddBackgroundTRSegment(segment) {
 				errs = append(errs, fmt.Errorf("Failed to add segment"))
 			}
-		case datamodel.IResponseType_NONE_FOUND:
+		case apb.IResponseType_NONE_FOUND:
 			errs = append(errs, fmt.Errorf("None Found"))
-		case datamodel.IResponseType_ERROR:
+		case apb.IResponseType_ERROR:
 			errs = append(errs, fmt.Errorf(resp.Error))
 		}
 	}

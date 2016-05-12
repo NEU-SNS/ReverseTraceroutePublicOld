@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
+	apb "github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -83,7 +84,7 @@ type ReverseTraceroute struct {
 	mu                       sync.Mutex // protects running
 	hostnameCache            map[string]string
 	rttCache                 map[string]float32
-	tokens                   []*datamodel.IntersectionResponse
+	tokens                   []*apb.IntersectionResponse
 	rrsSrcToDstToVPToRevHops map[string]map[string]map[string][]string
 	trsSrcToDstToPath        map[string]map[string][]string
 	tsSrcToProbeToVPToResult map[string]map[string]map[string][]string
@@ -98,6 +99,8 @@ type ReverseTraceroute struct {
 	vps                    vpservice.VPSource
 	opc                    chan Status
 }
+
+var initOnce sync.Once
 
 // NewReverseTraceroute creates a new reverse traceroute
 func NewReverseTraceroute(src, dst string, id, stale uint32, as types.AdjacencySource) *ReverseTraceroute {
@@ -928,6 +931,9 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 
 // CreateReverseTraceroute creates a reverse traceroute for the web interface
 func CreateReverseTraceroute(revtr pb.RevtrMeasurement, backoffEndhost, print bool, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) *ReverseTraceroute {
+	initOnce.Do(func() {
+		ipToCluster = newClusterMap(cs)
+	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	rt.backoffEndhost = backoffEndhost
 	rt.print = print
@@ -1077,6 +1083,9 @@ func (si stringInt) String() string {
 
 // RunReverseTraceroute runs a reverse traceroute
 func RunReverseTraceroute(revtr pb.RevtrMeasurement, cl client.Client, at at.Atlas, vpserv vpservice.VPSource, as types.AdjacencySource, cs types.ClusterSource) (*ReverseTraceroute, error) {
+	initOnce.Do(func() {
+		ipToCluster = newClusterMap(cs)
+	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness, as)
 	rt.backoffEndhost = revtr.BackoffEndhost
 	rt.cl = cl
