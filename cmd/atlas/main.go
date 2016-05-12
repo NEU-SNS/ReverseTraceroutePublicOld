@@ -22,6 +22,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	vpsclient "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Config is the config for the atlas
@@ -82,6 +83,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	http.Handle("/metrics", prometheus.Handler())
+	go func() {
+		for {
+			log.Error(http.ListenAndServe(":8080", nil))
+		}
+	}()
 	serv := server.NewServer(server.WithVPS(vps),
 		server.WithTRS(r),
 		server.WithClient(cc))

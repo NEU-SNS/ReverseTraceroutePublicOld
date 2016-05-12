@@ -31,11 +31,9 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,49 +52,41 @@ import (
 )
 
 var (
+	nameSpace     = "controller"
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
-	}, getName())
+	}, nameSpace)
 	rpcCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "count",
 		Help:      "Count of Rpc Calls sent",
 	})
 	timeoutCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "timeout_count",
 		Help:      "Count of Rpc Timeouts",
 	})
 	errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "error_count",
 		Help:      "Count of Rpc Errors",
 	})
 	pingResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "ping_response_times",
 		Help:      "The time it takes for pings to respond",
 	})
 	tracerouteResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "traceroute_response_times",
 		Help:      "The time it takes for traceroutes to reponsd",
 	})
 )
-var id = rand.Uint32()
-
-func getName() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return fmt.Sprintf("controller_%d", id)
-	}
-	return fmt.Sprintf("controller_%s", strings.Replace(name, ".", "_", -1))
-}
 
 func init() {
 	prometheus.MustRegister(procCollector)

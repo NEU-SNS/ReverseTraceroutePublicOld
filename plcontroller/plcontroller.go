@@ -30,10 +30,8 @@ package plcontroller
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -51,88 +49,78 @@ import (
 )
 
 var (
+	nameSpace     = "plcontroller"
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
-	}, getName())
+	}, nameSpace)
 	rpcCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "count",
 		Help:      "Count of Rpc Calls sent",
 	})
 	timeoutCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "timeout_count",
 		Help:      "Count of Rpc Timeouts",
 	})
 	timeoutCounterByVPMT = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "timeout_by_vp",
 		Help:      "The count of Rpc timeouts by VP, per measurement type",
 	}, []string{"vp", "measurement_type"})
 	errorCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "error_count",
 		Help:      "Count of Rpc Errors",
 	})
 	errorCounterByVPMT = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "rpc",
 		Name:      "error_by_vp",
 		Help:      "The count of Rpc Errors by VP, per measurement type",
 	}, []string{"vp", "measurement_type"})
 	pingGoroutineGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "ping_goroutines",
 		Help:      "The current number of goroutines running pings",
 	})
 	pingResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "ping_response_times",
 		Help:      "The time it takes for pings to respond",
 	})
 	tracerouteGoroutineGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "traceroute_goroutines",
 		Help:      "The current number of goroutines running traceroutes",
 	})
 
 	tracerouteResponseTimes = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "traceroute_response_times",
 		Help:      "The time it takes for traceroutes to respond",
 	})
 	ipOptionsResponseTimes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "options_response_times",
 		Help:      "The time it takes for different ip options probes to respond",
 	}, []string{"spoofed", "option"})
 	vpsConnected = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "vantage_points",
 		Name:      "connected_vantage_points",
 		Help:      "The number of currently connected vantage points",
 	})
 )
-
-var id = rand.Uint32()
-
-func getName() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return fmt.Sprintf("plcontroller_%d", id)
-	}
-	r := strings.NewReplacer(".", "_", "-", "")
-	return fmt.Sprintf("plcontroller_%s", r.Replace(name))
-}
 
 func init() {
 	prometheus.MustRegister(errorCounterByVPMT)
