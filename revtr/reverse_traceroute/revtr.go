@@ -993,7 +993,10 @@ func (rt *ReverseTraceroute) Run() error {
 				rt.StopReason = "REACHES"
 				return nil
 			}
-			continue
+			if err == nil {
+				continue
+			}
+			log.Error(err)
 		}
 		rt.debug(err)
 		rt.debug("Attempting RR")
@@ -1016,7 +1019,10 @@ func (rt *ReverseTraceroute) Run() error {
 				rt.StopReason = "REACHES"
 				return nil
 			}
-			continue
+			if err == nil {
+				continue
+			}
+			log.Error(err)
 		}
 		rt.debug("Attempting TS")
 		err = nil
@@ -1038,7 +1044,10 @@ func (rt *ReverseTraceroute) Run() error {
 				rt.StopReason = "REACHES"
 				return nil
 			}
-			continue
+			if err == nil {
+				continue
+			}
+			log.Error(err)
 		}
 		rt.debug("Attempting to add from background traceroute")
 		err = rt.revtreiveBackgroundTRS()
