@@ -1246,6 +1246,38 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 	if err != nil {
 		return err
 	}
+	// initalize all entires so logic for max unresponsive works
+	for rec, spoofToTarg := range recvToSpooferToTarget {
+		inner, ok := rt.rrsSrcToDstToVPToRevHops[rec]
+		if ok {
+			for spoof, targs := range spoofToTarg {
+				for _, targ := range targs {
+					in, ok := inner[targ]
+					if ok {
+						in[spoof] = nil
+					} else {
+						inner[targ] = make(map[string][]string)
+						inner[targ][spoof] = nil
+					}
+				}
+			}
+		} else {
+			tmp := make(map[string]map[string][]string)
+			for spoof, targs := range spoofToTarg {
+				for _, targ := range targs {
+					in, ok := tmp[targ]
+					if ok {
+						in[spoof] = nil
+					} else {
+						tmp[targ] = make(map[string][]string)
+						tmp[targ][spoof] = nil
+					}
+				}
+			}
+			rt.rrsSrcToDstToVPToRevHops[rec] = tmp
+		}
+	}
+	rt.debug(rt.rrsSrcToDstToVPToRevHops)
 	for {
 		p, err := st.Recv()
 		if err == io.EOF {
@@ -1256,9 +1288,9 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 		}
 		rt.debug("Got spoofed RR response: ", p)
 		pr := p.GetResponses()
+		ssrc, _ := util.Int32ToIPString(p.Src)
+		sdst, _ := util.Int32ToIPString(p.Dst)
 		if len(pr) > 0 {
-			ssrc, _ := util.Int32ToIPString(p.Src)
-			sdst, _ := util.Int32ToIPString(p.Dst)
 			sspoofer, _ := util.Int32ToIPString(p.SpoofedFrom)
 			rrs := pr[0].RR
 			cls := new(string)
@@ -1281,6 +1313,20 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 				tmp := make(map[string]map[string][]string)
 				tmp[sdst] = make(map[string][]string)
 				tmp[sdst][sspoofer] = processRR(ssrc, sdst, rrs, true)
+				rt.rrsSrcToDstToVPToRevHops[ssrc] = tmp
+
+			}
+		} else {
+			inner, ok := rt.rrsSrcToDstToVPToRevHops[ssrc]
+			if ok {
+				_, ok := inner[sdst]
+				if !ok {
+					inner[sdst] = make(map[string][]string)
+				} else {
+				}
+			} else {
+				tmp := make(map[string]map[string][]string)
+				tmp[sdst] = make(map[string][]string)
 
 			}
 		}
