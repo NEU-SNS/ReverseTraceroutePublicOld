@@ -279,28 +279,34 @@ func addVP(tx *sql.Tx, vp *pb.VantagePoint) error {
 const (
 	getRRSpoofers = `
 SELECT
-    vps.ip, 
-    vps.hostname, 
-    vps.site, 
-    vps.timestamp, 
-    vps.record_route, 
-    vps.spoof, 
+    vps.ip,
+    vps.hostname,
+    vps.site,
+    vps.timestamp,
+    vps.record_route,
+    vps.spoof,
     vps.rec_spoof,
-    MAX(IFNULL(dtd.dist, ~0 >> 32)) AS dist
+    MAX(IFNULL(dtd.dist, ~0 >>32)) AS dist
 FROM
-    vantage_points vps 
-    LEFT OUTER JOIN dist_to_dest dtd ON dtd.src = vps.ip
+    vantage_points vps
+    LEFT OUTER JOIN (
+        SELECT
+            dtd.src, dtd.dist
+        FROM
+            dist_to_dest dtd
+        WHERE
+            dtd.slash_24 = (? >> 8)
+        ) dtd ON dtd.src = vps.ip
 WHERE
-    (dtd.dist IS NULL OR dtd.slash_24 = (? >> 8)) 
-    AND vps.record_route 
-    AND vps.spoof
+    vps.record_route AND
+    vps.spoof
 GROUP BY
-    vps.ip, 
-    vps.hostname, 
-    vps.site, 
-    vps.timestamp, 
-    vps.record_route, 
-    vps.spoof, 
+    vps.ip,
+    vps.hostname,
+    vps.site,
+    vps.timestamp,
+    vps.record_route,
+    vps.spoof,
     vps.rec_spoof
 ORDER BY
     dist
@@ -331,7 +337,7 @@ func (r *Repo) GetRRSpoofers(target uint32) ([]types.RRVantagePoint, error) {
 	var rrvps []types.RRVantagePoint
 	defer logError(res.Close)
 	for res.Next() {
-		var rrvp types.RRVantagePoint
+		rrvp := new(types.RRVantagePoint)
 		rrvp.Target = target
 		err := res.Scan(&rrvp.Ip,
 			&rrvp.Hostname,
@@ -344,7 +350,7 @@ func (r *Repo) GetRRSpoofers(target uint32) ([]types.RRVantagePoint, error) {
 		if err != nil {
 			return nil, err
 		}
-		rrvps = append(rrvps, rrvp)
+		rrvps = append(rrvps, *rrvp)
 	}
 	if err = res.Err(); err != nil {
 		return nil, err
@@ -361,7 +367,7 @@ func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
 	var tsvps []types.TSVantagePoint
 	defer logError(res.Close)
 	for res.Next() {
-		var tsvp types.TSVantagePoint
+		tsvp := new(types.TSVantagePoint)
 		tsvp.Target = target
 		err := res.Scan(&tsvp.Ip,
 			&tsvp.Hostname,
@@ -373,7 +379,7 @@ func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
 		if err != nil {
 			return nil, err
 		}
-		tsvps = append(tsvps, tsvp)
+		tsvps = append(tsvps, *tsvp)
 	}
 	if err = res.Err(); err != nil {
 		return nil, err

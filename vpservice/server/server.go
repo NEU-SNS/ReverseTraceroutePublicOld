@@ -125,7 +125,8 @@ func makeTSF(f filters.TSFilter) tsFilter {
 		}
 		var final []*pb.VantagePoint
 		for _, vp := range fvps {
-			final = append(final, &vp.VantagePoint)
+			currvp := vp.VantagePoint
+			final = append(final, &currvp)
 		}
 		return final
 	}
@@ -140,7 +141,8 @@ func makeRRF(f filters.RRFilter) rrFilter {
 		}
 		var final []*pb.VantagePoint
 		for _, vp := range fvps {
-			final = append(final, &vp.VantagePoint)
+			currvp := vp.VantagePoint
+			final = append(final, &currvp)
 		}
 		return final
 	}
@@ -167,17 +169,21 @@ func (s server) GetVPs(pbr *pb.VPRequest) (*pb.VPReturn, error) {
 }
 
 func (s server) GetRRSpoofers(rrs *pb.RRSpooferRequest) (*pb.RRSpooferResponse, error) {
+	log.Debug("Getting rrspoofers ", rrs)
 	if rrs.Max == 0 {
 		rrs.Max = defaultLimit
 	}
 	vps, err := s.opts.vpp.GetRRSpoofers(rrs.Addr)
 	if err != nil {
+		log.Debug(err)
 		return nil, err
 	}
+	log.Debug("Got ", len(vps), " rr spoofers: ", vps)
 	var resp pb.RRSpooferResponse
 	resp.Addr = rrs.Addr
 	resp.Max = rrs.Max
 	resp.Spoofers = s.rrf(vps)
+	log.Debug("filtered rr spoofers: ", resp.Spoofers)
 	if uint32(len(resp.Spoofers)) > rrs.Max {
 		resp.Spoofers = resp.Spoofers[:rrs.Max]
 	}
@@ -185,17 +191,21 @@ func (s server) GetRRSpoofers(rrs *pb.RRSpooferRequest) (*pb.RRSpooferResponse, 
 }
 
 func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, error) {
+	log.Debug("Getting tsspoofers ", tsr)
 	if tsr.Max == 0 {
 		tsr.Max = defaultLimit
 	}
 	vps, err := s.opts.vpp.GetTSSpoofers(tsr.Addr)
 	if err != nil {
+		log.Debug(err)
 		return nil, err
 	}
+	log.Debug("Got ", len(vps), " ts spoofers: ", vps)
 	var resp pb.TSSpooferResponse
 	resp.Addr = tsr.Addr
 	resp.Max = tsr.Max
 	resp.Spoofers = s.tsf(vps)
+	log.Debug("filtered ts spoofers: ", resp.Spoofers)
 	if uint32(len(resp.Spoofers)) > tsr.Max {
 		resp.Spoofers = resp.Spoofers[:tsr.Max]
 	}
@@ -279,7 +289,7 @@ func (s server) checkCapabilities() {
 
 // call in a goroutine
 func (s server) updateGauges() {
-	tick := time.NewTicker(time.Hour * 1)
+	tick := time.NewTicker(time.Minute * 5)
 	for {
 		select {
 		case <-tick.C:

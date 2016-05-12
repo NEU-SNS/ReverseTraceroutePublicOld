@@ -23,6 +23,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/server"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // AppConfig is the config struct for the atlas
@@ -99,7 +100,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	http.Handle("/metrics", prometheus.Handler())
+	go func() {
+		for {
+			log.Error(http.ListenAndServe(":8080", nil))
+		}
+	}()
 	ln, err := net.Listen("tcp", ":45000")
 	if err != nil {
 		log.Fatal(err)
