@@ -2,10 +2,8 @@ package server
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -28,11 +26,12 @@ import (
 )
 
 var (
+	nameSpace   = "revtr"
 	goCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
-	}, getName())
+	}, nameSpace)
 	runningRevtrs = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "revtrs",
 		Name:      "running_revtrs",
 		Help:      "The count of currently running reverse traceroutes.",
@@ -45,20 +44,9 @@ var (
 	ErrFailedToCreateBatch = fmt.Errorf("could not create batch")
 )
 
-var id = rand.Uint32()
-
 func init() {
 	prometheus.MustRegister(goCollector)
 	prometheus.MustRegister(runningRevtrs)
-}
-
-func getName() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return fmt.Sprintf("revtr_%d", id)
-	}
-	r := strings.NewReplacer(".", "_", "-", "")
-	return fmt.Sprintf("revtr_%s", r.Replace(name))
 }
 
 type errorf func() error

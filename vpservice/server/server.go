@@ -3,9 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -21,17 +19,18 @@ import (
 )
 
 var (
+	nameSpace     = "vpservice"
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
-	}, getName())
+	}, nameSpace)
 	spooferGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "vantage_points",
 		Name:      "current_spoofers",
 		Help:      "The current number of spoofing VPS",
 	})
 	onlineVPGuage = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: getName(),
+		Namespace: nameSpace,
 		Subsystem: "vantage_points",
 		Name:      "online_vps",
 		Help:      "The current number of online vps",
@@ -43,20 +42,10 @@ const (
 	testSize     = 50
 )
 
-var id = rand.Uint32()
-
 func init() {
 	prometheus.MustRegister(procCollector)
 	prometheus.MustRegister(spooferGauge)
 	prometheus.MustRegister(onlineVPGuage)
-}
-
-func getName() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return fmt.Sprintf("vpservice_%d", id)
-	}
-	return fmt.Sprintf("vpservice_%s", strings.Replace(name, ".", "_", -1))
 }
 
 // VPServer is the interace for the vantage point server

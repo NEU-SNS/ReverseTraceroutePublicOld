@@ -3,10 +3,8 @@ package server
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,20 +22,11 @@ import (
 )
 
 var (
+	nameSpace     = "atlas"
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
-	}, getName())
+	}, nameSpace)
 )
-
-var id = rand.Uint32()
-
-func getName() string {
-	name, err := os.Hostname()
-	if err != nil {
-		return fmt.Sprintf("atlas_%d", id)
-	}
-	return fmt.Sprintf("atlas_%s", strings.Replace(name, ".", "_", -1))
-}
 
 func init() {
 	prometheus.MustRegister(procCollector)
