@@ -41,8 +41,7 @@ import (
 )
 
 var (
-	homeTemplate    = template.Must(template.ParseFiles("webroot/templates/home.html"))
-	runningTemplate = template.Must(template.ParseFiles("webroot/templates/running.html"))
+	templates = template.Must(template.ParseGlob("webroot/templates/*.html"))
 )
 
 // AppConfig for the app
@@ -239,7 +238,7 @@ func (h Home) Home(rw http.ResponseWriter, req *http.Request) {
 	}
 	sort.Sort(vpModelSort(vpl))
 	model.Nodes = vpl
-	homeTemplate.Execute(rw, &model)
+	templates.ExecuteTemplate(rw, "home", &model)
 }
 
 type runningModel struct {
@@ -451,6 +450,6 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
 	rr.rts[id] = nil
-	runningTemplate.Execute(rw, &rt)
+	templates.ExecuteTemplate(rw, "running", &rt)
 	return
 }
