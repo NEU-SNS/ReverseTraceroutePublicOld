@@ -460,13 +460,6 @@ func (rt *ReverseTraceroute) resolveHostname(ip string) string {
 	}
 	hn, ok := rt.hostnameCache[ip]
 	if !ok {
-		for _, vp := range vps {
-			ips, _ := util.Int32ToIPString(vp.Ip)
-			if ips == ip {
-				rt.hostnameCache[ip] = vp.Hostname
-				return vp.Hostname
-			}
-		}
 		hns, err := net.LookupAddr(ip)
 		if err != nil {
 			rt.error(err)
@@ -1001,6 +994,7 @@ func (rt *ReverseTraceroute) Run() error {
 			return nil
 		}
 		if err == nil {
+			log.Debug("Retreiving background trs")
 			err = rt.revtreiveBackgroundTRS()
 			if rt.Reaches() {
 				rt.EndTime = time.Now()
@@ -1113,6 +1107,7 @@ func RunReverseTraceroute(revtr pb.RevtrMeasurement, cl client.Client, at at.Atl
 	rt.backoffEndhost = revtr.BackoffEndhost
 	rt.cl = cl
 	rt.at = at
+	rt.vps = vpserv
 	return rt, rt.Run()
 }
 
