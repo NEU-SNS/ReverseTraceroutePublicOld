@@ -299,7 +299,6 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 	// run these guys
 	go func() {
 		var wg sync.WaitGroup
-		defer logError(servs.Close)
 		wg.Add(len(reqToRun))
 		for _, rtr := range reqToRun {
 			runningRevtrs.Add(1)
@@ -319,6 +318,10 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 				}
 			}(rtr)
 		}
+		defer func() {
+			wg.Wait()
+			logError(servs.Close)
+		}()
 	}()
 	return &pb.RunRevtrResp{
 		BatchId: batchID,
