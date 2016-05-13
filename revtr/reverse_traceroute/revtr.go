@@ -82,6 +82,7 @@ type ReverseTraceroute struct {
 	print                    bool
 	running                  bool
 	mu                       sync.Mutex // protects running
+	hnCacheInit              bool
 	hostnameCache            map[string]string
 	rttCache                 map[string]float32
 	tokens                   []*apb.IntersectionResponse
@@ -444,6 +445,18 @@ func (rt *ReverseTraceroute) HTML() string {
 }
 
 func (rt *ReverseTraceroute) resolveHostname(ip string) string {
+	if !rt.hnCacheInit {
+		vps, err := rt.vps.GetVPs()
+		if err == nil {
+			for _, vp := range vps.GetVps() {
+				ips, _ := util.Int32ToIPString(vp.Ip)
+				rt.hostnameCache[ips] = vp.Hostname
+			}
+			rt.hnCacheInit = true
+		} else {
+			log.Error(err)
+		}
+	}
 	hn, ok := rt.hostnameCache[ip]
 	if !ok {
 		for _, vp := range vps {
