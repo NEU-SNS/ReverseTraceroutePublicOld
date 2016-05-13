@@ -393,11 +393,12 @@ func (rt *ReverseTraceroute) HTML() string {
 	out.WriteString(fmt.Sprintf(" (%s)", rt.resolveHostname(rt.Src)))
 	out.WriteString("</caption>")
 	out.WriteString(`<tbody>`)
-	first := true
+	first := new(bool)
 	var i int
 	if len(*rt.Paths) > 0 {
 
 		for _, segment := range *rt.CurrPath().Path {
+			*first = true
 			symbol := new(string)
 			switch segment.(type) {
 			case *DstSymRevSegment:
@@ -425,9 +426,9 @@ func (rt *ReverseTraceroute) HTML() string {
 				}
 				hopsSeen[hop] = true
 				tech := new(string)
-				if first {
+				if *first {
 					*tech = *symbol
-					first = false
+					*first = false
 				} else {
 					*tech = "-" + *symbol
 				}
