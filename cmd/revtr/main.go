@@ -116,10 +116,7 @@ func main() {
 	v1api.NewV1Api(serv, mux)
 	v2serv := v2api.CreateServer(serv, tlsConf)
 	gatewayMux := runtime.NewServeMux()
-	selfCreds, err := credentials.NewClientTLSFromFile(*conf.ServerConfig.RootCA, "revtr.revtr.ccs.neu.edu")
-	if err != nil {
-		log.Fatal(err)
-	}
+	selfCreds := credentials.NewClientTLSFromCert(nil, "www.revtr.ccs.neu.edu")
 	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(selfCreds)}
 	err = pb.RegisterRevtrHandlerFromEndpoint(context.Background(), gatewayMux, ":8080", dialOpts)
 	if err != nil {
