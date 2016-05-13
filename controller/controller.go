@@ -84,7 +84,7 @@ var (
 		Namespace: nameSpace,
 		Subsystem: "measurements",
 		Name:      "traceroute_response_times",
-		Help:      "The time it takes for traceroutes to reponsd",
+		Help:      "The time it takes for traceroutes to respond",
 	})
 )
 
