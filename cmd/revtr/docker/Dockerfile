@@ -3,9 +3,9 @@ FROM ubuntu:latest
 WORKDIR /revtr
 COPY . /revtr
 
-RUN useradd -ms /bin/bash revtr
-
-USER revtr
+RUN apt-get update
+RUN apt-get install -y ca-certificates &&  apt-get clean \
+&&  rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/revtr/revtr"]
 CMD ["-loglevel", "error"]
