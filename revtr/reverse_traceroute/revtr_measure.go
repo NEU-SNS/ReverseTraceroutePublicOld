@@ -354,7 +354,7 @@ func (rt *ReverseTraceroute) issueTraceroute() error {
 		if len(hopst) > 0 && hopst[len(hopst)-1] != rt.LastHop() {
 			rt.errorDetails.WriteString("Traceroute didn't reach destination.\n")
 			rt.errorDetails.WriteString(tr.ErrorString() + "\n")
-			rt.errorDetails.WriteString(fmt.Sprintf("<a href=\"/runrevtr?src=%s&dst=%s\">Try rerunning from the last responseiv hop!</a>", rt.Src, hopst[len(hopst)-1]))
+			rt.errorDetails.WriteString(fmt.Sprintf("<a href=\"/runrevtr?src=%s&dst=%s\">Try rerunning from the last responsive hop! </a>", rt.Src, hopst[len(hopst)-1]))
 			return fmt.Errorf("Traceroute didn't reach destination")
 		}
 		rt.debug("got traceroute ", hopst)
