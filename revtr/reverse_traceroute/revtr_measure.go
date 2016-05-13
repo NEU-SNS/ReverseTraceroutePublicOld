@@ -144,7 +144,7 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 	as, err := rt.at.GetIntersectingPath(ctx)
 	var errs []error
 	if err != nil {
-		return nil
+		return err
 	}
 	for _, hop := range rt.CurrPath().LastSeg().Hops() {
 		dest, _ := util.IPStringToInt32(rt.Src)
@@ -223,7 +223,7 @@ func (rt *ReverseTraceroute) revtreiveBackgroundTRS() error {
 	defer cancel()
 	as, err := rt.at.GetPathsWithToken(ctx)
 	if err != nil {
-		return nil
+		return err
 	}
 	for _, token := range rt.tokens {
 		rt.debug("Sending for token: ", token)
