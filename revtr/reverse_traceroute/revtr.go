@@ -1285,7 +1285,6 @@ func (rt *ReverseTraceroute) issueSpoofedRecordRoutes(recvToSpooferToTarget map[
 			rt.rrsSrcToDstToVPToRevHops[rec] = tmp
 		}
 	}
-	rt.debug(rt.rrsSrcToDstToVPToRevHops)
 	for {
 		p, err := st.Recv()
 		if err == io.EOF {
