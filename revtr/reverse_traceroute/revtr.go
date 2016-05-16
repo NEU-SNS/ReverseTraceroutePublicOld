@@ -1174,7 +1174,7 @@ func (rt *ReverseTraceroute) reverseHopsRR() error {
 				Src:        srcs,
 				Dst:        dsts,
 				RR:         true,
-				Timeout:    30,
+				Timeout:    10,
 				Count:      "1",
 				CheckDb:    true,
 				CheckCache: true,
