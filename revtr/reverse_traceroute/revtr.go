@@ -866,7 +866,6 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 	for k := range tmp {
 		keys = append(keys, k)
 	}
-	rt.debug("Keys: ", keys, " vpsleft: ", rt.RRHop2VPSLeft[*cls])
 	usedVps := stringSet(keys).union(stringSet(rt.RRHop2VPSLeft[*cls]))
 	rt.RRHop2VPSLeft[*cls] = stringSliceMinus(rt.RRHop2VPSLeft[*cls], usedVps)
 	var finalUsedVPs []string
