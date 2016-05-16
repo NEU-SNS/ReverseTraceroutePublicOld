@@ -512,7 +512,6 @@ func (rt *ReverseTraceroute) getRTT(ip string) float32 {
 			rt.rttCache[ip] = 0
 			break
 		}
-		rt.debug(p)
 		rt.rttCache[ip] = float32(p.Responses[0].Rtt) / 1000
 	}
 	return rt.rttCache[ip]
