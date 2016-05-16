@@ -837,10 +837,10 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string) ([]string, string) {
 		rt.debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
 		var vals [][]string
 		for _, val := range rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls] {
-			rt.debug("Found old values: ", val)
-			if len(val) > 0 {
-				vals = append(vals, val)
+			if val == nil {
+				continue
 			}
+			vals = append(vals, val)
 		}
 		// 0. destination seems to be unresponsive
 		if len(rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls]) >= maxUnresponsive &&
