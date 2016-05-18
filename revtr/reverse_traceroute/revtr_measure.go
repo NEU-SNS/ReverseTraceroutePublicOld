@@ -10,9 +10,9 @@ import (
 
 	apb "github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/prometheus/log"
 	"golang.org/x/net/context"
 )
 
