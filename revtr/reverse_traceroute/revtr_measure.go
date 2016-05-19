@@ -29,6 +29,7 @@ func (rt *ReverseTraceroute) issueRecordRoutes(ping *datamodel.PingMeasurement) 
 		*sdst, _ = util.Int32ToIPString(ping.Dst)
 		*cls = *sdst
 	}
+	rt.ProbeCount["rr"]++
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	st, err := rt.cl.Ping(ctx, &datamodel.PingArg{
