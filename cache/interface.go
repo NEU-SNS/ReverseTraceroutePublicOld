@@ -40,7 +40,6 @@ type Cache interface {
 	GetMulti([]string) (map[string]Item, error)
 	Set(string, []byte) error
 	SetWithExpire(string, []byte, int32) error
-	SetPrefix(string)
 }
 
 // Keyer is anything that generates a key
