@@ -372,6 +372,7 @@ func (s server) testTS(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 	for _, pm := range pms {
 		tspm := new(datamodel.PingMeasurement)
 		*tspm = *pm
+		tspm.RR = false
 		tspm.TimeStamp = fmt.Sprintf("tsprespec=%v,%v", ipaddress(pm.Src), ipaddress(pm.Dst))
 		tests = append(tests, tspm)
 	}
@@ -423,6 +424,8 @@ func (s server) testSpoof(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.V
 	for i, pm := range pms {
 		spm := new(datamodel.PingMeasurement)
 		*spm = *pm
+		spm.RR = false
+		spm.TimeStamp = ""
 		// Spoof as the src of the next vp in the list
 		spoofAs := pms[(i+1)%len(pms)]
 		sip, _ := util.Int32ToIPString(spoofAs.Src)
