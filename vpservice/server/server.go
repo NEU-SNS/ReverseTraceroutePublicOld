@@ -38,7 +38,7 @@ var (
 )
 
 const (
-	defaultLimit = 150
+	defaultLimit = 250
 	testSize     = 50
 )
 
