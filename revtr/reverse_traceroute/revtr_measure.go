@@ -148,6 +148,9 @@ func (rt *ReverseTraceroute) reverseHopsTRToSrc() error {
 		return err
 	}
 	for _, hop := range rt.CurrPath().LastSeg().Hops() {
+		if iputil.IsPrivate(net.ParseIP(hop)) {
+			continue
+		}
 		dest, _ := util.IPStringToInt32(rt.Src)
 		hops, _ := util.IPStringToInt32(hop)
 		rt.debug("Attempting to find TR for hop: ", hop, "(", hops, ")", " to ", dest)
