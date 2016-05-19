@@ -29,7 +29,6 @@ package cache
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/bradfitz/gomemcache/memcache"
@@ -84,45 +83,29 @@ func (o outItem) Value() []byte {
 	return o.data
 }
 
-func fixKey(in string) string {
-	res := strings.SplitAfterN(in, "_", 2)
-	return res[1]
-}
-
 func toOutItem(key string, data []byte) outItem {
-
 	return outItem{
 		data: data,
-		key:  fixKey(key),
+		key:  key,
 	}
 }
 
 type cache struct {
-	c      *memcache.Client
-	prefix string
+	c *memcache.Client
 }
 
 // New creates a new cache
 func New(servers ServerList) Cache {
 	return &cache{
-		c:      memcache.New(servers...),
-		prefix: "DEFAULT",
+		c: memcache.New(servers...),
 	}
-}
-
-func (c *cache) SetPrefix(pre string) {
-	c.prefix = pre
-}
-
-func makeKey(pre, val string) string {
-	return fmt.Sprintf("%s_%s", pre, val)
 }
 
 func (c *cache) Get(key string) (Item, error) {
 	if c.c == nil {
 		return nil, ErrorNoClient
 	}
-	item, err := c.c.Get(makeKey(c.prefix, key))
+	item, err := c.c.Get(key)
 	if err != nil {
 		return nil, toError(err)
 	}
@@ -137,7 +120,7 @@ func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	nkeys := len(keys)
 	ukeys := make([]string, nkeys)
 	for i, key := range keys {
-		ukeys[i] = makeKey(c.prefix, key)
+		ukeys[i] = key
 	}
 	multi, err := c.c.GetMulti(ukeys)
 	if err != nil {
@@ -145,7 +128,7 @@ func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	}
 	ret := make(map[string]Item)
 	for k, v := range multi {
-		ret[fixKey(k)] = toOutItem(v.Key, v.Value)
+		ret[k] = toOutItem(v.Key, v.Value)
 	}
 	log.Debug("got cache result for keys: ", keys)
 	return ret, nil
@@ -166,7 +149,7 @@ func (c *cache) SetWithExpire(key string, val []byte, exp int32) error {
 		return ErrorNoClient
 	}
 	return toError(c.c.Set(&memcache.Item{
-		Key:        makeKey(c.prefix, key),
+		Key:        key,
 		Value:      val,
 		Expiration: exp,
 	}))

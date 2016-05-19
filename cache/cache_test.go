@@ -32,7 +32,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/cache"
 )
 
-var list = cache.ServerList{"127.0.0.1:11211", "127.0.0.1:11212"}
+var list = cache.ServerList{"127.0.0.1:11211"}
 
 func TestNewCache(t *testing.T) {
 	c := cache.New(list)
