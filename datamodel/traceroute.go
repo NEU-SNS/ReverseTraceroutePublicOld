@@ -103,7 +103,7 @@ func (t *Traceroute) ErrorString() string {
 		*last = int(hop.ProbeTtl)
 	}
 	if t.StopReason == "GAPLIMIT" {
-		for i := 0; i < 7; i++ {
+		for i := 0; i < 5; i++ {
 			buf.WriteString(fmt.Sprintf("%d: *   *   *\n", *last+i+1))
 		}
 

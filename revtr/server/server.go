@@ -657,9 +657,7 @@ func makePrintHTML(sc chan<- Status, rs revtrServer) func(*reversetraceroute.Rev
 		var out bytes.Buffer
 		out.WriteString(`<table class="table">`)
 		out.WriteString(`<caption class="text-center">Reverse Traceroute from `)
-		if len(rt.Hops()) >= 1 {
-			out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Dst, rs.resolveHostname(rt.Dst)))
-		}
+		out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Dst, rs.resolveHostname(rt.Dst)))
 		out.WriteString(rt.Src)
 		out.WriteString(fmt.Sprintf(" (%s)", rs.resolveHostname(rt.Src)))
 		out.WriteString("</caption>")
@@ -722,10 +720,16 @@ func makePrintHTML(sc chan<- Status, rs revtrServer) func(*reversetraceroute.Rev
 		}
 		out.WriteString("</tbody></table>")
 		out.WriteString(fmt.Sprintf("\n%s", rt.StopReason))
+		var showError = rt.StopReason == reversetraceroute.Failed
+		var errorText string
+		if showError {
+			errorText = strings.Replace(rt.ErrorDetails.String(), "\n", "<br>", -1)
 
+		}
 		var stat Status
 		stat.Rep = strings.Replace(out.String(), "\n", "<br>", -1)
 		stat.Status = rt.StopReason != ""
+		stat.Error = errorText
 		select {
 		case sc <- stat:
 		default:
