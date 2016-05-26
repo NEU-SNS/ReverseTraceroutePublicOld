@@ -680,6 +680,8 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 		revtr.Src, revtr.LastHop(), revtr.Staleness)
 	if err != nil {
 		log.Debug("Issue traceroute err: ", err)
+		revtr.ErrorDetails.WriteString("Error running traceroute\n")
+		revtr.ErrorDetails.WriteString(err.Error() + "\n")
 		revtr.FailCurrPath()
 		if revtr.Failed() {
 			// we failed so we're done
@@ -869,11 +871,28 @@ type sprrhops struct {
 }
 
 type tracerouteError struct {
+	err   error
 	trace *datamodel.Traceroute
+	extra string
 }
 
 func (te tracerouteError) Error() string {
-	return te.trace.ErrorString()
+	var buf bytes.Buffer
+	if te.err != nil {
+		buf.WriteString(te.err.Error() + "\n")
+	}
+	if te.trace.Error != "" {
+		buf.WriteString(fmt.Sprintf("Error running traceroute %v ", te.trace) + "\n")
+		if te.extra != "" {
+			buf.WriteString(te.extra + "\n")
+		}
+		return buf.String()
+	}
+	buf.WriteString(te.trace.ErrorString() + "\n")
+	if te.extra != "" {
+		buf.WriteString(te.extra + "\n")
+	}
+	return buf.String()
 }
 
 type traceroute struct {
@@ -895,7 +914,7 @@ func issueTraceroute(cl client.Client, cm clustermap.ClusterMap,
 		CheckCache: true,
 		CheckDb:    true,
 		Staleness:  staleness,
-		Timeout:    10,
+		Timeout:    30,
 		Wait:       "2",
 		Attempts:   "1",
 		LoopAction: "1",
@@ -939,10 +958,14 @@ func issueTraceroute(cl client.Client, cm clustermap.ClusterMap,
 		}
 		if len(hopst) == 0 {
 			log.Debug("Received traceroute with no hops")
-			return traceroute{}, fmt.Errorf("Traceroute didn't find hops")
+
+			return traceroute{}, tracerouteError{trace: trace}
 		}
 		if cm.Get(hopst[len(hopst)-1]) != cls {
-			return traceroute{}, tracerouteError{trace: trace}
+			return traceroute{}, tracerouteError{
+				err:   fmt.Errorf("Traceroute didn't reach destination"),
+				trace: trace,
+				extra: fmt.Sprintf("<a href=\"/runrevtr?src=%s&dst=%s\">Try rerunning from the last responsive hop! </a>", src, hopst[len(hopst)-1])}
 		}
 		log.Debug("Got traceroute ", hopst)
 		return traceroute{src: src, dst: dst, hops: hopst}, nil
@@ -967,11 +990,12 @@ func intersectingTraceroute(src, dst string, addrs []uint32,
 		log.Debug("Attempting to find TR for hop: ", addr,
 			"(", ipstr(addr).String(), ")", " to ", src)
 		is := apb.IntersectionRequest{
-			UseAliases: true,
-			Staleness:  staleness,
-			Dest:       dest,
-			Address:    addr,
-			Src:        srci,
+			UseAliases:   true,
+			Staleness:    staleness,
+			Dest:         dest,
+			Address:      addr,
+			Src:          srci,
+			IgnoreSource: true,
 		}
 		err := as.Send(&is)
 		if err != nil {

@@ -80,7 +80,7 @@ type ReverseTraceroute struct {
 	// Since I can't intialize to true, I'm going to use an int and say 0 is true
 	// anythign else will be false
 	tsHopResponsive         map[string]int
-	errorDetails            bytes.Buffer
+	ErrorDetails            bytes.Buffer
 	lastResponsive          string
 	rrSpoofRRResponsive     map[string]int
 	onAdd                   OnAddFunc
