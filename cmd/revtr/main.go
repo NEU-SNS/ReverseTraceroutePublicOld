@@ -23,12 +23,13 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
-	"github.com/NEU-SNS/ReverseTraceroute/revtr/reverse_traceroute"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/runner"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/server"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/v1api"
@@ -48,6 +49,7 @@ var (
 type AppConfig struct {
 	ServerConfig types.Config
 	DB           repo.Configs
+	CAConfig     cache.Config
 }
 
 func init() {
@@ -70,6 +72,7 @@ func init() {
 func main() {
 	conf := AppConfig{
 		ServerConfig: types.NewConfig(),
+		CAConfig:     cache.NewConfig(),
 	}
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
@@ -102,13 +105,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	ca := cache.New(*conf.CAConfig.Addrs)
 	serv := server.NewRevtrServer(server.WithVPSource(vps),
 		server.WithAdjacencySource(da),
 		server.WithClusterSource(da),
 		server.WithRTStore(da),
 		server.WithRootCA(*conf.ServerConfig.RootCA),
 		server.WithCertFile(*conf.ServerConfig.CertFile),
-		server.WithKeyFile(*conf.ServerConfig.KeyFile))
+		server.WithKeyFile(*conf.ServerConfig.KeyFile),
+		server.WithCache(ca),
+		server.WithRunner(runner.New()))
 	mux := http.NewServeMux()
 	RegisterHome(vps, mux)
 	RegisterRunRevtr(serv, mux)
@@ -243,13 +249,13 @@ type runningModel struct {
 	URL string
 }
 
-type msgFunc func(msg reversetraceroute.Status) error
+type msgFunc func(msg server.Status) error
 
 type outputChan struct {
-	c <-chan reversetraceroute.Status
+	c <-chan server.Status
 	// protects the following
 	mu    sync.Mutex
-	last  reversetraceroute.Status
+	last  server.Status
 	funcs map[*msgFunc]bool
 }
 
@@ -260,7 +266,7 @@ func (oc *outputChan) register(mf msgFunc) {
 		oc.funcs = make(map[*msgFunc]bool)
 	}
 	oc.funcs[&mf] = true
-	zero := reversetraceroute.Status{}
+	zero := server.Status{}
 	if oc.last != zero {
 		oc.callAll(oc.last)
 	}
@@ -275,7 +281,7 @@ func (oc *outputChan) remove(mf msgFunc) {
 	delete(oc.funcs, &mf)
 }
 
-func (oc *outputChan) callAll(s reversetraceroute.Status) {
+func (oc *outputChan) callAll(s server.Status) {
 	for f := range oc.funcs {
 		err := (*f)(s)
 		if err != nil {
@@ -393,14 +399,14 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	}
 	var oc *outputChan
 	if rtrs == nil {
-		out, err := rr.s.StartRevtr(uint32(keyint))
+		out, err := rr.s.StartRevtr(context.Background(), uint32(keyint))
 		if err != nil {
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		oc = &outputChan{c: out}
 		rr.rts[uint32(keyint)] = oc
 	}
-	mf := msgFunc(func(s reversetraceroute.Status) error {
+	mf := msgFunc(func(s server.Status) error {
 		err := c.Write(wsMessage{
 			HTML:   s.Rep,
 			Status: s.Status,

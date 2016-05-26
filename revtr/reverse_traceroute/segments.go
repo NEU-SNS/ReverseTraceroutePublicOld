@@ -7,51 +7,20 @@ import (
 	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
-	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
+	"github.com/NEU-SNS/ReverseTraceroute/util/string"
 )
 
 const (
-	dstRevSegment                         = 1
-	dstSymRevSegment                      = 2
-	trToSrcRevSegment                     = 3
-	rrRevSegment                          = 4
-	spoofRRRevSegment                     = 5
-	tsAdjRevSegment                       = 6
-	spoofTSAdjRevSegment                  = 7
-	spoofTSAdjRevSegmentTSZero            = 8
-	spoofTSAdjRevSegmentTSZeroDoubleStamp = 9
+	dstRevSegment = iota + 1
+	dstSymRevSegment
+	trToSrcRevSegment
+	rrRevSegment
+	spoofRRRevSegment
+	tsAdjRevSegment
+	spoofTSAdjRevSegment
+	spoofTSAdjRevSegmentTSZero
+	spoofTSAdjRevSegmentTSZeroDoubleStamp
 )
-
-type stringSet []string
-
-func (ss stringSet) union(s stringSet) []string {
-	var mm map[string]bool
-	mm = make(map[string]bool)
-	var ret []string
-	for _, c := range ss {
-		mm[ipToCluster.Get(c)] = false
-	}
-	for _, c := range s {
-		if _, ok := mm[ipToCluster.Get(c)]; ok {
-			mm[ipToCluster.Get(c)] = true
-		}
-	}
-	var foundNonSpoofed *bool
-	foundNonSpoofed = new(bool)
-	for k, v := range mm {
-		if k == "non_spoofed" && v {
-			*foundNonSpoofed = true
-			continue
-		}
-		if v {
-			ret = append(ret, k)
-		}
-	}
-	if *foundNonSpoofed {
-		ret = append([]string{"non_spoofed"}, ret...)
-	}
-	return ret
-}
 
 // Segment is the interface for a segment
 type Segment interface {
@@ -67,13 +36,13 @@ type Segment interface {
 	Type() int
 }
 
-// RevSegment is a...
+// RevSegment is a segment in a reverse path
 type RevSegment struct {
 	Segment  []string
 	Src, Hop string
 }
 
-// Type ...
+// Type returns the type of the segment
 func (rv *RevSegment) Type() int {
 	return 0
 }
@@ -101,12 +70,12 @@ func (rv *RevSegment) String() string {
 	return fmt.Sprintf("RevSegment_%v_S%s_H%s", rv.Segment, rv.Src, rv.Hop)
 }
 
-// Hops ...
+// Hops gets the hops of the segment
 func (rv *RevSegment) Hops() []string {
 	return rv.Segment
 }
 
-// SetHop ...
+// SetHop sets the hop for the segment
 func (rv *RevSegment) SetHop(hop string) {
 	rv.Hop = hop
 }
@@ -121,17 +90,17 @@ func rIndex(ss []string, s string) int {
 	return index
 }
 
-// RemoveHops ...
+// RemoveHops removes the given hops from the segment
 func (rv *RevSegment) RemoveHops(toDel []string) error {
 	var noZeros []string
-	segAsSet := stringSet(rv.Segment)
+	segAsSet := stringutil.StringSet(rv.Segment)
 	for _, ip := range toDel {
 		if ip != "0.0.0.0" {
 			noZeros = append(noZeros, ip)
 		}
 	}
 	hop := new(string)
-	common := segAsSet.union(stringSet(noZeros))
+	common := segAsSet.Union(stringutil.StringSet(noZeros))
 	if len(common) > 0 {
 		mapIndex := -1
 		for _, h := range common {
@@ -148,38 +117,32 @@ func (rv *RevSegment) RemoveHops(toDel []string) error {
 			rv.Segment = rv.Segment[mapIndex+1 : len(rv.Segment)]
 		}
 	}
-	common = stringSet(rv.Segment).union(stringSet(toDel))
+	common = stringutil.StringSet(rv.Segment).Union(stringutil.StringSet(toDel))
 	if len(common) > 0 {
 		return fmt.Errorf("Still a loop, %v, %v, %v, %v", toDel, rv.Segment, common, *hop)
 	}
 	return nil
 }
 
-// RemoveLocalHops ...
-func (rv *RevSegment) RemoveLocalHops() error {
+// RemoveLocalHops removes all private hops
+func (rv *RevSegment) RemoveLocalHops() {
 	var ns []string
 	for _, h := range rv.Segment {
 		ip := net.ParseIP(h)
-		if !iputil.IsPrivate(ip) {
+		if ip != nil && ip.IsGlobalUnicast() {
 			ns = append(ns, h)
 		}
 	}
 	rv.Segment = ns
-	if len(rv.Segment) == 0 {
-		return nil
-	}
-	for rv.Segment[len(rv.Segment)-1] == "0.0.0.0" {
-		rv.Segment = rv.Segment[:len(rv.Segment)-1]
-	}
-	return nil
 }
 
-// SymmetricAssumptions ...
+// SymmetricAssumptions returns the number of symmetric assumptions in the segment
 func (rv *RevSegment) SymmetricAssumptions() int {
 	return 0
 }
 
-// Length ...
+// Length returns the length of the segment. If excNullHops is given,
+// hops that are 0.0.0.0 aren't included
 func (rv *RevSegment) Length(excNullHops bool) int {
 	if excNullHops {
 		var length int
@@ -193,7 +156,8 @@ func (rv *RevSegment) Length(excNullHops bool) int {
 	return len(rv.Segment)
 }
 
-// LastHop ...
+// LastHop returns the last hop in the segment
+// returns "" if the segment is empty
 func (rv *RevSegment) LastHop() string {
 	if len(rv.Segment) == 0 {
 		return ""
@@ -201,37 +165,9 @@ func (rv *RevSegment) LastHop() string {
 	return rv.Segment[len(rv.Segment)-1]
 }
 
-// Reaches ...
+// Reaches returns true if the revsegment reaches the src
 func (rv *RevSegment) Reaches() bool {
 	return rv.LastHop() == rv.Src || ipToCluster.Get(rv.LastHop()) == ipToCluster.Get(rv.Src)
-}
-
-func stringArrayEquals(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i, ll := range left {
-		if ll != right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func orderStringArray(left, right []string) int {
-	if len(left) > len(right) {
-		return 1
-	}
-	if len(left) < len(right) {
-		return -1
-	}
-	for i, ll := range left {
-		cmp := strings.Compare(ll, right[i])
-		if cmp != 0 {
-			return cmp
-		}
-	}
-	return 0
 }
 
 // Order ...
@@ -242,7 +178,7 @@ func (rv *RevSegment) Order(b Segment) int {
 	} else if reflect.TypeOf(b) == reflect.TypeOf(&DstSymRevSegment{}) &&
 		reflect.TypeOf(rv) != reflect.TypeOf(&DstSymRevSegment{}) {
 		return 1
-	} else if stringArrayEquals(rv.Segment, b.Hops()) {
+	} else if stringutil.StringArrayEquals(rv.Segment, b.Hops()) {
 		return 0
 	} else if rv.LastHop() == b.LastHop() {
 		if rv.Length(true) != b.Length(true) {
@@ -254,7 +190,7 @@ func (rv *RevSegment) Order(b Segment) int {
 			}
 			return 1
 		}
-		return orderStringArray(rv.Segment, b.Hops())
+		return stringutil.OrderStringArray(rv.Segment, b.Hops())
 	} else if rv.Reaches() {
 		return 1
 	} else if b.Reaches() {
@@ -281,7 +217,7 @@ func NewRevSegment(segment []string, src, hop string) *RevSegment {
 		Segment: segment,
 	}
 	for i, h := range ret.Segment {
-		if strings.Index(h, "192.168.") == 0 {
+		if !net.ParseIP(h).IsGlobalUnicast() {
 			ret.Segment[i] = "0.0.0.0"
 		}
 	}
@@ -293,7 +229,7 @@ type DstRevSegment struct {
 	*RevSegment
 }
 
-// Type ...
+// Type satisfies the Segment Interface
 func (d *DstRevSegment) Type() int {
 	return dstRevSegment
 }
@@ -352,23 +288,14 @@ func (d *DstSymRevSegment) String() string {
 	return fmt.Sprintf("%s_AssumeSym", d.RevSegment.String())
 }
 
-func inArray(arr []string, s string) bool {
-	for _, ss := range arr {
-		if ss == s {
-			return true
-		}
-	}
-	return false
-}
-
 // This mimics the functionality of the static method select_nonzero_hops
 func ndsrsSelectNonzeroHops(tr []string, hops int, hopsToIgnore []string) []string {
 	log.Debugf("Selecting %d non-zero hops from %v, ignoring %v", hops, tr, hopsToIgnore)
 	var i, found int
 	for found < hops && i < len(tr) {
-		if tr[i] != "0.0.0.0" && (!inArray(hopsToIgnore, tr[i])) {
+		if tr[i] != "0.0.0.0" && (!stringutil.InArray(hopsToIgnore, tr[i])) {
 			found++
-		} else if inArray(hopsToIgnore, tr[i]) {
+		} else if stringutil.InArray(hopsToIgnore, tr[i]) {
 			log.Debug("Skipping Deadend ", tr[i])
 		}
 		i++
@@ -385,14 +312,6 @@ func ndsrsSelectNonzeroHops(tr []string, hops int, hopsToIgnore []string) []stri
 	return tr[:lastValidHop+1]
 }
 
-func stringSliceReverse(ss []string) []string {
-	ret := make([]string, len(ss))
-	for i, s := range ss {
-		ret[len(ss)-i-1] = s
-	}
-	return ret
-}
-
 //NewDstSymRevSegment creates a new NewDstSymRevSegment
 // tr is an array of hops along the forward path, not including the source
 // numhops is number of nonzero hops to assume
@@ -400,10 +319,9 @@ func stringSliceReverse(ss []string) []string {
 // still need to include numhops, since we don't know how many of those are being ignored
 // hop to ignore does no persist
 func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore []string) *DstSymRevSegment {
-	log.Debugf("src: %s, hop: %s, tr: %v, numHops: %d, htoi: %v", src, hop, tr, numhops, hopsToIgnore)
 	ntr := append([]string{src}, tr[:len(tr)-1]...)
 	log.Debug("New TR: ", ntr)
-	rev := stringSliceReverse(ntr)
+	rev := stringutil.StringSliceReverse(ntr)
 	log.Debug("The reversed slice is: ", rev)
 	segment := ndsrsSelectNonzeroHops(rev, numhops, hopsToIgnore)
 	log.Debug("The segment is: ", segment)
@@ -422,7 +340,7 @@ func NewDstSymRevSegment(src, hop string, tr []string, numhops int, hopsToIgnore
 // replacing the curring segments with a new one.
 func (d *DstSymRevSegment) AddHop(hopsToIgnore []string) error {
 	tr := append([]string{d.Src}, d.tr[:len(d.tr)-1]...)
-	rev := stringSliceReverse(tr)
+	rev := stringutil.StringSliceReverse(tr)
 	d.numHops++
 	d.Segment = ndsrsSelectNonzeroHops(rev, d.numHops, hopsToIgnore)
 	return nil
