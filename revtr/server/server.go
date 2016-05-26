@@ -1,23 +1,32 @@
 package server
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
+	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/clustermap"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/ip_utils"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/repository"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/reverse_traceroute"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/runner"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
@@ -161,7 +170,7 @@ type RevtrServer interface {
 	GetRevtr(*pb.GetRevtrReq) (*pb.GetRevtrResp, error)
 	GetSources(*pb.GetSourcesReq) (*pb.GetSourcesResp, error)
 	AddRevtr(pb.RevtrMeasurement) (uint32, error)
-	StartRevtr(uint32) (<-chan reversetraceroute.Status, error)
+	StartRevtr(context.Context, uint32) (<-chan Status, error)
 }
 
 type serverOptions struct {
@@ -169,62 +178,78 @@ type serverOptions struct {
 	vps                       vpservice.VPSource
 	as                        types.AdjacencySource
 	cs                        types.ClusterSource
+	ca                        cache.Cache
+	run                       runner.Runner
 	rootCA, certFile, keyFile string
 }
 
 // Option configures the server
 type Option func(*serverOptions)
 
-// WithRTStore returns a Option that sets the RTStore to rts
+// WithCache configures the server to use the cache c
+func WithCache(c cache.Cache) Option {
+	return func(so *serverOptions) {
+		so.ca = c
+	}
+}
+
+// WithRunner returns an  Option that sets the runner to r
+func WithRunner(r runner.Runner) Option {
+	return func(so *serverOptions) {
+		so.run = r
+	}
+}
+
+// WithRTStore returns an Option that sets the RTStore to rts
 func WithRTStore(rts RTStore) Option {
 	return func(so *serverOptions) {
 		so.rts = rts
 	}
 }
 
-// WithVPSource returns a Option that sets the VPSource to vps
+// WithVPSource returns an Option that sets the VPSource to vps
 func WithVPSource(vps vpservice.VPSource) Option {
 	return func(so *serverOptions) {
 		so.vps = vps
 	}
 }
 
-// WithAdjacencySource returns a Option that sets the AdjacencySource to as
+// WithAdjacencySource returns an Option that sets the AdjacencySource to as
 func WithAdjacencySource(as types.AdjacencySource) Option {
 	return func(so *serverOptions) {
 		so.as = as
 	}
 }
 
-// WithClusterSource returns a Option that sets the ClusterSource to cs
+// WithClusterSource returns an Option that sets the ClusterSource to cs
 func WithClusterSource(cs types.ClusterSource) Option {
 	return func(so *serverOptions) {
 		so.cs = cs
 	}
 }
 
-// WithRootCA returns a Option that sets the rootCA to rootCA
+// WithRootCA returns an Option that sets the rootCA to rootCA
 func WithRootCA(rootCA string) Option {
 	return func(so *serverOptions) {
 		so.rootCA = rootCA
 	}
 }
 
-// WithCertFile returns a Option that sets the certFile to certFile
+// WithCertFile returns an Option that sets the certFile to certFile
 func WithCertFile(certFile string) Option {
 	return func(so *serverOptions) {
 		so.certFile = certFile
 	}
 }
 
-// WithKeyFile returns a Option that sets the keyFile to keyFile
+// WithKeyFile returns an Option that sets the keyFile to keyFile
 func WithKeyFile(keyFile string) Option {
 	return func(so *serverOptions) {
 		so.keyFile = keyFile
 	}
 }
 
-// NewRevtrServer creates a new Server with the given options
+// NewRevtrServer creates an new Server with the given options
 func NewRevtrServer(opts ...Option) RevtrServer {
 	var serv revtrServer
 	for _, opt := range opts {
@@ -240,8 +265,12 @@ func NewRevtrServer(opts ...Option) RevtrServer {
 	serv.cs = serv.opts.cs
 	serv.rts = serv.opts.rts
 	serv.as = serv.opts.as
+	serv.run = serv.opts.run
+	serv.cm = clustermap.New(serv.opts.cs)
+	serv.ca = serv.opts.ca
 	serv.mu = &sync.Mutex{}
-	serv.revtrs = make(map[uint32]*reversetraceroute.ReverseTraceroute)
+	serv.revtrs = make(map[uint32]revtrOutput)
+	serv.running = make(map[uint32]<-chan *reversetraceroute.ReverseTraceroute)
 	return serv
 }
 
@@ -251,12 +280,16 @@ type revtrServer struct {
 	as     types.AdjacencySource
 	cs     types.ClusterSource
 	conf   types.Config
+	run    runner.Runner
 	opts   serverOptions
 	nextID *uint32
 	s      services
-	// mu protects the revtrs map
-	mu     *sync.Mutex
-	revtrs map[uint32]*reversetraceroute.ReverseTraceroute
+	cm     clustermap.ClusterMap
+	ca     cache.Cache
+	// mu protects the revtr maps
+	mu      *sync.Mutex
+	revtrs  map[uint32]revtrOutput
+	running map[uint32]<-chan *reversetraceroute.ReverseTraceroute
 }
 
 func (rs revtrServer) getID() uint32 {
@@ -298,30 +331,34 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 	}
 	// run these guys
 	go func() {
-		var wg sync.WaitGroup
-		wg.Add(len(reqToRun))
-		for _, rtr := range reqToRun {
-			runningRevtrs.Add(1)
-			go func(r *pb.RevtrMeasurement) {
-				defer runningRevtrs.Sub(1)
-				defer wg.Done()
-				if r.Staleness == 0 {
-					r.Staleness = 60
-				}
-				res, err := reversetraceroute.RunReverseTraceroute(*r, servs.cl, servs.at, servs.vpserv, rs.as, rs.cs)
-				if err != nil {
-					log.Errorf("Error running Revtr(%d): %v", res.ID, err)
-				}
-				err = rs.rts.StoreBatchedRevtrs([]pb.ReverseTraceroute{res.ToStorable()})
-				if err != nil {
-					log.Errorf("Error storing Revtr(%d): %v", res.ID, err)
-				}
-			}(rtr)
+		defer logError(servs.Close)
+		runningRevtrs.Add(float64(len(reqToRun)))
+		var rtrs []*reversetraceroute.ReverseTraceroute
+		for _, r := range reqToRun {
+			rtrs = append(rtrs, reversetraceroute.CreateReverseTraceroute(
+				*r,
+				rs.cs,
+				nil,
+				nil,
+				nil,
+			))
 		}
-		defer func() {
-			wg.Wait()
-			logError(servs.Close)
-		}()
+		done := rs.run.Run(rtrs,
+			runner.WithContext(context.Background()),
+			runner.WithClient(servs.cl),
+			runner.WithAtlas(servs.at),
+			runner.WithVPSource(servs.vpserv),
+			runner.WithAdjacencySource(rs.as),
+			runner.WithClusterMap(rs.cm),
+		)
+		for drtr := range done {
+			runningRevtrs.Sub(1)
+			err = rs.rts.StoreBatchedRevtrs([]pb.ReverseTraceroute{drtr.ToStorable()})
+			if err != nil {
+				log.Errorf("Error storing Revtr(%d): %v", drtr.ID, err)
+
+			}
+		}
 	}()
 	return &pb.RunRevtrResp{
 		BatchId: batchID,
@@ -330,6 +367,9 @@ func (rs revtrServer) RunRevtr(req *pb.RunRevtrReq) (*pb.RunRevtrResp, error) {
 
 func (rs revtrServer) GetRevtr(req *pb.GetRevtrReq) (*pb.GetRevtrResp, error) {
 	usr, err := rs.rts.GetUserByKey(req.Auth)
+	if err != nil {
+		log.Error(err)
+	}
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -367,6 +407,11 @@ func (rs revtrServer) GetSources(req *pb.GetSourcesReq) (*pb.GetSourcesResp, err
 	return sr, nil
 }
 
+type revtrOutput struct {
+	rt *reversetraceroute.ReverseTraceroute
+	oc chan Status
+}
+
 func (rs revtrServer) AddRevtr(rtm pb.RevtrMeasurement) (uint32, error) {
 	vps, err := rs.vps.GetVPs()
 	if err != nil {
@@ -382,9 +427,16 @@ func (rs revtrServer) AddRevtr(rtm pb.RevtrMeasurement) (uint32, error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	id := rs.getID()
+	oc := make(chan Status, 5)
+	pf := makePrintHTML(oc, rs)
 	rt := reversetraceroute.CreateReverseTraceroute(rtm,
-		false, true, rs.s.cl, rs.s.at, rs.s.vpserv, rs.as, rs.cs)
-	rs.revtrs[id] = rt
+		rs.cs,
+		reversetraceroute.OnAddFunc(pf),
+		reversetraceroute.OnFailFunc(pf),
+		reversetraceroute.OnReachFunc(pf))
+	// print out the initial state
+	pf(rt)
+	rs.revtrs[id] = revtrOutput{rt: rt, oc: oc}
 	return id, nil
 }
 
@@ -397,32 +449,288 @@ func (ide IDError) Error() string {
 	return fmt.Sprintf("invalid id %d", ide.id)
 }
 
-func (rs revtrServer) StartRevtr(id uint32) (<-chan reversetraceroute.Status, error) {
+// Status represents the current running state of a reverse traceroute
+// it is use for the web interface. Something better is probably needed
+type Status struct {
+	Rep    string
+	Status bool
+	Error  string
+}
+
+func (rs revtrServer) StartRevtr(ctx context.Context, id uint32) (<-chan Status, error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rt, ok := rs.revtrs[id]; ok {
 		go func() {
-			if !rt.IsRunning() {
-				runningRevtrs.Add(1)
-				err := rt.Run()
+			if _, ok := rs.running[id]; ok {
+				return
+			}
+			runningRevtrs.Add(1)
+			rs.mu.Lock()
+			rtrs := []*reversetraceroute.ReverseTraceroute{rt.rt}
+			done := rs.run.Run(rtrs,
+				runner.WithContext(context.Background()),
+				runner.WithClient(rs.s.cl),
+				runner.WithAtlas(rs.s.at),
+				runner.WithVPSource(rs.s.vpserv),
+				runner.WithAdjacencySource(rs.as),
+				runner.WithClusterMap(rs.cm),
+			)
+			rs.running[id] = done
+			rs.mu.Unlock()
+			for drtr := range done {
+				runningRevtrs.Sub(1)
+				rs.mu.Lock()
+				delete(rs.revtrs, id)
+				delete(rs.running, id)
+				// done, close the channel
+				close(rt.oc)
+				rs.mu.Unlock()
+				err := rs.rts.StoreRevtr(drtr.ToStorable())
 				if err != nil {
 					log.Error(err)
 				}
-			} else {
-				return
-			}
-			runningRevtrs.Sub(1)
-			rs.mu.Lock()
-			delete(rs.revtrs, id)
-			rs.mu.Unlock()
-			err := rs.rts.StoreRevtr(rt.ToStorable())
-			if err != nil {
-				log.Error(err)
 			}
 		}()
-		return rt.GetOutputChan(), nil
+		return rt.oc, nil
 	}
 	return nil, IDError{id: id}
+}
+
+func (rs revtrServer) resolveHostname(ip string) string {
+	item, err := rs.ca.Get(ip)
+	// If it's a cache miss, look through the vps
+	// if its found set it.
+	if err == cache.ErrorCacheMiss {
+		vps, err := rs.vps.GetVPs()
+		if err != nil {
+			log.Error(err)
+			return ""
+		}
+		for _, vp := range vps.GetVps() {
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			// found it, set the cache and return the hostname
+			if ips == ip {
+				rs.ca.Set(ip, []byte(vp.Hostname))
+				return vp.Hostname
+			}
+		}
+		// not found from vps try reverse lookup
+		hns, err := net.LookupAddr(ip)
+		if err != nil {
+			log.Error(err)
+			// since the lookup failed, just set it blank for now
+			// after it expires we'll try again
+			rs.ca.Set(ip, []byte{})
+			return ""
+		}
+		rs.ca.Set(ip, []byte(hns[0]))
+		return hns[0]
+	}
+	// this is some kind of harder failure such as servers not found
+	// or responding. Just going to check the vp list at this point
+	if err != nil {
+		log.Error(err)
+		vps, err := rs.vps.GetVPs()
+		if err != nil {
+			log.Error(err)
+			return ""
+		}
+		for _, vp := range vps.GetVps() {
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			// found it, set the cache and return the hostname
+			if ips == ip {
+				rs.ca.Set(ip, []byte(vp.Hostname))
+			}
+			return vp.Hostname
+		}
+		return ""
+	}
+	// if we get here we succeeded in the cache lookup
+	return string(item.Value())
+}
+
+func (rs revtrServer) getRTT(src, dst string) float32 {
+	key := fmt.Sprintf("%s:%s:rtt", src, dst)
+	item, err := rs.ca.Get(key)
+	if err == cache.ErrorCacheMiss {
+		targ, _ := util.IPStringToInt32(dst)
+		src, _ := util.IPStringToInt32(src)
+		ping := &datamodel.PingMeasurement{
+			Src:     src,
+			Dst:     targ,
+			Count:   "1",
+			Timeout: 5,
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		st, err := rs.s.cl.Ping(ctx,
+			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
+		if err != nil {
+			log.Error(err)
+			rs.ca.Set(key, []byte{0})
+			return 0
+		}
+		for {
+			p, err := st.Recv()
+			if err == io.EOF {
+				break
+
+			}
+			if err != nil {
+				log.Error(err)
+				rs.ca.Set(key, []byte{0})
+				return 0
+
+			}
+			if len(p.Responses) == 0 {
+				rs.ca.Set(key, []byte{0})
+				return 0
+
+			}
+			buf := new(bytes.Buffer)
+			err = binary.Write(buf, binary.LittleEndian, float32(p.Responses[0].Rtt)/1000)
+			if err != nil {
+				// I don't think writes to bytes.Buffer ever fail
+				// so this should never execute
+				log.Error(err)
+			}
+			rs.ca.Set(key, buf.Bytes())
+			return float32(p.Responses[0].Rtt) / 1000
+		}
+	}
+	if err != nil {
+		// this is a failure of the cache system
+		// so just try and get the rtt
+		log.Error(err)
+		targ, _ := util.IPStringToInt32(dst)
+		src, _ := util.IPStringToInt32(src)
+		ping := &datamodel.PingMeasurement{
+			Src:     src,
+			Dst:     targ,
+			Count:   "1",
+			Timeout: 5,
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		st, err := rs.s.cl.Ping(ctx,
+			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
+		if err != nil {
+			log.Error(err)
+			rs.ca.Set(key, []byte{0})
+			return 0
+		}
+		for {
+			p, err := st.Recv()
+			if err == io.EOF {
+				break
+
+			}
+			if err != nil {
+				log.Error(err)
+				rs.ca.Set(key, []byte{0})
+				return 0
+
+			}
+			if len(p.Responses) == 0 {
+				rs.ca.Set(key, []byte{0})
+				return 0
+
+			}
+			return float32(p.Responses[0].Rtt) / 1000
+		}
+	}
+	read := bytes.NewReader(item.Value())
+	var rtt float32
+	err = binary.Read(read, binary.LittleEndian, &rtt)
+	if err != nil {
+		log.Error(err)
+		return 0
+	}
+	return rtt
+}
+
+func makePrintHTML(sc chan<- Status, rs revtrServer) func(*reversetraceroute.ReverseTraceroute) {
+	return func(rt *reversetraceroute.ReverseTraceroute) {
+		//need to find hostnames and rtts
+		hopsSeen := make(map[string]bool)
+		var out bytes.Buffer
+		out.WriteString(`<table class="table">`)
+		out.WriteString(`<caption class="text-center">Reverse Traceroute from `)
+		if len(rt.Hops()) >= 1 {
+			out.WriteString(fmt.Sprintf("%s (%s) back to ", rt.Dst, rs.resolveHostname(rt.Dst)))
+		}
+		out.WriteString(rt.Src)
+		out.WriteString(fmt.Sprintf(" (%s)", rs.resolveHostname(rt.Src)))
+		out.WriteString("</caption>")
+		out.WriteString(`<tbody>`)
+		first := new(bool)
+		var i int
+		if len(*rt.Paths) > 0 {
+
+			for _, segment := range *rt.CurrPath().Path {
+				*first = true
+				symbol := new(string)
+				switch segment.(type) {
+				case *reversetraceroute.DstSymRevSegment:
+					*symbol = "sym"
+				case *reversetraceroute.DstRevSegment:
+					*symbol = "dst"
+				case *reversetraceroute.TRtoSrcRevSegment:
+					*symbol = "tr"
+				case *reversetraceroute.SpoofRRRevSegment:
+					*symbol = "rr"
+				case *reversetraceroute.RRRevSegment:
+					*symbol = "rr"
+				case *reversetraceroute.SpoofTSAdjRevSegmentTSZeroDoubleStamp:
+					*symbol = "ts"
+				case *reversetraceroute.SpoofTSAdjRevSegmentTSZero:
+					*symbol = "ts"
+				case *reversetraceroute.SpoofTSAdjRevSegment:
+					*symbol = "ts"
+				case *reversetraceroute.TSAdjRevSegment:
+					*symbol = "ts"
+				}
+				for _, hop := range segment.Hops() {
+					if hopsSeen[hop] {
+						continue
+
+					}
+					hopsSeen[hop] = true
+					tech := new(string)
+					if *first {
+						*tech = *symbol
+						*first = false
+
+					} else {
+						*tech = "-" + *symbol
+
+					}
+					if hop == "0.0.0.0" || hop == "*" {
+						out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s</td><td></td><td>%s</td></tr>", i, "* * *", *tech))
+
+					} else {
+						out.WriteString(fmt.Sprintf("<tr><td>%-2d</td><td>%-80s (%s)</td><td>%.3fms</td><td>%s</td></tr>", i, hop, rs.resolveHostname(hop), rs.getRTT(rt.Src, hop), *tech))
+
+					}
+					i++
+
+				}
+
+			}
+
+		}
+		out.WriteString("</tbody></table>")
+		out.WriteString(fmt.Sprintf("\n%s", rt.StopReason))
+
+		var stat Status
+		stat.Rep = strings.Replace(out.String(), "\n", "<br>", -1)
+		stat.Status = rt.StopReason != ""
+		select {
+		case sc <- stat:
+		default:
+		}
+	}
 }
 
 type services struct {

@@ -1,4 +1,4 @@
-package reversetraceroute
+package clustermap
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
-type clusterMap struct {
+type ClusterMap struct {
 	ipc map[string]cmItem
 	mu  *sync.Mutex
 	cs  types.ClusterSource
@@ -20,7 +20,7 @@ type cmItem struct {
 	val     string
 }
 
-func (cm clusterMap) fetchCluster(s string) string {
+func (cm ClusterMap) fetchCluster(s string) string {
 
 	ipint, _ := util.IPStringToInt32(s)
 	cluster, err := cm.cs.GetClusterIDByIP(ipint)
@@ -39,7 +39,7 @@ func (cm clusterMap) fetchCluster(s string) string {
 	return clusters
 }
 
-func (cm clusterMap) Get(s string) string {
+func (cm ClusterMap) Get(s string) string {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if cl, ok := cm.ipc[s]; ok {
@@ -50,9 +50,9 @@ func (cm clusterMap) Get(s string) string {
 	return cm.fetchCluster(s)
 }
 
-func newClusterMap(cs types.ClusterSource) clusterMap {
+func New(cs types.ClusterSource) ClusterMap {
 	i := make(map[string]cmItem)
-	return clusterMap{
+	return ClusterMap{
 		ipc: i,
 		mu:  &sync.Mutex{},
 		cs:  cs,

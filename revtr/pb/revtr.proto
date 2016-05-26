@@ -83,22 +83,23 @@ message RevtrHop {
 }
 
 enum RevtrHopType {
-    DUMMY                                         = 0;
-    DST_REV_SEGMENT                               = 1;
-    DST_SYM_REV_SEGMENT                           = 2;
-    TR_TO_SRC_REV_SEGMENT                         = 3;
-    RR_REV_SEGMENT                                = 4;
-    SPOOF_RR_REV_SEGMENT                          = 5;
-    TS_ADJ_REV_SEGMENT                            = 6;
-    SPOOF_TS_ADJ_REV_SEGMENT                      = 7;
-    SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO              = 8;
-    SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP = 9;
+  DUMMY                                         = 0;
+  DST_REV_SEGMENT                               = 1;
+  DST_SYM_REV_SEGMENT                           = 2;
+  TR_TO_SRC_REV_SEGMENT                         = 3;
+  RR_REV_SEGMENT                                = 4;
+  SPOOF_RR_REV_SEGMENT                          = 5;
+  TS_ADJ_REV_SEGMENT                            = 6;
+  SPOOF_TS_ADJ_REV_SEGMENT                      = 7;
+  SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO              = 8;
+  SPOOF_TS_ADJ_REV_SEGMENT_TS_ZERO_DOUBLE_STAMP = 9;
 }
 
 enum RevtrStatus {
-    DUMMY_X     = 0;
-    RUNNING     = 1;
-    COMPLETED   = 2;
+  DUMMY_X     = 0;
+  RUNNING     = 1;
+  COMPLETED   = 2;
+  CANCELED    = 3;
 }
 
 message RevtrUser {
