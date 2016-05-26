@@ -967,12 +967,11 @@ func intersectingTraceroute(src, dst string, addrs []uint32,
 		log.Debug("Attempting to find TR for hop: ", addr,
 			"(", ipstr(addr).String(), ")", " to ", src)
 		is := apb.IntersectionRequest{
-			UseAliases:   true,
-			Staleness:    staleness,
-			Dest:         dest,
-			Address:      addr,
-			IgnoreSource: true,
-			Src:          srci,
+			UseAliases: true,
+			Staleness:  staleness,
+			Dest:       dest,
+			Address:    addr,
+			Src:        srci,
 		}
 		err := as.Send(&is)
 		if err != nil {
