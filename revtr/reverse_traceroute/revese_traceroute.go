@@ -55,32 +55,27 @@ const (
 // [] means we've tried them all. if it is missing the key, that means we still need to
 // initialize it
 type ReverseTraceroute struct {
-	ID                       uint32
-	logStr                   string
-	Paths                    *[]*ReversePath
-	DeadEnd                  map[string]bool
-	RRHop2RateLimit          map[string]int
-	RRHop2VPSLeft            map[string][]string
-	TSHop2RateLimit          map[string]int
-	TSHop2AdjsLeft           map[string][]string
-	Src, Dst                 string
-	StopReason               StopReason
-	StartTime, EndTime       time.Time
-	Staleness                int64
-	ProbeCount               map[string]int
-	BackoffEndhost           bool
-	print                    bool
-	running                  bool
-	mu                       sync.Mutex // protects running
-	hnCacheInit              bool
-	hostnameCache            map[string]string
-	rttCache                 map[string]float32
-	Tokens                   []*apb.IntersectionResponse
-	rrsSrcToDstToVPToRevHops map[string]map[string]map[string][]string
-	trsSrcToDstToPath        map[string]map[string][]string
-	tsSrcToProbeToVPToResult map[string]map[string]map[string][]string
-	TSDstToStampsZero        map[string]bool
-	TSSrcToHopToSendSpoofed  map[string]map[string]bool
+	ID                      uint32
+	logStr                  string
+	Paths                   *[]*ReversePath
+	DeadEnd                 map[string]bool
+	RRHop2RateLimit         map[string]int
+	RRHop2VPSLeft           map[string][]string
+	TSHop2RateLimit         map[string]int
+	TSHop2AdjsLeft          map[string][]string
+	Src, Dst                string
+	StopReason              StopReason
+	StartTime, EndTime      time.Time
+	Staleness               int64
+	ProbeCount              map[string]int
+	BackoffEndhost          bool
+	mu                      sync.Mutex // protects running
+	hnCacheInit             bool
+	hostnameCache           map[string]string
+	rttCache                map[string]float32
+	Tokens                  []*apb.IntersectionResponse
+	TSDstToStampsZero       map[string]bool
+	TSSrcToHopToSendSpoofed map[string]map[string]bool
 	// whether this hop is thought to be responsive at all to this src
 	// Since I can't intialize to true, I'm going to use an int and say 0 is true
 	// anythign else will be false
@@ -112,28 +107,23 @@ func NewReverseTraceroute(src, dst string, id, stale uint32) *ReverseTraceroute 
 		id = rand.Uint32()
 	}
 	ret := ReverseTraceroute{
-		ID:                       id,
-		logStr:                   fmt.Sprintf("ID: %d :", id),
-		Src:                      src,
-		Dst:                      dst,
-		Paths:                    &[]*ReversePath{NewReversePath(src, dst, nil)},
-		DeadEnd:                  make(map[string]bool),
-		tsHopResponsive:          make(map[string]int),
-		TSDstToStampsZero:        make(map[string]bool),
-		TSSrcToHopToSendSpoofed:  make(map[string]map[string]bool),
-		RRHop2RateLimit:          make(map[string]int),
-		RRHop2VPSLeft:            make(map[string][]string),
-		TSHop2RateLimit:          make(map[string]int),
-		TSHop2AdjsLeft:           make(map[string][]string),
-		ProbeCount:               make(map[string]int),
-		StartTime:                time.Now(),
-		Staleness:                int64(stale),
-		hostnameCache:            make(map[string]string),
-		rttCache:                 make(map[string]float32),
-		rrsSrcToDstToVPToRevHops: make(map[string]map[string]map[string][]string),
-		trsSrcToDstToPath:        make(map[string]map[string][]string),
-		tsSrcToProbeToVPToResult: make(map[string]map[string]map[string][]string),
-		rrSpoofRRResponsive:      make(map[string]int),
+		ID:                      id,
+		logStr:                  fmt.Sprintf("ID: %d :", id),
+		Src:                     src,
+		Dst:                     dst,
+		Paths:                   &[]*ReversePath{NewReversePath(src, dst, nil)},
+		DeadEnd:                 make(map[string]bool),
+		tsHopResponsive:         make(map[string]int),
+		TSDstToStampsZero:       make(map[string]bool),
+		TSSrcToHopToSendSpoofed: make(map[string]map[string]bool),
+		RRHop2RateLimit:         make(map[string]int),
+		RRHop2VPSLeft:           make(map[string][]string),
+		TSHop2RateLimit:         make(map[string]int),
+		TSHop2AdjsLeft:          make(map[string][]string),
+		ProbeCount:              make(map[string]int),
+		StartTime:               time.Now(),
+		Staleness:               int64(stale),
+		rrSpoofRRResponsive:     make(map[string]int),
 	}
 	return &ret
 }
@@ -601,13 +591,6 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 		*cls = *target
 		log.Debug("Sending RR probes to: ", *cls)
 		log.Debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
-		var vals [][]string
-		for _, val := range rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls] {
-			if val == nil {
-				continue
-			}
-			vals = append(vals, val)
-		}
 		// 0. destination seems to be unresponsive
 		if rt.rrSpoofRRResponsive[*cls] != -1 &&
 			rt.rrSpoofRRResponsive[*cls] >= maxUnresponsive {
@@ -626,28 +609,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 		return nil, ""
 	}
 	log.Debug(rt.Src, " ", rt.Dst, " ", *target, " ", len(rt.RRHop2VPSLeft[*cls]), " RR VPs left to try")
-	// 2. probes to this dst that were already issues for other reverse
-	// traceroutes, but not in this reverse traceroute
-	var keys []string
-	tmp := rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls]
-	for k := range tmp {
-		keys = append(keys, k)
-	}
-	usedVps := stringutil.StringSet(keys).Union(stringutil.StringSet(rt.RRHop2VPSLeft[*cls]))
-	rt.RRHop2VPSLeft[*cls] = stringutil.StringSliceMinus(rt.RRHop2VPSLeft[*cls], usedVps)
-	var finalUsedVPs []string
-	for _, uvp := range usedVps {
-		idk, ok := rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls][uvp]
-		if ok && len(idk) > 0 {
-			continue
-		}
-		finalUsedVPs = append(finalUsedVPs, uvp)
-	}
-	if len(finalUsedVPs) > 0 {
-		return finalUsedVPs, *target
-	}
-
-	// 3. send non-spoofed version if it is in the next batch
+	// 2. send non-spoofed version if it is in the next batch
 	min := rt.RRHop2RateLimit[*cls]
 	if len(rt.RRHop2VPSLeft[*cls]) < min {
 		min = len(rt.RRHop2VPSLeft[*cls])
@@ -658,22 +620,18 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 		return []string{"non_spoofed"}, *target
 	}
 
-	// 4. use unused spoofing VPs
+	// 3. use unused spoofing VPs
 	// if the current last hop was discovered with spoofed, and it
 	// hasn't been used yet, use it
 	notEmpty := rt.len() > 0
-	var isRRRev, containsKey *bool
+	var isRRRev *bool
 	isRRRev = new(bool)
-	containsKey = new(bool)
 	spoofer := new(string)
 	if rrev, ok := rt.CurrPath().LastSeg().(*SpoofRRRevSegment); ok {
 		*isRRRev = true
 		*spoofer = rrev.SpoofSource
-		if _, ok := rt.rrsSrcToDstToVPToRevHops[rt.Src][*cls][rrev.SpoofSource]; ok {
-			*containsKey = true
-		}
 	}
-	if notEmpty && *isRRRev && !*containsKey {
+	if notEmpty && *isRRRev {
 		log.Debug("Found recent spoofer to use ", *spoofer)
 		var newleft []string
 		for _, s := range rt.RRHop2VPSLeft[*cls] {
