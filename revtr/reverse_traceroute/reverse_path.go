@@ -1,6 +1,10 @@
 package reversetraceroute
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/clustermap"
+)
 
 // ReversePath is a reverse path
 type ReversePath struct {
@@ -82,8 +86,8 @@ func (rp *ReversePath) Pop() Segment {
 }
 
 // Reaches returns weather or not the last segment reaches
-func (rp *ReversePath) Reaches() bool {
-	return rp.LastSeg().Reaches()
+func (rp *ReversePath) Reaches(cm clustermap.ClusterMap) bool {
+	return rp.LastSeg().Reaches(cm)
 }
 
 // SymmetricAssumptions returns the number of symmetric assumptions

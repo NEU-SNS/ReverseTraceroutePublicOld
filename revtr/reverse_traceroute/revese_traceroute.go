@@ -204,12 +204,12 @@ func (rt *ReverseTraceroute) LastHop() string {
 }
 
 // Reaches checks if the last path reaches
-func (rt *ReverseTraceroute) Reaches() bool {
+func (rt *ReverseTraceroute) Reaches(cm clustermap.ClusterMap) bool {
 	// Assume that any path reaches if and only if the last one reaches
 	if len(*rt.Paths) == 0 {
 		return false
 	}
-	reach := (*rt.Paths)[rt.len()-1].Reaches()
+	reach := (*rt.Paths)[rt.len()-1].Reaches(cm)
 	if reach {
 		rt.EndTime = time.Now()
 		rt.StopReason = Reaches
@@ -275,26 +275,29 @@ TODO
 I'm not entirely sure that this sort will match  the ruby one
 It will need to be tested and verified
 */
-type magicSort []Segment
+type magicSort struct {
+	s  []Segment
+	cm clustermap.ClusterMap
+}
 
-func (ms magicSort) Len() int           { return len(ms) }
-func (ms magicSort) Swap(i, j int)      { ms[i], ms[j] = ms[j], ms[i] }
-func (ms magicSort) Less(i, j int) bool { return ms[i].Order(ms[j]) < 0 }
+func (ms magicSort) Len() int           { return len(ms.s) }
+func (ms magicSort) Swap(i, j int)      { ms.s[i], ms.s[j] = ms.s[j], ms.s[i] }
+func (ms magicSort) Less(i, j int) bool { return ms.s[i].Order(ms.s[j], ms.cm) < 0 }
 
 // AddSegments returns a bool of whether any were added
 // might not be added if they are deadends
 // or if all hops would cause loops
-func (rt *ReverseTraceroute) AddSegments(segs []Segment) bool {
+func (rt *ReverseTraceroute) AddSegments(segs []Segment, cm clustermap.ClusterMap) bool {
 	var added *bool
 	added = new(bool)
 	// sort based on the magic compare
 	// or how long the path is?
-	sort.Sort(magicSort(segs))
+	sort.Sort(magicSort{s: segs, cm: cm})
 	basePath := rt.CurrPath().Clone()
 	for _, s := range segs {
 		if !rt.DeadEnd[s.LastHop()] {
 			// add loop removal here
-			err := s.RemoveHops(basePath.Hops())
+			err := s.RemoveHops(basePath.Hops(), cm)
 			if err != nil {
 				log.Error(err)
 				return false
@@ -553,7 +556,7 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment, cm clustermap
 	// then adds the segemnt to it. so we end up with an extra copy of found,
 	// that might have soem hops trimmed off it. not the end of the world,
 	// but something to be aware of
-	success := rt.AddSegments([]Segment{trSeg})
+	success := rt.AddSegments([]Segment{trSeg}, cm)
 	if !success {
 		for i, s := range *rt.Paths {
 			if found == s {
@@ -659,16 +662,9 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 	return touse, *target
 }
 
-var (
-	ipToCluster clustermap.ClusterMap
-)
-
 // CreateReverseTraceroute creates a reverse traceroute for the web interface
 func CreateReverseTraceroute(revtr pb.RevtrMeasurement, cs types.ClusterSource,
 	onAdd OnAddFunc, onFail OnFailFunc, onReach OnReachFunc) *ReverseTraceroute {
-	initOnce.Do(func() {
-		ipToCluster = clustermap.New(cs)
-	})
 	rt := NewReverseTraceroute(revtr.Src, revtr.Dst, revtr.Id, revtr.Staleness)
 	rt.BackoffEndhost = revtr.BackoffEndhost
 	rt.onAdd = onAdd
