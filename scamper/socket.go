@@ -32,10 +32,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"sync/atomic"
 
@@ -115,7 +117,7 @@ type Socket struct {
 	ip          string
 	port        string
 	cmds        *cmdMap
-	con         io.ReadWriteCloser
+	con         net.Conn
 	wartsHeader [2]Response
 	rc          uint32
 	rw          *bufio.ReadWriter
@@ -134,7 +136,7 @@ const (
 )
 
 // NewSocket creates a new scamper socket
-func NewSocket(fname string, con io.ReadWriteCloser) (*Socket, error) {
+func NewSocket(fname string, con net.Conn) (*Socket, error) {
 	sock := &Socket{
 		fname: fname,
 		cmds:  newCmdMap(),
@@ -281,6 +283,7 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 		if err != nil {
 			return nil, 0, err
 		}
+		s.con.SetWriteDeadline(time.Now().Add(time.Millisecond * 10))
 		err = cmd.IssueCommand(s.con, arg)
 		if err != nil {
 			log.Error(err)
