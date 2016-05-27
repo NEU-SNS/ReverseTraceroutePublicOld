@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/revtr/clustermap"
 	"github.com/NEU-SNS/ReverseTraceroute/util/string"
 )
 
@@ -27,10 +28,10 @@ type Segment interface {
 	Hops() []string
 	LastHop() string
 	Length(bool) int
-	Reaches() bool
+	Reaches(clustermap.ClusterMap) bool
 	SymmetricAssumptions() int
-	Order(Segment) int
-	RemoveHops([]string) error
+	Order(Segment, clustermap.ClusterMap) int
+	RemoveHops([]string, clustermap.ClusterMap) error
 	Clone() Segment
 	RemoveAt(int)
 	Type() int
@@ -80,10 +81,10 @@ func (rv *RevSegment) SetHop(hop string) {
 	rv.Hop = hop
 }
 
-func rIndex(ss []string, s string) int {
+func rIndex(ss []string, s string, cm clustermap.ClusterMap) int {
 	index := -1
 	for i, st := range ss {
-		if ipToCluster.Get(s) == ipToCluster.Get(st) {
+		if cm.Get(s) == cm.Get(st) {
 			index = i
 		}
 	}
@@ -91,7 +92,7 @@ func rIndex(ss []string, s string) int {
 }
 
 // RemoveHops removes the given hops from the segment
-func (rv *RevSegment) RemoveHops(toDel []string) error {
+func (rv *RevSegment) RemoveHops(toDel []string, cm clustermap.ClusterMap) error {
 	var noZeros []string
 	segAsSet := stringutil.StringSet(rv.Segment)
 	for _, ip := range toDel {
@@ -99,15 +100,12 @@ func (rv *RevSegment) RemoveHops(toDel []string) error {
 			noZeros = append(noZeros, ip)
 		}
 	}
-	hop := new(string)
 	common := segAsSet.Union(stringutil.StringSet(noZeros))
 	if len(common) > 0 {
 		mapIndex := -1
 		for _, h := range common {
-			tmp := rIndex(rv.Segment, h)
+			tmp := rIndex(rv.Segment, h, cm)
 			if tmp > mapIndex {
-				// This is in the original code but isn't used at any point
-				*hop = h
 				mapIndex = tmp
 			}
 		}
@@ -119,7 +117,7 @@ func (rv *RevSegment) RemoveHops(toDel []string) error {
 	}
 	common = stringutil.StringSet(rv.Segment).Union(stringutil.StringSet(toDel))
 	if len(common) > 0 {
-		return fmt.Errorf("Still a loop, %v, %v, %v, %v", toDel, rv.Segment, common, *hop)
+		return fmt.Errorf("Still a loop, %v, %v, %v", toDel, rv.Segment, common)
 	}
 	return nil
 }
@@ -166,12 +164,12 @@ func (rv *RevSegment) LastHop() string {
 }
 
 // Reaches returns true if the revsegment reaches the src
-func (rv *RevSegment) Reaches() bool {
-	return rv.LastHop() == rv.Src || ipToCluster.Get(rv.LastHop()) == ipToCluster.Get(rv.Src)
+func (rv *RevSegment) Reaches(cm clustermap.ClusterMap) bool {
+	return rv.LastHop() == rv.Src || cm.Get(rv.LastHop()) == cm.Get(rv.Src)
 }
 
 // Order ...
-func (rv *RevSegment) Order(b Segment) int {
+func (rv *RevSegment) Order(b Segment, cm clustermap.ClusterMap) int {
 	if reflect.TypeOf(rv) == reflect.TypeOf(&DstSymRevSegment{}) &&
 		reflect.TypeOf(b) != reflect.TypeOf(&DstSymRevSegment{}) {
 		return -1
@@ -191,9 +189,9 @@ func (rv *RevSegment) Order(b Segment) int {
 			return 1
 		}
 		return stringutil.OrderStringArray(rv.Segment, b.Hops())
-	} else if rv.Reaches() {
+	} else if rv.Reaches(cm) {
 		return 1
-	} else if b.Reaches() {
+	} else if b.Reaches(cm) {
 		return -1
 	} else if rv.Length(true) != b.Length(true) {
 		ll := rv.Length(true)

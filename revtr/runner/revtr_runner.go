@@ -132,7 +132,7 @@ func (b *rtBatch) initialStep(revtr *rt.ReverseTraceroute) step {
 
 func (b *rtBatch) backoffEndhost(revtr *rt.ReverseTraceroute) step {
 	next := b.assumeSymmetric(revtr)
-	if revtr.Reaches() {
+	if revtr.Reaches(b.opts.cm) {
 		revtr.StopReason = rt.Trivial
 		revtr.EndTime = time.Now()
 	}
@@ -168,7 +168,7 @@ func (b *rtBatch) trToSource(revtr *rt.ReverseTraceroute) step {
 	if !revtr.AddBackgroundTRSegment(segment, b.opts.cm) {
 		panic("Failed to add TR segment. That's not possible")
 	}
-	if revtr.Reaches() {
+	if revtr.Reaches(b.opts.cm) {
 		return nil
 	}
 	panic("Added a TR to source but the revtr didn't reach")
@@ -204,14 +204,14 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 				}
 				segs = append(segs, rt.NewRRRevSegment(rr[:i+1], revtr.Src, target))
 			}
-			if !revtr.AddSegments(segs) {
+			if !revtr.AddSegments(segs, b.opts.cm) {
 				// Failed to anything from the RR hops
 				// move on to next group
 				continue
 			}
 			// RR get up hops
 			// test if it reaches we're done
-			if revtr.Reaches() {
+			if revtr.Reaches(b.opts.cm) {
 				return nil
 			}
 			// Got hops but we didn't reach
@@ -252,14 +252,14 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 			continue
 		}
 		// try to add them
-		if !revtr.AddSegments(segs) {
+		if !revtr.AddSegments(segs, b.opts.cm) {
 			//Couldn't add anything
 			// continue
 			continue
 		}
 		// RR get up hops
 		// test if it reaches we're done
-		if revtr.Reaches() {
+		if revtr.Reaches(b.opts.cm) {
 			return nil
 		}
 
@@ -594,10 +594,10 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 		// return R'
 		// if stamps more thane once, decl,
 		if segments, ok := revHopsSrcDstToRevSeg[pair{src: revtr.Src, dst: revtr.LastHop()}]; ok {
-			if revtr.AddSegments(segments) {
+			if revtr.AddSegments(segments, b.opts.cm) {
 				// added a segment
 				// if it reaches we're done
-				if revtr.Reaches() {
+				if revtr.Reaches(b.opts.cm) {
 					return nil
 				}
 				return b.checkbgTRs(revtr, b.trToSource)
@@ -641,7 +641,7 @@ func (b *rtBatch) backgroundTRS(revtr *rt.ReverseTraceroute) step {
 	if !revtr.AddBackgroundTRSegment(segment, b.opts.cm) {
 		panic("Failed to add background TR segment. That's not possible")
 	}
-	if revtr.Reaches() {
+	if revtr.Reaches(b.opts.cm) {
 		return nil
 	}
 	panic("Added a TR to source but the revtr didn't reach")
@@ -698,7 +698,8 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 		rt.NewDstSymRevSegment(revtr.Src,
 			revtr.LastHop(),
 			trace.hops, 1,
-			hToIgnore)}) {
+			hToIgnore)},
+		b.opts.cm) {
 		return b.trToSource
 	}
 	// everything failed
