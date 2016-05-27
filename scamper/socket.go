@@ -283,7 +283,12 @@ func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error)
 		if err != nil {
 			return nil, 0, err
 		}
-		s.con.SetWriteDeadline(time.Now().Add(time.Millisecond * 10))
+		err = s.con.SetWriteDeadline(time.Now().Add(time.Millisecond * 10))
+		if err != nil {
+			log.Error(err)
+			s.cmds.rmCmd(id)
+			return nil, 0, ErrFailedToIssueCmd
+		}
 		err = cmd.IssueCommand(s.con, arg)
 		if err != nil {
 			log.Error(err)
