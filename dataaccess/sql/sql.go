@@ -227,6 +227,8 @@ UPDATE
         vantage_point
 SET
         controller = NULL
+WHERE
+        controller is not null
 `
 )
 

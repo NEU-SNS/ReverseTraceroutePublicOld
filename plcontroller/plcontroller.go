@@ -222,6 +222,7 @@ func New(opts ...ServerOption) (*PlController, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Debug("Using bind addr: ", ips)
 	pl.ip = ip
 	pl.shutdown = make(chan struct{})
 	pl.spoofs = spoofmap.New(pl.send)
