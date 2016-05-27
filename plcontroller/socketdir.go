@@ -120,6 +120,7 @@ func (c *PlController) removeAllVps() {
 		log.Debugf("Removing %v", sock.IP())
 		ip, err := util.IPStringToInt32(sock.IP())
 		if err != nil {
+			log.Error(err)
 			continue
 		}
 		err = c.db.UpdateController(ip, 0, c.ip)
