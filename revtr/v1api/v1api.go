@@ -131,7 +131,7 @@ func (v1 V1Api) submitRevtr(r http.ResponseWriter, req *http.Request) {
 	err = json.NewEncoder(r).Encode(struct {
 		ResultURI string `json:"result_uri"`
 	}{
-		ResultURI: fmt.Sprintf("https://%s%s?batchid=%d", req.Host, v1Prefix+"revtr", resp.BatchId),
+		ResultURI: fmt.Sprintf("https://%s%s?batchid=%d", "revtr.ccs.neu.edu", v1Prefix+"revtr", resp.BatchId),
 	})
 	r.Header().Set("Content-Type", "application/json")
 }
