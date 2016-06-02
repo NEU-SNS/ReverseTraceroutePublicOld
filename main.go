@@ -28,9 +28,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	pm := datamodel.PingMeasurement{
-		Src:   2159111452,
-		Dst:   69463798,
-		Count: "1",
+		Src:       1023933455,
+		Dst:       1023933481,
+		TimeStamp: "tsonly",
+		Count:     "1",
 	}
 	st, err := plc.Ping(ctx)
 	if err != nil {
@@ -57,5 +58,7 @@ func main() {
 			panic(err)
 		}
 		fmt.Println(p)
+		fmt.Println(p.Responses[0].Tsonly)
+		fmt.Println(p.Responses[0].Tsandaddr)
 	}
 }

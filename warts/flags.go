@@ -24,7 +24,6 @@ func getFlags(f io.Reader, first uint8) ([]uint8, error) {
 		}
 		check = next
 		byteNum++
-
 	}
 }
 

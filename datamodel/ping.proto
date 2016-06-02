@@ -39,6 +39,10 @@ message PingArg {
   repeated PingMeasurement pings = 1;
 }
 
+message PingArgResp {
+  repeated Ping pings = 1;
+}
+
 message PingStats {
     int32 replies = 1;
     float loss    = 2;
@@ -68,26 +72,27 @@ message PingResponse {
 }
 
 message TsAndAddr {
-    uint32 ip  = 1;
-    uint32 ts  = 2;
+  uint32 ip  = 1;
+  uint32 ts  = 2;
 }
 
 message Ping {
-    string type                     =  1;
-	string method                   =  2;
-	uint32 src                      =  3;
-	uint32 dst                      =  4;
-	Time start                      =  5;
-	uint32 ping_sent                =  6;
-	uint32 probe_size               =  7;
-	uint32 user_id                  =  8;
-	uint32 ttl                      =  9;
-	uint32 wait                     = 10;
-	uint32 timeout                  = 11;
-	repeated string flags           = 12;
-	repeated PingResponse responses = 13;
-	PingStats statistics            = 14;
-    string error                    = 15;
-    string version                  = 16;
-    uint32 spoofed_from             = 17;
+  string type                     =  1;
+  string method                   =  2;
+  uint32 src                      =  3;
+  uint32 dst                      =  4;
+  Time start                      =  5;
+  uint32 ping_sent                =  6;
+  uint32 probe_size               =  7;
+  uint32 user_id                  =  8;
+  uint32 ttl                      =  9;
+  uint32 wait                     = 10;
+  uint32 timeout                  = 11;
+  repeated string flags           = 12;
+  repeated PingResponse responses = 13;
+  PingStats statistics            = 14;
+  string error                    = 15;
+  string version                  = 16;
+  uint32 spoofed_from             = 17;
+  int64 id                        = 18;
 }
