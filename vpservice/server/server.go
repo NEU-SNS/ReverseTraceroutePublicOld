@@ -35,6 +35,18 @@ var (
 		Name:      "online_vps",
 		Help:      "The current number of online vps",
 	})
+	activeSiteGuage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: nameSpace,
+		Subsystem: "sites",
+		Name:      "active_sites",
+		Help:      "The current number of active sites",
+	})
+	spoofingSiteGuage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: nameSpace,
+		Subsystem: "sites",
+		Name:      "spoofing_sites",
+		Help:      "The current number of active spoofing sites",
+	})
 )
 
 const (
@@ -46,6 +58,8 @@ func init() {
 	prometheus.MustRegister(procCollector)
 	prometheus.MustRegister(spooferGauge)
 	prometheus.MustRegister(onlineVPGuage)
+	prometheus.MustRegister(activeSiteGuage)
+	prometheus.MustRegister(spoofingSiteGuage)
 }
 
 // VPServer is the interace for the vantage point server
@@ -295,6 +309,26 @@ func (s server) updateGauges() {
 				}
 			}
 			spooferGauge.Set(spoofCnt)
+			siteMap := make(map[string]struct{})
+			for _, vp := range vps {
+				siteMap[vp.Site] = struct{}{}
+			}
+			var siteCnt float64
+			for _ = range siteMap {
+				siteCnt++
+			}
+			activeSiteGuage.Set(siteCnt)
+			spoofSiteMap := make(map[string]struct{})
+			for _, vp := range vps {
+				if vp.Spoof {
+					spoofSiteMap[vp.Site] = struct{}{}
+				}
+			}
+			var spSiteCnt float64
+			for _ = range spoofSiteMap {
+				spSiteCnt++
+			}
+			spoofingSiteGuage.Set(spSiteCnt)
 		}
 	}
 }
