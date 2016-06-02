@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -365,6 +366,18 @@ func (ws wsConnection) Write(mess wsMessage) error {
 // WS is the endpoint for websockets
 func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	var upgrader websocket.Upgrader
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		orig := req.Header.Get("Origin")
+		if len(orig) == 0 {
+			return false
+		}
+		u, err := url.Parse(orig)
+		if err != nil {
+			log.Error(err)
+			return false
+		}
+		return u.Host == "www.revtr.ccs.neu.edu" || u.Host == "revtr.ccs.neu.edu"
+	}
 	ws, err := upgrader.Upgrade(rw, req, nil)
 	if err != nil {
 		log.Error(err)
@@ -449,7 +462,7 @@ func (rr RunRevtr) RunRevtr(rw http.ResponseWriter, req *http.Request) {
 	}
 	var rt runningModel
 	rt.Key = fmt.Sprintf("%d", id)
-	rt.URL = req.Host
+	rt.URL = "revtr.ccs.neu.edu"
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
 	rr.rts[id] = nil

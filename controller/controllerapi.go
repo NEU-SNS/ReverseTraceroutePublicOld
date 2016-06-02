@@ -232,7 +232,7 @@ func (c *controllerT) RecordRouteHandler(rw http.ResponseWriter, req *http.Reque
 	rw.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(rw).Encode(struct {
 		Results string
-	}{Results: fmt.Sprintf("https://%s%s?id=%d", req.Host, v1Prefix+"pings", bid)})
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", "revtr.ccs.neu.edu", v1Prefix+"pings", bid)})
 	if err != nil {
 		panic(err)
 	}
@@ -305,7 +305,7 @@ func (c *controllerT) TimeStampHandler(rw http.ResponseWriter, req *http.Request
 	rw.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(rw).Encode(struct {
 		Results string `json:"results,omitempty"`
-	}{Results: fmt.Sprintf("https://%s%s?id=%d", req.Host, v1Prefix+"pings", bid)})
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", "revtr.ccs.neu.edu", v1Prefix+"pings", bid)})
 	if err != nil {
 		panic(err)
 	}
