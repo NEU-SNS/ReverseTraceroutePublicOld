@@ -29,12 +29,18 @@
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"strconv"
 	"time"
 
 	cont "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/gogo/protobuf/jsonpb"
 	con "golang.org/x/net/context"
 )
 
@@ -98,6 +104,248 @@ func (c *controllerT) Traceroute(ta *dm.TracerouteArg, stream cont.Controller_Tr
 			return ctx.Err()
 		}
 	}
+}
+
+//Priority is the priority for ping request
+type Priority uint32
+
+//PingReq is a request for pings
+type PingReq struct {
+	Pings    []Ping   `json:"pings,omitempty"`
+	Priority Priority `json:"priority,omitempty"`
+}
+
+//Ping is an individual measurement
+type Ping struct {
+	Src       string `json:"src,omitempty"`
+	Dst       string `json:"dst,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
+const (
+	apiKey   = "Api-Key"
+	v1Prefix = "/api/v1/"
+)
+
+func (c *controllerT) verifyKey(key string) (dm.User, bool) {
+	u, err := c.db.GetUser(key)
+	if err != nil {
+		log.Error(err)
+		return u, false
+	}
+	log.Debug("Got user ", u)
+	return u, true
+}
+
+func (c *controllerT) GetPingsHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	id := req.FormValue("id")
+	idi, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	log.Debug("Getting pings for batch ", idi)
+	pings, err := c.db.GetPingBatch(u, idi)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	var marsh jsonpb.Marshaler
+	if err := marsh.Marshal(rw, &dm.PingArgResp{Pings: pings}); err != nil {
+		panic(err)
+	}
+}
+
+func (c *controllerT) RecordRouteHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	var preq PingReq
+	if err := json.NewDecoder(req.Body).Decode(&preq); err != nil {
+		panic(err)
+	}
+	log.Debug("Running record routes ", preq)
+	var pings []*dm.PingMeasurement
+	for _, p := range preq.Pings {
+		srci, err := util.IPStringToInt32(p.Src)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		dsti, err := util.IPStringToInt32(p.Dst)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		pings = append(pings, &dm.PingMeasurement{
+			Src:     srci,
+			Dst:     dsti,
+			Timeout: 10,
+			Count:   "1",
+			RR:      true,
+		})
+	}
+	bid, err := c.db.AddPingBatch(u)
+	if err != nil {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	go func() {
+		ctx := con.Background()
+		ctx, cancel := con.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		results := c.doPing(ctx, pings)
+		var ids []int64
+		for p := range results {
+			ids = append(ids, p.Id)
+		}
+		err := c.db.AddPingsToBatch(bid, ids)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(struct {
+		Results string
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", req.Host, v1Prefix+"pings", bid)})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (c *controllerT) TimeStampHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	var preq PingReq
+	if err := json.NewDecoder(req.Body).Decode(&preq); err != nil {
+		panic(err)
+	}
+	var pings []*dm.PingMeasurement
+	for _, p := range preq.Pings {
+		if p.Timestamp == "" {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		srci, err := util.IPStringToInt32(p.Src)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		dsti, err := util.IPStringToInt32(p.Dst)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		pings = append(pings, &dm.PingMeasurement{
+			Src:       srci,
+			Dst:       dsti,
+			Timeout:   10,
+			Count:     "1",
+			TimeStamp: p.Timestamp,
+		})
+	}
+	bid, err := c.db.AddPingBatch(u)
+	if err != nil {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	go func() {
+		ctx := con.Background()
+		ctx, cancel := con.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		results := c.doPing(ctx, pings)
+		var ids []int64
+		for p := range results {
+			log.Debug("Got timestamp ", p)
+			ids = append(ids, p.Id)
+		}
+		err := c.db.AddPingsToBatch(bid, ids)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(struct {
+		Results string `json:"results,omitempty"`
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", req.Host, v1Prefix+"pings", bid)})
+	if err != nil {
+		panic(err)
+	}
+}
+
+type vps struct {
+	IP string
+}
+
+type vpret struct {
+	VPS []vps
+}
+
+func (c *controllerT) VPSHandler(rw http.ResponseWriter, req *http.Request) {
+	key := req.Header.Get(apiKey)
+	_, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	ctx := con.Background()
+	ctx, cancel := con.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	vpr, err := c.doGetVPs(ctx, &dm.VPRequest{})
+	if err != nil {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	var ret vpret
+	for _, vp := range vpr.GetVps() {
+		ips, _ := util.Int32ToIPString(vp.Ip)
+		ret.VPS = append(ret.VPS, vps{IP: ips})
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(ret)
+	if err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (c *controllerT) GetVPs(ctx con.Context, gvp *dm.VPRequest) (vpr *dm.VPReturn, err error) {

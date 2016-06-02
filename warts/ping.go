@@ -6,7 +6,6 @@ import (
 	"io"
 	"math"
 	"syscall"
-	"time"
 )
 
 const (
@@ -255,19 +254,13 @@ type PingReplyFlags struct {
 }
 
 // IsTsOnly returns true if the ping is tsonly ts option
-func (prf PingReplyFlags) IsTsOnly() bool {
-	return prf.Flags&0x08 > 0
+func (p Ping) IsTsOnly() bool {
+	return p.Flags.PF&(0x01<<3) > 0
 }
 
 // IsTsAndAddr returns true of the ping is tsandaddr
-func (prf PingReplyFlags) IsTsAndAddr() bool {
-	return prf.Flags&0x10 > 0
-}
-
-// HasTsAndAddr returns true if there are ts and addrs present
-func (prf PingReplyFlags) HasTsAndAddr() bool {
-	return len(prf.V4TS.Addrs) > 0 &&
-		len(prf.V4TS.TimeStamps) > 0
+func (p Ping) IsTsAndAddr() bool {
+	return len(p.Flags.TS) > 0
 }
 
 // RProto is the proto of the reply
@@ -353,13 +346,17 @@ type V4TS struct {
 
 func (v V4TS) String() string {
 	var buf bytes.Buffer
-	if len(v.Addrs) == 0 {
+	if len(v.Addrs) == 0 && len(v.TimeStamps) == 0 {
 		return ""
 	}
+	if len(v.Addrs) == 0 {
+		for _, ts := range v.TimeStamps {
+			fmt.Fprintf(&buf, "TimeStamp: %v\n", ts)
+		}
+		return buf.String()
+	}
 	for i, addr := range v.Addrs {
-		buf.WriteString(
-			fmt.Sprintf("{ Addr: %s, TimeStamp: %s }", addr, timeSinceMidnight(v.TimeStamps[i])),
-		)
+		fmt.Fprintf(&buf, "{ Addr: %s, TimeStamp: %v }\n", addr, v.TimeStamps[i])
 	}
 	return buf.String()
 }
@@ -372,17 +369,10 @@ type TSReply struct {
 }
 
 func (tsr TSReply) String() string {
-	return fmt.Sprintf("{ OTimestamp: %s, RTimestamp: %s, TTimestamp: %s}",
-		timeSinceMidnight(tsr.OTimestamp),
-		timeSinceMidnight(tsr.RTimestamp),
-		timeSinceMidnight(tsr.TTimestamp))
-}
-
-func timeSinceMidnight(in uint32) string {
-	now := time.Now()
-	midn := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	newtime := midn.Add(time.Millisecond * time.Duration(in))
-	return newtime.String()
+	return fmt.Sprintf("{ OTimestamp: %v, RTimestamp: %v, TTimestamp: %v}",
+		tsr.OTimestamp,
+		tsr.RTimestamp,
+		tsr.TTimestamp)
 }
 
 func readPing(f io.Reader) (Ping, error) {

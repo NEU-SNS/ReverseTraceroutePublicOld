@@ -73,6 +73,7 @@ func ConvertPing(in warts.Ping) Ping {
 				rep.Tsonly = append(rep.Tsonly, uint32(ts))
 			}
 		} else if resp.IsTsAndAddr() {
+			p.Flags = append(p.Flags, "tsandaddr")
 			rep.Tsandaddr = make([]*TsAndAddr, 0)
 			for i, ts := range resp.V4TS.TimeStamps {
 				tsa := &TsAndAddr{}

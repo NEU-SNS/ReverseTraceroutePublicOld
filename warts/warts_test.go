@@ -42,11 +42,10 @@ func TestParsePing(t *testing.T) {
 	}
 	pingFilter := make([]warts.WartsT, 1)
 	pingFilter[0] = warts.PingT
-	p, err := warts.Parse(content, pingFilter)
+	_, err = warts.Parse(content, pingFilter)
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}
-	t.Log(p)
 }
 
 func TestParsePingTSPreSpec(t *testing.T) {
@@ -57,8 +56,31 @@ func TestParsePingTSPreSpec(t *testing.T) {
 	pingFilter := make([]warts.WartsT, 1)
 	pingFilter[0] = warts.PingT
 	p, err := warts.Parse(content, pingFilter)
-	t.Log(p[0].(warts.Ping).PingReplies[0].IsTsAndAddr())
-	t.Log(p[0].(warts.Ping).PingReplies[0].Flags)
+	t.Log(p[0].(warts.Ping).PingReplies[0].V4TS)
+	if !p[0].(warts.Ping).IsTsAndAddr() {
+		t.Fatal("TSPreSpec is not TsAndAddr")
+	}
+	if err != nil {
+		t.Fatalf("ParsePing failed: %v", err)
+	}
+}
+
+func TestParsePingTSOnly(t *testing.T) {
+	content, err := ioutil.ReadFile("../doc/test_tsonly.warts")
+	if err != nil {
+		t.Fatal("ParsePing could not read file")
+	}
+	pingFilter := make([]warts.WartsT, 1)
+	pingFilter[0] = warts.PingT
+	p, err := warts.Parse(content, pingFilter)
+	t.Log(p[0].(warts.Ping).PingReplies[0].V4TS)
+	if p[0].(warts.Ping).IsTsAndAddr() {
+		t.Fatal("TSPreSpec is TsAndAddr")
+	}
+	t.Log(p[0].(warts.Ping).Flags.PF.Strings())
+	if !p[0].(warts.Ping).IsTsOnly() {
+		t.Fatal("TSPreSpec is not TsOnly")
+	}
 	if err != nil {
 		t.Fatalf("ParsePing failed: %v", err)
 	}

@@ -43,12 +43,13 @@ func ConvertPing(in warts.Ping) Ping {
 		rep.ReplyIpid = uint32(resp.ReplyIPID)
 		rep.IcmpType = uint32((resp.ICMP & 0xFF00) >> 8)
 		rep.IcmpCode = uint32(resp.ICMP & 0x00FF)
-		if resp.IsTsOnly() {
+		if in.IsTsOnly() {
 			rep.Tsonly = make([]uint32, 0)
 			for _, ts := range resp.V4TS.TimeStamps {
 				rep.Tsonly = append(rep.Tsonly, uint32(ts))
 			}
-		} else if resp.HasTsAndAddr() {
+		} else if in.IsTsAndAddr() {
+			p.Flags = append(p.Flags, "tsandaddr")
 			rep.Tsandaddr = make([]*TsAndAddr, 0)
 			for i, ts := range resp.V4TS.TimeStamps {
 				tsa := &TsAndAddr{}

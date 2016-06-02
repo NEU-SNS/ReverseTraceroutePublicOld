@@ -93,17 +93,23 @@ func init() {
 	prometheus.MustRegister(rpcCounter)
 	prometheus.MustRegister(timeoutCounter)
 	prometheus.MustRegister(errorCounter)
+	prometheus.MustRegister(pingResponseTimes)
+	prometheus.MustRegister(tracerouteResponseTimes)
 }
 
 // DataAccess defines the interface needed by a DB
 type DataAccess interface {
 	GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error)
 	GetPingsMulti([]*dm.PingMeasurement) ([]*dm.Ping, error)
-	StorePing(*dm.Ping) error
+	StorePing(*dm.Ping) (int64, error)
 	GetTRBySrcDst(uint32, uint32) ([]*dm.Traceroute, error)
 	GetTraceMulti([]*dm.TracerouteMeasurement) ([]*dm.Traceroute, error)
 	StoreTraceroute(*dm.Traceroute) error
 	Close() error
+	GetUser(string) (dm.User, error)
+	AddPingBatch(dm.User) (int64, error)
+	AddPingsToBatch(int64, []int64) error
+	GetPingBatch(dm.User, int64) ([]*dm.Ping, error)
 }
 
 type controllerT struct {
@@ -368,16 +374,15 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						if pp == nil {
 							return
 						}
-						go func() {
-							err := c.db.StorePing(pp)
-							if err != nil {
-								log.Error(err)
-							}
-							err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
-							if err != nil {
-								log.Error(err)
-							}
-						}()
+						id, err := c.db.StorePing(pp)
+						if err != nil {
+							log.Error(err)
+						}
+						err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
+						if err != nil {
+							log.Error(err)
+						}
+						pp.Id = id
 						log.Debug("Sending: ", pp)
 						ret <- pp
 					}
@@ -494,10 +499,11 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					if err != nil {
 						log.Error(err)
 					}
-					err = c.db.StorePing(px)
+					pid, err := c.db.StorePing(px)
 					if err != nil {
 						log.Error(err)
 					}
+					px.Id = pid
 					select {
 					case <-ctx.Done():
 						close(kill)
@@ -882,6 +888,14 @@ func (c *controllerT) run(ec chan error, con Config, db DataAccess, cache ca.Cac
 func Start(c Config, db DataAccess, cache ca.Cache, r router.Router) chan error {
 	log.Info("Starting controller")
 	http.Handle("/metrics", prometheus.Handler())
+	mux := http.NewServeMux()
+	mux.HandleFunc(v1Prefix+"vps", controller.VPSHandler)
+	mux.HandleFunc(v1Prefix+"rr", controller.RecordRouteHandler)
+	mux.HandleFunc(v1Prefix+"ts", controller.TimeStampHandler)
+	mux.HandleFunc(v1Prefix+"pings", controller.GetPingsHandler)
+	go func() {
+		log.Error(http.ListenAndServe(":8080", mux))
+	}()
 	go startHTTP(*c.Local.PProfAddr)
 	errChan := make(chan error, 2)
 	go controller.run(errChan, c, db, cache, r)

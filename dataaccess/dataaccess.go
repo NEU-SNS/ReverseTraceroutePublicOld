@@ -93,7 +93,7 @@ func (d *DataAccess) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Durati
 }
 
 // StorePing stores a ping
-func (d *DataAccess) StorePing(p *dm.Ping) error {
+func (d *DataAccess) StorePing(p *dm.Ping) (int64, error) {
 	return d.db.StorePing(p)
 }
 
@@ -145,6 +145,26 @@ func (d *DataAccess) StoreAdjacencyToDest(dest24, addr, adj net.IP) error {
 // StoreAlias stores an alias with id id
 func (d *DataAccess) StoreAlias(id int, ips []net.IP) error {
 	return d.db.StoreAlias(id, ips)
+}
+
+// GetUser gets a user for the given key
+func (d *DataAccess) GetUser(key string) (dm.User, error) {
+	return d.db.GetUser(key)
+}
+
+// AddPingBatch adds a ping batch for user u
+func (d *DataAccess) AddPingBatch(u dm.User) (int64, error) {
+	return d.db.AddPingBatch(u)
+}
+
+// AddPingsToBatch adds pings pids to batch bid
+func (d *DataAccess) AddPingsToBatch(bid int64, pids []int64) error {
+	return d.db.AddPingsToBatch(bid, pids)
+}
+
+// GetPingBatch get the pings in the associated batch
+func (d *DataAccess) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
+	return d.db.GetPingBatch(u, bid)
 }
 
 // New create a new dataAccess with the given config
