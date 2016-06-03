@@ -35,6 +35,7 @@ It has these top-level messages:
 	RTT
 	TracerouteMeasurement
 	TracerouteArg
+	TracerouteArgResp
 	TracerouteHop
 	Traceroute
 	TracerouteTime

@@ -359,25 +359,25 @@ func storeTraceHop(tx *sql.Tx, id int64, hop uint32, in *dm.TracerouteHop) error
 }
 
 // StoreTraceroute saves a traceroute to the DB
-func (db *DB) StoreTraceroute(in *dm.Traceroute) error {
+func (db *DB) StoreTraceroute(in *dm.Traceroute) (int64, error) {
 	conn := db.GetWriter()
 	tx, err := conn.Begin()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	id, err := storeTraceroute(tx, in)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return 0, err
 	}
 	for i, hop := range in.GetHops() {
 		err = storeTraceHop(tx, id, uint32(i), hop)
 		if err != nil {
 			tx.Rollback()
-			return err
+			return 0, err
 		}
 	}
-	return tx.Commit()
+	return id, tx.Commit()
 }
 
 const (
@@ -426,7 +426,67 @@ WHERE t.start > ?
 ORDER BY
 	t.start DESC
 `
+
+	addTraceBatch      = `insert into trace_batch(user_id) VALUES(?)`
+	addTraceBatchTrace = `insert into trace_batch_trace(batch_id, trace_id) VALUES(?, ?)`
+	getTraceBatch0     = "SELECT t.id, t.src, t.dst, t.type, t.user_id, t.method, t.sport, " +
+		"t.dport, t.stop_reason, t.stop_data, t.start, t.version, t.hop_count, t.attempts, " +
+		"t.hop_limit, t.first_hop, t.wait, t.wait_probe, t.tos, t.probe_size  " +
+		"FROM users u inner join trace_batch tb on tb.user_id = u.id inner join " +
+		"inner join trace_batch_trace tbt on tb.id = tbt.batch_id inner join " +
+		"traceroutes t on t.id = tbt.trace_id WHERE u.`key` = ? and tb.id = ?;"
+	getTraceBatch = "SELECT t.id, t.src, t.dst, t.type, t.user_id, t.method, " +
+		"t.sport, t.dport, t.stop_reason, t.stop_data, t.start, t.version, " +
+		"t.hop_count, t.attempts, t.hop_limit, t.first_hop, t.wait, t.wait_probe, " +
+		"t.tos, t.probe_size, th.traceroute_id, " +
+		"th.hop, th.addr, th.probe_ttl, th.probe_id, th.probe_size, " +
+		"th.rtt, th.reply_ttl, th.reply_tos, th.reply_size, " +
+		"th.reply_ipid, th.icmp_type, th.icmp_code, th.icmp_q_ttl, th.icmp_q_ipl, th.icmp_q_tos " +
+		"FROM " +
+		"users u " +
+		"inner join trace_batch tb on u.id = tb.user_id " +
+		"inner join trace_batch_trace tbt on tb.id = tbt.batch_id " +
+		"inner join traceroutes t on tbt.trace_id = t.id " +
+		"inner join traceroute_hops th on th.traceroute_id = t.id " +
+		"WHERE " +
+		"u.`key` = ? and tb.id = ?; "
 )
+
+// AddTraceBatch adds a traceroute batch
+func (db *DB) AddTraceBatch(u dm.User) (int64, error) {
+	res, err := db.GetWriter().Exec(addTraceBatch, u.ID)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// AddTraceToBatch adds pings pids to batch bid
+func (db *DB) AddTraceToBatch(bid int64, tids []int64) error {
+	con := db.GetWriter()
+	tx, err := con.Begin()
+	if err != nil {
+		return err
+	}
+	for _, tid := range tids {
+		_, err := tx.Exec(addTraceBatchTrace, bid, tid)
+		if err != nil {
+			log.Error(err)
+			return tx.Rollback()
+		}
+	}
+	return tx.Commit()
+}
+
+// GetTraceBatch gets a batch of traceroute for user u with id bid
+func (db *DB) GetTraceBatch(u dm.User, bid int64) ([]*dm.Traceroute, error) {
+	rows, err := db.GetReader().Query(getTraceBatch, u.Key, bid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return splitTraces(rows)
+}
 
 func splitTraces(rows *sql.Rows) ([]*dm.Traceroute, error) {
 	currTraces := make(map[int64]*dm.Traceroute)
@@ -438,11 +498,15 @@ func splitTraces(rows *sql.Rows) ([]*dm.Traceroute, error) {
 		var id int64
 		var tID sql.NullInt64
 		var hopNum, rtt sql.NullInt64
-		rows.Scan(&id, &curr.Src, &curr.Dst, &curr.Type, &curr.UserId, &curr.Method, &curr.Sport,
+		err := rows.Scan(&id, &curr.Src, &curr.Dst, &curr.Type, &curr.UserId, &curr.Method, &curr.Sport,
 			&curr.Dport, &curr.StopReason, &curr.StopData, &start, &curr.Version, &curr.HopCount,
 			&curr.Attempts, &curr.Hoplimit, &curr.Firsthop, &curr.Wait, &curr.WaitProbe, &curr.Tos,
 			&curr.ProbeSize, &tID, &hopNum, &hop.Addr, &hop.ProbeTtl, &hop.ProbeId, &hop.ProbeSize,
-			&rtt, &hop.IcmpCode, &hop.IcmpQTtl, &hop.IcmpQIpl, &hop.IcmpQTos)
+			&rtt, &hop.ReplyTtl, &hop.ReplyTos, &hop.ReplySize, &hop.ReplyIpid, &hop.IcmpType,
+			&hop.IcmpCode, &hop.IcmpQTtl, &hop.IcmpQIpl, &hop.IcmpQTos)
+		if err != nil {
+			return nil, err
+		}
 		if _, ok := currTraces[id]; !ok {
 			curr.Start = &dm.TracerouteTime{}
 			nano := start.UnixNano()

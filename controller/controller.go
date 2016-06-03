@@ -104,12 +104,15 @@ type DataAccess interface {
 	StorePing(*dm.Ping) (int64, error)
 	GetTRBySrcDst(uint32, uint32) ([]*dm.Traceroute, error)
 	GetTraceMulti([]*dm.TracerouteMeasurement) ([]*dm.Traceroute, error)
-	StoreTraceroute(*dm.Traceroute) error
+	StoreTraceroute(*dm.Traceroute) (int64, error)
 	Close() error
 	GetUser(string) (dm.User, error)
 	AddPingBatch(dm.User) (int64, error)
 	AddPingsToBatch(int64, []int64) error
 	GetPingBatch(dm.User, int64) ([]*dm.Ping, error)
+	AddTraceBatch(dm.User) (int64, error)
+	AddTraceToBatch(int64, []int64) error
+	GetTraceBatch(dm.User, int64) ([]*dm.Traceroute, error)
 }
 
 type controllerT struct {
@@ -766,16 +769,15 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 							return
 						}
 						log.Debug("Got TR ", pp)
-						go func() {
-							err := c.db.StoreTraceroute(pp)
-							if err != nil {
-								log.Error(err)
-							}
-							err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
-							if err != nil {
-								log.Error(err)
-							}
-						}()
+						id, err := c.db.StoreTraceroute(pp)
+						if err != nil {
+							log.Error(err)
+						}
+						pp.Id = id
+						err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
+						if err != nil {
+							log.Error(err)
+						}
 						ret <- pp
 					}
 				}
@@ -893,6 +895,9 @@ func Start(c Config, db DataAccess, cache ca.Cache, r router.Router) chan error 
 	mux.HandleFunc(v1Prefix+"rr", controller.RecordRouteHandler)
 	mux.HandleFunc(v1Prefix+"ts", controller.TimeStampHandler)
 	mux.HandleFunc(v1Prefix+"pings", controller.GetPingsHandler)
+	mux.HandleFunc(v1Prefix+"ping", controller.PingHandler)
+	mux.HandleFunc(v1Prefix+"traceroute", controller.TracerouteHandler)
+	mux.HandleFunc(v1Prefix+"traceroutes", controller.GetTracesHandler)
 	go func() {
 		log.Error(http.ListenAndServe(":8080", mux))
 	}()

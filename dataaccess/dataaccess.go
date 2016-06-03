@@ -63,7 +63,7 @@ func uToNSec(u int64) int64 {
 }
 
 // StoreTraceroute stores a traceroute
-func (d *DataAccess) StoreTraceroute(t *dm.Traceroute) error {
+func (d *DataAccess) StoreTraceroute(t *dm.Traceroute) (int64, error) {
 	return d.db.StoreTraceroute(t)
 }
 
@@ -165,6 +165,21 @@ func (d *DataAccess) AddPingsToBatch(bid int64, pids []int64) error {
 // GetPingBatch get the pings in the associated batch
 func (d *DataAccess) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
 	return d.db.GetPingBatch(u, bid)
+}
+
+// AddTraceBatch adds a traceroute batch for user u
+func (d *DataAccess) AddTraceBatch(u dm.User) (int64, error) {
+	return d.db.AddTraceBatch(u)
+}
+
+// AddTraceToBatch adds traceroutes tids to batch bid
+func (d *DataAccess) AddTraceToBatch(bid int64, tids []int64) error {
+	return d.db.AddTraceToBatch(bid, tids)
+}
+
+// GetTraceBatch get the traceroute in the associated batch
+func (d *DataAccess) GetTraceBatch(u dm.User, bid int64) ([]*dm.Traceroute, error) {
+	return d.db.GetTraceBatch(u, bid)
 }
 
 // New create a new dataAccess with the given config
