@@ -115,16 +115,32 @@ type PingReq struct {
 	Priority Priority `json:"priority,omitempty"`
 }
 
+// TraceReq is a request for traceroutes
+type TraceReq struct {
+	Traceroutes []Trace  `json:"traceroutes,omitempty"`
+	Priority    Priority `json:"priority,omitempty"`
+}
+
+// Trace is an individual traceroute measurement
+type Trace struct {
+	Src      string `json:"src,omitempty"`
+	Dst      string `json:"dst,omitempty"`
+	Attempts int    `json:"attempts,omitempty"`
+}
+
 //Ping is an individual measurement
 type Ping struct {
 	Src       string `json:"src,omitempty"`
 	Dst       string `json:"dst,omitempty"`
 	Timestamp string `json:"timestamp,omitempty"`
+	Count     int    `json:"count,omitempty"`
 }
 
 const (
-	apiKey   = "Api-Key"
-	v1Prefix = "/api/v1/"
+	apiKey                = "Api-Key"
+	v1Prefix              = "/api/v1/"
+	maxProbeCount         = 4
+	maxTracerouteAttempts = 4
 )
 
 func (c *controllerT) verifyKey(key string) (dm.User, bool) {
@@ -170,6 +186,191 @@ func (c *controllerT) GetPingsHandler(rw http.ResponseWriter, req *http.Request)
 	}
 }
 
+func (c *controllerT) GetTracesHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	id := req.FormValue("id")
+	idi, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	log.Debug("Getting traces for batch ", idi)
+	traces, err := c.db.GetTraceBatch(u, idi)
+	if err != nil {
+		log.Error(err)
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	var marsh jsonpb.Marshaler
+	if err := marsh.Marshal(rw, &dm.TracerouteArgResp{Traceroutes: traces}); err != nil {
+		panic(err)
+	}
+}
+
+func (c *controllerT) TracerouteHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	var treq TraceReq
+	if err := json.NewDecoder(req.Body).Decode(&treq); err != nil {
+		panic(err)
+	}
+	log.Debug("Running traces treq")
+	var traces []*dm.TracerouteMeasurement
+	for _, t := range treq.Traceroutes {
+		if t.Attempts > maxTracerouteAttempts || t.Attempts < 0 {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		srci, err := util.IPStringToInt32(t.Src)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		dsti, err := util.IPStringToInt32(t.Dst)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		if t.Attempts == 0 {
+			t.Attempts = 2
+		}
+		traces = append(traces, &dm.TracerouteMeasurement{
+			Src:      srci,
+			Dst:      dsti,
+			Attempts: fmt.Sprintf("%d", t.Attempts),
+			Timeout:  20,
+		})
+	}
+	if len(traces) == 0 {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	bid, err := c.db.AddTraceBatch(u)
+	if err != nil {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	go func() {
+		ctx := con.Background()
+		ctx, cancel := con.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		results := c.doTraceroute(ctx, traces)
+		var ids []int64
+		for t := range results {
+			ids = append(ids, t.Id)
+		}
+		err := c.db.AddTraceToBatch(bid, ids)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(struct {
+		Results string `json:"results,omitempty"`
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", "revtr.ccs.neu.edu", v1Prefix+"traceroutes", bid)})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (c *controllerT) PingHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPut {
+		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	key := req.Header.Get(apiKey)
+	u, ok := c.verifyKey(key)
+	if !ok {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	var preq PingReq
+	if err := json.NewDecoder(req.Body).Decode(&preq); err != nil {
+		panic(err)
+	}
+	var pings []*dm.PingMeasurement
+	for _, p := range preq.Pings {
+		if p.Count > maxProbeCount || p.Count <= 0 {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		srci, err := util.IPStringToInt32(p.Src)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		dsti, err := util.IPStringToInt32(p.Dst)
+		if err != nil {
+			rw.Header().Set("Content-Type", "text/plain")
+			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		pings = append(pings, &dm.PingMeasurement{
+			Src:     srci,
+			Dst:     dsti,
+			Timeout: 10,
+			Count:   fmt.Sprintf("%d", p.Count),
+		})
+
+	}
+	bid, err := c.db.AddPingBatch(u)
+	if err != nil {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	go func() {
+		ctx := con.Background()
+		ctx, cancel := con.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		results := c.doPing(ctx, pings)
+		var ids []int64
+		for p := range results {
+			ids = append(ids, p.Id)
+		}
+		err := c.db.AddPingsToBatch(bid, ids)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	rw.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(rw).Encode(struct {
+		Results string `json:"results,omitempty"`
+	}{Results: fmt.Sprintf("https://%s%s?id=%d", "revtr.ccs.neu.edu", v1Prefix+"pings", bid)})
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (c *controllerT) RecordRouteHandler(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(rw, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -209,6 +410,11 @@ func (c *controllerT) RecordRouteHandler(rw http.ResponseWriter, req *http.Reque
 			RR:      true,
 		})
 	}
+	if len(pings) == 0 {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	bid, err := c.db.AddPingBatch(u)
 	if err != nil {
 		rw.Header().Set("Content-Type", "text/plain")
@@ -231,7 +437,7 @@ func (c *controllerT) RecordRouteHandler(rw http.ResponseWriter, req *http.Reque
 	}()
 	rw.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(rw).Encode(struct {
-		Results string
+		Results string `json:"results,omitempty"`
 	}{Results: fmt.Sprintf("https://%s%s?id=%d", "revtr.ccs.neu.edu", v1Prefix+"pings", bid)})
 	if err != nil {
 		panic(err)
@@ -280,6 +486,11 @@ func (c *controllerT) TimeStampHandler(rw http.ResponseWriter, req *http.Request
 			Count:     "1",
 			TimeStamp: p.Timestamp,
 		})
+	}
+	if len(pings) == 0 {
+		rw.Header().Set("Content-Type", "text/plain")
+		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 	bid, err := c.db.AddPingBatch(u)
 	if err != nil {
