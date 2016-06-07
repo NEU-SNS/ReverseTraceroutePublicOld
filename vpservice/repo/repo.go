@@ -222,40 +222,57 @@ func (ae addVPError) Error() string {
 }
 
 // UpdateActiveVPs updates the active vps in the database
-func (r *Repo) UpdateActiveVPs(vps []*pb.VantagePoint) error {
+func (r *Repo) UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error) {
 	ovps, err := r.GetVPs()
 	if err != nil {
 		log.Error(err)
-		return ErrFailedToUpdateVPs
+		return nil, nil, ErrFailedToUpdateVPs
 	}
 	rem, add := generateChanges(vps, ovps)
 	tx, err := r.repo.GetWriter().Begin()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	for _, vp := range add {
 		if err := addVP(tx, vp); err != nil {
 			logError(tx.Rollback)
-			return err
+			return nil, nil, err
+		}
+		if err := insertEvent(tx, "ONLINE", vp); err != nil {
+			logError(tx.Rollback)
+			return nil, nil, err
 		}
 	}
 	for _, vp := range rem {
 		if err := delVP(tx, vp); err != nil {
 			logError(tx.Rollback)
-			return err
+			return nil, nil, err
+		}
+		if err := insertEvent(tx, "OFFLINE", vp); err != nil {
+			logError(tx.Rollback)
+			return nil, nil, err
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Error(err)
-		return err
+		return nil, nil, err
 	}
-	return nil
+	return add, rem, nil
 }
 
 const (
 	insertVP = `insert into vantage_points(ip, hostname, site) values(?, ?, ?)`
 	removeVP = `delete from vantage_points where ip = ?`
+	addEvent = `insert into vp_events(type, hostname, site) values(?,?,?)`
 )
+
+func insertEvent(tx *sql.Tx, event string, vp *pb.VantagePoint) error {
+	_, err := tx.Exec(addEvent, event, vp.Hostname, vp.Site)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func delVP(tx *sql.Tx, vp *pb.VantagePoint) error {
 	_, err := tx.Exec(removeVP, vp.Ip)

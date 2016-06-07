@@ -47,6 +47,11 @@ var (
 		Name:      "spoofing_sites",
 		Help:      "The current number of active spoofing sites",
 	})
+	onlineVPGuageVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "vantage_points",
+		Name:      "vp_status",
+		Help:      "The status of individual vantage points, 1 is online 0 is offline.",
+	}, []string{"vp"})
 )
 
 const (
@@ -60,6 +65,7 @@ func init() {
 	prometheus.MustRegister(onlineVPGuage)
 	prometheus.MustRegister(activeSiteGuage)
 	prometheus.MustRegister(spoofingSiteGuage)
+	prometheus.MustRegister(onlineVPGuageVec)
 }
 
 // VPServer is the interace for the vantage point server
@@ -247,9 +253,16 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 		cvp.Site = vp.Site
 		aVps = append(aVps, cvp)
 	}
-	err := s.opts.vpp.UpdateActiveVPs(aVps)
+	add, rem, err := s.opts.vpp.UpdateActiveVPs(aVps)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	for _, vp := range add {
+		onlineVPGuageVec.WithLabelValues(vp.Hostname).Set(1)
+	}
+	for _, vp := range rem {
+		onlineVPGuageVec.WithLabelValues(vp.Hostname).Set(-1)
 	}
 }
 
