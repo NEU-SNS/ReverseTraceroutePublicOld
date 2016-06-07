@@ -9,7 +9,7 @@ type VPProvider interface {
 	GetTSSpoofers(target uint32) ([]TSVantagePoint, error)
 	UpdateVP(vp pb.VantagePoint) error
 	GetVPsForTesting(limit int) ([]*pb.VantagePoint, error)
-	UpdateActiveVPs(vps []*pb.VantagePoint) error
+	UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error)
 }
 
 // RRVantagePoint represents a vantage point
