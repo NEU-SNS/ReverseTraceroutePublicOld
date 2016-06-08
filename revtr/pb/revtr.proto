@@ -65,16 +65,17 @@ message Source {
 }
 
 message ReverseTraceroute {
-    RevtrStatus status     =  1; 
-    string src             =  2;
-    string dst             =  3;
-    int64 runtime          =  4;
-    int32 rr_issued        =  5;
-    int32 ts_issued        =  6;
-    string stop_reason     =  7;
-    string date            =  8;
-    repeated RevtrHop path =  9;
-    uint32 id              = 10;
+  RevtrStatus status     =  1; 
+  string src             =  2;
+  string dst             =  3;
+  int64 runtime          =  4;
+  int32 rr_issued        =  5;
+  int32 ts_issued        =  6;
+  string stop_reason     =  7;
+  string date            =  8;
+  repeated RevtrHop path =  9;
+  uint32 id              = 10;
+  string fail_reason     = 11;
 }
 
 message RevtrHop {  
