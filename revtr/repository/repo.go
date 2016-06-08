@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason, status) VALUES
-	(?, ?, ?, ?, ?, ?, ?)`
+	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason, status, fail_reason) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?)`
 	revtrInitRevtr         = `INSERT INTO reverse_traceroutes(src, dst) VALUES (?, ?)`
 	revtrUpdateRevtrStatus = `UPDATE reverse_traceroutes SET status = ? WHERE id = ?`
 	revtrStoreRevtrHop     = "INSERT INTO reverse_traceroute_hops(reverse_traceroute_id, hop, hop_type, `order`) VALUES (?, ?, ?, ?)"
@@ -36,7 +36,7 @@ const (
 		"		u.max "
 	revtrAddBatch         = "INSERT INTO batch(user_id) SELECT id FROM users WHERE users.`key` = ?"
 	revtrAddBatchRevtr    = "INSERT INTO batch_revtr(batch_id, revtr_id) VALUES (?, ?)"
-	revtrGetRevtrsInBatch = "SELECT rt.id, rt.src, rt.dst, rt.runtime, rt.rr_issued, rt.ts_issued, rt.stop_reason, rt.status, rt.date " +
+	revtrGetRevtrsInBatch = "SELECT rt.id, rt.src, rt.dst, rt.runtime, rt.rr_issued, rt.ts_issued, rt.stop_reason, rt.status, rt.date, rt.fail_reason " +
 		"FROM users u INNER JOIN batch b ON u.id = b.user_id INNER JOIN batch_revtr brt ON b.id = brt.batch_id " +
 		"INNER JOIN reverse_traceroutes rt ON brt.revtr_id = rt.id WHERE u.id = ? AND b.id = ?"
 	revtrGetHopsForRevtr = "SELECT hop, hop_type FROM reverse_traceroute_hops rth WHERE rth.reverse_traceroute_id = ? ORDER BY rth.`order`"
@@ -46,7 +46,8 @@ const (
 		rr_issued = ?,
 		ts_issued = ?,
 		stop_reason = ?,
-		status = ?
+		status = ?,
+        fail_reason = ?
 	WHERE
 		reverse_traceroutes.id = ?;`
 )
@@ -149,7 +150,9 @@ func (r *Repo) StoreBatchedRevtrs(batch []pb.ReverseTraceroute) error {
 		return ErrFailedToStoreBatch
 	}
 	for _, rt := range batch {
-		_, err = tx.Exec(revtrUpdateRevtr, rt.Runtime, rt.RrIssued, rt.TsIssued, rt.StopReason, rt.Status.String(), rt.Id)
+		_, err = tx.Exec(revtrUpdateRevtr, rt.Runtime, rt.RrIssued,
+			rt.TsIssued, rt.StopReason, rt.Status.String(),
+			rt.FailReason, rt.Id)
 		if err != nil {
 			log.Error(err)
 			if err := tx.Rollback(); err != nil {
@@ -205,7 +208,9 @@ func (r *Repo) GetRevtrsInBatch(uid, bid uint32) ([]*pb.ReverseTraceroute, error
 		var src, dst, id uint32
 		var t time.Time
 		var status string
-		err = res.Scan(&id, &src, &dst, &r.Runtime, &r.RrIssued, &r.TsIssued, &r.StopReason, &status, &t)
+		err = res.Scan(&id, &src, &dst, &r.Runtime,
+			&r.RrIssued, &r.TsIssued, &r.StopReason,
+			&status, &t, &r.FailReason)
 		if err != nil {
 			log.Error(err)
 			return nil, ErrFailedToGetBatch
@@ -343,7 +348,9 @@ func (r *Repo) StoreRevtr(rt pb.ReverseTraceroute) error {
 	}
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.Dst)
-	res, err := tx.Exec(revtrStoreRevtr, src, dst, rt.Runtime, rt.RrIssued, rt.TsIssued, rt.StopReason, rt.Status.String())
+	res, err := tx.Exec(revtrStoreRevtr, src, dst,
+		rt.Runtime, rt.RrIssued, rt.TsIssued,
+		rt.StopReason, rt.Status.String(), rt.FailReason)
 	if err != nil {
 		log.Error(err)
 		logError(tx.Rollback)

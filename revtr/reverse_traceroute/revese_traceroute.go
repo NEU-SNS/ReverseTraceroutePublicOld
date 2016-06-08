@@ -69,6 +69,7 @@ type ReverseTraceroute struct {
 	Staleness               int64
 	ProbeCount              map[string]int
 	BackoffEndhost          bool
+	FailReason              string
 	mu                      sync.Mutex // protects running
 	hnCacheInit             bool
 	hostnameCache           map[string]string
@@ -324,6 +325,7 @@ func (rt *ReverseTraceroute) ToStorable() pb.ReverseTraceroute {
 	ret.Id = rt.ID
 	ret.Src = rt.Src
 	ret.Dst = rt.Dst
+	ret.FailReason = rt.FailReason
 	ret.Runtime = rt.EndTime.Sub(rt.StartTime).Nanoseconds()
 	ret.RrIssued = int32(rt.ProbeCount["rr"] + rt.ProbeCount["spoof-rr"])
 	ret.TsIssued = int32(rt.ProbeCount["ts"] + rt.ProbeCount["spoof-ts"])

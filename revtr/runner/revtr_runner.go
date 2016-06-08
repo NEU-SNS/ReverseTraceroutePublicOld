@@ -688,6 +688,7 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 		revtr.FailCurrPath()
 		if revtr.Failed() {
 			// we failed so we're done
+			revtr.FailReason = "Traceroue failed when trying to assume symmetric"
 			return nil
 		}
 		// move on to the top of the loop
@@ -703,11 +704,16 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 			trace.hops, 1,
 			hToIgnore)},
 		b.opts.cm) {
+		if revtr.Reaches(b.opts.cm) {
+			// done
+			return nil
+		}
 		return b.trToSource
 	}
 	// everything failed
 	revtr.FailCurrPath()
 	if revtr.Failed() {
+		revtr.FailReason = "Failed to find hops for any path."
 		return nil
 	}
 	return b.trToSource
