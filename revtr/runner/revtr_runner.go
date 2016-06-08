@@ -673,6 +673,9 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 		added := revtr.AddAndReplaceSegment(newSeg)
 		if added {
 			log.Debug("Added hop from another DstSymRevSegment")
+			if revtr.Reaches(b.opts.cm) {
+				return nil
+			}
 			return b.trToSource
 		}
 	}
