@@ -20,6 +20,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/api"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/filters"
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/httpapi"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/server"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
@@ -100,10 +101,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	http.Handle("/metrics", prometheus.Handler())
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", prometheus.Handler())
+	httpapi.NewAPI(s, mux)
 	go func() {
 		for {
-			log.Error(http.ListenAndServe(":8080", nil))
+			log.Error(http.ListenAndServe(":8080", mux))
 		}
 	}()
 	ln, err := net.Listen("tcp", ":45000")
