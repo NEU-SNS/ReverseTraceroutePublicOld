@@ -204,6 +204,7 @@ func (sm *SpoofPingMonitor) poll(addr string, probes chan<- dm.Probe, ec chan er
 			if err != nil {
 				log.Error(err)
 			}
+			return
 		default:
 			var pr *dm.Probe
 			if pr, err = getProbe(c); err != nil {
