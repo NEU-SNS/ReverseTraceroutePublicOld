@@ -10,6 +10,10 @@ type VPProvider interface {
 	UpdateVP(vp pb.VantagePoint) error
 	GetVPsForTesting(limit int) ([]*pb.VantagePoint, error)
 	UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error)
+	UnquarantineVPs(vps []string) error
+	QuarantineVPs(vps []string) error
+	UnquarantineActiveVPs(days int) error
+	GetQuarantined() ([]string, error)
 }
 
 // RRVantagePoint represents a vantage point
