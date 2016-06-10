@@ -47,7 +47,7 @@ type Config struct {
 	SubCon SubConfig
 }
 
-const test_config = `
+const testingConfig = `
 name: Rob
 num: 65
 subcon:
@@ -88,7 +88,7 @@ func TestEnv(t *testing.T) {
 	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
 	err := config.Parse(flags, &conf)
 	if err != nil {
-		t.Fatalf("Error Parsing flags: ", err)
+		t.Fatal("Error Parsing flags: ", err)
 	}
 	if testConfig != conf {
 		t.Fatalf("Parseing ENV failed. Expected[%v] got[%v]", testConfig, conf)
@@ -102,7 +102,7 @@ func TestFile(t *testing.T) {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpfile.Name())
-	_, err = tmpfile.Write([]byte(test_config))
+	_, err = tmpfile.Write([]byte(testingConfig))
 	if err != nil {
 		t.Fatalf("Failed to write config: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestFile(t *testing.T) {
 	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
 	err = config.Parse(flags, &conf)
 	if err != nil {
-		t.Fatalf("Error Parsing flags: ", err)
+		t.Fatal("Error Parsing flags: ", err)
 	}
 	if testConfig != conf {
 		t.Fatalf("Parseing ENV failed. Expected[%v] got[%v]", testConfig, conf)
