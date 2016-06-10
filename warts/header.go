@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015, Northeastern University
+ Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package warts
 
 import (
@@ -31,15 +32,16 @@ import (
 	"io"
 )
 
-type WartsHeader struct {
+// Header is the header value that a warts file uses
+type Header struct {
 	Magic  uint16
 	Type   WartsT
 	Length uint32
 }
 
-func readHeader(f io.Reader) (WartsHeader, error) {
+func readHeader(f io.Reader) (Header, error) {
 	head := make([]byte, 8)
-	var wh WartsHeader
+	var wh Header
 	n, err := f.Read(head)
 	if err != nil {
 		return wh, err

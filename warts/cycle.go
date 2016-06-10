@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package warts
 
 import (
@@ -31,6 +32,7 @@ import (
 	"io"
 )
 
+// CycleStart is the start of a warts cycle
 type CycleStart struct {
 	CycleID   uint32
 	ListID    uint32
@@ -52,17 +54,20 @@ func (c CycleStart) String() string {
 	)
 }
 
+// CycleStartFlags are the flags that a CycleStart can contain
 type CycleStartFlags struct {
 	Length   uint16
 	StopTime uint32
 	Hostname string
 }
 
+// CycleStop is the end of a warts cycle
 type CycleStop struct {
 	CycleID  uint32
 	StopTime uint32
 }
 
+// CycleStopFlags are the flags that a CycleStop can contain
 type CycleStopFlags struct {
 }
 
