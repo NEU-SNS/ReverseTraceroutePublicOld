@@ -50,8 +50,6 @@ func noop(err error, ps *os.ProcessState, p *proc.Process) bool {
 	return false
 }
 
-var id uint32
-
 // MProc is a basic process manager
 type MProc interface {
 	ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error)
@@ -67,6 +65,7 @@ type MProc interface {
 type mProc struct {
 	mu           sync.Mutex
 	managedProcs map[uint32]*managedP
+	id           uint32
 }
 
 type managedP struct {
@@ -91,6 +90,7 @@ func create(p *proc.Process, keepAlive bool, retry uint, f FailFunc) *managedP {
 	return &managedP{p: p, keepAlive: keepAlive, retry: retry, remRetry: retry, f: f}
 }
 
+// KillAll sends SIGKILL all processes
 func (mp *mProc) KillAll() {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
@@ -103,6 +103,7 @@ func (mp *mProc) KillAll() {
 	}
 }
 
+// IntAll sends SIGINT to all processes
 func (mp *mProc) IntAll() {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
@@ -114,7 +115,9 @@ func (mp *mProc) IntAll() {
 	}
 }
 
-//If you want the process to restart indef. just use MaxUint32
+// ManageProcess runs the process p and returns and id to use to refer to the process or an error
+// if ka is true, the process will be restarted up to retry times
+// If you want the process to restart indef. just use MaxUint32
 func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error) {
 
 	if p == nil {
@@ -128,12 +131,12 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc)
 		return 0, err
 	}
 	manp := create(p, ka, retry, f)
-	mp.managedProcs[id] = manp
+	mp.managedProcs[mp.id] = manp
 	if ka {
-		mp.keepAlive(id)
+		mp.keepAlive(mp.id)
 	}
-	rid := id
-	id = id + 1
+	rid := mp.id
+	mp.id = mp.id + 1
 	return rid, err
 }
 
@@ -187,6 +190,7 @@ func (mp *managedP) endKeepAlive() {
 	mp.remRetry = 0
 }
 
+// EndKeepAlive stops the keep alive of process id
 func (mp *mProc) EndKeepAlive(id uint32) error {
 	p := mp.getMp(id)
 	if p == nil {
@@ -205,6 +209,7 @@ func (mp *mProc) getMp(id uint32) *managedP {
 	return mp.managedProcs[id]
 }
 
+// SignalProc sends signal sig to process with id id
 func (mp *mProc) SignalProc(id uint32, sig os.Signal) error {
 	pro := mp.GetProc(id)
 	if pro == nil {
@@ -213,11 +218,13 @@ func (mp *mProc) SignalProc(id uint32, sig os.Signal) error {
 	return pro.Signal(sig)
 }
 
+// WaitProc waits on the process with the id id
 func (mp *mProc) WaitProc(id uint32) chan error {
 	proc := mp.GetProc(id)
 	return proc.Wait()
 }
 
+// GetProc gets the process with id id
 func (mp *mProc) GetProc(id uint32) *proc.Process {
 	defer mp.mu.Unlock()
 	mp.mu.Lock()
@@ -228,6 +235,7 @@ func (mp *mProc) GetProc(id uint32) *proc.Process {
 	return nil
 }
 
+// KillProc kills the process with id id
 func (mp *mProc) KillProc(id uint32) error {
 	proc := mp.GetProc(id)
 	if proc == nil {
