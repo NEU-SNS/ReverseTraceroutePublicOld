@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015, Northeastern University
+ Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -24,6 +24,7 @@ Copyright (c) 2015, Northeastern University
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package warts
 
 import (
@@ -32,7 +33,7 @@ import (
 	"syscall"
 )
 
-// Traceroute is a traceroute
+// Traceroute is a warts traceroute
 type Traceroute struct {
 	Flags      TracerouteFlags
 	PLength    uint16
@@ -41,7 +42,7 @@ type Traceroute struct {
 	EndOfTrace uint16
 }
 
-// TracerouteHop is a traceroute hop
+// TracerouteHop is a warts traceroute hop
 type TracerouteHop struct {
 	PLength        uint16
 	HopAddr        Address
@@ -122,7 +123,7 @@ func readICMPExtensionList(f io.Reader) (ICMPExtensionList, error) {
 	return ret, nil
 }
 
-// TracerouteFlags are the traceroute flags
+// TracerouteFlags are the traceroute flags of a warts traceroute
 type TracerouteFlags struct {
 	ListID       uint32
 	CycleID      uint32
