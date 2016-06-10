@@ -63,21 +63,31 @@ func parseYamlConfig(path string, opts interface{}) error {
 	return nil
 }
 
-var configPaths = make(map[string]configPath)
-
 type configPath struct {
 	Path  string
 	Order int
 }
 
-var lastConfig int
+type files struct {
+	LastConfig  int
+	ConfigPaths map[string]configPath
+}
+
+func (f *files) AddConfigPath(path string) {
+	order := f.LastConfig
+	f.LastConfig++
+	cp := configPath{Path: path, Order: order}
+	if f.ConfigPaths == nil {
+		f.ConfigPaths = make(map[string]configPath)
+	}
+	f.ConfigPaths[path] = cp
+}
+
+var configFiles files
 
 // AddConfigPath added the path to possible config files
 func AddConfigPath(path string) {
-	order := lastConfig
-	lastConfig++
-	cp := configPath{Path: path, Order: order}
-	configPaths[path] = cp
+	configFiles.AddConfigPath(path)
 }
 
 type configPathOrder []configPath
@@ -88,9 +98,9 @@ func (cp configPathOrder) Less(i, j int) bool { return cp[i].Order < cp[j].Order
 
 func mergeFiles(f *flag.FlagSet, opts interface{}) error {
 	ov := reflect.ValueOf(opts)
-	paths := make([]configPath, len(configPaths))
+	paths := make([]configPath, len(configFiles.ConfigPaths))
 	var i int
-	for _, val := range configPaths {
+	for _, val := range configFiles.ConfigPaths {
 		paths[i] = val
 		i++
 	}

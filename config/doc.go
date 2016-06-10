@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015, Northeastern University
+ Copyright (c) 2015, Northeastern University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -25,58 +25,9 @@ Copyright (c) 2015, Northeastern University
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// Package config handles the config parsing for the various commands
+// The package merges flags from multiple sources into on object
+// Command line flags take precedent over environment variables
+// which take precedent over config files
+// Config files must be in yaml format
 package config
-
-import (
-	"flag"
-	"os"
-	"strings"
-)
-
-var envPrefix string
-
-// SetEnvPrefix Sets the prefix to environment variables
-// When the prefix is set, env variables will be looked
-// for starting with pre_name
-func SetEnvPrefix(pre string) {
-	envPrefix = pre
-}
-
-type env struct {
-	env map[string]*string
-}
-
-func newEnv() *env {
-	split := "="
-	en := make(map[string]*string)
-
-	for _, val := range os.Environ() {
-		split := strings.SplitN(val, split, 2)
-		en[split[0]] = &split[1]
-	}
-	return &env{env: en}
-}
-
-func (e *env) Get(key string) *string {
-	return e.env[key]
-}
-
-func mergeEnvironment(f *flag.FlagSet) error {
-	env := newEnv()
-	fn := func(name string) *string {
-		sep := "_"
-		if envPrefix == "" {
-			sep = ""
-		}
-		key := strings.ToUpper(strings.Join(
-			[]string{
-				envPrefix,
-				strings.Replace(name, "-", "_", -1),
-			},
-			sep,
-		))
-		return env.Get(key)
-	}
-	err := merge(f, fn)
-	return err
-}
