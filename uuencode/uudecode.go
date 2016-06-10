@@ -44,6 +44,7 @@ type UUDecodingWriter struct {
 	b bytes.Buffer
 }
 
+// Write uudecodes the bytes in p
 func (w *UUDecodingWriter) Write(p []byte) (n int, err error) {
 	res, err := UUDecode(p)
 	if err != nil {
