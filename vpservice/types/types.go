@@ -1,6 +1,10 @@
 package types
 
-import "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
+import (
+	"time"
+
+	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
+)
 
 // VPProvider is the interface for a provider for vantage points
 type VPProvider interface {
@@ -10,10 +14,40 @@ type VPProvider interface {
 	UpdateVP(vp pb.VantagePoint) error
 	GetVPsForTesting(limit int) ([]*pb.VantagePoint, error)
 	UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error)
-	UnquarantineVPs(vps []string) error
-	QuarantineVPs(vps []string) error
-	UnquarantineActiveVPs(days int) error
-	GetQuarantined() ([]string, error)
+	UnquarantineVPs(vps []Quarantine) error
+	QuarantineVPs(vps []Quarantine) error
+	GetQuarantined() ([]Quarantine, error)
+}
+
+// Quarantine represents the quarntining of a vantange point
+type Quarantine struct {
+	Site        string
+	Hostname    string
+	IP          uint32
+	Reason      string
+	Attempt     int
+	Added       time.Time
+	LastAttempt time.Time
+	Retry       int64
+	tried       bool
+}
+
+const (
+	minQuarantine = time.Hour * 24 * 2
+	maxQuarantine = time.Hour * 24 * 7
+)
+
+// NewQuarantineFromVP creates a quarantine from the given vp
+// with default settings with the given reason
+func NewQuarantineFromVP(vp pb.VantagePoint, reason string) Quarantine {
+
+	return Quarantine{
+		Site:     vp.Site,
+		Hostname: vp.Hostname,
+		IP:       vp.Ip,
+		Reason:   reason,
+		Attempts: 0,
+	}
 }
 
 // RRVantagePoint represents a vantage point
