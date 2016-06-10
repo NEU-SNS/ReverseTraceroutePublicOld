@@ -90,7 +90,7 @@ func logError(e errorf) {
 
 const (
 	getVPS = `select 
-    vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof 
+    vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof, vps.ping, vps.trace 
 from 
     vantage_points vps
     left outer join quarantined_vps qvps on vps.hostname = qvps.hostname
@@ -98,7 +98,7 @@ where qvps.hostname is null
 `
 	getAllVPS = `select 
 ip, hostname, site, 
-timestamp, record_route, spoof, rec_spoof from vantage_points`
+timestamp, record_route, spoof, rec_spoof, ping, trace from vantage_points`
 	updateVP = `
 update vantage_points
   set hostname = ?,
@@ -107,17 +107,17 @@ update vantage_points
   record_route = ?,
   spoof = ?,
   rec_spoof = ?,
+  ping = ?,
+  trace = ?,
   last_check = now()
 where ip = ?;
 `
 	getVPSForTesting = `
-SELECT  vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof FROM
+SELECT  vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof, vps.ping, vps.trace  FROM
 (select                                                                                                                                                                                                              
   min(vps.ip) as ip                                                                                                    
 from                                                                                                                                                                                                                
  vantage_points vps                                                                                                                                                                                                 
- left outer join quarantined_vps qvps on vps.hostname = qvps.hostname
-where qvps.hostname is null
 group by vps.site
 order by last_check
 limit 50) X
@@ -131,7 +131,8 @@ func scanVPs(rows *sql.Rows) ([]*pb.VantagePoint, error) {
 	for rows.Next() {
 		cvp := new(pb.VantagePoint)
 		err := rows.Scan(&cvp.Ip, &cvp.Hostname, &cvp.Site,
-			&cvp.Timestamp, &cvp.RecordRoute, &cvp.Spoof, &cvp.RecSpoof)
+			&cvp.Timestamp, &cvp.RecordRoute, &cvp.Spoof,
+			&cvp.RecSpoof, &cvp.Ping, &cvp.Trace)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -456,15 +457,12 @@ func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
 }
 
 const (
-	unquarantinevp     = `delete from quarantined_vps where hostname = ?`
-	quarantinevp       = `insert ignore into quarantined_vps(hostname) values(?)`
-	unquarantineActive = `delete from quarantined_vps 
-where hostname in (select hostname from vantage_points)
-AND added < DATE_SUB(NOW(), INTERVAL ? DAY)`
+	unquarantinevp = `delete from quarantined_vps where hostname = ?`
+	quarantinevp   = `insert ignore into quarantined_vps(hostname) values(?)`
 )
 
 // UnquarantineVPs removes the vps in vps from quarantine
-func (r *Repo) UnquarantineVPs(vps []string) error {
+func (r *Repo) UnquarantineVPs(vps []types.Quarantine) error {
 	stmt, err := r.repo.GetWriter().Prepare(unquarantinevp)
 	if err != nil {
 		return err
@@ -484,7 +482,7 @@ func (r *Repo) UnquarantineVPs(vps []string) error {
 }
 
 // QuarantineVPs adds the vps in vps to quarantine
-func (r *Repo) QuarantineVPs(vps []string) error {
+func (r *Repo) QuarantineVPs(vps []types.Quarantine) error {
 	stmt, err := r.repo.GetWriter().Prepare(quarantinevp)
 	if err != nil {
 		return err
@@ -501,11 +499,4 @@ func (r *Repo) QuarantineVPs(vps []string) error {
 		}
 	}
 	return nil
-}
-
-// UnquarantineActiveVPs unquarantines and active vps that have been added
-// to quarantine loger than days ago
-func (r *Repo) UnquarantineActiveVPs(days int) error {
-	_, err := r.repo.GetWriter().Exec(unquarantineActive)
-	return err
 }
