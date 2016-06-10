@@ -94,6 +94,7 @@ func parseNext(f io.Reader) (interface{}, error) {
 }
 
 // Parse parses bytes into warts objects
+// Only objects of the types in objs will be returned
 func Parse(data []byte, objs []WartsT) ([]interface{}, error) {
 	types := make(map[WartsT]bool)
 	for _, obj := range objs {

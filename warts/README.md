@@ -10,7 +10,8 @@
 ```go
 func Parse(data []byte, objs []WartsT) ([]interface{}, error)
 ```
-Parse parses bytes into warts objects
+Parse parses bytes into warts objects Only objects of the types in objs will be
+returned
 
 #### type Address
 
