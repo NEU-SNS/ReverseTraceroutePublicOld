@@ -24,6 +24,7 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 package mproc
 
 import (
@@ -39,9 +40,10 @@ import (
 )
 
 const (
-	DELAY = 2
+	delay = 2
 )
 
+// FailFunc is a function that is called when a process dies
 type FailFunc func(err error, ps *os.ProcessState, p *proc.Process) bool
 
 func noop(err error, ps *os.ProcessState, p *proc.Process) bool {
@@ -50,6 +52,7 @@ func noop(err error, ps *os.ProcessState, p *proc.Process) bool {
 
 var id uint32
 
+// MProc is a basic process manager
 type MProc interface {
 	ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error)
 	KillAll()
@@ -75,6 +78,7 @@ type managedP struct {
 	f         FailFunc
 }
 
+// New creates a new MProc
 func New() MProc {
 	return &mProc{managedProcs: make(map[uint32]*managedP, 10)}
 
@@ -157,7 +161,7 @@ func (mp *mProc) keepAlive(id uint32) {
 			mp.mu.Lock()
 			defer mp.mu.Unlock()
 			if p.keepAlive && p.remRetry > 0 {
-				<-time.After(DELAY * time.Second)
+				<-time.After(delay * time.Second)
 				pid, err := p.p.Start()
 				if err != nil {
 					exit := p.f(err, p.p.GetWaitStatus(), p.p)
