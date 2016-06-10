@@ -25,7 +25,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// Package config handles the config parsing for the various commands
 package config
 
 import (
@@ -65,7 +64,9 @@ func Parse(f *flag.FlagSet, opts interface{}) error {
 	if ov.Kind() != reflect.Ptr || ov.IsNil() {
 		return ErrorInvalidType
 	}
-	f.Parse(os.Args[1:])
+	if err := f.Parse(os.Args[1:]); err != nil {
+		return err
+	}
 	err := mergeEnvironment(f)
 	if err != nil {
 		return err
