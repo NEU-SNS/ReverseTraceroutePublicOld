@@ -2,6 +2,7 @@
 --
     import "github.com/NEU-SNS/ReverseTraceroute/warts"
 
+Package warts is a library for parsing warts files
 
 ## Usage
 
@@ -10,7 +11,7 @@
 ```go
 func Parse(data []byte, objs []WartsT) ([]interface{}, error)
 ```
-Parse parses bytes into warts objects Only objects of the types in objs will be
+Parse parses bytes into warts objects. Only objects of the types in objs will be
 returned
 
 #### type Address
