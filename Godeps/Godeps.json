@@ -1,0 +1,80 @@
+{
+	"ImportPath": "github.com/NEU-SNS/ReverseTraceroute",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v74",
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.10.0-19-gf3cfb45",
+			"Rev": "f3cfb454f4c209e6668c95216c4744b8fddb2356"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "8616e8ee5e20a1704615e6c8d7afcdac06087a67"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/http2",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/http2/hpack",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/internal/timeseries",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/lex/httplex",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/trace",
+			"Rev": "3f122ce3dbbe488b7e6a8bdb26f41edec852a40b"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "7f918dd405547ecb864d14a8ecbbfe205b5f930f"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/codes",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/credentials",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/grpclog",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/internal",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/metadata",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/naming",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/peer",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/transport",
+			"Rev": "88aeffff979aa77aa502cb011423d0a08fa12c5a"
+		}
+	]
+}
