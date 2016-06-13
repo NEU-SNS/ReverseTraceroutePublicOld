@@ -38,22 +38,25 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// TTime is a time that matches the format of the time in a warts traceroute
 type TTime time.Time
 
-const TRACETIME = "2006-01-_2 15:04:05"
+const traceTime = "2006-01-_2 15:04:05"
 
+// UnmarshalJSON satisfies the json packages interface
 func (t *TTime) UnmarshalJSON(data []byte) (err error) {
-	temp, err := time.Parse(`"`+TRACETIME+`"`, string(data))
+	temp, err := time.Parse(`"`+traceTime+`"`, string(data))
 	*t = TTime(temp)
 	return
 }
 
+// MarshalJSON satisfies the json packages interface
 func (t TTime) MarshalJSON() ([]byte, error) {
 	tt := time.Time(t)
 	if y := tt.Year(); y < 0 || y >= 10000 {
 		return nil, errors.New("TTime.MarshalJSON: year outside of range [0,9999]")
 	}
-	return []byte(tt.Format(`"` + TRACETIME + `"`)), nil
+	return []byte(tt.Format(`"` + traceTime + `"`)), nil
 }
 
 func (t TTime) String() string {
@@ -61,13 +64,17 @@ func (t TTime) String() string {
 	return tt.String()
 }
 
+// Key generates a chache key for a Traceroute
 func (t *Traceroute) Key() string {
 	return fmt.Sprintf("%s_%d_%d", "XXTR", t.Src, t.Dst)
 }
+
+// CUnmarshal unmarshals a traceroute which is retrieved from a cache
 func (t *Traceroute) CUnmarshal(data []byte) error {
 	return proto.Unmarshal(data, t)
 }
 
+// CMarshal marshals a traceroute for storing in a cache
 func (t *Traceroute) CMarshal() []byte {
 	ret, err := proto.Marshal(t)
 	if err != nil {
@@ -76,6 +83,8 @@ func (t *Traceroute) CMarshal() []byte {
 	return ret
 }
 
+// ErrorString generates an error string for a traceroute
+// which is used to print error messages in reverse traceroute
 func (t *Traceroute) ErrorString() string {
 	var buf bytes.Buffer
 	ssrc, _ := util.Int32ToIPString(t.Src)
@@ -115,6 +124,7 @@ func (t *Traceroute) ErrorString() string {
 	return buf.String()
 }
 
+// CMarshal marshals a traceroute measurement for storing in a cache
 func (tm *TracerouteMeasurement) CMarshal() []byte {
 	ret, err := proto.Marshal(tm)
 	if err != nil {
@@ -123,6 +133,7 @@ func (tm *TracerouteMeasurement) CMarshal() []byte {
 	return ret
 }
 
+// Key generates a key for storing a traceroute measurement in a cache
 func (tm *TracerouteMeasurement) Key() string {
 	return fmt.Sprintf("%s_%d_%d", "XXTR", tm.Src, tm.Dst)
 }
