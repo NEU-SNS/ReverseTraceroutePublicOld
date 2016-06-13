@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 GOSRC=$GOPATH/src
 
 protoc  -I$GOSRC --go_out=plugins=grpc:$GOSRC \
