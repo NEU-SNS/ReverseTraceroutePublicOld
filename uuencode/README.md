@@ -8,8 +8,7 @@ Package uuencode is a package for uuencoding bytes and decoding uuencoded bytes
 
 ```go
 var (
-	// ErrorUUDecDone is the error for indicating the UUDecoding is done
-	ErrorUUDecDone = errors.New("Decoding Done")
+
 	// ErrorInvalidByte is the error for an invalid byte in a UUDecoding
 	ErrorInvalidByte = errors.New("InvalidByte")
 )

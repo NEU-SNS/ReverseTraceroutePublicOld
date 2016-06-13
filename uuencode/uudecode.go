@@ -34,7 +34,7 @@ import (
 
 var (
 	// ErrorUUDecDone is the error for indicating the UUDecoding is done
-	ErrorUUDecDone = errors.New("Decoding Done")
+	errorUUDecDone = errors.New("Decoding Done")
 	// ErrorInvalidByte is the error for an invalid byte in a UUDecoding
 	ErrorInvalidByte = errors.New("InvalidByte")
 )
@@ -69,7 +69,7 @@ func UUDecode(e []byte) ([]byte, error) {
 			break
 		}
 		ue, err := uudecodeLine(line)
-		if err != nil && err != ErrorUUDecDone {
+		if err != nil && err != errorUUDecDone {
 			return nil, err
 		}
 		result = append(result, ue...)
@@ -79,7 +79,7 @@ func UUDecode(e []byte) ([]byte, error) {
 
 func uudecodeLine(e []byte) ([]byte, error) {
 	if len(e) == 1 && e[0] == '`' {
-		return nil, ErrorUUDecDone
+		return nil, errorUUDecDone
 	}
 	lenB := uint(e[0] - 32)
 	e = e[1:]
