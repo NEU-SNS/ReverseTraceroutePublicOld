@@ -17,7 +17,10 @@ var (
 
 ```go
 type Event interface {
+	// Name gets the name of the file associated with the event
 	Name() string
+	// Type gets the event type
+	// Currently only create and Remove events are supported
 	Type() EventType
 }
 ```
@@ -45,7 +48,11 @@ const (
 
 ```go
 type Watcher interface {
+	// Close closes the watcher. The path watched by the watcher is no longer being
+	// watched for events
 	Close() error
+	// GetEvent gets the next file system event. The call will block until an event occurs.
+	// The call can be unblocked by closing the channel argument
 	GetEvent(chan struct{}) (Event, error)
 }
 ```
@@ -57,4 +64,4 @@ Watcher watches a path
 ```go
 func New(path string) (Watcher, error)
 ```
-New creates a new watcher at the given path
+New creates a new watcher which watches the given path
