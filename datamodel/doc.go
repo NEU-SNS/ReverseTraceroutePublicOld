@@ -25,14 +25,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// Package datamodel contains the shared data structures used in the different
+// parts of the reverse traceroute system.
 package datamodel
-
-// User is a user of the controller api
-type User struct {
-	ID    uint32
-	Name  string
-	EMail string
-	Max   uint32
-	Delay uint32
-	Key   string
-}
