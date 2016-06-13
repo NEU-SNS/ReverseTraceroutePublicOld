@@ -358,6 +358,10 @@ var _PLController_serviceDesc = grpc.ServiceDesc{
 	},
 }
 
+func init() {
+	proto.RegisterFile("github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb/plcontrollerapi.proto", fileDescriptor0)
+}
+
 var fileDescriptor0 = []byte{
 	// 317 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x92, 0x4d, 0x4b, 0xf3, 0x40,
