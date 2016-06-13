@@ -37,8 +37,8 @@ import (
 )
 
 type SubConfig struct {
-	Name string `flag:"sub_name"`
-	Age  int    `flag:"sub_age"`
+	Name string `flag:"sub-name"`
+	Age  int    `flag:"sub-age"`
 }
 
 type Config struct {
