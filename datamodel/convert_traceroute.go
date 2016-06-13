@@ -50,7 +50,7 @@ func ConvertTraceroute(in warts.Traceroute) Traceroute {
 	tt := TracerouteTime{}
 	tt.Sec = in.Flags.StartTime.Sec
 	tt.Usec = in.Flags.StartTime.Usec
-	tt.Ftime = time.Unix(tt.Sec, tt.Usec*1000).Format(`"` + TRACETIME + `"`)
+	tt.Ftime = time.Unix(tt.Sec, tt.Usec*1000).Format(`"` + traceTime + `"`)
 	t.Start = &tt
 	t.HopCount = uint32(in.HopCount)
 	t.Attempts = uint32(in.Flags.Attempts)
