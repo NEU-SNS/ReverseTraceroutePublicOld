@@ -66,7 +66,7 @@ var testConfig = Config{
 }
 
 func TestEnv(t *testing.T) {
-
+	args := []string{"dummy", "dummy"}
 	env := map[string]string{
 		"NAME":     "Rob",
 		"NUM":      "65",
@@ -85,6 +85,7 @@ func TestEnv(t *testing.T) {
 			}
 		}
 	}()
+	os.Args = args
 	var conf Config
 	flags := flag.NewFlagSet("Test", flag.ContinueOnError)
 	flags.StringVar(&conf.Name, "name", "", "")
@@ -101,6 +102,8 @@ func TestEnv(t *testing.T) {
 }
 
 func TestFile(t *testing.T) {
+	args := []string{"dummy", "dummy"}
+	os.Args = args
 	fileName := "revtr.Config"
 	tmpfile, err := ioutil.TempFile("", fileName)
 	if err != nil {
