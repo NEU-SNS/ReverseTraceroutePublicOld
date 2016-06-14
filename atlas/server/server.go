@@ -366,6 +366,14 @@ func (tc *tokenCache) Get(id uint32) *pb.IntersectionRequest {
 	return tc.cache[id]
 }
 
+type cacheError struct {
+	id uint32
+}
+
+func (ce cacheError) Error() string {
+	return fmt.Sprintf("No token registered for id: %d", ce.id)
+}
+
 func (tc *tokenCache) Remove(id uint32) error {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
@@ -373,7 +381,7 @@ func (tc *tokenCache) Remove(id uint32) error {
 		delete(tc.cache, id)
 		return nil
 	}
-	return fmt.Errorf("No token registerd for id: %d", id)
+	return cacheError{id: id}
 }
 
 func newTokenCache() *tokenCache {
