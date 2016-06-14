@@ -9,6 +9,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 )
 
+// ClusterMap maps IP addresses to cluster ids
 type ClusterMap struct {
 	ipc map[string]cmItem
 	mu  *sync.Mutex
@@ -39,6 +40,7 @@ func (cm ClusterMap) fetchCluster(s string) string {
 	return clusters
 }
 
+// Get gets a cluster id for ip s or returns s if there is none
 func (cm ClusterMap) Get(s string) string {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -50,6 +52,8 @@ func (cm ClusterMap) Get(s string) string {
 	return cm.fetchCluster(s)
 }
 
+// New creates a new cluster map using ClusterSource cs to retreive
+// cluster ids
 func New(cs types.ClusterSource) ClusterMap {
 	i := make(map[string]cmItem)
 	return ClusterMap{
