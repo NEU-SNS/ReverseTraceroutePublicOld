@@ -40,7 +40,6 @@ import (
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/mproc"
-	"github.com/NEU-SNS/ReverseTraceroute/mproc/proc"
 	plc "github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
@@ -135,26 +134,6 @@ type plVantagepointT struct {
 }
 
 var plVantagepoint plVantagepointT
-
-func (vp *plVantagepointT) handleScamperStop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	sip, e := pickIP(*vp.config.Local.Host)
-	if e != nil {
-		log.Errorf("Couldn't resolve host on restart")
-		return true
-	}
-	vp.sc.IP = sip
-	arg := fmt.Sprintf("%s:%s", sip, vp.sc.Port)
-	vp.am.Lock()
-	vp.addr = fmt.Sprintf("%s:%d", sip, *vp.config.Local.Port)
-	vp.am.Unlock()
-	p.SetArg(scamper.ADDRINDEX, arg)
-	switch err.(type) {
-	default:
-		return false
-	case *os.PathError:
-		return true
-	}
-}
 
 func (vp *plVantagepointT) handleSig(s os.Signal) {
 	log.Infof("Got signal: %v", s)
@@ -272,5 +251,5 @@ func pickIP(host string) (string, error) {
 func (vp *plVantagepointT) startScamperProcs() {
 	log.Info("Starting scamper procs")
 	sp := scamper.GetVPProc(vp.sc.ScPath, vp.sc.IP, vp.sc.Port)
-	vp.mp.ManageProcess(sp, true, 10000, vp.handleScamperStop)
+	vp.mp.ManageProcess(sp, true, 10000)
 }
