@@ -30,6 +30,8 @@ package plcontroller
 import (
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/plcontroller/mocks"
 	smock "github.com/NEU-SNS/ReverseTraceroute/spoofmap/mocks"
@@ -89,7 +91,7 @@ func TestRecSpoof(t *testing.T) {
 	}
 	cl.On("DoMeasurement", mmock.AnythingOfType("string"), dummy).Return(nil, uint32(0), nil)
 	sm.On("Register", *spoof).Return(nil)
-	_, err := plc.recSpoof(spoof)
+	_, err := plc.recSpoof(context.Background(), spoof)
 	if err != nil {
 		t.Fatalf("plc.recSpoof(%v), got[%v], expected[<nil>]", spoof, err)
 	}
