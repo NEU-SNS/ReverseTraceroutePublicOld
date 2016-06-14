@@ -148,9 +148,9 @@ func main() {
 	}
 	proc := scamper.GetProc(sc.Path, sc.Port, sc.ScPath)
 	mp := mproc.New()
-	_, err = mp.ManageProcess(proc, true, 1000, nil)
+	_, err = mp.ManageProcess(proc, true, 1000)
 	if err != nil {
-		log.Fatal("Could not start scamper: %v\n", err)
+		log.Fatalf("Could not start scamper: %v\n", err)
 	}
 	db, err := da.New(da.DbConfig{
 		WriteConfigs: []da.Config{

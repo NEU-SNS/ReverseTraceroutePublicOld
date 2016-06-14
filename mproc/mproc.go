@@ -43,19 +43,12 @@ const (
 	delay = 2
 )
 
-// FailFunc is a function that is called when a process dies
-type FailFunc func(err error, ps *os.ProcessState, p *proc.Process) bool
-
-func noop(err error, ps *os.ProcessState, p *proc.Process) bool {
-	return false
-}
-
 // MProc is a basic process manager
 type MProc interface {
 	// ManageProcess runs the process p and returns and id to use to refer to the process or an error
 	// if ka is true, the process will be restarted up to retry times
 	// If you want the process to restart indef. just use MaxUint32
-	ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error)
+	ManageProcess(p *proc.Process, ka bool, retry uint) (uint32, error)
 	// KillAll sends SIGKILL all processes
 	KillAll()
 	// IntAll sends SIGINT to all processes
@@ -84,7 +77,6 @@ type managedP struct {
 	keepAlive bool
 	retry     uint
 	remRetry  uint
-	f         FailFunc
 }
 
 // New creates a new MProc
@@ -93,11 +85,8 @@ func New() MProc {
 
 }
 
-func create(p *proc.Process, keepAlive bool, retry uint, f FailFunc) *managedP {
-	if f == nil {
-		f = noop
-	}
-	return &managedP{p: p, keepAlive: keepAlive, retry: retry, remRetry: retry, f: f}
+func create(p *proc.Process, keepAlive bool, retry uint) *managedP {
+	return &managedP{p: p, keepAlive: keepAlive, retry: retry, remRetry: retry}
 }
 
 // KillAll sends SIGKILL all processes
@@ -128,7 +117,7 @@ func (mp *mProc) IntAll() {
 // ManageProcess runs the process p and returns and id to use to refer to the process or an error
 // if ka is true, the process will be restarted up to retry times
 // If you want the process to restart indef. just use MaxUint32
-func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc) (uint32, error) {
+func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint) (uint32, error) {
 
 	if p == nil {
 		return 0, errors.New("ManageProcess Argument nil: p")
@@ -140,7 +129,7 @@ func (mp *mProc) ManageProcess(p *proc.Process, ka bool, retry uint, f FailFunc)
 	if err != nil {
 		return 0, err
 	}
-	manp := create(p, ka, retry, f)
+	manp := create(p, ka, retry)
 	mp.managedProcs[mp.id] = manp
 	if ka {
 		mp.keepAlive(mp.id)
@@ -154,12 +143,6 @@ func (mp *mProc) keepAlive(id uint32) {
 	go func() {
 		p := mp.getMp(id)
 		err := <-p.p.Wait()
-		exit := p.f(err, p.p.GetWaitStatus(), p.p)
-		if exit {
-			p.keepAlive = false
-			p.remRetry = 0
-			return
-		}
 		log.Infof("Keep Alive just returned from wait")
 		pid, e := p.p.Pid()
 		if e != nil {
@@ -177,11 +160,7 @@ func (mp *mProc) keepAlive(id uint32) {
 				<-time.After(delay * time.Second)
 				pid, err := p.p.Start()
 				if err != nil {
-					exit := p.f(err, p.p.GetWaitStatus(), p.p)
 					log.Error("Failed to restart process in keepAlive")
-					if exit {
-						return
-					}
 				}
 				log.Infof("Restarted process: %s, PID: %d", p.p.Prog(), pid)
 				p.remRetry--
