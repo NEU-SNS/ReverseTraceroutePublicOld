@@ -184,6 +184,10 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 		}
 		traces = append(traces, curr)
 	}
+	// if there are none to run, don't
+	if len(traces) == 0 {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	st, err := a.opts.cl.Traceroute(ctx, &dm.TracerouteArg{Traceroutes: traces})

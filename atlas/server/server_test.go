@@ -1,219 +1,127 @@
-package server
+/*
+ Copyright (c) 2015, Northeastern University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the Northeastern University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+package server_test
 
 import (
-	"sort"
 	"testing"
+	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/mocks"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
+	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
+	cmocks "github.com/NEU-SNS/ReverseTraceroute/controller/mocks"
+	vpmocks "github.com/NEU-SNS/ReverseTraceroute/vpservice/mocks"
+	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
+	"github.com/stretchr/testify/mock"
 )
 
-func uint32SliceEqual(l, r []uint32) bool {
-	if len(l) != len(r) {
-		return false
-	}
-	sort.Sort(UInt32Slice(l))
-	sort.Sort(UInt32Slice(r))
-	for i, li := range l {
-		if li != r[i] {
-			return false
-		}
-	}
-	return true
-}
+func TestGetPathsWithToken(t *testing.T) {
+	trsm := &mocks.TRStore{}
+	trsm.On("FindIntersectingTraceroute",
+		mock.AnythingOfType("types.IntersectionQuery")).Return(nil, repo.ErrNoIntFound)
+	trsm.On("GetAtlasSources",
+		mock.AnythingOfType("uint32"), mock.AnythingOfType("time.Duration")).Return([]uint32{}, nil)
+	clm := &cmocks.Client{}
+	vpsm := &vpmocks.VPSource{}
+	vpsm.On("GetVPs").Return(&vppb.VPReturn{}, nil)
+	var opts []server.Option
+	opts = append(opts, server.WithClient(clm), server.WithTRS(trsm), server.WithVPS(vpsm))
 
-func TestRunningTrace_TryAdd(t *testing.T) {
-	var tests = []struct {
-		desc  string
-		dst   uint32
-		setup [][]uint32
-		test  []uint32
-		res   []uint32
-	}{
-		{
-			desc:  "Add Overlapping Addresses",
-			dst:   0,
-			setup: [][]uint32{[]uint32{1, 2, 3}},
-			test:  []uint32{2, 4, 5},
-			res:   []uint32{4, 5},
+	serv := server.NewServer(opts...)
+	load := []*pb.IntersectionRequest{
+		&pb.IntersectionRequest{
+			Address: 9,
+			Dest:    10,
+			Src:     2,
 		},
-		{
-			desc:  "Add Overlapping Addresses out of order",
-			dst:   0,
-			setup: [][]uint32{[]uint32{1, 5, 7, 99, 3, 18}}, test: []uint32{2, 5, 7, 18, 4, 15, 105},
-			res: []uint32{2, 4, 15, 105},
+		&pb.IntersectionRequest{
+			Address: 0,
+			Dest:    1,
+			Src:     2,
 		},
-	}
-	for _, test := range tests {
-		rt := newRunningTraces()
-		for _, ts := range test.setup {
-			rt.TryAdd(test.dst, ts)
-		}
-		res := rt.TryAdd(test.dst, test.test)
-		if !uint32SliceEqual(res, test.res) {
-			t.Fatalf("%s: got: %v, expected: %v", test.desc, res, test.res)
-		}
-	}
-}
-
-func TestRunningTrace_Remove(t *testing.T) {
-	var tests = []struct {
-		desc  string
-		dst   uint32
-		setup [][]uint32
-		test  []uint32
-		res   []uint32
-	}{
-		{
-			desc:  "Remove addresses",
-			dst:   0,
-			setup: [][]uint32{[]uint32{1, 2, 3}},
-			test:  []uint32{1, 2, 3},
-			res:   nil,
+		&pb.IntersectionRequest{
+			Address: 11,
+			Dest:    15,
+			Src:     2,
 		},
-		{
-			desc:  "Remove partial addresses",
-			dst:   600,
-			setup: [][]uint32{[]uint32{1, 2, 3}},
-			test:  []uint32{1, 3},
-			res:   []uint32{2},
-		},
-		{
-			desc:  "Remove not present addresses",
-			dst:   999,
-			setup: [][]uint32{[]uint32{1, 2, 3}},
-			test:  []uint32{4, 5},
-			res:   []uint32{1, 2, 3},
+		&pb.IntersectionRequest{
+			Address: 19,
+			Dest:    20,
+			Src:     2,
 		},
 	}
-	for _, test := range tests {
-		rt := newRunningTraces()
-		for _, ts := range test.setup {
-			added := rt.TryAdd(test.dst, ts)
-			if !uint32SliceEqual(added, ts) {
-				t.Fatalf("%s: failed to add sources got: %v, expected: %v", test.desc, added, test.res)
-			}
+	var responses []*pb.IntersectionResponse
+	for _, l := range load {
+		res, err := serv.GetIntersectingPath(l)
+		if err != nil {
+			t.Fatal("Failed to load requests ", err)
 		}
-		rt.Remove(test.dst, test.test)
-		check, _ := rt.Check(test.dst)
-		if !uint32SliceEqual(check, test.res) {
-			t.Fatalf("%s: got: %v, expected: %v", test.desc, check, test.res)
+		if res.Type != pb.IResponseType_TOKEN {
+			t.Fatalf("GetIntersectingPath(%v) expected token response got(%v)", l, res)
+		}
+		responses = append(responses, res)
+	}
+	// This is ugly, but wait so that other goroutines can run
+	<-time.After(time.Second * 2)
+	for _, resp := range responses {
+		r, err := serv.GetPathsWithToken(&pb.TokenRequest{
+			Token: resp.Token,
+		})
+		if err != nil {
+			t.Fatalf("Failed to get path with token(%v) got err %v", resp.Token, err)
+		}
+		if r.Token != resp.Token {
+			t.Fatalf("Expected Token[%v], Got Token[%v]", resp.Token, r.Token)
+		}
+		if r.Type != pb.IResponseType_NONE_FOUND {
+			t.Fatalf("Expected[%v], Got[%v]", pb.IResponseType_NONE_FOUND, r.Type)
 		}
 	}
 }
 
-func TestTokenCache_Add(t *testing.T) {
-	var tests = []struct {
-		desc string
-		add  *pb.IntersectionRequest
-	}{
-		{
-			desc: "Add IR",
-			add: &pb.IntersectionRequest{
-				Address:      1,
-				Dest:         2,
-				Staleness:    30,
-				UseAliases:   true,
-				IgnoreSource: true,
-				Src:          566,
-			},
-		},
+func TestGetPathsWithTokenInvalidToken(t *testing.T) {
+	trsm := &mocks.TRStore{}
+	trsm.On("FindIntersectingTraceroute",
+		mock.AnythingOfType("types.IntersectionQuery")).Return(nil, repo.ErrNoIntFound)
+	clm := &cmocks.Client{}
+	vpsm := &vpmocks.VPSource{}
+	var opts []server.Option
+	opts = append(opts, server.WithClient(clm), server.WithTRS(trsm), server.WithVPS(vpsm))
+	serv := server.NewServer(opts...)
+	tokenReq := &pb.TokenRequest{
+		Token: 99999,
 	}
-	for _, test := range tests {
-		tc := newTokenCache()
-		id := tc.Add(test.add)
-		ir := tc.Get(id)
-		if *ir != *test.add {
-			t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.add)
-		}
+	r, err := serv.GetPathsWithToken(tokenReq)
+	if err != nil {
+		t.Fatalf("Expected nil error received resp[%v], err[%v]", r, err)
 	}
-}
-
-func TestTokenCache_Get(t *testing.T) {
-	var tests = []struct {
-		desc   string
-		add    *pb.IntersectionRequest
-		expect *pb.IntersectionRequest
-	}{
-		{
-			desc: "Get IR",
-			add: &pb.IntersectionRequest{
-				Address:      1,
-				Dest:         2,
-				Staleness:    30,
-				UseAliases:   true,
-				IgnoreSource: true,
-				Src:          566,
-			},
-			expect: &pb.IntersectionRequest{
-				Address:      1,
-				Dest:         2,
-				Staleness:    30,
-				UseAliases:   true,
-				IgnoreSource: true,
-				Src:          566,
-			},
-		},
-		{
-			desc:   "Get IR Nil",
-			add:    nil,
-			expect: nil,
-		},
-	}
-	for _, test := range tests {
-		tc := newTokenCache()
-		id := tc.Add(test.add)
-		ir := tc.Get(id)
-		if ir == nil {
-			if ir != test.expect {
-				t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.expect)
-			}
-			continue
-		}
-		if *ir != *test.expect {
-			t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.expect)
-		}
-	}
-}
-
-func TestTokenCache_Remove(t *testing.T) {
-	var tests = []struct {
-		desc   string
-		add    []*pb.IntersectionRequest
-		remove []uint32
-		expect []error
-	}{
-		{
-			desc: "Remove IR",
-			add: []*pb.IntersectionRequest{&pb.IntersectionRequest{
-				Address:      1,
-				Dest:         2,
-				Staleness:    30,
-				UseAliases:   true,
-				IgnoreSource: true,
-				Src:          566,
-			}},
-			remove: []uint32{1},
-			expect: []error{nil},
-		},
-		{
-			desc:   "Remove Unadded",
-			add:    nil,
-			remove: []uint32{1},
-			expect: []error{cacheError{id: 1}},
-		},
-	}
-	for _, test := range tests {
-		tc := newTokenCache()
-		var ids []uint32
-		for _, a := range test.add {
-			id := tc.Add(a)
-			ids = append(ids, id)
-		}
-		for i, rem := range test.remove {
-			res := tc.Remove(rem)
-			if res != test.expect[i] {
-				t.Fatalf("%s: got: %v, expected: %v", test.desc, res, test.expect[i])
-			}
-		}
+	if r.Type != pb.IResponseType_ERROR || r.Token != tokenReq.Token {
+		t.Fatalf("Unexpected response resp[%v], err[%v]", r, err)
 	}
 }
