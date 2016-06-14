@@ -120,7 +120,7 @@ func TestFile(t *testing.T) {
 	flags.IntVar(&conf.Num, "num", 0, "")
 	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
 	err = config.Parse(flags, &conf)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "flag provided but not defined") {
 		t.Fatal("Error Parsing flags: ", err)
 	}
 	if testConfig != conf {
@@ -136,7 +136,7 @@ func TestParse(t *testing.T) {
 	flags.IntVar(&conf.Num, "num", 0, "")
 	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
 	err := config.Parse(flags, conf)
-	if err != config.ErrorInvalidType {
+	if err != config.ErrorInvalidType && !strings.Contains(err.Error(), "flag provided but not defined") {
 		t.Fatalf("Error parsing config Expected[%v] got[%v]", config.ErrorInvalidType, err)
 	}
 }
