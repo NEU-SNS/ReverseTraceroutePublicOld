@@ -1,22 +1,17 @@
 #!/bin/bash
 
-cd ../../cmd/controller
+# build and save the docker image for the central controller
 
-go build -a || exit 1
+set -e
 
-cp controller ./docker
-cp controller.config ./docker
-cp certs/controller.crt ./docker
-cp certs/controller.key ./docker
-cp certs/root.crt ./docker
-cd docker
+BIN_DIR=./bin
+BIN=ccontroller
+CONT_DIR=containers
+ROOT=$(git rev-parse --show-toplevel)
+
+cp $BIN_DIR/$BIN cmd/$BIN/docker/.
+cd cmd/$BIN/docker
 
 docker build --rm=true -t revtr/controller .
-docker save -o cc.tar revtr/controller
+docker save -o $ROOT/$CONT_DIR/cc.tar revtr/controller
 docker rmi revtr/controller
-
-rm controller
-rm controller.config
-rm controller.crt
-rm controller.key
-rm root.crt

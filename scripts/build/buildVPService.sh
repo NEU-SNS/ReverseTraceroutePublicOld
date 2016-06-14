@@ -1,20 +1,18 @@
 #!/bin/bash
 
-cd ../../cmd/vpservice
+# build and save the docker image for the vpservice
 
-go build -a || exit 1
+set -e 
 
-cp vpservice ./docker
-cp vpservice.config ./docker
-cp ./certs/* ./docker
-cd docker
+BIN_DIR=./bin
+BIN=vpservice
+CONT_DIR=containers
+ROOT=$(git rev-parse --show-toplevel)
+
+
+cp $BIN_DIR/$BIN cmd/$BIN/docker/.
+cd cmd/$BIN/docker
 
 docker build --rm=true -t revtr/vpservice .
-docker save -o vps.tar revtr/vpservice
+docker save -o $ROOT/$CONT_DIR/vps.tar revtr/vpservice
 docker rmi revtr/vpservice
-
-rm vpservice
-rm vpserv.key
-rm vpserv.crt
-rm root.crt
-rm vpservice.config

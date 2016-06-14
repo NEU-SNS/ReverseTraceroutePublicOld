@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+# This script builds all of the .proto files in the repo into their proper locations
+# It can be run stand alone or by running make protos 
+
 set -e
 
 GOSRC=$GOPATH/src

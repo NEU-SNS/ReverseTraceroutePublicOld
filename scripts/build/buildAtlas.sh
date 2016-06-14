@@ -1,20 +1,14 @@
 #!/bin/bash
 
-cd ../../cmd/atlas
+# build and save the docker image for the atlas
 
-go build -a || exit 1
+set -e 
 
-cp atlas ./docker
-cp atlas.config ./docker
-cp ./certs/* ./docker
-cd docker
+cp $BIN_DIR/$BIN cmd/$BIN/docker/.
+cd cmd/$BIN/docker
+CONT_DIR=containers
+ROOT=$(git rev-parse --show-toplevel)
 
 docker build --rm=true -t revtr/atlas .
-docker save -o atlas.tar revtr/atlas
+docker save -o $ROOT/$CONT_DIR/atlas.tar revtr/atlas
 docker rmi revtr/atlas
-
-rm atlas
-rm atlas.config
-rm atlas.crt
-rm atlas.key
-rm root.crt
