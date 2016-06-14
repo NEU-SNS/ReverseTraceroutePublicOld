@@ -1,22 +1,18 @@
 #!/bin/bash
 
-cd ../../cmd/revtr
+# build and save the docker image for the revtr service
 
-go build -a || exit 1
+set -e 
 
-cp revtr ./docker
-cp revtr.config ./docker
-cp ./certs/* ./docker
-cp -r ./webroot ./docker
-cd docker
+BIN_DIR=./bin
+BIN=revtr
+CONT_DIR=containers
+ROOT=$(git rev-parse --show-toplevel)
+
+
+cp $BIN_DIR/$BIN cmd/$BIN/docker/.
+cd cmd/$BIN/docker
 
 docker build --rm=true -t revtr/revtr .
-docker save -o revtr.tar revtr/revtr
+docker save -o $ROOT/$CONT_DIR/revtr.tar revtr/revtr
 docker rmi revtr/revtr
-
-rm revtr
-rm root.crt
-rm revtr.crt
-rm revtr.key
-rm revtr.config
-rm -rf webroot
