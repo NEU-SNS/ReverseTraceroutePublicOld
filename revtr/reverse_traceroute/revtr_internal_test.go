@@ -81,6 +81,9 @@ var mvps = &vpm.VPSource{}
 func initTests() {
 	cs.On("GetClusterIDByIP", mock.AnythingOfType("uint32")).Return(0, fmt.Errorf("None found"))
 	mvps.On("GetVPs").Return(&vpt.VPReturn{Vps: vp}, nil)
+	mvps.On("GetRRSpoofers",
+		mock.AnythingOfType("uint32"),
+		mock.AnythingOfType("uint32")).Return(vp, nil)
 }
 
 func TestMain(m *testing.M) {
@@ -598,8 +601,8 @@ func TestFailed(t *testing.T) {
 	if revtr == nil {
 		t.Fatalf("Failed to create ReverseTraceroute")
 	}
-	if !revtr.Failed() {
-		t.Fatal("Brand new revtr didn't fail Failed(true)")
+	if revtr.Failed() {
+		t.Fatal("Brand new revtr Failed")
 	}
 }
 
