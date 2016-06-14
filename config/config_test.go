@@ -31,6 +31,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/NEU-SNS/ReverseTraceroute/config"
@@ -73,11 +74,15 @@ func TestEnv(t *testing.T) {
 		"SUB_AGE":  "25",
 	}
 	for k, v := range env {
-		os.Setenv(k, v)
+		if err := os.Setenv(k, v); err != nil {
+			t.Fatal("TestEnv: ", err)
+		}
 	}
 	defer func() {
-		for k, _ := range env {
-			os.Unsetenv(k)
+		for k := range env {
+			if err := os.Unsetenv(k); err != nil {
+				t.Fatal("TestEnv ", err)
+			}
 		}
 	}()
 	var conf Config
@@ -87,7 +92,7 @@ func TestEnv(t *testing.T) {
 	flags.IntVar(&conf.Num, "num", 0, "")
 	flags.IntVar(&conf.SubCon.Age, "sub-age", 0, "")
 	err := config.Parse(flags, &conf)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "flag provided but not defined") {
 		t.Fatal("Error Parsing flags: ", err)
 	}
 	if testConfig != conf {
