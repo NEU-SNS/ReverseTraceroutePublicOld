@@ -89,14 +89,18 @@ func TestRecSpoof(t *testing.T) {
 		Sport:   "61681",
 		Dport:   "62195",
 	}
+
 	cl.On("DoMeasurement", mmock.AnythingOfType("string"), dummy).Return(nil, uint32(0), nil)
+	cl.On("RemoveMeasurement", mmock.AnythingOfType("string"),
+		mmock.AnythingOfType("uint32")).Return(nil)
 	sm.On("Register", *spoof).Return(nil)
-	_, err := plc.recSpoof(context.Background(), spoof)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, err := plc.recSpoof(ctx, spoof)
 	if err != nil {
 		t.Fatalf("plc.recSpoof(%v), got[%v], expected[<nil>]", spoof, err)
 	}
 	cl.AssertNumberOfCalls(t, "DoMeasurement", 1)
 	sm.AssertNumberOfCalls(t, "Register", 1)
-	cl.AssertExpectations(t)
 	sm.AssertExpectations(t)
 }
