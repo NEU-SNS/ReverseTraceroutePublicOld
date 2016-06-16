@@ -31,7 +31,7 @@ CREATE TABLE `dist_to_dest` (
   PRIMARY KEY (`src`,`dst`,`slash_24`),
   KEY `index1` (`src`,`dst`),
   KEY `slash` (`slash_24`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -48,7 +48,7 @@ CREATE TABLE `dist_to_dest_temp` (
   `slash_24` int(10) unsigned NOT NULL,
   `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY `index1` (`src`,`dst`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -60,12 +60,12 @@ DROP TABLE IF EXISTS `quarantine_events`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `quarantine_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `type` varchar(45) NOT NULL,
-  `hostname` varchar(255) NOT NULL,
-  `site` varchar(255) NOT NULL,
+  `type` varchar(45) COLLATE utf8_unicode_ci NOT NULL,
+  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+  `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
   `time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,11 +76,11 @@ DROP TABLE IF EXISTS `quarantined_vps`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `quarantined_vps` (
-  `hostname` varchar(255) NOT NULL,
+  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
   `added` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`hostname`),
   KEY `added` (`added`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -92,15 +92,15 @@ DROP TABLE IF EXISTS `quarantined_vps_new`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `quarantined_vps_new` (
   `ip` int(10) unsigned NOT NULL,
-  `hostname` varchar(255) NOT NULL DEFAULT '',
-  `site` varchar(255) NOT NULL DEFAULT '',
+  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `attempt` int(11) NOT NULL DEFAULT '1',
   `retry` bigint(20) NOT NULL DEFAULT '0',
   `last_attempt` datetime DEFAULT NULL,
   `added` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`ip`),
   UNIQUE KEY `hostname_UNIQUE` (`hostname`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -113,7 +113,7 @@ DROP TABLE IF EXISTS `unresponsive_targets`;
 CREATE TABLE `unresponsive_targets` (
   `ip` int(10) unsigned NOT NULL,
   PRIMARY KEY (`ip`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -125,8 +125,8 @@ DROP TABLE IF EXISTS `vantage_points`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `vantage_points` (
   `ip` int(10) unsigned NOT NULL,
-  `hostname` varchar(255) NOT NULL DEFAULT '',
-  `site` varchar(255) NOT NULL DEFAULT '',
+  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `timestamp` tinyint(4) NOT NULL DEFAULT '0',
   `record_route` tinyint(4) NOT NULL DEFAULT '0',
   `spoof` tinyint(4) NOT NULL DEFAULT '0',
@@ -136,7 +136,7 @@ CREATE TABLE `vantage_points` (
   KEY `rr` (`record_route`),
   KEY `spoof` (`spoof`),
   KEY `ts` (`timestamp`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -148,13 +148,13 @@ DROP TABLE IF EXISTS `vp_events`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `vp_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `type` varchar(45) NOT NULL,
-  `hostname` varchar(255) NOT NULL,
-  `site` varchar(255) NOT NULL,
+  `type` varchar(45) COLLATE utf8_unicode_ci NOT NULL,
+  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+  `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
   `time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `hostname_time` (`hostname`,`time`)
-) ENGINE=InnoDB AUTO_INCREMENT=1760 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=2052 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -166,4 +166,4 @@ CREATE TABLE `vp_events` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-13 10:55:27
+-- Dump completed on 2016-06-16 10:43:56

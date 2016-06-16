@@ -27,7 +27,7 @@ CREATE TABLE `ping_batch` (
   `user_id` int(10) unsigned NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -40,7 +40,7 @@ DROP TABLE IF EXISTS `ping_batch_ping`;
 CREATE TABLE `ping_batch_ping` (
   `batch_id` int(10) unsigned NOT NULL,
   `ping_id` int(10) unsigned NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -57,7 +57,7 @@ CREATE TABLE `ping_responses` (
   `seq` int(10) unsigned NOT NULL,
   `reply_size` int(10) unsigned NOT NULL,
   `reply_ttl` int(10) unsigned NOT NULL,
-  `reply_proto` varchar(45) NOT NULL,
+  `reply_proto` varchar(45) COLLATE utf8_unicode_ci NOT NULL,
   `rtt` int(10) unsigned NOT NULL,
   `probe_ipid` int(10) unsigned NOT NULL,
   `reply_ipid` int(10) unsigned NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE `ping_responses` (
   PRIMARY KEY (`id`),
   KEY `fk_ping_responses_1_idx` (`ping_id`),
   CONSTRAINT `pr_ping` FOREIGN KEY (`ping_id`) REFERENCES `pings` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=5859723 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=8293286 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -87,7 +87,7 @@ CREATE TABLE `ping_stats` (
   `std_dev` float NOT NULL,
   KEY `fk_ping_stats_1_idx` (`ping_id`),
   CONSTRAINT `ps_ping` FOREIGN KEY (`ping_id`) REFERENCES `pings` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -108,7 +108,7 @@ CREATE TABLE `pings` (
   `ttl` int(10) unsigned DEFAULT NULL,
   `wait` int(10) unsigned DEFAULT NULL,
   `spoofed_from` int(10) unsigned DEFAULT NULL,
-  `version` varchar(45) DEFAULT NULL,
+  `version` varchar(45) COLLATE utf8_unicode_ci DEFAULT NULL,
   `spoofed` tinyint(1) unsigned NOT NULL,
   `record_route` tinyint(1) unsigned NOT NULL,
   `payload` tinyint(1) unsigned NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE `pings` (
   KEY `src_dst` (`src`,`dst`) USING BTREE,
   KEY `record_route` (`record_route`),
   KEY `created` (`created`)
-) ENGINE=InnoDB AUTO_INCREMENT=12202968 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=17108343 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -138,7 +138,7 @@ CREATE TABLE `record_routes` (
   `ip` int(10) unsigned NOT NULL,
   KEY `fk_record_routes_1_idx` (`response_id`),
   CONSTRAINT `rr_ping_responses` FOREIGN KEY (`response_id`) REFERENCES `ping_responses` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -155,7 +155,7 @@ CREATE TABLE `timestamp_addrs` (
   `ts` int(10) unsigned DEFAULT NULL,
   KEY `fk_timestamp_addrs_1_idx` (`response_id`),
   CONSTRAINT `tsa_ping_responses` FOREIGN KEY (`response_id`) REFERENCES `ping_responses` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -171,7 +171,7 @@ CREATE TABLE `timestamps` (
   `ts` int(10) unsigned NOT NULL,
   KEY `fk_timestamps_1_idx` (`response_id`),
   CONSTRAINT `ts_ping_responses` FOREIGN KEY (`response_id`) REFERENCES `ping_responses` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -186,7 +186,7 @@ CREATE TABLE `trace_batch` (
   `user_id` int(10) unsigned NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -199,7 +199,7 @@ DROP TABLE IF EXISTS `trace_batch_trace`;
 CREATE TABLE `trace_batch_trace` (
   `batch_id` int(10) unsigned NOT NULL,
   `trace_id` int(10) unsigned NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -231,7 +231,7 @@ CREATE TABLE `traceroute_hops` (
   KEY `fk_traceroute_hops_1_idx` (`traceroute_id`),
   KEY `traceroute_id` (`traceroute_id`),
   CONSTRAINT `traceroute` FOREIGN KEY (`traceroute_id`) REFERENCES `traceroutes` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=199701 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=207528 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -245,15 +245,15 @@ CREATE TABLE `traceroutes` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `src` int(10) unsigned NOT NULL,
   `dst` int(10) unsigned NOT NULL,
-  `type` varchar(45) DEFAULT NULL,
+  `type` varchar(45) COLLATE utf8_unicode_ci DEFAULT NULL,
   `user_id` int(10) unsigned NOT NULL,
-  `method` varchar(45) DEFAULT NULL,
+  `method` varchar(45) COLLATE utf8_unicode_ci DEFAULT NULL,
   `sport` int(10) unsigned NOT NULL,
   `dport` int(10) unsigned NOT NULL,
-  `stop_reason` varchar(45) DEFAULT NULL,
+  `stop_reason` varchar(45) COLLATE utf8_unicode_ci DEFAULT NULL,
   `stop_data` int(10) unsigned NOT NULL,
   `start` datetime NOT NULL,
-  `version` varchar(45) DEFAULT NULL,
+  `version` varchar(45) COLLATE utf8_unicode_ci DEFAULT NULL,
   `hop_count` int(10) unsigned NOT NULL,
   `attempts` int(10) unsigned NOT NULL,
   `hop_limit` int(10) unsigned NOT NULL,
@@ -267,7 +267,7 @@ CREATE TABLE `traceroutes` (
   KEY `src_dst` (`src`,`dst`) USING BTREE,
   KEY `start` (`start`),
   KEY `created` (`created`)
-) ENGINE=InnoDB AUTO_INCREMENT=15906 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=16605 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -279,14 +279,14 @@ DROP TABLE IF EXISTS `users`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL DEFAULT '',
-  `email` varchar(255) NOT NULL DEFAULT '',
+  `name` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `email` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `max` int(10) unsigned NOT NULL DEFAULT '0',
   `delay` int(10) unsigned NOT NULL DEFAULT '0',
-  `key` varchar(100) NOT NULL DEFAULT '',
+  `key` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `index2` (`key`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -298,4 +298,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-13 10:54:55
+-- Dump completed on 2016-06-16 10:43:29

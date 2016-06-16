@@ -28,7 +28,7 @@ CREATE TABLE `adjacencies` (
   `cnt` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`ip1`,`ip2`),
   KEY `address2` (`ip2`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -44,7 +44,7 @@ CREATE TABLE `adjacencies_to_dest` (
   `adjacent` int(10) unsigned NOT NULL DEFAULT '0',
   `cnt` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`address`,`dest24`,`adjacent`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -59,7 +59,7 @@ CREATE TABLE `batch` (
   `user_id` int(10) unsigned NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2603 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2603 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,7 +76,7 @@ CREATE TABLE `batch_revtr` (
   KEY `fk_batch_revtr_batch_id` (`batch_id`),
   CONSTRAINT `fk_batch_revtr_2` FOREIGN KEY (`revtr_id`) REFERENCES `reverse_traceroutes` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_batch_revtr_batch_id` FOREIGN KEY (`batch_id`) REFERENCES `batch` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -88,9 +88,9 @@ DROP TABLE IF EXISTS `hop_types`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `hop_types` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `type` varchar(45) NOT NULL DEFAULT '',
+  `type` varchar(45) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -105,7 +105,7 @@ CREATE TABLE `ip_aliases` (
   `ip_address` int(10) unsigned NOT NULL,
   PRIMARY KEY (`ip_address`),
   KEY `cluster_idx` (`cluster_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -203,7 +203,7 @@ CREATE TABLE `reverse_traceroute_hops` (
   KEY `fk_reverse_traceroute_hops_1_idx` (`reverse_traceroute_id`),
   CONSTRAINT `fk_reverse_traceroute_hops_1` FOREIGN KEY (`reverse_traceroute_id`) REFERENCES `reverse_traceroutes` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_reverse_traceroute_hops_2` FOREIGN KEY (`hop_type`) REFERENCES `hop_types` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=2224650 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2224660 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -220,13 +220,13 @@ CREATE TABLE `reverse_traceroutes` (
   `runtime` bigint(20) NOT NULL DEFAULT '0',
   `rr_issued` int(10) unsigned NOT NULL DEFAULT '0',
   `ts_issued` int(10) unsigned NOT NULL DEFAULT '0',
-  `stop_reason` varchar(45) NOT NULL DEFAULT '',
-  `status` varchar(45) NOT NULL DEFAULT 'RUNNING',
-  `fail_reason` varchar(255) DEFAULT '',
+  `stop_reason` varchar(45) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `status` varchar(45) COLLATE utf8_unicode_ci NOT NULL DEFAULT 'RUNNING',
+  `fail_reason` varchar(255) COLLATE utf8_unicode_ci DEFAULT '',
   `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `index2` (`src`,`dst`)
-) ENGINE=InnoDB AUTO_INCREMENT=211838 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=211842 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -238,14 +238,14 @@ DROP TABLE IF EXISTS `users`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL DEFAULT '',
-  `email` varchar(255) NOT NULL DEFAULT '',
+  `name` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `email` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `max` int(10) unsigned NOT NULL DEFAULT '0',
   `delay` int(10) unsigned NOT NULL DEFAULT '0',
-  `key` varchar(100) NOT NULL DEFAULT '',
+  `key` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `index2` (`key`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -275,4 +275,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-13 10:55:36
+-- Dump completed on 2016-06-16 10:43:13

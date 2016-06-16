@@ -29,7 +29,7 @@ CREATE TABLE `atlas_traceroute_hops` (
   KEY `fk_atlas_traceroute_hops_1_idx` (`trace_id`),
   KEY `index2` (`hop`) USING BTREE,
   CONSTRAINT `atlas_traceroute` FOREIGN KEY (`trace_id`) REFERENCES `atlas_traceroutes` (`Id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -47,7 +47,7 @@ CREATE TABLE `atlas_traceroutes` (
   PRIMARY KEY (`Id`),
   KEY `index2` (`dest`,`date`) USING BTREE,
   KEY `index3` (`src`,`dest`,`date`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=682 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -62,7 +62,7 @@ CREATE TABLE `ip_aliases` (
   `ip_address` int(10) unsigned NOT NULL,
   PRIMARY KEY (`ip_address`),
   KEY `cluster_idx` (`cluster_id`) USING BTREE
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -74,4 +74,4 @@ CREATE TABLE `ip_aliases` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-13 10:55:15
+-- Dump completed on 2016-06-16 10:43:44
