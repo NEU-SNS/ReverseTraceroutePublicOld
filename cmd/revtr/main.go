@@ -251,13 +251,33 @@ type runningModel struct {
 }
 
 type msgFunc func(msg server.Status) error
+type completeFunc func()
 
 type outputChan struct {
 	c <-chan server.Status
 	// protects the following
-	mu    sync.Mutex
-	last  server.Status
-	funcs map[*msgFunc]bool
+	mu        sync.Mutex
+	last      server.Status
+	funcs     map[*msgFunc]bool
+	compl     completeFunc
+	completed bool
+}
+
+func (oc *outputChan) complete() {
+	if oc.completed {
+		// Already done
+		return
+	}
+	oc.completed = true
+	if oc.compl != nil {
+		oc.compl()
+	}
+}
+
+func (oc *outputChan) onComplete(cf completeFunc) {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+	oc.compl = cf
 }
 
 func (oc *outputChan) register(mf msgFunc) {
@@ -302,6 +322,7 @@ func (oc *outputChan) monitor() {
 			oc.mu.Lock()
 			oc.callAll(s)
 			oc.last = s
+			oc.complete()
 			oc.mu.Unlock()
 		}
 	}
@@ -366,6 +387,9 @@ func (ws wsConnection) Write(mess wsMessage) error {
 // WS is the endpoint for websockets
 func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	var upgrader websocket.Upgrader
+	// There were issues with the origin header not passing the default check
+	// so check after putting this behind the proxy
+	// So the proxy now passes through the Origin and we check that its what we expect
 	upgrader.CheckOrigin = func(r *http.Request) bool {
 		orig := req.Header.Get("Origin")
 		if len(orig) == 0 {
@@ -417,7 +441,15 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		oc = &outputChan{c: out}
+		// When the reverse traceroute is done, remove it from the map
+		oc.onComplete(func() {
+			rr.mu.Lock()
+			defer rr.mu.Unlock()
+			delete(rr.rts, uint32(keyint))
+		})
 		rr.rts[uint32(keyint)] = oc
+	} else {
+		oc = rtrs
 	}
 	mf := msgFunc(func(s server.Status) error {
 		err := c.Write(wsMessage{
