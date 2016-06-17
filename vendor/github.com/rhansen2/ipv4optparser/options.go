@@ -130,9 +130,10 @@ func (o Option) ToSecurity() (SecurityOption, error) {
 }
 
 type RecordRouteOption struct {
-	Type   OptionType
-	Length OptionLength
-	Routes []Route
+	Type    OptionType
+	Length  OptionLength
+	Pointer byte
+	Routes  []Route
 }
 
 func (o Option) ToRecordRoute() (RecordRouteOption, error) {
@@ -148,7 +149,8 @@ func (o Option) ToRecordRoute() (RecordRouteOption, error) {
 	if routeLen%4 != 0 {
 		return rro, ErrorRouteLengthIncorrect
 	}
-	for i := 0; i < int(routeLen); i += 4 {
+	rro.Pointer = byte(o.Data[0])
+	for i := 1; i < int(routeLen); i += 4 {
 		var route Route
 		route |= Route(o.Data[i]) << 24
 		route |= Route(o.Data[i+1]) << 16
@@ -189,11 +191,12 @@ type Stamp struct {
 }
 
 type TimeStampOption struct {
-	Type   OptionType
-	Length OptionLength
-	Flags  Flag
-	Over   Overflow
-	Stamps []Stamp
+	Type    OptionType
+	Length  OptionLength
+	Pointer byte
+	Flags   Flag
+	Over    Overflow
+	Stamps  []Stamp
 }
 
 func (o Option) ToTimeStamp() (TimeStampOption, error) {
@@ -206,6 +209,7 @@ func (o Option) ToTimeStamp() (TimeStampOption, error) {
 	if len(o.Data) > MaxOptionsLen {
 		return ts, ErrorOptionDataTooLarge
 	}
+	ts.Pointer = byte(o.Data[0])
 	ts.Over = Overflow(o.Data[1] >> 4)
 	ts.Flags = Flag(o.Data[1] & 0x0F)
 	// Take off two because of the flag and overflow byte and the ponter byte
@@ -229,7 +233,7 @@ func (o Option) ToTimeStamp() (TimeStampOption, error) {
 }
 
 func getStampsTSOnly(data []OptionData, length int) ([]Stamp, error) {
-	stamp := make([]Stamp, 0)
+	var stamp []Stamp
 	for i := 0; i < length; i += 4 {
 		st := Stamp{}
 		st.Time |= Timestamp(data[i]) << 24
@@ -242,7 +246,7 @@ func getStampsTSOnly(data []OptionData, length int) ([]Stamp, error) {
 }
 
 func getStamps(data []OptionData, length int) ([]Stamp, error) {
-	stamp := make([]Stamp, 0)
+	var stamp []Stamp
 	for i := 0; i < length; i += 8 {
 		st := Stamp{}
 		st.Addr |= Address(data[i]) << 24
