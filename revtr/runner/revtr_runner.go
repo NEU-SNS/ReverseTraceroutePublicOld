@@ -410,6 +410,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				}
 			}
 			log.Debug("Issuing TS probes")
+			revtr.ProbeCount["ts"] += len(tsToIssueSrcToProbe)
 			issueTimestamps(tsToIssueSrcToProbe, processTSCheckForRevHop,
 				revtr.Staleness, b.opts.cl)
 			log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
@@ -433,6 +434,9 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			}
 		}
 		log.Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
+		for _, val := range receiverToSpooferToProbe {
+			revtr.ProbeCount["spoof-ts"] += len(val)
+		}
 		if len(receiverToSpooferToProbe) > 0 {
 			issueSpoofedTimestamps(receiverToSpooferToProbe,
 				processTSCheckForRevHop, revtr.Staleness, b.opts.cl)
@@ -487,8 +491,12 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					}
 				}
 			}
+			revtr.ProbeCount["ts"] += len(tsToIssueSrcToProbe)
 			issueTimestamps(linuxChecksSrcToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
+			for _, val := range receiverToSpooferToProbe {
+				revtr.ProbeCount["spoof-ts"] += len(val)
+			}
 			issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
 		}
