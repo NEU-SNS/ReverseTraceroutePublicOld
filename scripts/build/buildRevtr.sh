@@ -11,8 +11,11 @@ ROOT=$(git rev-parse --show-toplevel)
 
 
 cp $BIN_DIR/$BIN cmd/$BIN/docker/.
+cp -r $ROOT/cmd/revtr/webroot $ROOT/cmd/revtr/docker
 cd cmd/$BIN/docker
 
 docker build --rm=true -t revtr/revtr .
 docker save -o $ROOT/$CONT_DIR/revtr.tar revtr/revtr
 docker rmi revtr/revtr
+
+rm -rf $ROOT/cmd/revtr/docker/webroot
