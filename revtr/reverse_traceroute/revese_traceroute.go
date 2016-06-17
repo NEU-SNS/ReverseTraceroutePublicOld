@@ -251,6 +251,10 @@ func (rt *ReverseTraceroute) FailCurrPath() {
 		// Pop
 		*rt.Paths = (*rt.Paths)[:rt.len()-1]
 	}
+	// When we cail the curr path we'll do an onadd to print the curr path
+	if rt.onAdd != nil {
+		rt.onAdd(rt)
+	}
 }
 
 // AddAndReplaceSegment adds a new path, equal to the current one but with the last
