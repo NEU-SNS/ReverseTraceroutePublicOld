@@ -414,7 +414,7 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 		defer ws.Close()
 		err = ws.WriteMessage(websocket.TextMessage, []byte("Missing key."))
 		if err != nil {
-			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			log.Error(err)
 		}
 		return
 	}
@@ -424,14 +424,20 @@ func (rr RunRevtr) WS(rw http.ResponseWriter, req *http.Request) {
 	keyint, err := strconv.ParseUint(key, 10, 32)
 	if err != nil {
 		log.Error(err)
-		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		err = ws.WriteMessage(websocket.TextMessage, []byte("Invalid key."))
+		if err != nil {
+			log.Error(err)
+		}
 		return
 	}
 	rtrs, ok := rr.rts[uint32(keyint)]
 	if !ok {
 		defer ws.Close()
 		log.Errorf("Invalid Key: %d", keyint)
-		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		err = ws.WriteMessage(websocket.TextMessage, []byte("Invalid key."))
+		if err != nil {
+			log.Error(err)
+		}
 		return
 	}
 	var oc *outputChan
