@@ -119,7 +119,7 @@
 		},
 		{
 			"ImportPath": "github.com/rhansen2/ipv4optparser",
-			"Rev": "399c6638e091f3c2af86fe3597b4841cfb2a51fc"
+			"Rev": "7217b1413f4bb0aed6397d669cd8995f0bb98f72"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
