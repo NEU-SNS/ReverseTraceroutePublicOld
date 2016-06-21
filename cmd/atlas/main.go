@@ -17,6 +17,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/api"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/httputils"
@@ -28,9 +29,10 @@ import (
 // Config is the config for the atlas
 type Config struct {
 	DB       repo.Configs
-	RootCA   string `flag:"root-ca"`
-	CertFile string `flag:"cert-file"`
-	KeyFile  string `flag:"key-file"`
+	RootCA   string           `flag:"root-ca"`
+	CertFile string           `flag:"cert-file"`
+	KeyFile  string           `flag:"key-file"`
+	Cache    cache.ServerList `flag:"cache-addr"`
 }
 
 func init() {
@@ -89,9 +91,11 @@ func main() {
 			log.Error(http.ListenAndServe(":8080", nil))
 		}
 	}()
+
 	serv := server.NewServer(server.WithVPS(vps),
 		server.WithTRS(r),
-		server.WithClient(cc))
+		server.WithClient(cc),
+		server.WithCache(cache.New(conf.Cache)))
 	ln, err := net.Listen("tcp", ":55000")
 	if err != nil {
 		log.Fatal(err)
