@@ -1,9 +1,6 @@
 package types
 
-import (
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
-	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
-)
+import "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 
 // VPProvider is the interface for a provider for vantage points
 type VPProvider interface {
@@ -36,10 +33,9 @@ type TSVantagePoint struct {
 
 // Config represents the config options for the revtr service.
 type Config struct {
-	RootCA      *string `flag:"root-ca"`
-	CertFile    *string `flag:"cert-file"`
-	KeyFile     *string `flag:"key-file"`
-	CacheConfig cache.ServerList
+	RootCA   *string `flag:"root-ca"`
+	CertFile *string `flag:"cert-file"`
+	KeyFile  *string `flag:"key-file"`
 }
 
 // NewConfig creats a Config
