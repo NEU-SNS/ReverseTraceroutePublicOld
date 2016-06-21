@@ -2,7 +2,10 @@
 
 # build and save the docker image for the atlas
 
-set -e 
+set -e
+
+BIN_DIR=./bin
+BIN=atlas
 
 cp $BIN_DIR/$BIN cmd/$BIN/docker/.
 cd cmd/$BIN/docker
