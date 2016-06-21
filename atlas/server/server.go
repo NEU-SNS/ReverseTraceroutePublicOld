@@ -129,6 +129,7 @@ func (a *server) GetPathsWithToken(tr *pb.TokenRequest) (*pb.TokenResponse, erro
 	log.Debug("Looking for intersection from token: ", tr)
 	req, err := a.tc.Get(tr.Token)
 	if err != nil {
+		log.Error(err)
 		return &pb.TokenResponse{
 			Token: tr.Token,
 			Type:  pb.IResponseType_ERROR,
@@ -190,6 +191,7 @@ func (a *server) GetIntersectingPath(ir *pb.IntersectionRequest) (*pb.Intersecti
 		token, err := a.tc.Add(ir)
 		var iresp *pb.IntersectionResponse
 		if err != nil {
+			log.Error(err)
 			iresp = &pb.IntersectionResponse{
 				Type:  pb.IResponseType_ERROR,
 				Error: err.Error(),

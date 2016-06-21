@@ -29,10 +29,10 @@ import (
 // Config is the config for the atlas
 type Config struct {
 	DB       repo.Configs
-	RootCA   string           `flag:"root-ca"`
-	CertFile string           `flag:"cert-file"`
-	KeyFile  string           `flag:"key-file"`
-	Cache    cache.ServerList `flag:"cache-addr"`
+	RootCA   string `flag:"root-ca"`
+	CertFile string `flag:"cert-file"`
+	KeyFile  string `flag:"key-file"`
+	Cache    cache.Config
 }
 
 func init() {
@@ -62,6 +62,7 @@ func logError(f errorf) {
 
 func main() {
 	conf := Config{}
+	conf.Cache = cache.NewConfig()
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Fatal(err)
@@ -95,7 +96,7 @@ func main() {
 	serv := server.NewServer(server.WithVPS(vps),
 		server.WithTRS(r),
 		server.WithClient(cc),
-		server.WithCache(cache.New(conf.Cache)))
+		server.WithCache(cache.New(*conf.Cache.Addrs)))
 	ln, err := net.Listen("tcp", ":55000")
 	if err != nil {
 		log.Fatal(err)
