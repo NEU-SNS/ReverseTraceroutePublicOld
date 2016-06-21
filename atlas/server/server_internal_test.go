@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 )
 
 func uint32SliceEqual(l, r []uint32) bool {
@@ -128,6 +129,48 @@ func TestRunningTrace_Remove(t *testing.T) {
 	}
 }
 
+type mockCache struct {
+	cache map[string][]byte
+}
+
+type mockItem struct {
+	key string
+	val []byte
+}
+
+func (mi *mockItem) Key() string {
+	return mi.key
+}
+
+func (mi *mockItem) Value() []byte {
+	return mi.val
+}
+
+func (mc *mockCache) Get(key string) (cache.Item, error) {
+	if mc.cache == nil {
+		mc.cache = make(map[string][]byte)
+	}
+	if val, ok := mc.cache[key]; ok {
+		return &mockItem{key: key, val: val}, nil
+	}
+	return nil, cache.ErrorCacheMiss
+}
+
+func (mc *mockCache) GetMulti(keys []string) (map[string]cache.Item, error) {
+	panic("unimplemented")
+}
+func (mc *mockCache) Set(key string, val []byte) error {
+	if mc.cache == nil {
+		mc.cache = make(map[string][]byte)
+	}
+	mc.cache[key] = val
+	return nil
+}
+
+func (mc *mockCache) SetWithExpire(string, []byte, int32) error {
+	panic("unimplemented")
+}
+
 func TestTokenCache_Add(t *testing.T) {
 	var tests = []struct {
 		desc string
@@ -146,9 +189,9 @@ func TestTokenCache_Add(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tc := newTokenCache()
-		id := tc.Add(test.add)
-		ir := tc.Get(id)
+		tc := newTokenCache(&mockCache{})
+		id, _ := tc.Add(test.add)
+		ir, _ := tc.Get(id)
 		if *ir != *test.add {
 			t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.add)
 		}
@@ -187,9 +230,9 @@ func TestTokenCache_Get(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tc := newTokenCache()
-		id := tc.Add(test.add)
-		ir := tc.Get(id)
+		tc := newTokenCache(&mockCache{})
+		id, _ := tc.Add(test.add)
+		ir, _ := tc.Get(id)
 		if ir == nil {
 			if ir != test.expect {
 				t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.expect)
@@ -198,49 +241,6 @@ func TestTokenCache_Get(t *testing.T) {
 		}
 		if *ir != *test.expect {
 			t.Fatalf("%s: got: %v, expected: %v", test.desc, ir, test.expect)
-		}
-	}
-}
-
-func TestTokenCache_Remove(t *testing.T) {
-	var tests = []struct {
-		desc   string
-		add    []*pb.IntersectionRequest
-		remove []uint32
-		expect []error
-	}{
-		{
-			desc: "Remove IR",
-			add: []*pb.IntersectionRequest{&pb.IntersectionRequest{
-				Address:      1,
-				Dest:         2,
-				Staleness:    30,
-				UseAliases:   true,
-				IgnoreSource: true,
-				Src:          566,
-			}},
-			remove: []uint32{1},
-			expect: []error{nil},
-		},
-		{
-			desc:   "Remove Unadded",
-			add:    nil,
-			remove: []uint32{1},
-			expect: []error{cacheError{id: 1}},
-		},
-	}
-	for _, test := range tests {
-		tc := newTokenCache()
-		var ids []uint32
-		for _, a := range test.add {
-			id := tc.Add(a)
-			ids = append(ids, id)
-		}
-		for i, rem := range test.remove {
-			res := tc.Remove(rem)
-			if res != test.expect[i] {
-				t.Fatalf("%s: got: %v, expected: %v", test.desc, res, test.expect[i])
-			}
 		}
 	}
 }

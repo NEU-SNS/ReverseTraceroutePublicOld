@@ -1,3 +1,30 @@
+/*
+Copyright (c) 2015, Northeastern University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the Northeastern University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 package server
 
 import (
@@ -12,11 +39,13 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/types"
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
+	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 )
@@ -41,14 +70,15 @@ type AtlasServer interface {
 type server struct {
 	donec chan struct{}
 	curr  runningTraces
-	tc    *tokenCache
 	opts  serverOptions
+	tc    *tokenCache
 }
 
 type serverOptions struct {
 	cl  cclient.Client
 	vps client.VPSource
 	trs types.TRStore
+	ca  cache.Cache
 }
 
 // Option sets an option to configure the server
@@ -75,31 +105,36 @@ func WithTRS(trs types.TRStore) Option {
 	}
 }
 
+// WithCache configures the server to use the cache ca
+func WithCache(ca cache.Cache) Option {
+	return func(opts *serverOptions) {
+		opts.ca = ca
+	}
+}
+
 // NewServer creates a server
 func NewServer(opts ...Option) AtlasServer {
 	atlas := &server{
 		curr: newRunningTraces(),
-		tc:   newTokenCache(),
 	}
 	for _, opt := range opts {
 		opt(&atlas.opts)
 	}
+	atlas.tc = newTokenCache(atlas.opts.ca)
 	return atlas
 }
 
 // GetPathsWithToken satisfies the server interface
 func (a *server) GetPathsWithToken(tr *pb.TokenRequest) (*pb.TokenResponse, error) {
 	log.Debug("Looking for intersection from token: ", tr)
-	req := a.tc.Get(tr.Token)
-	if req == nil {
+	req, err := a.tc.Get(tr.Token)
+	if err != nil {
 		return &pb.TokenResponse{
 			Token: tr.Token,
 			Type:  pb.IResponseType_ERROR,
-			Error: fmt.Sprintf("No request found matching: %d", tr.Token),
+			Error: err.Error(),
 		}, nil
 	}
-	a.tc.Remove(tr.Token)
-
 	ir := types.IntersectionQuery{
 		Addr:         req.Address,
 		Dst:          req.Dest,
@@ -152,10 +187,20 @@ func (a *server) GetIntersectingPath(ir *pb.IntersectionRequest) (*pb.Intersecti
 			log.Error(err)
 			return nil, err
 		}
-		iresp := &pb.IntersectionResponse{
-			Type:  pb.IResponseType_TOKEN,
-			Token: a.tc.Add(ir),
+		token, err := a.tc.Add(ir)
+		var iresp *pb.IntersectionResponse
+		if err != nil {
+			iresp = &pb.IntersectionResponse{
+				Type:  pb.IResponseType_ERROR,
+				Error: err.Error(),
+			}
+		} else {
+			iresp = &pb.IntersectionResponse{
+				Type:  pb.IResponseType_TOKEN,
+				Token: token,
+			}
 		}
+
 		go a.fillAtlas(ir.Address, ir.Dest, ir.Staleness)
 		return iresp, nil
 	}
@@ -350,24 +395,42 @@ func (rt runningTraces) TryAdd(ip uint32, dsts []uint32) []uint32 {
 }
 
 type tokenCache struct {
-	mu    sync.Mutex
-	cache map[uint32]*pb.IntersectionRequest
+	ca cache.Cache
 	// Should only be accessed atomicaly
 	nextID uint32
 }
 
-func (tc *tokenCache) Add(ir *pb.IntersectionRequest) uint32 {
+func (tc *tokenCache) Add(ir *pb.IntersectionRequest) (uint32, error) {
 	new := atomic.AddUint32(&tc.nextID, 1)
-	tc.mu.Lock()
-	defer tc.mu.Unlock()
-	tc.cache[new] = ir
-	return new
+	msg, err := proto.Marshal(ir)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	err = tc.ca.Set(fmt.Sprintf("%d", new), msg)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return new, nil
 }
 
-func (tc *tokenCache) Get(id uint32) *pb.IntersectionRequest {
-	tc.mu.Lock()
-	defer tc.mu.Unlock()
-	return tc.cache[id]
+func (tc *tokenCache) Get(id uint32) (*pb.IntersectionRequest, error) {
+	ir := &pb.IntersectionRequest{}
+	it, err := tc.ca.Get(fmt.Sprintf("%d", id))
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	err = proto.Unmarshal(it.Value(), ir)
+	if err == cache.ErrorCacheMiss {
+		return nil, cacheError{id: id}
+	}
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return ir, nil
 }
 
 type cacheError struct {
@@ -378,19 +441,9 @@ func (ce cacheError) Error() string {
 	return fmt.Sprintf("No token registered for id: %d", ce.id)
 }
 
-func (tc *tokenCache) Remove(id uint32) error {
-	tc.mu.Lock()
-	defer tc.mu.Unlock()
-	if _, ok := tc.cache[id]; ok {
-		delete(tc.cache, id)
-		return nil
-	}
-	return cacheError{id: id}
-}
-
-func newTokenCache() *tokenCache {
+func newTokenCache(ca cache.Cache) *tokenCache {
 	tc := &tokenCache{
-		cache: make(map[uint32]*pb.IntersectionRequest),
+		ca: ca,
 	}
 	return tc
 }
