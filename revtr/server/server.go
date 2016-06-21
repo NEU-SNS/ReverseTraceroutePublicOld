@@ -266,7 +266,7 @@ func NewRevtrServer(opts ...Option) RevtrServer {
 	serv.rts = serv.opts.rts
 	serv.as = serv.opts.as
 	serv.run = serv.opts.run
-	serv.cm = clustermap.New(serv.opts.cs)
+	serv.cm = clustermap.New(serv.opts.cs, serv.opts.ca)
 	serv.ca = serv.opts.ca
 	serv.mu = &sync.Mutex{}
 	serv.revtrs = make(map[uint32]revtrOutput)
