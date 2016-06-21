@@ -35,11 +35,54 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
+	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	cmocks "github.com/NEU-SNS/ReverseTraceroute/controller/mocks"
 	vpmocks "github.com/NEU-SNS/ReverseTraceroute/vpservice/mocks"
 	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/stretchr/testify/mock"
 )
+
+type mockCache struct {
+	cache map[string][]byte
+}
+
+type mockItem struct {
+	key string
+	val []byte
+}
+
+func (mi *mockItem) Key() string {
+	return mi.key
+}
+
+func (mi *mockItem) Value() []byte {
+	return mi.val
+}
+
+func (mc *mockCache) Get(key string) (cache.Item, error) {
+	if mc.cache == nil {
+		mc.cache = make(map[string][]byte)
+	}
+	if val, ok := mc.cache[key]; ok {
+		return &mockItem{key: key, val: val}, nil
+	}
+	return nil, cache.ErrorCacheMiss
+}
+
+func (mc *mockCache) GetMulti(keys []string) (map[string]cache.Item, error) {
+	panic("unimplemented")
+}
+func (mc *mockCache) Set(key string, val []byte) error {
+	if mc.cache == nil {
+		mc.cache = make(map[string][]byte)
+	}
+	mc.cache[key] = val
+	return nil
+}
+
+func (mc *mockCache) SetWithExpire(string, []byte, int32) error {
+	panic("unimplemented")
+}
 
 func TestGetPathsWithToken(t *testing.T) {
 	trsm := &mocks.TRStore{}
@@ -51,7 +94,9 @@ func TestGetPathsWithToken(t *testing.T) {
 	vpsm := &vpmocks.VPSource{}
 	vpsm.On("GetVPs").Return(&vppb.VPReturn{}, nil)
 	var opts []server.Option
-	opts = append(opts, server.WithClient(clm), server.WithTRS(trsm), server.WithVPS(vpsm))
+	opts = append(opts, server.WithClient(clm),
+		server.WithTRS(trsm), server.WithVPS(vpsm),
+		server.WithCache(&mockCache{}))
 
 	serv := server.NewServer(opts...)
 	load := []*pb.IntersectionRequest{
@@ -112,7 +157,9 @@ func TestGetPathsWithTokenInvalidToken(t *testing.T) {
 	clm := &cmocks.Client{}
 	vpsm := &vpmocks.VPSource{}
 	var opts []server.Option
-	opts = append(opts, server.WithClient(clm), server.WithTRS(trsm), server.WithVPS(vpsm))
+	opts = append(opts, server.WithClient(clm),
+		server.WithTRS(trsm), server.WithVPS(vpsm),
+		server.WithCache(&mockCache{}))
 	serv := server.NewServer(opts...)
 	tokenReq := &pb.TokenRequest{
 		Token: 99999,
