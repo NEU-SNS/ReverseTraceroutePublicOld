@@ -5,7 +5,7 @@
 set -e
 
 BIN_DIR=./bin
-BIN=ccontroller
+BIN=controller
 CONT_DIR=containers
 ROOT=$(git rev-parse --show-toplevel)
 
