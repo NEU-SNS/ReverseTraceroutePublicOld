@@ -568,7 +568,7 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 		if err != nil {
 			log.Error(err)
-			rs.ca.Set(key, []byte{0})
+			rs.ca.Set(key, []byte{0, 0, 0, 0})
 			return 0
 		}
 		for {
@@ -579,12 +579,12 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			}
 			if err != nil {
 				log.Error(err)
-				rs.ca.Set(key, []byte{0})
+				rs.ca.Set(key, []byte{0, 0, 0, 0})
 				return 0
 
 			}
 			if len(p.Responses) == 0 {
-				rs.ca.Set(key, []byte{0})
+				rs.ca.Set(key, []byte{0, 0, 0, 0})
 				return 0
 
 			}
@@ -617,7 +617,7 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 		if err != nil {
 			log.Error(err)
-			rs.ca.Set(key, []byte{0})
+			rs.ca.Set(key, []byte{0, 0, 0, 0})
 			return 0
 		}
 		for {
@@ -628,12 +628,12 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			}
 			if err != nil {
 				log.Error(err)
-				rs.ca.Set(key, []byte{0})
+				rs.ca.Set(key, []byte{0, 0, 0, 0})
 				return 0
 
 			}
 			if len(p.Responses) == 0 {
-				rs.ca.Set(key, []byte{0})
+				rs.ca.Set(key, []byte{0, 0, 0, 0})
 				return 0
 
 			}
