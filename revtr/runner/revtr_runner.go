@@ -163,6 +163,11 @@ func (b *rtBatch) trToSource(revtr *rt.ReverseTraceroute) step {
 		// received tokens, move on to next step and try later
 		return b.recordRoute
 	}
+	if len(hops.hops) == 0 {
+		revtr.Tokens = tokens
+		// no hops found move on
+		return b.recordRoute
+	}
 	log.Debug("Creating TRToSrc seg: ", hops, " ", revtr.Src, " ", hops.addr)
 	segment := rt.NewTrtoSrcRevSegment(hops.hops, revtr.Src, hops.addr)
 	if !revtr.AddBackgroundTRSegment(segment, b.opts.cm) {
