@@ -498,6 +498,7 @@ func (rs revtrServer) StartRevtr(ctx context.Context, id uint32) (<-chan Status,
 }
 
 func (rs revtrServer) resolveHostname(ip string) string {
+	// TODO clean up error logging
 	item, err := rs.ca.Get(ip)
 	// If it's a cache miss, look through the vps
 	// if its found set it.
@@ -511,7 +512,9 @@ func (rs revtrServer) resolveHostname(ip string) string {
 			ips, _ := util.Int32ToIPString(vp.Ip)
 			// found it, set the cache and return the hostname
 			if ips == ip {
-				rs.ca.Set(ip, []byte(vp.Hostname))
+				if err := rs.ca.Set(ip, []byte(vp.Hostname)); err != nil {
+					log.Error(err)
+				}
 				return vp.Hostname
 			}
 		}
@@ -521,10 +524,14 @@ func (rs revtrServer) resolveHostname(ip string) string {
 			log.Error(err)
 			// since the lookup failed, just set it blank for now
 			// after it expires we'll try again
-			rs.ca.Set(ip, []byte{})
+			if err := rs.ca.Set(ip, []byte{}); err != nil {
+				log.Error(err)
+			}
 			return ""
 		}
-		rs.ca.Set(ip, []byte(hns[0]))
+		if err := rs.ca.Set(ip, []byte(hns[0])); err != nil {
+			log.Error(err)
+		}
 		return hns[0]
 	}
 	// this is some kind of harder failure such as servers not found
@@ -540,7 +547,9 @@ func (rs revtrServer) resolveHostname(ip string) string {
 			ips, _ := util.Int32ToIPString(vp.Ip)
 			// found it, set the cache and return the hostname
 			if ips == ip {
-				rs.ca.Set(ip, []byte(vp.Hostname))
+				if err := rs.ca.Set(ip, []byte(vp.Hostname)); err != nil {
+					log.Error(err)
+				}
 			}
 			return vp.Hostname
 		}
@@ -568,7 +577,9 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 		if err != nil {
 			log.Error(err)
-			rs.ca.Set(key, []byte{0, 0, 0, 0})
+			if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+				log.Error(err)
+			}
 			return 0
 		}
 		for {
@@ -579,12 +590,16 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			}
 			if err != nil {
 				log.Error(err)
-				rs.ca.Set(key, []byte{0, 0, 0, 0})
+				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+					log.Error(err)
+				}
 				return 0
 
 			}
 			if len(p.Responses) == 0 {
-				rs.ca.Set(key, []byte{0, 0, 0, 0})
+				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+					log.Error(err)
+				}
 				return 0
 
 			}
@@ -595,7 +610,9 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 				// so this should never execute
 				log.Error(err)
 			}
-			rs.ca.Set(key, buf.Bytes())
+			if err := rs.ca.Set(key, buf.Bytes()); err != nil {
+				log.Error(err)
+			}
 			return float32(p.Responses[0].Rtt) / 1000
 		}
 	}
@@ -617,7 +634,9 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 		if err != nil {
 			log.Error(err)
-			rs.ca.Set(key, []byte{0, 0, 0, 0})
+			if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+				log.Error(err)
+			}
 			return 0
 		}
 		for {
@@ -628,12 +647,16 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			}
 			if err != nil {
 				log.Error(err)
-				rs.ca.Set(key, []byte{0, 0, 0, 0})
+				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+					log.Error(err)
+				}
 				return 0
 
 			}
 			if len(p.Responses) == 0 {
-				rs.ca.Set(key, []byte{0, 0, 0, 0})
+				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
+					log.Error(err)
+				}
 				return 0
 
 			}
