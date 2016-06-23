@@ -19,12 +19,31 @@ type VPProvider interface {
 	GetQuarantined() ([]Quarantine, error)
 }
 
+// QuarantineReason is a reason to quarantine a vp
+type QuarantineReason int
+
+const (
+	// CantPerformMeasurement is the QuarantineReason when a vp can't perform
+	// any measurements
+	CantPerformMeasurement QuarantineReason = iota
+	// Manual is when some quarantines a VP manually for a set amount of time
+	Manual
+)
+
+var (
+	reasonToDesc = map[QuarantineReason]string{
+		CantPerformMeasurement: "VP can not perform any measurements",
+		Manual:                 "VP was manually quarantined",
+	}
+)
+
 // Quarantine represents the quarntining of a vantange point
 type Quarantine struct {
+	vp          pb.VantagePoint
 	Site        string
 	Hostname    string
 	IP          uint32
-	Reason      string
+	Reason      QuarantineReason
 	Attempt     int
 	Added       time.Time
 	LastAttempt time.Time
@@ -39,14 +58,14 @@ const (
 
 // NewQuarantineFromVP creates a quarantine from the given vp
 // with default settings with the given reason
-func NewQuarantineFromVP(vp pb.VantagePoint, reason string) Quarantine {
+func NewQuarantineFromVP(vp pb.VantagePoint, reason QuarantineReason) Quarantine {
 
 	return Quarantine{
+
 		Site:     vp.Site,
 		Hostname: vp.Hostname,
 		IP:       vp.Ip,
 		Reason:   reason,
-		Attempts: 0,
 	}
 }
 

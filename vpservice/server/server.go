@@ -84,8 +84,8 @@ type VPServer interface {
 	GetVPs(*pb.VPRequest) (*pb.VPReturn, error)
 	GetRRSpoofers(*pb.RRSpooferRequest) (*pb.RRSpooferResponse, error)
 	GetTSSpoofers(*pb.TSSpooferRequest) (*pb.TSSpooferResponse, error)
-	QuarantineVPs(vps []string) error
-	UnquarantineVPs(vps []string) error
+	QuarantineVPs(vps []types.Quarantine) error
+	UnquarantineVPs(vps []types.Quarantine) error
 }
 
 // Option configures the server
@@ -136,7 +136,6 @@ func NewServer(opts ...Option) (VPServer, error) {
 	s.initGuages()
 	go s.checkCapabilitiesAndUpdate()
 	go s.updateGauges()
-	go s.unquarantine()
 	return s, nil
 }
 
@@ -362,13 +361,15 @@ func (s server) checkCapabilities() {
 	s.testSpoof(tests, vpm)
 	s.testPing(tests, vpm)
 	s.testTrace(traceTests, vpm)
-	var quarnatines []types.Quarantine
+	var quarantines []types.Quarantine
 	for _, vp := range vpm {
 		err := s.opts.vpp.UpdateVP(*vp)
 		if err != nil {
 			log.Error(err)
 		}
 		if shouldQuarantine(*vp) {
+			quarantines = append(quarantines,
+				types.NewQuarantineFromVP(*vp, types.CantPerformMeasurement))
 		}
 	}
 }
