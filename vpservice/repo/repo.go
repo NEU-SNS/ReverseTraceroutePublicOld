@@ -120,7 +120,7 @@ from
 where qvps.hostname is null
 group by vps.site
 order by last_check
-limit 50) X
+limit ?) X
 INNER JOIN vantage_points vps on X.ip = vps.ip
 `
 	getQuarantinedVPs = `select hostname from quarantined_vps`
