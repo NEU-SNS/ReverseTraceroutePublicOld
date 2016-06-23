@@ -199,11 +199,13 @@ func (c Cmd) issueTraceroute(w io.Writer, t *dm.TracerouteMeasurement) error {
 		buf.WriteString(t.Payload)
 		buf.WriteByte(' ')
 	}
+	buf.WriteString("-P ")
 	if t.Method != "" {
-		buf.WriteString("-P ")
 		buf.WriteString(t.Method)
-		buf.WriteByte(' ')
+	} else {
+		buf.WriteString("ICMP-paris")
 	}
+	buf.WriteByte(' ')
 	if t.Attempts != "" {
 		buf.WriteString("-q ")
 		buf.WriteString(t.Attempts)
