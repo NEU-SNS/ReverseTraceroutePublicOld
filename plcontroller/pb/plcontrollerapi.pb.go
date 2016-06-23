@@ -42,7 +42,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion2
+const _ = grpc.SupportPackageIsVersion3
 
 // Client API for PLController service
 
@@ -356,6 +356,11 @@ var _PLController_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
+	Metadata: fileDescriptor0,
+}
+
+func init() {
+	proto.RegisterFile("github.com/NEU-SNS/ReverseTraceroute/plcontroller/pb/plcontrollerapi.proto", fileDescriptor0)
 }
 
 var fileDescriptor0 = []byte{

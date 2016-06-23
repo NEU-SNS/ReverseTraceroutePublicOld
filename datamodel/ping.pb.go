@@ -255,6 +255,10 @@ func init() {
 	proto.RegisterType((*Ping)(nil), "datamodel.Ping")
 }
 
+func init() {
+	proto.RegisterFile("github.com/NEU-SNS/ReverseTraceroute/datamodel/ping.proto", fileDescriptor0)
+}
+
 var fileDescriptor0 = []byte{
 	// 751 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x54, 0xcb, 0x6e, 0xdb, 0x3a,
