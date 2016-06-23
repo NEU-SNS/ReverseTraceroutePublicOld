@@ -38,6 +38,10 @@ func init() {
 	proto.RegisterType((*RTT)(nil), "datamodel.RTT")
 }
 
+func init() {
+	proto.RegisterFile("github.com/NEU-SNS/ReverseTraceroute/datamodel/time.proto", fileDescriptor2)
+}
+
 var fileDescriptor2 = []byte{
 	// 136 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xb2, 0x4c, 0xcf, 0x2c, 0xc9,

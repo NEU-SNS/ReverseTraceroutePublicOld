@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -457,8 +458,9 @@ func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
 }
 
 const (
-	unquarantinevp = `delete from quarantined_vps where hostname = ?`
-	quarantinevp   = `insert ignore into quarantined_vps(hostname) values(?)`
+	unquarantinevp = `delete from quarantined_vps where ip = ?;`
+	quarantinevp   = `insert ignore into quarantined_vps(ip, hostname, site, type, quarantine) 
+values(?, ?, ?, ?, ?);`
 )
 
 // UnquarantineVPs removes the vps in vps from quarantine
@@ -473,7 +475,7 @@ func (r *Repo) UnquarantineVPs(vps []types.Quarantine) error {
 		}
 	}()
 	for _, vp := range vps {
-		_, err := stmt.Exec(vp)
+		_, err := stmt.Exec(vp.GetVP().Ip)
 		if err != nil {
 			return err
 		}
@@ -493,9 +495,23 @@ func (r *Repo) QuarantineVPs(vps []types.Quarantine) error {
 		}
 	}()
 	for _, vp := range vps {
-		_, err := stmt.Exec(vp)
+		avp := vp.GetVP()
+		data, err := json.Marshal(vp)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		res, err := stmt.Exec(avp.Ip, avp.Hostname, avp.Site, vp.GetReason(), data)
 		if err != nil {
 			return err
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if rows > 0 {
+			// do some stuff
 		}
 	}
 	return nil

@@ -1,3 +1,30 @@
+/*
+Copyright (c) 2015, Northeastern University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the Northeastern University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 package server
 
 import (
@@ -183,7 +210,7 @@ type server struct {
 func (s server) QuarantineVPs(vps []types.Quarantine) error {
 	for _, vp := range vps {
 		// Now that a node is quarantened, remove it from the monitoring
-		onlineVPGaugeVec.DeleteLabelValues(vp.Hostname)
+		onlineVPGaugeVec.DeleteLabelValues(vp.GetVP().Hostname)
 	}
 	return s.opts.vpp.QuarantineVPs(vps)
 }
@@ -292,7 +319,7 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 	quarantinedVPGauge.Set(float64(len(quar)))
 	quarMap := make(map[string]struct{})
 	for _, vp := range quar {
-		quarMap[vp.Hostname] = struct{}{}
+		quarMap[vp.GetVP().Hostname] = struct{}{}
 	}
 	log.Debug("Quarantined vps ", quar)
 	log.Debug("Adding ", add)
@@ -368,8 +395,7 @@ func (s server) checkCapabilities() {
 			log.Error(err)
 		}
 		if shouldQuarantine(*vp) {
-			quarantines = append(quarantines,
-				types.NewQuarantineFromVP(*vp, types.CantPerformMeasurement))
+			quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, false))
 		}
 	}
 }
@@ -670,7 +696,7 @@ func (s server) initGuages() {
 	quarantinedVPGauge.Set(float64(len(quar)))
 	quarMap := make(map[string]struct{})
 	for _, vp := range quar {
-		quarMap[vp] = struct{}{}
+		quarMap[vp.GetVP().Hostname] = struct{}{}
 	}
 	vps, err := s.opts.vpp.GetVPs()
 	if err != nil {
@@ -704,7 +730,7 @@ func (s server) updateGauges() {
 			quarantinedVPGauge.Set(float64(len(quar)))
 			quarMap := make(map[string]struct{})
 			for _, vp := range quar {
-				quarMap[vp] = struct{}{}
+				quarMap[vp.GetVP().Hostname] = struct{}{}
 			}
 			doGauges(vps, quarMap)
 		}
