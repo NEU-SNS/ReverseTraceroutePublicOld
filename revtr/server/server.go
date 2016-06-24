@@ -402,6 +402,7 @@ func (rs revtrServer) GetSources(req *pb.GetSourcesReq) (*pb.GetSourcesResp, err
 		s := new(pb.Source)
 		s.Hostname = vp.Hostname
 		s.Ip, _ = util.Int32ToIPString(vp.Ip)
+		s.Site = vp.Site
 		sr.Srcs = append(sr.Srcs, s)
 	}
 	return sr, nil

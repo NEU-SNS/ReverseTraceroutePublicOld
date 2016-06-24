@@ -63,6 +63,7 @@ message GetSourcesResp {
 message Source {
   string hostname =  1;
   string ip       =  2;
+  string site     =  3;
 }
 
 message ReverseTraceroute {
