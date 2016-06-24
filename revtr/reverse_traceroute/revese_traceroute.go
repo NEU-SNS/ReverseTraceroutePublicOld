@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/util/string"
+	"github.com/golang/protobuf/ptypes"
 
 	apb "github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -57,6 +58,7 @@ const (
 type ReverseTraceroute struct {
 	ID                      uint32
 	logStr                  string
+	Stats                   Stats
 	Paths                   *[]*ReversePath
 	DeadEnd                 map[string]bool
 	RRHop2RateLimit         map[string]int
@@ -67,7 +69,6 @@ type ReverseTraceroute struct {
 	StopReason              StopReason
 	StartTime, EndTime      time.Time
 	Staleness               int64
-	ProbeCount              map[string]int
 	BackoffEndhost          bool
 	FailReason              string
 	mu                      sync.Mutex // protects running
@@ -82,12 +83,30 @@ type ReverseTraceroute struct {
 	// anythign else will be false
 	tsHopResponsive         map[string]int
 	ErrorDetails            bytes.Buffer
-	lastResponsive          string
 	rrSpoofRRResponsive     map[string]int
 	onAdd                   OnAddFunc
 	onReach                 OnReachFunc
 	onFail                  OnFailFunc
 	onReachOnce, onFailOnce sync.Once
+}
+
+// Stats are the stats collected
+// while running a reverse traceroute
+type Stats struct {
+	RRProbes                  int
+	SpoofedRRProbes           int
+	TSProbes                  int
+	SpoofedTSProbes           int
+	RRRoundCount              int
+	RRDuration                time.Duration
+	TSRoundCount              int
+	TSDuration                time.Duration
+	TRToSrcRoundCount         int
+	TRToSrcDuration           time.Duration
+	AssumeSymmetricRoundCount int
+	AssumeSymmetricDuration   time.Duration
+	BackgroundTRSRoundCount   int
+	BackgroundTRSDuration     time.Duration
 }
 
 // OnAddFunc is the type of the callback that can be called
@@ -121,7 +140,6 @@ func NewReverseTraceroute(src, dst string, id, stale uint32) *ReverseTraceroute 
 		RRHop2VPSLeft:           make(map[string][]string),
 		TSHop2RateLimit:         make(map[string]int),
 		TSHop2AdjsLeft:          make(map[string][]string),
-		ProbeCount:              make(map[string]int),
 		StartTime:               time.Now(),
 		Staleness:               int64(stale),
 		rrSpoofRRResponsive:     make(map[string]int),
@@ -331,9 +349,24 @@ func (rt *ReverseTraceroute) ToStorable() pb.ReverseTraceroute {
 	ret.Dst = rt.Dst
 	ret.FailReason = rt.FailReason
 	ret.Runtime = rt.EndTime.Sub(rt.StartTime).Nanoseconds()
-	ret.RrIssued = int32(rt.ProbeCount["rr"] + rt.ProbeCount["spoof-rr"])
-	ret.TsIssued = int32(rt.ProbeCount["ts"] + rt.ProbeCount["spoof-ts"])
 	ret.StopReason = string(rt.StopReason)
+	stats := pb.Stats{
+		TsDuration:                ptypes.DurationProto(rt.Stats.TSDuration),
+		RrDuration:                ptypes.DurationProto(rt.Stats.RRDuration),
+		TrToSrcDuration:           ptypes.DurationProto(rt.Stats.TRToSrcDuration),
+		AssumeSymmetricDuration:   ptypes.DurationProto(rt.Stats.AssumeSymmetricDuration),
+		BackgroundTrsDuration:     ptypes.DurationProto(rt.Stats.BackgroundTRSDuration),
+		RrProbes:                  int32(rt.Stats.RRProbes),
+		SpoofedRrProbes:           int32(rt.Stats.SpoofedRRProbes),
+		TsProbes:                  int32(rt.Stats.TSProbes),
+		SpoofedTsProbes:           int32(rt.Stats.SpoofedTSProbes),
+		RrRoundCount:              int32(rt.Stats.RRRoundCount),
+		TsRoundCount:              int32(rt.Stats.TSRoundCount),
+		TrToSrcRoundCount:         int32(rt.Stats.TRToSrcRoundCount),
+		AssumeSymmetricRoundCount: int32(rt.Stats.AssumeSymmetricRoundCount),
+		BackgroundTrsRoundCount:   int32(rt.Stats.BackgroundTRSRoundCount),
+	}
+	ret.Stats = &stats
 	if rt.StopReason != "" {
 		ret.Status = pb.RevtrStatus_COMPLETED
 	} else {
