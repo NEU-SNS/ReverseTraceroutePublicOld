@@ -51,13 +51,13 @@ func (v1 V1Api) sources(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	r.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(r).Encode(resp)
 	if err != nil {
 		log.Error(err)
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	r.Header().Set("Content-Type", "application/json")
 }
 
 func (v1 V1Api) revtr(r http.ResponseWriter, req *http.Request) {
@@ -98,6 +98,7 @@ func (v1 V1Api) retreiveRevtr(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	r.Header().Set("Content-Type", "application/json")
 	var m jsonpb.Marshaler
 	err = m.Marshal(r, revtrs)
 	if err != nil {
@@ -105,7 +106,6 @@ func (v1 V1Api) retreiveRevtr(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusBadRequest)
 		return
 	}
-	r.Header().Set("Content-Type", "application/json")
 }
 
 func (v1 V1Api) submitRevtr(r http.ResponseWriter, req *http.Request) {
@@ -128,10 +128,10 @@ func (v1 V1Api) submitRevtr(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	r.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(r).Encode(struct {
 		ResultURI string `json:"result_uri"`
 	}{
 		ResultURI: fmt.Sprintf("https://%s%s?batchid=%d", "revtr.ccs.neu.edu", v1Prefix+"revtr", resp.BatchId),
 	})
-	r.Header().Set("Content-Type", "application/json")
 }

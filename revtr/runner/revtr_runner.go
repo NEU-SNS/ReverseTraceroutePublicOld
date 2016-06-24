@@ -143,6 +143,13 @@ func (b *rtBatch) backoffEndhost(revtr *rt.ReverseTraceroute) step {
 }
 
 func (b *rtBatch) trToSource(revtr *rt.ReverseTraceroute) step {
+	revtr.Stats.TRToSrcRoundCount++
+	start := time.Now()
+	defer func() {
+		done := time.Now()
+		dur := done.Sub(start)
+		revtr.Stats.TRToSrcDuration += dur
+	}()
 	var addrs []uint32
 	for _, hop := range revtr.CurrPath().LastSeg().Hops() {
 		addr, _ := util.IPStringToInt32(hop)
@@ -187,6 +194,13 @@ func (ips ipstr) String() string {
 }
 
 func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
+	revtr.Stats.RRRoundCount++
+	start := time.Now()
+	defer func() {
+		done := time.Now()
+		dur := done.Sub(start)
+		revtr.Stats.RRDuration += dur
+	}()
 	for {
 		vps, target := revtr.GetRRVPs(revtr.LastHop(), b.opts.vps)
 		if len(vps) == 0 {
@@ -194,7 +208,7 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 			return b.timestamp
 		}
 		if stringutil.InArray(vps, "non_spoofed") {
-			revtr.ProbeCount["rr"]++
+			revtr.Stats.RRProbes++
 			rr, err := issueRR(revtr.Src, target,
 				revtr.Staleness, b.opts.cl, b.opts.cm)
 			if err != nil {
@@ -226,7 +240,7 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 			// we're back to the start with trToSource
 			return b.checkbgTRs(revtr, b.trToSource)
 		}
-		revtr.ProbeCount["spoof-rr"] += len(vps)
+		revtr.Stats.SpoofedRRProbes += len(vps)
 		rrs, err := issueSpoofedRR(revtr.Src, target, vps,
 			revtr.Staleness, b.opts.cl, b.opts.cm)
 		if err != nil {
@@ -282,6 +296,13 @@ const (
 )
 
 func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
+	revtr.Stats.TSRoundCount++
+	start := time.Now()
+	defer func() {
+		done := time.Now()
+		dur := done.Sub(start)
+		revtr.Stats.TSDuration += dur
+	}()
 	log.Debug("Trying Timestamp")
 	var receiverToSpooferToProbe = make(map[string]map[string][][]string)
 	checkMapMagic := func(f, s string) {
@@ -415,7 +436,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				}
 			}
 			log.Debug("Issuing TS probes")
-			revtr.ProbeCount["ts"] += len(tsToIssueSrcToProbe)
+			revtr.Stats.TSProbes += len(tsToIssueSrcToProbe)
 			issueTimestamps(tsToIssueSrcToProbe, processTSCheckForRevHop,
 				revtr.Staleness, b.opts.cl)
 			log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
@@ -440,7 +461,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 		}
 		log.Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
 		for _, val := range receiverToSpooferToProbe {
-			revtr.ProbeCount["spoof-ts"] += len(val)
+			revtr.Stats.SpoofedTSProbes += len(val)
 		}
 		if len(receiverToSpooferToProbe) > 0 {
 			issueSpoofedTimestamps(receiverToSpooferToProbe,
@@ -496,11 +517,11 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					}
 				}
 			}
-			revtr.ProbeCount["ts"] += len(tsToIssueSrcToProbe)
+			revtr.Stats.TSProbes += len(tsToIssueSrcToProbe)
 			issueTimestamps(linuxChecksSrcToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
 			for _, val := range receiverToSpooferToProbe {
-				revtr.ProbeCount["spoof-ts"] += len(val)
+				revtr.Stats.SpoofedTSProbes += len(val)
 			}
 			issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
@@ -641,6 +662,13 @@ func (b *rtBatch) checkbgTRs(revtr *rt.ReverseTraceroute, next step) step {
 }
 
 func (b *rtBatch) backgroundTRS(revtr *rt.ReverseTraceroute) step {
+	revtr.Stats.BackgroundTRSRoundCount++
+	start := time.Now()
+	defer func() {
+		done := time.Now()
+		dur := done.Sub(start)
+		revtr.Stats.BackgroundTRSDuration += dur
+	}()
 	tokens := revtr.Tokens
 	revtr.Tokens = nil
 	tr, err := retreiveTraceroutes(tokens, b.opts.at, b.opts.cm)
@@ -661,6 +689,13 @@ func (b *rtBatch) backgroundTRS(revtr *rt.ReverseTraceroute) step {
 }
 
 func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
+	revtr.Stats.AssumeSymmetricRoundCount++
+	start := time.Now()
+	defer func() {
+		done := time.Now()
+		dur := done.Sub(start)
+		revtr.Stats.AssumeSymmetricDuration += dur
+	}()
 	// if last hop is assumed, add one more from that tr
 	if reflect.TypeOf(revtr.CurrPath().LastSeg()) == reflect.TypeOf(&rt.DstSymRevSegment{}) {
 		log.Debug("Backing off along current path for ", revtr.Src, " ", revtr.Dst)

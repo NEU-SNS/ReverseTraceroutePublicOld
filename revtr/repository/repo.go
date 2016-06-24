@@ -10,15 +10,23 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/types"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
+	"github.com/golang/protobuf/ptypes"
 )
 
 const (
-	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, rr_issued, ts_issued, stop_reason, status, fail_reason) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?)`
+	revtrStoreRevtr = `INSERT INTO reverse_traceroutes(src, dst, runtime, stop_reason, status, fail_reason) VALUES
+	(?, ?, ?, ?, ?, ?)`
 	revtrInitRevtr         = `INSERT INTO reverse_traceroutes(src, dst) VALUES (?, ?)`
 	revtrUpdateRevtrStatus = `UPDATE reverse_traceroutes SET status = ? WHERE id = ?`
 	revtrStoreRevtrHop     = "INSERT INTO reverse_traceroute_hops(reverse_traceroute_id, hop, hop_type, `order`) VALUES (?, ?, ?, ?)"
-	revtrGetUserByKey      = "SELECT " +
+	revtrStoreStats        = `INSERT INTO 
+                                  reverse_traceroute_stats(revtr_id, rr_probes, spoofed_rr_probes, 
+                                                           ts_probes, spoofed_ts_probes, rr_round_count, 
+                                                           rr_duration, ts_round_count, ts_duration, tr_to_src_round_count, 
+                                                           tr_to_src_duration, assume_symmetric_round_count, assume_symmetric_duration, 
+                                                           background_trs_round_count, background_trs_duration) 
+                                                           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+	revtrGetUserByKey = "SELECT " +
 		"`id`, `name`, `email`, `max`, `delay`, `key` " +
 		"FROM " +
 		"users " +
@@ -36,15 +44,17 @@ const (
 		"		u.max "
 	revtrAddBatch         = "INSERT INTO batch(user_id) SELECT id FROM users WHERE users.`key` = ?"
 	revtrAddBatchRevtr    = "INSERT INTO batch_revtr(batch_id, revtr_id) VALUES (?, ?)"
-	revtrGetRevtrsInBatch = "SELECT rt.id, rt.src, rt.dst, rt.runtime, rt.rr_issued, rt.ts_issued, rt.stop_reason, rt.status, rt.date, rt.fail_reason " +
+	revtrGetRevtrsInBatch = "SELECT rt.id, rt.src, rt.dst, rt.runtime, rt.stop_reason, rt.status, rt.date, rt.fail_reason " +
 		"FROM users u INNER JOIN batch b ON u.id = b.user_id INNER JOIN batch_revtr brt ON b.id = brt.batch_id " +
 		"INNER JOIN reverse_traceroutes rt ON brt.revtr_id = rt.id WHERE u.id = ? AND b.id = ?"
-	revtrGetHopsForRevtr = "SELECT hop, hop_type FROM reverse_traceroute_hops rth WHERE rth.reverse_traceroute_id = ? ORDER BY rth.`order`"
-	revtrUpdateRevtr     = `UPDATE reverse_traceroutes 
+	revtrGetHopsForRevtr  = "SELECT hop, hop_type FROM reverse_traceroute_hops rth WHERE rth.reverse_traceroute_id = ? ORDER BY rth.`order`"
+	revtrGetStatsForRevtr = `SELECT rr_probes, spoofed_rr_probes, ts_probes, spoofed_ts_probes, rr_round_count, rr_duration, 
+                             ts_round_count, ts_duration, tr_to_src_round_count, tr_to_src_duration, assume_symmetric_round_count, 
+                             assume_symmetric_duration, background_trs_round_count, background_trs_duration 
+                             from reverse_traceroute_stats rts where rts.revtr_id = ? limit 1`
+	revtrUpdateRevtr = `UPDATE reverse_traceroutes 
 	SET 
 		runtime = ?,
-		rr_issued = ?,
-		ts_issued = ?,
 		stop_reason = ?,
 		status = ?,
         fail_reason = ?
@@ -150,8 +160,8 @@ func (r *Repo) StoreBatchedRevtrs(batch []pb.ReverseTraceroute) error {
 		return ErrFailedToStoreBatch
 	}
 	for _, rt := range batch {
-		_, err = tx.Exec(revtrUpdateRevtr, rt.Runtime, rt.RrIssued,
-			rt.TsIssued, rt.StopReason, rt.Status.String(),
+		_, err = tx.Exec(revtrUpdateRevtr, rt.Runtime,
+			rt.StopReason, rt.Status.String(),
 			rt.FailReason, rt.Id)
 		if err != nil {
 			log.Error(err)
@@ -170,6 +180,24 @@ func (r *Repo) StoreBatchedRevtrs(batch []pb.ReverseTraceroute) error {
 				}
 				return ErrFailedToStoreBatch
 			}
+		}
+		rrdur, _ := ptypes.Duration(rt.Stats.RrDuration)
+		tsdur, _ := ptypes.Duration(rt.Stats.TsDuration)
+		trdur, _ := ptypes.Duration(rt.Stats.TrToSrcDuration)
+		asdur, _ := ptypes.Duration(rt.Stats.AssumeSymmetricDuration)
+		bgtrdur, _ := ptypes.Duration(rt.Stats.BackgroundTrsDuration)
+		_, err := tx.Exec(revtrStoreStats, rt.Id, rt.Stats.RrProbes, rt.Stats.SpoofedRrProbes,
+			rt.Stats.TsProbes, rt.Stats.SpoofedTsProbes, rt.Stats.RrRoundCount,
+			rrdur.Nanoseconds(), rt.Stats.TsRoundCount, tsdur.Nanoseconds(),
+			rt.Stats.TrToSrcRoundCount, trdur.Nanoseconds(),
+			rt.Stats.AssumeSymmetricRoundCount, asdur.Nanoseconds(),
+			rt.Stats.BackgroundTrsRoundCount, bgtrdur.Nanoseconds())
+		if err != nil {
+			log.Error(err)
+			if err := tx.Rollback(); err != nil {
+				log.Error(err)
+			}
+			return ErrFailedToStoreBatch
 		}
 	}
 	err = tx.Commit()
@@ -209,8 +237,7 @@ func (r *Repo) GetRevtrsInBatch(uid, bid uint32) ([]*pb.ReverseTraceroute, error
 		var t time.Time
 		var status string
 		err = res.Scan(&id, &src, &dst, &r.Runtime,
-			&r.RrIssued, &r.TsIssued, &r.StopReason,
-			&status, &t, &r.FailReason)
+			&r.StopReason, &status, &t, &r.FailReason)
 		if err != nil {
 			log.Error(err)
 			return nil, ErrFailedToGetBatch
@@ -244,7 +271,13 @@ func (r *Repo) GetRevtrsInBatch(uid, bid uint32) ([]*pb.ReverseTraceroute, error
 				h.Hop, _ = util.Int32ToIPString(hop)
 				h.Type = pb.RevtrHopType(hopType)
 				use.Path = append(use.Path, &h)
-				log.Debug(h)
+				if err != nil {
+					log.Error(err)
+					if err := res2.Close(); err != nil {
+						log.Error(err)
+					}
+					return nil, ErrFailedToGetBatch
+				}
 			}
 			if err := res2.Err(); err != nil {
 				log.Error(err)
@@ -254,7 +287,40 @@ func (r *Repo) GetRevtrsInBatch(uid, bid uint32) ([]*pb.ReverseTraceroute, error
 				log.Error(err)
 			}
 		}
-		final = append(final, &(use))
+		res3, err := con.Query(revtrGetStatsForRevtr, rt.id)
+		if err != nil {
+			log.Error(err)
+			return nil, ErrFailedToGetBatch
+		}
+		for res3.Next() {
+			stat := pb.Stats{}
+			var rrdur, tsdur, trdur, assdur, bgtrdur int64
+			err = res3.Scan(&stat.RrProbes, &stat.SpoofedRrProbes, &stat.TsProbes,
+				&stat.SpoofedTsProbes, &stat.RrRoundCount, &rrdur, &stat.TsRoundCount,
+				&tsdur, &stat.TrToSrcRoundCount, &trdur, &stat.AssumeSymmetricRoundCount,
+				&assdur, &stat.BackgroundTrsRoundCount, &bgtrdur)
+			if err != nil {
+				log.Error(err)
+				if err := res3.Close(); err != nil {
+					log.Error(err)
+					return nil, ErrFailedToGetBatch
+				}
+			}
+			if err := res3.Err(); err != nil {
+				log.Error(err)
+				return nil, ErrFailedToGetBatch
+			}
+			if err := res3.Close(); err != nil {
+				log.Error(err)
+			}
+			stat.RrDuration = ptypes.DurationProto(time.Duration(rrdur))
+			stat.TsDuration = ptypes.DurationProto(time.Duration(tsdur))
+			stat.TrToSrcDuration = ptypes.DurationProto(time.Duration(trdur))
+			stat.AssumeSymmetricDuration = ptypes.DurationProto(time.Duration(assdur))
+			stat.BackgroundTrsDuration = ptypes.DurationProto(time.Duration(bgtrdur))
+			use.Stats = &stat
+		}
+		final = append(final, &use)
 	}
 	log.Debug(final)
 	return final, nil
@@ -349,8 +415,8 @@ func (r *Repo) StoreRevtr(rt pb.ReverseTraceroute) error {
 	src, _ := util.IPStringToInt32(rt.Src)
 	dst, _ := util.IPStringToInt32(rt.Dst)
 	res, err := tx.Exec(revtrStoreRevtr, src, dst,
-		rt.Runtime, rt.RrIssued, rt.TsIssued,
-		rt.StopReason, rt.Status.String(), rt.FailReason)
+		rt.Runtime, rt.StopReason,
+		rt.Status.String(), rt.FailReason)
 	if err != nil {
 		log.Error(err)
 		logError(tx.Rollback)
@@ -370,6 +436,24 @@ func (r *Repo) StoreRevtr(rt pb.ReverseTraceroute) error {
 			logError(tx.Rollback)
 			return err
 		}
+	}
+	rrdur, _ := ptypes.Duration(rt.Stats.RrDuration)
+	tsdur, _ := ptypes.Duration(rt.Stats.TsDuration)
+	trdur, _ := ptypes.Duration(rt.Stats.TrToSrcDuration)
+	asdur, _ := ptypes.Duration(rt.Stats.AssumeSymmetricDuration)
+	bgtrdur, _ := ptypes.Duration(rt.Stats.BackgroundTrsDuration)
+	_, err = tx.Exec(revtrStoreStats, id, rt.Stats.RrProbes, rt.Stats.SpoofedRrProbes,
+		rt.Stats.TsProbes, rt.Stats.SpoofedTsProbes, rt.Stats.RrRoundCount,
+		rrdur.Nanoseconds(), rt.Stats.TsRoundCount, tsdur.Nanoseconds(),
+		rt.Stats.TrToSrcRoundCount, trdur.Nanoseconds(),
+		rt.Stats.AssumeSymmetricRoundCount, asdur.Nanoseconds(),
+		rt.Stats.BackgroundTrsRoundCount, bgtrdur.Nanoseconds())
+	if err != nil {
+		log.Error(err)
+		if err := tx.Rollback(); err != nil {
+			log.Error(err)
+		}
+		return ErrFailedToStoreBatch
 	}
 	err = tx.Commit()
 	if err != nil {

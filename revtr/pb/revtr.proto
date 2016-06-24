@@ -5,6 +5,7 @@ package pb;
 option go_package = "pb";
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 
 service Revtr {
   rpc RunRevtr(RunRevtrReq) returns (RunRevtrResp) {
@@ -69,13 +70,29 @@ message ReverseTraceroute {
   string src             =  2;
   string dst             =  3;
   int64 runtime          =  4;
-  int32 rr_issued        =  5;
-  int32 ts_issued        =  6;
-  string stop_reason     =  7;
-  string date            =  8;
-  repeated RevtrHop path =  9;
-  uint32 id              = 10;
-  string fail_reason     = 11;
+  string stop_reason     =  5;
+  string date            =  6;
+  repeated RevtrHop path =  7;
+  uint32 id              =  8;
+  string fail_reason     =  9;
+  Stats stats            = 10;
+}
+
+message Stats {
+  google.protobuf.Duration ts_duration               =  1;
+  google.protobuf.Duration rr_duration               =  2;
+  google.protobuf.Duration tr_to_src_duration        =  3;
+  google.protobuf.Duration assume_symmetric_duration =  4;
+  google.protobuf.Duration background_trs_duration   =  5;
+  int32 rr_probes                    =  6;
+  int32 spoofed_rr_probes            =  7;
+  int32 ts_probes                    =  8;
+  int32 spoofed_ts_probes            =  9;
+  int32 rr_round_count               = 10;
+  int32 ts_round_count               = 11; 
+  int32 tr_to_src_round_count        = 12; 
+  int32 assume_symmetric_round_count = 13;
+  int32 background_trs_round_count   = 14;
 }
 
 message RevtrHop {  
