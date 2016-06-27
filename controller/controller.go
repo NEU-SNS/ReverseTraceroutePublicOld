@@ -158,22 +158,28 @@ func (c *controllerT) startRPC(eChan chan error) {
 	}
 }
 
-func errorAllPing(err error, out chan<- *dm.Ping, ps []*dm.PingMeasurement) {
+func errorAllPing(ctx con.Context, err error, out chan<- *dm.Ping, ps []*dm.PingMeasurement) {
 	for _, p := range ps {
-		out <- &dm.Ping{
+		select {
+		case out <- &dm.Ping{
 			Src:   p.Src,
 			Dst:   p.Dst,
 			Error: err.Error(),
+		}:
+		case <-ctx.Done():
 		}
 	}
 }
 
-func errorAllTrace(err error, out chan<- *dm.Traceroute, ts []*dm.TracerouteMeasurement) {
+func errorAllTrace(ctx con.Context, err error, out chan<- *dm.Traceroute, ts []*dm.TracerouteMeasurement) {
 	for _, t := range ts {
-		out <- &dm.Traceroute{
+		select {
+		case out <- &dm.Traceroute{
 			Src:   t.Src,
 			Dst:   t.Dst,
 			Error: err.Error(),
+		}:
+		case <-ctx.Done():
 		}
 	}
 }
@@ -354,7 +360,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 				mt, err := c.router.GetMT(s)
 				if err != nil {
 					log.Error(err)
-					errorAllPing(err, ret, meas)
+					errorAllPing(ctx, err, ret, meas)
 					return
 				}
 				defer mt.Close()
@@ -363,7 +369,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 				})
 				if err != nil {
 					log.Error(err)
-					errorAllPing(err, ret, meas)
+					errorAllPing(ctx, err, ret, meas)
 					return
 				}
 				for {
@@ -387,7 +393,11 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						}
 						pp.Id = id
 						log.Debug("Sending: ", pp)
-						ret <- pp
+						select {
+						case ret <- pp:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}(sd, pms)
@@ -634,15 +644,19 @@ func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAcc
 		found, err := db.GetTraceMulti(check)
 		if err != nil {
 			log.Error(err)
-			eout <- err
+			select {
+			case eout <- err:
+			case <-ctx.Done():
+			}
+			return
 		}
 		for _, p := range found {
 			foundMap[p.Key()] = p
 		}
 		select {
 		case <-quit:
-			return
 		case out <- foundMap:
+		case <-ctx.Done():
 		}
 	}()
 	select {
@@ -748,7 +762,7 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 				mt, err := c.router.GetMT(s)
 				if err != nil {
 					log.Error(err)
-					errorAllTrace(err, ret, meas)
+					errorAllTrace(ctx, err, ret, meas)
 					return
 				}
 				defer mt.Close()
@@ -757,7 +771,7 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 				})
 				if err != nil {
 					log.Error(err)
-					errorAllTrace(err, ret, meas)
+					errorAllTrace(ctx, err, ret, meas)
 					return
 				}
 				for {
@@ -778,7 +792,11 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 						if err != nil {
 							log.Error(err)
 						}
-						ret <- pp
+						select {
+						case ret <- pp:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}(sd, tms)
