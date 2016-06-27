@@ -49,13 +49,13 @@ atlas-docker: atlas
 plcontroller: protos
 	go build -a -o $(BIN_DIR)/plcontroller ./cmd/plcontroller;
 
-plcontroller-docker: 
+plcontroller-docker: plcontroller
 	./scripts/build/buildPlc.sh
 
 controller: protos
 	go build -a -o $(BIN_DIR)/controller ./cmd/controller;
 
-controller-docker:
+controller-docker: controller
 	./scripts/build/buildCC.sh
 
 
