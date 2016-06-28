@@ -12,3 +12,4 @@ CMD ["-loglevel", "error"]
 
 EXPOSE 45000
 EXPOSE 8080
+EXPOSE 45454

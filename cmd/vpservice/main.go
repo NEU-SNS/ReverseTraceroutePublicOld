@@ -109,6 +109,11 @@ func main() {
 			log.Error(http.ListenAndServe(":8080", mux))
 		}
 	}()
+	go func() {
+		for {
+			log.Error(http.ListenAndServe(":45454", nil))
+		}
+	}()
 	ln, err := net.Listen("tcp", ":45000")
 	if err != nil {
 		log.Fatal(err)
