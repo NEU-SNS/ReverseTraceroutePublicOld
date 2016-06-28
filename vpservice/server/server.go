@@ -93,7 +93,7 @@ var (
 
 const (
 	defaultLimit = 250
-	testSize     = 50
+	testSize     = 100
 )
 
 func init() {
@@ -113,6 +113,7 @@ type VPServer interface {
 	GetTSSpoofers(*pb.TSSpooferRequest) (*pb.TSSpooferResponse, error)
 	QuarantineVPs(vps []types.Quarantine) error
 	UnquarantineVPs(vps []types.Quarantine) error
+	GetLastQuarantine(ip uint32) (types.Quarantine, error)
 }
 
 // Option configures the server
@@ -144,6 +145,7 @@ func WithTSFilter(tsf filters.TSFilter) Option {
 	return func(so *serverOptions) {
 		so.tsf = tsf
 	}
+
 }
 
 type serverOptions struct {
@@ -272,6 +274,10 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 	return &resp, nil
 }
 
+func (s server) GetLastQuarantine(ip uint32) (types.Quarantine, error) {
+	return s.opts.vpp.GetLastQuarantine(ip)
+}
+
 // call in a goroutine
 // loop forever checking the capabilities of vantage points
 // as well checking for new vps/vps being removed
@@ -338,15 +344,78 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 	}
 }
 
+func (s server) tryUnquarantine() {
+	tick := time.NewTicker(2 * time.Minute)
+	for {
+		select {
+		case t := <-tick.C:
+			log.Debug("Trying unquarantine for time: ", t)
+			vps, err := s.opts.vpp.GetVPs()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			vpmap := make(map[string]*pb.VantagePoint)
+			for _, vp := range vps {
+				vpmap[vp.Hostname] = vp
+			}
+			qs, err := s.opts.vpp.GetQuarantined()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			var unquar []types.Quarantine
+			var updateQuar []types.Quarantine
+			for _, q := range qs {
+				if q.Expired(time.Now()) {
+					unquar = append(unquar, q)
+					continue
+				}
+				if q.Elapsed(time.Now()) {
+					// If our backoff elapsed, see if the node is up and running
+					if vp, ok := vpmap[q.GetVP().Hostname]; ok {
+						if !shouldQuarantine(*vp) {
+							// Up and running, remove it from the quarantines
+							unquar = append(unquar, q)
+						}
+					}
+					// Not up or not running, set the next backoff and update in db
+					q.NextBackoff()
+					updateQuar = append(updateQuar, q)
+				}
+			}
+			// if any should be removed from quarantine do that now
+			if len(unquar) > 0 {
+				if err := s.opts.vpp.UnquarantineVPs(unquar); err != nil {
+					log.Error(err)
+				}
+			}
+			// if any should still be quarantined, update them in the db
+			if len(updateQuar) > 0 {
+
+			}
+		}
+	}
+}
+
 func (s server) checkCapabilities() {
 	vps, err := s.opts.vpp.GetVPsForTesting(testSize)
 	if err != nil {
 		log.Error(err)
 		return
 	}
+	var onePerSite []*pb.VantagePoint
+	siteMap := make(map[string]*pb.VantagePoint)
+	for _, vp := range vps {
+		siteMap[vp.Site] = vp
+	}
+	for _, vp := range siteMap {
+		onePerSite = append(onePerSite, vp)
+	}
+	log.Debug("Checking Capabilities for: ", onePerSite)
 	vpm := make(map[uint32]*pb.VantagePoint)
 	var tests []*datamodel.PingMeasurement
-	for _, vp := range vps {
+	for _, vp := range onePerSite {
 		vp.RecSpoof = false
 		vp.Spoof = false
 		vp.RecordRoute = false
@@ -395,8 +464,16 @@ func (s server) checkCapabilities() {
 			log.Error(err)
 		}
 		if shouldQuarantine(*vp) {
-			quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, false))
+			quar, err := s.GetLastQuarantine(vp.Ip)
+			if err != nil {
+				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, nil))
+			} else {
+				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, quar))
+			}
 		}
+	}
+	if err := s.QuarantineVPs(quarantines); err != nil {
+		log.Error(err)
 	}
 }
 
@@ -667,6 +744,7 @@ func doGauges(vps []*pb.VantagePoint, quar map[string]struct{}) {
 	spooferGauge.Set(spoofCnt)
 	siteMap := make(map[string]struct{})
 	for _, vp := range vps {
+		onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
 		siteMap[vp.Site] = struct{}{}
 	}
 	var siteCnt float64
