@@ -416,13 +416,13 @@ FROM
 		FROM
 			traceroutes tt
 		WHERE
-			tt.src = ? and tt.dst = ?
+			tt.src = %d and tt.dst = %d
 		ORDER BY
 			tt.start DESC
 		LIMIT 1
 	) t left outer join
 	traceroute_hops th on th.traceroute_id = t.id
-WHERE t.start > ?
+WHERE t.start > %d
 ORDER BY
 	t.start DESC
 `
@@ -544,7 +544,7 @@ func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
 func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
 	minTime := time.Now().Add(-s)
-	rows, err := db.GetReader().Query(getTraceBySrcDstStale, src, dst, minTime)
+	rows, err := db.GetReader().Query(fmt.Sprintf(getTraceBySrcDstStale, src, dst, minTime))
 	if err != nil {
 		return nil, err
 	}
