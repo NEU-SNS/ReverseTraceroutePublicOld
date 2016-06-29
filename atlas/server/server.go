@@ -226,7 +226,7 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 		curr := &dm.TracerouteMeasurement{
 			Src:        src,
 			Dst:        dest,
-			Timeout:    20,
+			Timeout:    60,
 			Wait:       "2",
 			Attempts:   "1",
 			LoopAction: "1",
@@ -241,7 +241,7 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	if len(traces) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
 	defer cancel()
 	st, err := a.opts.cl.Traceroute(ctx, &dm.TracerouteArg{Traceroutes: traces})
 	if err != nil {
