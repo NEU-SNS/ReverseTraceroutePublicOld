@@ -44,7 +44,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/router"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
-	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -191,9 +190,9 @@ var (
 
 func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.Ping, error) {
 	log.Debug("Checking for pings in cache: ", keys)
-	out := make(chan map[string]*dm.Ping)
+	out := make(chan map[string]*dm.Ping, 1)
 	quit := make(chan struct{})
-	eout := make(chan error)
+	eout := make(chan error, 1)
 	go func() {
 		found := make(map[string]*dm.Ping)
 		res, err := c.GetMulti(keys)
@@ -230,9 +229,9 @@ func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.
 }
 
 func checkPingDb(ctx con.Context, check []*dm.PingMeasurement, db DataAccess) (map[string]*dm.Ping, error) {
-	out := make(chan map[string]*dm.Ping)
+	out := make(chan map[string]*dm.Ping, 1)
 	quit := make(chan struct{})
-	eout := make(chan error)
+	eout := make(chan error, 1)
 	go func() {
 		foundMap := make(map[string]*dm.Ping)
 		found, err := db.GetPingsMulti(check)
@@ -597,9 +596,8 @@ func (c *controllerT) doRecSpoof(ctx con.Context, pr *dm.Probe) {
 
 func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*dm.Traceroute, error) {
 	log.Debug("Checking for traceroute in cache: ", keys)
-	out := make(chan map[string]*dm.Traceroute)
-	quit := make(chan struct{})
-	eout := make(chan error)
+	out := make(chan map[string]*dm.Traceroute, 1)
+	eout := make(chan error, 1)
 	go func() {
 		found := make(map[string]*dm.Traceroute)
 		res, err := ca.GetMulti(keys)
@@ -607,7 +605,7 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 			log.Error(err)
 			select {
 			case eout <- err:
-			case <-quit:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -621,14 +619,12 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 			found[key] = trace
 		}
 		select {
-		case <-quit:
-			return
+		case <-ctx.Done():
 		case out <- found:
 		}
 	}()
 	select {
 	case <-ctx.Done():
-		close(quit)
 		return nil, ErrTimeout
 	case ret := <-out:
 		log.Debug("Got from traceroute cache: ", ret)
@@ -639,9 +635,9 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 }
 
 func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAccess) (map[string]*dm.Traceroute, error) {
-	out := make(chan map[string]*dm.Traceroute)
+	out := make(chan map[string]*dm.Traceroute, 1)
 	quit := make(chan struct{})
-	eout := make(chan error)
+	eout := make(chan error, 1)
 	go func() {
 		foundMap := make(map[string]*dm.Traceroute)
 		found, err := db.GetTraceMulti(check)
@@ -824,36 +820,11 @@ func (c *controllerT) fetchVPs(ctx con.Context, gvp *dm.VPRequest) (*dm.VPReturn
 		}
 		mt.Close()
 	}
-	go func() {
-		data, err := proto.Marshal(&ret)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		// Cache for 5 min
-		c.cache.SetWithExpire("all_vps", data, 5*60)
-	}()
 	return &ret, nil
 }
 
 func (c *controllerT) doGetVPs(ctx con.Context, gvp *dm.VPRequest) (*dm.VPReturn, error) {
-	res, err := c.cache.Get("all_vps")
-	if err != nil && err != ca.ErrorCacheMiss {
-		log.Error(err)
-		return nil, err
-	}
-	var ret dm.VPReturn
-	if err == ca.ErrorCacheMiss {
-		return c.fetchVPs(ctx, gvp)
-	}
-	err = proto.Unmarshal(res.Value(), &ret)
-	if err != nil {
-		return nil, err
-	}
-	if len(ret.Vps) == 0 {
-		return c.fetchVPs(ctx, gvp)
-	}
-	return &ret, nil
+	return c.fetchVPs(ctx, gvp)
 }
 
 func startHTTP(addr string) {
