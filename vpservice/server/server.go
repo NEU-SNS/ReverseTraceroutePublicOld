@@ -166,6 +166,7 @@ func NewServer(opts ...Option) (VPServer, error) {
 	s.initGuages()
 	go s.checkCapabilitiesAndUpdate()
 	go s.updateGauges()
+	go s.tryUnquarantine()
 	return s, nil
 }
 
@@ -441,7 +442,7 @@ func (s server) checkCapabilities() {
 		}
 	}
 	var traceTests []*datamodel.TracerouteMeasurement
-	for _, vp := range vps {
+	for _, vp := range onePerSite {
 		for _, d := range vps {
 			if d.Ip == vp.Ip {
 				continue
@@ -471,9 +472,11 @@ func (s server) checkCapabilities() {
 		if shouldQuarantine(*vp) {
 			quar, err := s.GetLastQuarantine(vp.Ip)
 			if err != nil {
-				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, nil))
+				quarantines = append(quarantines,
+					types.NewDefaultQuarantine(*vp, nil, types.CantPerformMeasurement))
 			} else {
-				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, quar))
+				quarantines = append(quarantines,
+					types.NewDefaultQuarantine(*vp, quar, types.CantPerformMeasurement))
 			}
 		}
 	}

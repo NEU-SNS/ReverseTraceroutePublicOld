@@ -92,6 +92,23 @@ func (qr *QuarantineReason) UnmarshalJSON(in []byte) error {
 	}
 }
 
+func (qr QuarantineReason) String() string {
+	switch qr {
+	case CantPerformMeasurement:
+		return "CANTPERFORMMEASUREMENT"
+	case Manual:
+		return "MANUAL"
+	case FlipFlop:
+		return "FLIPFLOP"
+	case DownTooLong:
+		return "DOWNTOOLONG"
+	case CantRunCode:
+		return "CANTRUNCODE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	// CantPerformMeasurement is the QuarantineReason when a vp can't perform
 	// any measurements
@@ -253,6 +270,7 @@ func (dq *defaultQuarantine) Type() QuarantineType {
 // NewDefaultQuarantine creates a defaultQuarantine
 func NewDefaultQuarantine(vp pb.VantagePoint, prevQuar Quarantine, reason QuarantineReason) Quarantine {
 	var q defaultQuarantine
+	q.VP = vp
 	q.Reason = reason
 	q.InitialBackoff = time.Hour * 24
 	q.Multiplier = 2
@@ -293,6 +311,7 @@ func (mq *manualQuarantine) NextBackoff() time.Time {
 // NewManualQuarantine creates a manualQuarantine with expire exp
 func NewManualQuarantine(vp pb.VantagePoint, exp time.Time) Quarantine {
 	q := manualQuarantine{}
+	q.VP = vp
 	q.Expire = exp
 	q.Reason = Manual
 	return &q

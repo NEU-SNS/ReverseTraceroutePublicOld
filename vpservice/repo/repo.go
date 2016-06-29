@@ -190,6 +190,8 @@ func (r *Repo) UpdateVP(vp pb.VantagePoint) error {
 		vp.RecordRoute,
 		vp.Spoof,
 		vp.RecSpoof,
+		vp.Ping,
+		vp.Trace,
 		vp.Ip)
 
 	if err != nil {
@@ -227,6 +229,8 @@ func generateChanges(new, old []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.Van
 		curr.Timestamp = false
 		curr.RecSpoof = false
 		curr.RecordRoute = false
+		curr.Ping = false
+		curr.Trace = false
 		oldm[curr] = true
 	}
 	add = vpNotIn(oldm, newm)
@@ -283,6 +287,8 @@ func (r *Repo) UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*p
 		return nil, nil, ErrFailedToUpdateVPs
 	}
 	rem, add := generateChanges(vps, ovps)
+	log.Debug("Added: ", add)
+	log.Debug("Removing: ", rem)
 	tx, err := r.repo.GetWriter().Begin()
 	if err != nil {
 		return nil, nil, err
@@ -543,7 +549,7 @@ func (r *Repo) QuarantineVPs(vps []types.Quarantine) error {
 			logError(tx.Rollback)
 			return err
 		}
-		res, err := stmt.Exec(avp.Ip, avp.Hostname, avp.Site, vp.GetReason(), data)
+		res, err := stmt.Exec(avp.Ip, avp.Hostname, avp.Site, string(vp.Type()), data)
 		if err != nil {
 			logError(tx.Rollback)
 			return err
