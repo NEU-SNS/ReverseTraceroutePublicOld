@@ -118,7 +118,8 @@ where ip = ?;
 SELECT  vps.ip, vps.hostname, vps.site, vps.timestamp, 
 vps.record_route, vps.spoof, vps.rec_spoof, vps.ping, vps.trace  
 FROM
-vantage_points vps limit ?;
+vantage_points vps 
+order by vps.last_check limit ?;
 `
 	getQuarantinedVPs = `select ip, hostname, site, type, added, quarantine from quarantined_vps;`
 )
