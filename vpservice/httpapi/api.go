@@ -49,6 +49,7 @@ type quarantine struct {
 
 type manualQuarantine struct {
 	Hostname string    `json:"hostname"`
+	Type     string    `json:"type"`
 	Expire   time.Time `json:"expire"`
 }
 
@@ -80,7 +81,19 @@ func (api API) quarantineVPS(r http.ResponseWriter, req *http.Request) {
 	var quars []types.Quarantine
 	for _, q := range mq.Quarantines {
 		if vp, ok := vpm[q.Hostname]; ok {
-			quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
+			switch q.Type {
+			case "manual":
+				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
+			case "cant_run_code":
+				pq, err := api.s.GetLastQuarantine(vp.Ip)
+				if err != nil {
+					log.Error(err)
+					break
+				}
+				quars = append(quars, types.NewDefaultQuarantine(*vp, q.Expire))
+			default:
+				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
+			}
 		}
 	}
 	if err := api.s.QuarantineVPs(quars); err != nil {
@@ -113,7 +126,27 @@ func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
 		}
 		vps = append(vps, al.Labels[vpLabelKey])
 	}
-	err := api.s.QuarantineVPs(vps)
+	vpmap := make(map[string]*pb.VantagePoint)
+	currVps, err := api.s.GetVPs(&pb.VPRequest{})
+	if err != nil {
+		log.Error(err)
+		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	for _, vp := range currVps.GetVps() {
+		vpmap[vp.Hostname] = vp
+	}
+	var toQuar []types.Quarantine
+	for _, vp := range vps {
+		if v, ok := vpmap[vp]; ok {
+			// We can ignore the error because regardless of what it is we
+			// use the value of quar
+			quar, _ := api.s.GetLastQuarantine(v.Ip)
+			q := types.NewDefaultQuarantine(*v, quar)
+			toQuar = append(toQuar, q)
+		}
+	}
+	err = api.s.QuarantineVPs(toQuar)
 	if err != nil {
 		log.Error(err)
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -135,7 +168,23 @@ func (api API) unquarantineVPS(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	err := api.s.UnquarantineVPs(unq.VPS)
+	qs, err := api.s.GetQuarantined()
+	if err != nil {
+		log.Error(err)
+		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	var toUnq []types.Quarantine
+	hnToQuar := make(map[string]types.Quarantine)
+	for _, q := range qs {
+		hnToQuar[q.GetVP().Hostname] = q
+	}
+	for _, vp := range unq.VPS {
+		if q, ok := hnToQuar[vp]; ok {
+			toUnq = append(toUnq, q)
+		}
+	}
+	err = api.s.UnquarantineVPs(toUnq)
 	if err != nil {
 		log.Error(err)
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
