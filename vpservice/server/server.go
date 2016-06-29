@@ -1,9 +1,37 @@
+/*
+Copyright (c) 2015, Northeastern University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the Northeastern University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Northeastern University BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 package server
 
 import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -65,7 +93,7 @@ var (
 
 const (
 	defaultLimit = 250
-	testSize     = 50
+	testSize     = 100
 )
 
 func init() {
@@ -83,8 +111,10 @@ type VPServer interface {
 	GetVPs(*pb.VPRequest) (*pb.VPReturn, error)
 	GetRRSpoofers(*pb.RRSpooferRequest) (*pb.RRSpooferResponse, error)
 	GetTSSpoofers(*pb.TSSpooferRequest) (*pb.TSSpooferResponse, error)
-	QuarantineVPs(vps []string) error
-	UnquarantineVPs(vps []string) error
+	QuarantineVPs(vps []types.Quarantine) error
+	UnquarantineVPs(vps []types.Quarantine) error
+	GetLastQuarantine(ip uint32) (types.Quarantine, error)
+	GetQuarantined() ([]types.Quarantine, error)
 }
 
 // Option configures the server
@@ -116,6 +146,7 @@ func WithTSFilter(tsf filters.TSFilter) Option {
 	return func(so *serverOptions) {
 		so.tsf = tsf
 	}
+
 }
 
 type serverOptions struct {
@@ -135,7 +166,6 @@ func NewServer(opts ...Option) (VPServer, error) {
 	s.initGuages()
 	go s.checkCapabilitiesAndUpdate()
 	go s.updateGauges()
-	go s.unquarantine()
 	return s, nil
 }
 
@@ -180,15 +210,15 @@ type server struct {
 	rrf  rrFilter
 }
 
-func (s server) QuarantineVPs(vps []string) error {
+func (s server) QuarantineVPs(vps []types.Quarantine) error {
 	for _, vp := range vps {
 		// Now that a node is quarantened, remove it from the monitoring
-		onlineVPGaugeVec.DeleteLabelValues(vp)
+		onlineVPGaugeVec.DeleteLabelValues(vp.GetVP().Hostname)
 	}
 	return s.opts.vpp.QuarantineVPs(vps)
 }
 
-func (s server) UnquarantineVPs(vps []string) error {
+func (s server) UnquarantineVPs(vps []types.Quarantine) error {
 	return s.opts.vpp.UnquarantineVPs(vps)
 }
 
@@ -235,16 +265,22 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 		log.Debug(err)
 		return nil, err
 	}
-	log.Debug("Got ", len(vps), " ts spoofers: ", vps)
 	var resp pb.TSSpooferResponse
 	resp.Addr = tsr.Addr
 	resp.Max = tsr.Max
 	resp.Spoofers = s.tsf(vps)
-	log.Debug("filtered ts spoofers: ", resp.Spoofers)
 	if uint32(len(resp.Spoofers)) > tsr.Max {
 		resp.Spoofers = resp.Spoofers[:tsr.Max]
 	}
 	return &resp, nil
+}
+
+func (s server) GetLastQuarantine(ip uint32) (types.Quarantine, error) {
+	return s.opts.vpp.GetLastQuarantine(ip)
+}
+
+func (s server) GetQuarantined() ([]types.Quarantine, error) {
+	return s.opts.vpp.GetQuarantined()
 }
 
 // call in a goroutine
@@ -266,21 +302,6 @@ func (s server) checkCapabilitiesAndUpdate() {
 				cancel()
 			}
 			s.checkCapabilities()
-		}
-	}
-}
-
-// call in a goroutine
-// loop forever and on an interval, check if nodes should be unquarantined
-func (s server) unquarantine() {
-	unqTime := time.NewTicker(time.Hour * 24)
-	for {
-		select {
-		case <-unqTime.C:
-			err := s.opts.vpp.UnquarantineActiveVPs(7)
-			if err != nil {
-				log.Error(err)
-			}
 		}
 	}
 }
@@ -309,7 +330,7 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 	quarantinedVPGauge.Set(float64(len(quar)))
 	quarMap := make(map[string]struct{})
 	for _, vp := range quar {
-		quarMap[vp] = struct{}{}
+		quarMap[vp.GetVP().Hostname] = struct{}{}
 	}
 	log.Debug("Quarantined vps ", quar)
 	log.Debug("Adding ", add)
@@ -328,19 +349,84 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 	}
 }
 
+func (s server) tryUnquarantine() {
+	tick := time.NewTicker(2 * time.Minute)
+	for {
+		select {
+		case t := <-tick.C:
+			log.Debug("Trying unquarantine for time: ", t)
+			vps, err := s.opts.vpp.GetVPs()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			vpmap := make(map[string]*pb.VantagePoint)
+			for _, vp := range vps {
+				vpmap[vp.Hostname] = vp
+			}
+			qs, err := s.opts.vpp.GetQuarantined()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			var unquar []types.Quarantine
+			var updateQuar []types.Quarantine
+			for _, q := range qs {
+				if q.Expired(time.Now()) {
+					unquar = append(unquar, q)
+					continue
+				}
+				if q.Elapsed(time.Now()) {
+					// If our backoff elapsed, see if the node is up and running
+					if vp, ok := vpmap[q.GetVP().Hostname]; ok {
+						if !shouldQuarantine(*vp) {
+							// Up and running, remove it from the quarantines
+							unquar = append(unquar, q)
+						}
+					}
+					// Not up or not running, set the next backoff and update in db
+					q.NextBackoff()
+					updateQuar = append(updateQuar, q)
+				}
+			}
+			// if any should be removed from quarantine do that now
+			if len(unquar) > 0 {
+				if err := s.opts.vpp.UnquarantineVPs(unquar); err != nil {
+					log.Error(err)
+				}
+			}
+			// if any should still be quarantined, update them in the db
+			if len(updateQuar) > 0 {
+
+			}
+		}
+	}
+}
+
 func (s server) checkCapabilities() {
 	vps, err := s.opts.vpp.GetVPsForTesting(testSize)
 	if err != nil {
 		log.Error(err)
 		return
 	}
+	var onePerSite []*pb.VantagePoint
+	siteMap := make(map[string]*pb.VantagePoint)
+	for _, vp := range vps {
+		siteMap[vp.Site] = vp
+	}
+	for _, vp := range siteMap {
+		onePerSite = append(onePerSite, vp)
+	}
+	log.Debug("Checking Capabilities for: ", onePerSite)
 	vpm := make(map[uint32]*pb.VantagePoint)
 	var tests []*datamodel.PingMeasurement
-	for _, vp := range vps {
+	for _, vp := range onePerSite {
 		vp.RecSpoof = false
 		vp.Spoof = false
 		vp.RecordRoute = false
 		vp.Timestamp = false
+		vp.Ping = false
+		vp.Trace = false
 		vpm[vp.Ip] = vp
 		for _, d := range vps {
 			if d.Ip == vp.Ip {
@@ -354,96 +440,130 @@ func (s server) checkCapabilities() {
 			})
 		}
 	}
+	var traceTests []*datamodel.TracerouteMeasurement
+	for _, vp := range vps {
+		for _, d := range vps {
+			if d.Ip == vp.Ip {
+				continue
+			}
+			traceTests = append(traceTests, &datamodel.TracerouteMeasurement{
+				Src:        vp.Ip,
+				Dst:        vp.Ip,
+				Timeout:    30,
+				Wait:       "2",
+				Attempts:   "1",
+				LoopAction: "1",
+				Loops:      "3",
+			})
+		}
+	}
 	s.testRR(tests, vpm)
 	s.testTS(tests, vpm)
 	s.testSpoof(tests, vpm)
+	s.testPing(tests, vpm)
+	s.testTrace(traceTests, vpm)
+	var quarantines []types.Quarantine
 	for _, vp := range vpm {
 		err := s.opts.vpp.UpdateVP(*vp)
 		if err != nil {
 			log.Error(err)
 		}
-	}
-}
-
-func doGauges(vps []*pb.VantagePoint, quar map[string]struct{}) {
-	onlineVPGauge.Set(float64(len(vps)))
-	var spoofCnt float64
-	for _, vp := range vps {
-		if vp.Spoof {
-			spoofCnt++
-		}
-	}
-	spooferGauge.Set(spoofCnt)
-	siteMap := make(map[string]struct{})
-	for _, vp := range vps {
-		siteMap[vp.Site] = struct{}{}
-	}
-	var siteCnt float64
-	for _ = range siteMap {
-		siteCnt++
-	}
-	activeSiteGauge.Set(siteCnt)
-	spoofSiteMap := make(map[string]struct{})
-	for _, vp := range vps {
-		if vp.Spoof {
-			spoofSiteMap[vp.Site] = struct{}{}
-		}
-	}
-	var spSiteCnt float64
-	for _ = range spoofSiteMap {
-		spSiteCnt++
-	}
-	spoofingSiteGauge.Set(spSiteCnt)
-}
-
-func (s server) initGuages() {
-	quar, err := s.opts.vpp.GetQuarantined()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	quarantinedVPGauge.Set(float64(len(quar)))
-	quarMap := make(map[string]struct{})
-	for _, vp := range quar {
-		quarMap[vp] = struct{}{}
-	}
-	vps, err := s.opts.vpp.GetVPs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	for _, vp := range vps {
-		if _, ok := quarMap[vp.Hostname]; !ok {
-			onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
-		}
-	}
-	doGauges(vps, quarMap)
-}
-
-// call in a goroutine
-func (s server) updateGauges() {
-	tick := time.NewTicker(time.Minute * 5)
-	for {
-		select {
-		case <-tick.C:
-			vps, err := s.opts.vpp.GetVPs()
+		if shouldQuarantine(*vp) {
+			quar, err := s.GetLastQuarantine(vp.Ip)
 			if err != nil {
-				log.Error(err)
-				continue
+				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, nil))
+			} else {
+				quarantines = append(quarantines, types.NewDefaultQuarantine(*vp, quar))
 			}
-			quar, err := s.opts.vpp.GetQuarantined()
+		}
+	}
+	if err := s.QuarantineVPs(quarantines); err != nil {
+		log.Error(err)
+	}
+}
+
+func shouldQuarantine(vp pb.VantagePoint) bool {
+	// if we can perform any type of measurement, quarantine the vp
+	if !vp.Ping &&
+		!vp.Trace &&
+		!vp.RecordRoute &&
+		!vp.Timestamp &&
+		!vp.Spoof {
+		return true
+	}
+	return false
+}
+
+func (s server) testTrace(tms []*datamodel.TracerouteMeasurement, vps map[uint32]*pb.VantagePoint) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(len(tms))
+	for _, tm := range tms {
+		go func(t *datamodel.TracerouteMeasurement, vp *pb.VantagePoint) {
+			defer wg.Done()
+			ts, err := s.opts.cl.Traceroute(ctx, &datamodel.TracerouteArg{
+				Traceroutes: []*datamodel.TracerouteMeasurement{t},
+			})
 			if err != nil {
 				log.Error(err)
 				return
 			}
-			quarantinedVPGauge.Set(float64(len(quar)))
-			quarMap := make(map[string]struct{})
-			for _, vp := range quar {
-				quarMap[vp] = struct{}{}
+			ts.CloseSend()
+			for {
+				t, err := ts.Recv()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					if grpc.Code(err) != codes.DeadlineExceeded {
+						log.Error(err)
+					}
+					break
+				}
+				if t.Error == "" {
+					vp.Trace = true
+				}
 			}
-			doGauges(vps, quarMap)
-		}
+		}(tm, vps[tm.Src])
 	}
+	wg.Wait()
+}
+
+func (s server) testPing(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.VantagePoint) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(len(pms))
+	for _, pm := range pms {
+		go func(p *datamodel.PingMeasurement, vp *pb.VantagePoint) {
+			defer wg.Done()
+			ps, err := s.opts.cl.Ping(ctx, &datamodel.PingArg{
+				Pings: []*datamodel.PingMeasurement{p},
+			})
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			ps.CloseSend()
+			for {
+				p, err := ps.Recv()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					if grpc.Code(err) != codes.DeadlineExceeded {
+						log.Error(err)
+					}
+					break
+				}
+				if p.Error == "" && len(p.Responses) > 0 {
+					vp.Ping = true
+				}
+			}
+		}(pm, vps[pm.Src])
+	}
+	wg.Wait()
 }
 
 func (s server) testRR(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.VantagePoint) {
@@ -463,6 +583,7 @@ func (s server) testRR(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 		log.Error(err)
 		return
 	}
+	ps.CloseSend()
 	for {
 		p, err := ps.Recv()
 		if err == io.EOF {
@@ -532,13 +653,16 @@ func (s server) testTS(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.Vant
 		log.Error(err)
 		return
 	}
+	ps.CloseSend()
 	for {
 		p, err := ps.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			log.Error(err)
+			if grpc.Code(err) != codes.DeadlineExceeded {
+				log.Error(err)
+			}
 			break
 		}
 		if len(p.Responses) == 0 {
@@ -589,13 +713,16 @@ func (s server) testSpoof(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.V
 		log.Error(err)
 		return
 	}
+	ps.CloseSend()
 	for {
 		p, err := ps.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			log.Error(err)
+			if grpc.Code(err) != codes.DeadlineExceeded {
+				log.Error(err)
+			}
 			break
 		}
 		if vp, ok := vps[p.SpoofedFrom]; ok {
@@ -607,6 +734,88 @@ func (s server) testSpoof(pms []*datamodel.PingMeasurement, vps map[uint32]*pb.V
 		}
 		if p.Statistics.Loss != 1 {
 			log.Error("Got spoofed probe with invalid spoofed from addr: ", p)
+		}
+	}
+}
+
+func doGauges(vps []*pb.VantagePoint, quar map[string]struct{}) {
+	onlineVPGauge.Set(float64(len(vps)))
+	var spoofCnt float64
+	for _, vp := range vps {
+		if vp.Spoof {
+			spoofCnt++
+		}
+	}
+	spooferGauge.Set(spoofCnt)
+	siteMap := make(map[string]struct{})
+	for _, vp := range vps {
+		onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
+		siteMap[vp.Site] = struct{}{}
+	}
+	var siteCnt float64
+	for _ = range siteMap {
+		siteCnt++
+	}
+	activeSiteGauge.Set(siteCnt)
+	spoofSiteMap := make(map[string]struct{})
+	for _, vp := range vps {
+		if vp.Spoof {
+			spoofSiteMap[vp.Site] = struct{}{}
+		}
+	}
+	var spSiteCnt float64
+	for _ = range spoofSiteMap {
+		spSiteCnt++
+	}
+	spoofingSiteGauge.Set(spSiteCnt)
+}
+
+func (s server) initGuages() {
+	quar, err := s.opts.vpp.GetQuarantined()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	quarantinedVPGauge.Set(float64(len(quar)))
+	quarMap := make(map[string]struct{})
+	for _, vp := range quar {
+		quarMap[vp.GetVP().Hostname] = struct{}{}
+	}
+	vps, err := s.opts.vpp.GetVPs()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	for _, vp := range vps {
+		if _, ok := quarMap[vp.Hostname]; !ok {
+			onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
+		}
+	}
+	doGauges(vps, quarMap)
+}
+
+// call in a goroutine
+func (s server) updateGauges() {
+	tick := time.NewTicker(time.Minute * 2)
+	for {
+		select {
+		case <-tick.C:
+			vps, err := s.opts.vpp.GetVPs()
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			quar, err := s.opts.vpp.GetQuarantined()
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			quarantinedVPGauge.Set(float64(len(quar)))
+			quarMap := make(map[string]struct{})
+			for _, vp := range quar {
+				quarMap[vp.GetVP().Hostname] = struct{}{}
+			}
+			doGauges(vps, quarMap)
 		}
 	}
 }

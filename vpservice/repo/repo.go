@@ -2,7 +2,9 @@ package repo
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/repository"
@@ -90,7 +92,7 @@ func logError(e errorf) {
 
 const (
 	getVPS = `select 
-    vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof 
+    vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof, vps.ping, vps.trace 
 from 
     vantage_points vps
     left outer join quarantined_vps qvps on vps.hostname = qvps.hostname
@@ -98,7 +100,7 @@ where qvps.hostname is null
 `
 	getAllVPS = `select 
 ip, hostname, site, 
-timestamp, record_route, spoof, rec_spoof from vantage_points`
+timestamp, record_route, spoof, rec_spoof, ping, trace from vantage_points`
 	updateVP = `
 update vantage_points
   set hostname = ?,
@@ -107,23 +109,19 @@ update vantage_points
   record_route = ?,
   spoof = ?,
   rec_spoof = ?,
+  ping = ?,
+  trace = ?,
   last_check = now()
 where ip = ?;
 `
 	getVPSForTesting = `
-SELECT  vps.ip, vps.hostname, vps.site, vps.timestamp, vps.record_route, vps.spoof, vps.rec_spoof FROM
-(select                                                                                                                                                                                                              
-  min(vps.ip) as ip                                                                                                    
-from                                                                                                                                                                                                                
- vantage_points vps                                                                                                                                                                                                 
- left outer join quarantined_vps qvps on vps.hostname = qvps.hostname
-where qvps.hostname is null
-group by vps.site
-order by last_check
-limit ?) X
-INNER JOIN vantage_points vps on X.ip = vps.ip
+SELECT  vps.ip, vps.hostname, vps.site, vps.timestamp, 
+vps.record_route, vps.spoof, vps.rec_spoof, vps.ping, vps.trace  
+FROM
+vantage_points vps 
+order by vps.last_check limit ?;
 `
-	getQuarantinedVPs = `select hostname from quarantined_vps`
+	getQuarantinedVPs = `select ip, hostname, site, type, added, quarantine from quarantined_vps;`
 )
 
 func scanVPs(rows *sql.Rows) ([]*pb.VantagePoint, error) {
@@ -131,7 +129,8 @@ func scanVPs(rows *sql.Rows) ([]*pb.VantagePoint, error) {
 	for rows.Next() {
 		cvp := new(pb.VantagePoint)
 		err := rows.Scan(&cvp.Ip, &cvp.Hostname, &cvp.Site,
-			&cvp.Timestamp, &cvp.RecordRoute, &cvp.Spoof, &cvp.RecSpoof)
+			&cvp.Timestamp, &cvp.RecordRoute, &cvp.Spoof,
+			&cvp.RecSpoof, &cvp.Ping, &cvp.Trace)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -246,21 +245,29 @@ func (ae addVPError) Error() string {
 	return fmt.Sprintf("failed to insert vp: %v", ae.vp)
 }
 
-// GetQuarantined gets the hostnames of all quarantined vps
-func (r *Repo) GetQuarantined() ([]string, error) {
+// GetQuarantined gets all the quarantined VPs of all quarantined vps
+func (r *Repo) GetQuarantined() ([]types.Quarantine, error) {
 	rows, err := r.repo.GetReader().Query(getQuarantinedVPs)
 	if err != nil {
 		return nil, err
 	}
+	var quar []types.Quarantine
 	defer logError(rows.Close)
-	var quar []string
 	for rows.Next() {
-		var vp string
-		err := rows.Scan(&vp)
+		var ip uint32
+		var hostname, site, typen string
+		var added time.Time
+		var quarantine []byte
+		err := rows.Scan(&ip, &hostname, &site, &typen, &added, &quarantine)
 		if err != nil {
 			return nil, err
 		}
-		quar = append(quar, vp)
+		q, err := types.GetQuarantine(types.QuarantineType(typen), quarantine)
+		if err != nil {
+			log.Error(err)
+			return nil, fmt.Errorf("Failed to load Quarantines")
+		}
+		quar = append(quar, q)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -456,17 +463,26 @@ func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
 }
 
 const (
-	unquarantinevp     = `delete from quarantined_vps where hostname = ?`
-	quarantinevp       = `insert ignore into quarantined_vps(hostname) values(?)`
-	unquarantineActive = `delete from quarantined_vps 
-where hostname in (select hostname from vantage_points)
-AND added < DATE_SUB(NOW(), INTERVAL ? DAY)`
+	unquarantinevp = `delete from quarantined_vps where ip = ?;`
+	quarantinevp   = `insert ignore into quarantined_vps(ip, hostname, site, type, quarantine) 
+values(?, ?, ?, ?, ?);`
+	quarantineEvent = `insert into quarantine_events(type, ip, hostname, site, quarantine_type, quarantine) 
+ values(?, ?, ?, ?, ?, ?);`
+	updateQuarantine = `
+update quarantined_vps 
+set quarantine = ? 
+where ip = ?;`
 )
 
 // UnquarantineVPs removes the vps in vps from quarantine
-func (r *Repo) UnquarantineVPs(vps []string) error {
-	stmt, err := r.repo.GetWriter().Prepare(unquarantinevp)
+func (r *Repo) UnquarantineVPs(vps []types.Quarantine) error {
+	tx, err := r.repo.GetWriter().Begin()
 	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(unquarantinevp)
+	if err != nil {
+		logError(tx.Rollback)
 		return err
 	}
 	defer func() {
@@ -475,18 +491,43 @@ func (r *Repo) UnquarantineVPs(vps []string) error {
 		}
 	}()
 	for _, vp := range vps {
-		_, err := stmt.Exec(vp)
+		avp := vp.GetVP()
+		res, err := stmt.Exec(vp.GetVP().Ip)
 		if err != nil {
+			logError(tx.Rollback)
 			return err
 		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if rows > 0 {
+			quar, err := json.Marshal(vp)
+			if err != nil {
+				logError(tx.Rollback)
+				return err
+			}
+			_, err = tx.Exec(quarantineEvent, "REMOVED", avp.Ip,
+				avp.Hostname, avp.Site, string(vp.Type()), quar)
+			if err != nil {
+				logError(tx.Rollback)
+				return err
+			}
+		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // QuarantineVPs adds the vps in vps to quarantine
-func (r *Repo) QuarantineVPs(vps []string) error {
-	stmt, err := r.repo.GetWriter().Prepare(quarantinevp)
+func (r *Repo) QuarantineVPs(vps []types.Quarantine) error {
+	tx, err := r.repo.GetWriter().Begin()
 	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(quarantinevp)
+	if err != nil {
+		logError(tx.Rollback)
 		return err
 	}
 	defer func() {
@@ -495,17 +536,112 @@ func (r *Repo) QuarantineVPs(vps []string) error {
 		}
 	}()
 	for _, vp := range vps {
-		_, err := stmt.Exec(vp)
+		avp := vp.GetVP()
+		data, err := json.Marshal(vp)
 		if err != nil {
+			log.Error(err)
+			logError(tx.Rollback)
 			return err
 		}
+		res, err := stmt.Exec(avp.Ip, avp.Hostname, avp.Site, vp.GetReason(), data)
+		if err != nil {
+			logError(tx.Rollback)
+			return err
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if rows > 0 {
+			quar, err := json.Marshal(vp)
+			if err != nil {
+				logError(tx.Rollback)
+				return err
+			}
+			_, err = tx.Exec(quarantineEvent, "ADDED", avp.Ip,
+				avp.Hostname, avp.Site, string(vp.Type()), quar)
+			if err != nil {
+				logError(tx.Rollback)
+				return err
+			}
+		}
 	}
-	return nil
+	return tx.Commit()
 }
 
-// UnquarantineActiveVPs unquarantines and active vps that have been added
-// to quarantine loger than days ago
-func (r *Repo) UnquarantineActiveVPs(days int) error {
-	_, err := r.repo.GetWriter().Exec(unquarantineActive)
-	return err
+var (
+	// ErrFailedToUpdateQuarantines is a failure to update quarantines
+	ErrFailedToUpdateQuarantines = fmt.Errorf("Could not update quarantines")
+)
+
+// UpdateQuarantines update the given quarantines
+func (r *Repo) UpdateQuarantines(qs []types.Quarantine) error {
+	tx, err := r.repo.GetWriter().Begin()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	stmt, err := tx.Prepare(updateQuarantine)
+	if err != nil {
+		log.Error(err)
+		logError(tx.Rollback)
+		return ErrFailedToUpdateQuarantines
+	}
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
+	for _, q := range qs {
+		data, err := json.Marshal(q)
+		if err != nil {
+			log.Error(err)
+			logError(tx.Rollback)
+			return ErrFailedToUpdateQuarantines
+		}
+		_, err = stmt.Exec(q.GetVP().Ip, data)
+		if err != nil {
+			log.Error(err)
+			logError(tx.Rollback)
+			return ErrFailedToUpdateQuarantines
+		}
+	}
+	return tx.Commit()
+}
+
+const (
+	getLastestQuarantine = `
+SELECT qe.type, qe.ip, qe.hostname, qe.site, qe.quarantine_type, qe.quarantine 
+FROM quarantine_events qe 
+WHERE qe.ip = ? 
+ORDER BY time 
+LIMIT 1;
+`
+)
+
+var (
+	// ErrNoQuarantine is returened when there is no Quarantine to return from
+	// GetLastQuarantine
+	ErrNoQuarantine = fmt.Errorf("No Quarantine Found")
+)
+
+// GetLastQuarantine gets the most recent quarantine event for the given ip
+func (r *Repo) GetLastQuarantine(ip uint32) (types.Quarantine, error) {
+	row := r.repo.GetReader().QueryRow(getLastestQuarantine, ip)
+	var qet, hostname, site, qt string
+	var ipaddr uint32
+	var quar []byte
+	err := row.Scan(&qet, &ipaddr, &hostname, &site, &qt, &quar)
+	if err == sql.ErrNoRows {
+		return nil, ErrNoQuarantine
+	}
+	if err != nil {
+		return nil, err
+	}
+	q, err := types.GetQuarantine(types.QuarantineType(qt), quar)
+	if err != nil {
+		return nil, err
+	}
+	return q, nil
 }

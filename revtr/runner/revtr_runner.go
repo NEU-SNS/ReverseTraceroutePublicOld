@@ -726,6 +726,7 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 			}
 			return b.trToSource
 		}
+		panic("Should never get here")
 	}
 	trace, err := issueTraceroute(b.opts.cl, b.opts.cm,
 		revtr.Src, revtr.LastHop(), revtr.Staleness)

@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	_ "net/http/pprof"
-
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
