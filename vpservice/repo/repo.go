@@ -449,7 +449,6 @@ func (r *Repo) GetTSSpoofers() ([]types.TSVantagePoint, error) {
 	defer logError(res.Close)
 	for res.Next() {
 		tsvp := new(types.TSVantagePoint)
-		tsvp.Target = target
 		err := res.Scan(&tsvp.Ip,
 			&tsvp.Hostname,
 			&tsvp.Site,
