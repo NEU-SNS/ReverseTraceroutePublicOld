@@ -80,8 +80,6 @@ func (qr *QuarantineReason) UnmarshalJSON(in []byte) error {
 	useStr := in[1:]
 	// chop off trailing "
 	useStr = useStr[:len(useStr)-1]
-	fmt.Println("Data: ", string(in))
-	fmt.Println("Using string ", string(useStr))
 	if r, ok := descToReason[string(useStr)]; ok {
 		*qr = r
 		return nil
