@@ -16,6 +16,8 @@ message VantagePoint {
   bool record_route =  5;
   bool spoof        =  6;
   bool rec_spoof    =  7;
+  bool ping         =  8;
+  bool trace        =  9;
 }
 
 message VPRequest {
