@@ -605,8 +605,11 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 		res, err := ca.GetMulti(keys)
 		if err != nil {
 			log.Error(err)
-			eout <- err
-			return
+			select {
+			case eout <- err:
+			case <-quit:
+				return
+			}
 		}
 		for key, item := range res {
 			trace := &dm.Traceroute{}
