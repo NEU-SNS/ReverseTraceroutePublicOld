@@ -83,15 +83,23 @@ func (api API) quarantineVPS(r http.ResponseWriter, req *http.Request) {
 		if vp, ok := vpm[q.Hostname]; ok {
 			switch q.Type {
 			case "manual":
+				if q.Expire.IsZero() {
+					log.Error("Got manual quarantine with a zero expire ", q)
+					break
+				}
 				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
 			case "cant_run_code":
 				pq, err := api.s.GetLastQuarantine(vp.Ip)
 				if err != nil {
 					log.Error(err)
+				}
+				nq := types.NewDefaultQuarantine(*vp, pq, types.CantRunCode)
+				quars = append(quars, nq)
+			default:
+				if q.Expire.IsZero() {
+					log.Error("Got manual quarantine with a zero expire ", q)
 					break
 				}
-				quars = append(quars, types.NewDefaultQuarantine(*vp, q.Expire))
-			default:
 				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
 			}
 		}
@@ -133,6 +141,8 @@ func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	// We only quarantine vps that aren't quarantined
+	// GetVps only gets unquarantined nodes
 	for _, vp := range currVps.GetVps() {
 		vpmap[vp.Hostname] = vp
 	}
@@ -142,14 +152,16 @@ func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
 			// We can ignore the error because regardless of what it is we
 			// use the value of quar
 			quar, _ := api.s.GetLastQuarantine(v.Ip)
-			q := types.NewDefaultQuarantine(*v, quar)
+			q := types.NewDefaultQuarantine(*v, quar, types.CantPerformMeasurement)
 			toQuar = append(toQuar, q)
 		}
 	}
-	err = api.s.QuarantineVPs(toQuar)
-	if err != nil {
-		log.Error(err)
-		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	if len(toQuar) > 0 {
+		err = api.s.QuarantineVPs(toQuar)
+		if err != nil {
+			log.Error(err)
+			http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 	}
 }
 

@@ -102,6 +102,8 @@ const (
 	FlipFlop
 	// DownTooLong is when a vp has been down too much time in the defined interval
 	DownTooLong
+	// CantRunCode is when the code will not run on the vp
+	CantRunCode
 )
 
 var (
@@ -110,12 +112,14 @@ var (
 		Manual:                 "VP was manually quarantined",
 		FlipFlop:               "VP switches between down and up too often",
 		DownTooLong:            "VP is down too long in the specified interval",
+		CantRunCode:            "VP cannot run the measurement code",
 	}
 	descToReason = map[string]QuarantineReason{
 		"VP can not perform any measurements":           CantPerformMeasurement,
 		"VP was manually quarantined":                   Manual,
 		"VP switches between down and up too often":     FlipFlop,
 		"VP is down too long in the specified interval": DownTooLong,
+		"VP cannot run the measurement code":            CantRunCode,
 	}
 )
 
