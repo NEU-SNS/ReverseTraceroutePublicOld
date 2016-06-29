@@ -422,7 +422,7 @@ FROM
 		LIMIT 1
 	) t left outer join
 	traceroute_hops th on th.traceroute_id = t.id
-WHERE t.start > %d
+WHERE t.start >= DATE_SUB(NOW(), interval %d minute)
 ORDER BY
 	t.start DESC
 `
@@ -543,8 +543,7 @@ func (db *DB) GetTRBySrcDst(src, dst uint32) ([]*dm.Traceroute, error) {
 
 // GetTRBySrcDstWithStaleness gets a traceroute with the src/dst this is newer than s
 func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Traceroute, error) {
-	minTime := time.Now().Add(-s)
-	rows, err := db.GetReader().Query(fmt.Sprintf(getTraceBySrcDstStale, src, dst, minTime))
+	rows, err := db.GetReader().Query(fmt.Sprintf(getTraceBySrcDstStale, src, dst, int(s.Minutes())))
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +555,7 @@ func (db *DB) GetTRBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*d
 func (db *DB) GetTraceMulti(in []*dm.TracerouteMeasurement) ([]*dm.Traceroute, error) {
 	var ret []*dm.Traceroute
 	for _, tm := range in {
-		ts, err := db.GetTRBySrcDstWithStaleness(tm.Src, tm.Dst, time.Duration(tm.Staleness)*time.Second)
+		ts, err := db.GetTRBySrcDstWithStaleness(tm.Src, tm.Dst, time.Duration(tm.Staleness)*time.Minute)
 		if err != nil {
 			return nil, err
 		}
@@ -577,7 +576,7 @@ const (
 		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
-		"WHERE p.src = ? and p.dst = ? and p.start > ?;"
+		"WHERE p.src = ? and p.dst = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
 	getPingResponses = "SELECT pr.id, pr.ping_id, pr.`from`, pr.seq, " +
 		"pr.reply_size, pr.reply_ttl, pr.rtt, pr.probe_ipid, pr.reply_ipid, " +
 		"pr.icmp_type, pr.icmp_code, pr.tx, pr.rx " +
@@ -669,7 +668,7 @@ func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 		if pm.Staleness == 0 {
 			stale = 60
 		}
-		ps, err := db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Second)
+		ps, err := db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
 		if err != nil {
 			return nil, err
 		}
@@ -869,8 +868,7 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
-	minTime := time.Now().Add(-s)
-	rows, err := db.GetReader().Query(getPingStaleness, src, dst, minTime)
+	rows, err := db.GetReader().Query(getPingStaleness, src, dst, int(s.Minutes()))
 	if err != nil {
 		return nil, err
 	}
