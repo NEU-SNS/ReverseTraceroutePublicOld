@@ -141,6 +141,7 @@ func (a *server) GetPathsWithToken(tr *pb.TokenRequest) (*pb.TokenResponse, erro
 			Error: err.Error(),
 		}, nil
 	}
+	a.tc.Remove(tr.Token)
 	ir := types.IntersectionQuery{
 		Addr:         req.Address,
 		Dst:          req.Dest,
@@ -423,6 +424,10 @@ func (tc *tokenCache) Get(id uint32) (*pb.IntersectionRequest, error) {
 		return &ir, nil
 	}
 	return nil, fmt.Errorf("Untknown type cached in token cache")
+}
+
+func (tc *tokenCache) Remove(id uint32) {
+	tc.ca.Remove(fmt.Sprintf("%d", id))
 }
 
 type cacheError struct {
