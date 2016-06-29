@@ -261,7 +261,7 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 	if tsr.Max == 0 {
 		tsr.Max = defaultLimit
 	}
-	vps, err := s.opts.vpp.GetTSSpoofers(tsr.Addr)
+	vps, err := s.opts.vpp.GetTSSpoofers()
 	if err != nil {
 		log.Debug(err)
 		return nil, err
