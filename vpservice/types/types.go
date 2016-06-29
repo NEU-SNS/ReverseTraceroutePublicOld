@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
@@ -55,18 +56,66 @@ type VPProvider interface {
 // QuarantineReason is a reason to quarantine a vp
 type QuarantineReason int
 
+// MarshalJSON is for the json.Marshaler interface
+func (qr *QuarantineReason) MarshalJSON() ([]byte, error) {
+	if qr == nil || *qr == 0 {
+		return []byte{}, nil
+	}
+
+	if str, ok := reasonToDesc[*qr]; ok {
+		return []byte("\"" + str + "\""), nil
+	}
+	return nil, &json.MarshalerError{
+		Type: reflect.TypeOf(qr),
+		Err:  fmt.Errorf("Unknown QuarantineReason: %v", *qr),
+	}
+}
+
+// UnmarshalJSON is for the json.Unmarshaler interface
+func (qr *QuarantineReason) UnmarshalJSON(in []byte) error {
+	if qr == nil {
+		qr = new(QuarantineReason)
+	}
+	// chop off leading "
+	useStr := in[1:]
+	// chop off trailing "
+	useStr = useStr[:len(useStr)-1]
+	fmt.Println("Data: ", string(in))
+	fmt.Println("Using string ", string(useStr))
+	if r, ok := descToReason[string(useStr)]; ok {
+		*qr = r
+		return nil
+	}
+	return &json.UnmarshalTypeError{
+		Value: "string " + string(in) + " unknown QuarantineReason",
+		Type:  reflect.TypeOf(qr),
+	}
+}
+
 const (
 	// CantPerformMeasurement is the QuarantineReason when a vp can't perform
 	// any measurements
-	CantPerformMeasurement QuarantineReason = iota
+	CantPerformMeasurement QuarantineReason = iota + 1
 	// Manual is when some quarantines a VP manually for a set amount of time
 	Manual
+	// FlipFlop is when a vp is flipping between up and down too often
+	FlipFlop
+	// DownTooLong is when a vp has been down too much time in the defined interval
+	DownTooLong
 )
 
 var (
 	reasonToDesc = map[QuarantineReason]string{
 		CantPerformMeasurement: "VP can not perform any measurements",
 		Manual:                 "VP was manually quarantined",
+		FlipFlop:               "VP switches between down and up too often",
+		DownTooLong:            "VP is down too long in the specified interval",
+	}
+	descToReason = map[string]QuarantineReason{
+		"VP can not perform any measurements":           CantPerformMeasurement,
+		"VP was manually quarantined":                   Manual,
+		"VP switches between down and up too often":     FlipFlop,
+		"VP is down too long in the specified interval": DownTooLong,
 	}
 )
 
@@ -75,7 +124,6 @@ type Quarantine interface {
 	GetVP() pb.VantagePoint
 	GetReason() QuarantineReason
 	GetAttempt() int
-	GetAdded() time.Time
 	GetLastAttempt() time.Time
 	GetBackoff() time.Time
 	GetInitialBackoff() time.Duration
@@ -105,7 +153,6 @@ type defaultQuarantine struct {
 	VP                 pb.VantagePoint  `json:"vp"`
 	Reason             QuarantineReason `json:"reason"`
 	Attempt            int              `json:"attempt"`
-	Added              time.Time        `json:"added"`
 	LastAttempt        time.Time        `json:"last_attempt"`
 	Backoff            time.Time        `json:"backoff"`
 	InitialBackoff     time.Duration    `json:"initial_backoff"`
@@ -113,7 +160,7 @@ type defaultQuarantine struct {
 	MaxBackoff         time.Duration    `json:"max_backoff"`
 	NextInitialBackoff time.Duration    `json:"next_init_backoff"`
 	Expire             time.Time        `json:"expire"`
-	CurrentBackoff     time.Duration    `json:"CurrentBackoff"`
+	CurrentBackoff     time.Duration    `json:"current_backoff"`
 }
 
 func (dq *defaultQuarantine) GetVP() pb.VantagePoint {
@@ -126,10 +173,6 @@ func (dq *defaultQuarantine) GetReason() QuarantineReason {
 
 func (dq *defaultQuarantine) GetAttempt() int {
 	return dq.Attempt
-}
-
-func (dq *defaultQuarantine) GetAdded() time.Time {
-	return dq.Added
 }
 
 func (dq *defaultQuarantine) GetLastAttempt() time.Time {
@@ -204,8 +247,9 @@ func (dq *defaultQuarantine) Type() QuarantineType {
 }
 
 // NewDefaultQuarantine creates a defaultQuarantine
-func NewDefaultQuarantine(vp pb.VantagePoint, prevQuar Quarantine) Quarantine {
+func NewDefaultQuarantine(vp pb.VantagePoint, prevQuar Quarantine, reason QuarantineReason) Quarantine {
 	var q defaultQuarantine
+	q.Reason = reason
 	q.InitialBackoff = time.Hour * 24
 	q.Multiplier = 2
 	q.MaxBackoff = time.Hour * 24 * 7
@@ -246,6 +290,7 @@ func (mq *manualQuarantine) NextBackoff() time.Time {
 func NewManualQuarantine(vp pb.VantagePoint, exp time.Time) Quarantine {
 	q := manualQuarantine{}
 	q.Expire = exp
+	q.Reason = Manual
 	return &q
 }
 

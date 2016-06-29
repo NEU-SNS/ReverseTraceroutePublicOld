@@ -114,6 +114,7 @@ type VPServer interface {
 	QuarantineVPs(vps []types.Quarantine) error
 	UnquarantineVPs(vps []types.Quarantine) error
 	GetLastQuarantine(ip uint32) (types.Quarantine, error)
+	GetQuarantined() ([]types.Quarantine, error)
 }
 
 // Option configures the server
@@ -276,6 +277,10 @@ func (s server) GetTSSpoofers(tsr *pb.TSSpooferRequest) (*pb.TSSpooferResponse, 
 
 func (s server) GetLastQuarantine(ip uint32) (types.Quarantine, error) {
 	return s.opts.vpp.GetLastQuarantine(ip)
+}
+
+func (s server) GetQuarantined() ([]types.Quarantine, error) {
+	return s.opts.vpp.GetQuarantined()
 }
 
 // call in a goroutine

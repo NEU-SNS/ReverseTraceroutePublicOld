@@ -36,15 +36,16 @@ import (
 )
 
 func TestMarshalQuarantine(t *testing.T) {
-	q := types.NewDefaultQuarantine(pb.VantagePoint{}, false)
+	q := types.NewDefaultQuarantine(pb.VantagePoint{}, nil, types.FlipFlop)
 	res, err := json.Marshal(q)
 	if err != nil {
 		t.Fatalf("Error marshaling Quarantine: %v", err)
 	}
-	q1 := types.NewDefaultQuarantine(pb.VantagePoint{}, false)
 	t.Log(string(res))
-	err = json.Unmarshal(res, q1)
+	nq, err := types.GetQuarantine(types.DefaultQuar, res)
 	if err != nil {
-		t.Fatalf("Error Unmarshaling Qurantine: %v", err)
+		t.Fatal(err)
 	}
+	t.Log(nq)
+	t.Log(q)
 }
