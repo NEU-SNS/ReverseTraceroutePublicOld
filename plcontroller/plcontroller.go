@@ -273,7 +273,6 @@ func (c *PlController) run() error {
 		return e
 	}
 	go c.handlEvents()
-	go c.maintain()
 	close(c.started)
 	return c.server.Serve(loggingListener{l})
 }
@@ -311,7 +310,7 @@ func (c *PlController) recSpoof(ctx context.Context, rs *dm.Spoof) (*dm.NotifyRe
 		select {
 		case <-pr:
 		case <-ctx.Done():
-			c.client.RemoveMeasurement(src, id)
+			_ = c.client.RemoveMeasurement(src, id)
 		}
 	}()
 	if err != nil {
@@ -417,32 +416,5 @@ func (c *PlController) runTraceroute(ctx context.Context, ta *dm.TracerouteMeasu
 		}
 		errorCounterByVPMT.WithLabelValues(src, "TRACEROUTE").Inc()
 		return dm.Traceroute{}, ctx.Err()
-	}
-}
-
-func (c *PlController) maintain() {
-	for {
-		select {
-		case <-c.shutdown:
-			return
-		case <-time.After(time.Minute * 5):
-			vps, err := c.db.GetVPs()
-			if err != nil {
-				log.Errorf("Failed to get VPs: %v", err)
-				return
-			}
-			err = maintainVPs(
-				vps,
-				*c.config.Local.PLUName,
-				*c.config.Local.SSHKeyPath,
-				*c.config.Local.UpdateURL,
-				c.db,
-				c.shutdown,
-			)
-			if err != nil {
-				log.Errorf("Failed to maintain VPS: %v", err)
-				return
-			}
-		}
 	}
 }
