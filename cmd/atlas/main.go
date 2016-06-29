@@ -17,12 +17,12 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/api"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	vpsclient "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
+	"github.com/hashicorp/golang-lru"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -32,7 +32,6 @@ type Config struct {
 	RootCA   string `flag:"root-ca"`
 	CertFile string `flag:"cert-file"`
 	KeyFile  string `flag:"key-file"`
-	Cache    cache.Config
 }
 
 func init() {
@@ -62,7 +61,6 @@ func logError(f errorf) {
 
 func main() {
 	conf := Config{}
-	conf.Cache = cache.NewConfig()
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
 		log.Fatal(err)
@@ -92,11 +90,14 @@ func main() {
 			log.Error(http.ListenAndServe(":8080", nil))
 		}
 	}()
-
+	cache, err := lru.New(1000000)
+	if err != nil {
+		panic("Could not create cache " + err.Error())
+	}
 	serv := server.NewServer(server.WithVPS(vps),
 		server.WithTRS(r),
 		server.WithClient(cc),
-		server.WithCache(cache.New(*conf.Cache.Addrs)))
+		server.WithCache(cache))
 	ln, err := net.Listen("tcp", ":55000")
 	if err != nil {
 		log.Fatal(err)

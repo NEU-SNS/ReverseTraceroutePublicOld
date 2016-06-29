@@ -39,13 +39,11 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/types"
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	cclient "github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
-	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 )
@@ -78,7 +76,14 @@ type serverOptions struct {
 	cl  cclient.Client
 	vps client.VPSource
 	trs types.TRStore
-	ca  cache.Cache
+	ca  Cache
+}
+
+// Cache is the cache used for the atlas
+type Cache interface {
+	Get(interface{}) (interface{}, bool)
+	Add(interface{}, interface{}) bool
+	Remove(interface{})
 }
 
 // Option sets an option to configure the server
@@ -106,7 +111,7 @@ func WithTRS(trs types.TRStore) Option {
 }
 
 // WithCache configures the server to use the cache ca
-func WithCache(ca cache.Cache) Option {
+func WithCache(ca Cache) Option {
 	return func(opts *serverOptions) {
 		opts.ca = ca
 	}
@@ -397,42 +402,27 @@ func (rt runningTraces) TryAdd(ip uint32, dsts []uint32) []uint32 {
 }
 
 type tokenCache struct {
-	ca cache.Cache
+	ca Cache
 	// Should only be accessed atomicaly
 	nextID uint32
 }
 
 func (tc *tokenCache) Add(ir *pb.IntersectionRequest) (uint32, error) {
 	new := atomic.AddUint32(&tc.nextID, 1)
-	msg, err := proto.Marshal(ir)
-	if err != nil {
-		log.Error(err)
-		return 0, err
-	}
-	err = tc.ca.Set(fmt.Sprintf("%d", new), msg)
-	if err != nil {
-		log.Error(err)
-		return 0, err
-	}
+	tc.ca.Add(fmt.Sprintf("%d", new), *ir)
 	return new, nil
 }
 
 func (tc *tokenCache) Get(id uint32) (*pb.IntersectionRequest, error) {
-	ir := &pb.IntersectionRequest{}
-	it, err := tc.ca.Get(fmt.Sprintf("%d", id))
-	if err != nil {
-		log.Error(err)
-		return nil, err
+	it, ok := tc.ca.Get(fmt.Sprintf("%d", id))
+	if !ok {
+		return nil, fmt.Errorf("Failed to get cached token for id: %v", id)
 	}
-	err = proto.Unmarshal(it.Value(), ir)
-	if err == cache.ErrorCacheMiss {
-		return nil, cacheError{id: id}
+
+	if ir, ok := it.(pb.IntersectionRequest); ok {
+		return &ir, nil
 	}
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return ir, nil
+	return nil, fmt.Errorf("Untknown type cached in token cache")
 }
 
 type cacheError struct {
@@ -443,7 +433,7 @@ func (ce cacheError) Error() string {
 	return fmt.Sprintf("No token registered for id: %d", ce.id)
 }
 
-func newTokenCache(ca cache.Cache) *tokenCache {
+func newTokenCache(ca Cache) *tokenCache {
 	tc := &tokenCache{
 		ca: ca,
 	}
