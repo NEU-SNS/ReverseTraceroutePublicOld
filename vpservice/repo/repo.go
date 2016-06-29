@@ -440,8 +440,8 @@ func (r *Repo) GetRRSpoofers(target uint32) ([]types.RRVantagePoint, error) {
 }
 
 // GetTSSpoofers gets vantage points usable for target target up to limit vps
-func (r *Repo) GetTSSpoofers(target uint32) ([]types.TSVantagePoint, error) {
-	res, err := r.repo.GetReader().Query(getTSSpoofers, target)
+func (r *Repo) GetTSSpoofers() ([]types.TSVantagePoint, error) {
+	res, err := r.repo.GetReader().Query(getTSSpoofers)
 	if err != nil {
 		return nil, err
 	}

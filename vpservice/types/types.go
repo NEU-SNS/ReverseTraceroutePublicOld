@@ -42,7 +42,7 @@ import (
 type VPProvider interface {
 	GetVPs() ([]*pb.VantagePoint, error)
 	GetRRSpoofers(target uint32) ([]RRVantagePoint, error)
-	GetTSSpoofers(target uint32) ([]TSVantagePoint, error)
+	GetTSSpoofers() ([]TSVantagePoint, error)
 	UpdateVP(vp pb.VantagePoint) error
 	GetVPsForTesting(limit int) ([]*pb.VantagePoint, error)
 	UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error)
