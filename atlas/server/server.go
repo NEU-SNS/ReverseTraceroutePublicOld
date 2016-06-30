@@ -221,6 +221,7 @@ func (a *server) GetIntersectingPath(ir *pb.IntersectionRequest) (*pb.Intersecti
 
 func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	srcs := a.getSrcs(hop, dest, stale)
+	log.Debug("Sources to fill atlas for ", dest, " ", srcs)
 	var traces []*dm.TracerouteMeasurement
 	for _, src := range srcs {
 		curr := &dm.TracerouteMeasurement{
@@ -249,7 +250,6 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 		a.curr.Remove(dest, srcs)
 		return
 	}
-	var finished []uint32
 	for {
 		t, err := st.Recv()
 		if err == io.EOF {
@@ -259,23 +259,20 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 			log.Error(err)
 			break
 		}
-		go func(tr *dm.Traceroute) {
-			hops := tr.GetHops()
-			if len(hops) == 0 {
-				return
-			}
-			if hops[len(hops)-1].Addr != tr.Dst {
-				log.Error("Traceroute did not reach destination")
-				return
-			}
-			err = a.opts.trs.StoreAtlasTraceroute(tr)
-			if err != nil {
-				log.Error(err)
-			}
-		}(t)
-		finished = append(finished, t.Src)
+		hops := t.GetHops()
+		if len(hops) == 0 {
+			return
+		}
+		if hops[len(hops)-1].Addr != t.Dst {
+			log.Error("Traceroute did not reach destination")
+			return
+		}
+		err = a.opts.trs.StoreAtlasTraceroute(t)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	a.curr.Remove(dest, finished)
+	a.curr.Remove(dest, srcs)
 }
 
 func (a *server) getSrcs(hop, dest uint32, stale int64) []uint32 {
@@ -284,6 +281,7 @@ func (a *server) getSrcs(hop, dest uint32, stale int64) []uint32 {
 		return nil
 	}
 	oldsrcs, err := a.opts.trs.GetAtlasSources(dest, time.Minute*time.Duration(stale))
+	log.Debug("Old sources: ", oldsrcs)
 	os := make(map[uint32]bool)
 	for _, o := range oldsrcs {
 		os[o] = true
