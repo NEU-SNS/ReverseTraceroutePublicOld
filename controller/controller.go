@@ -787,9 +787,11 @@ func (c *controllerT) doTraceroute(ctx con.Context, tms []*dm.TracerouteMeasurem
 							log.Error(err)
 						}
 						pp.Id = id
-						err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
-						if err != nil {
-							log.Error(err)
+						if pp.Error == "" {
+							err = c.cache.SetWithExpire(pp.Key(), pp.CMarshal(), 5*60)
+							if err != nil {
+								log.Error(err)
+							}
 						}
 						select {
 						case ret <- pp:
