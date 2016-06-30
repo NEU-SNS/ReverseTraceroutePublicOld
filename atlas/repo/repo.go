@@ -161,7 +161,9 @@ SELECT
 FROM
     atlas_traceroutes
 WHERE
-    dest = ? AND date >= DATE_SUB(NOW(), interval ? minute);
+    dest = ? AND date >= DATE_SUB(NOW(), interval ? minute) 
+GROUP BY
+    src;
 `
 )
 
