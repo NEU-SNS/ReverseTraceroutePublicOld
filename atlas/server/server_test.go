@@ -35,7 +35,6 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/repo"
 	"github.com/NEU-SNS/ReverseTraceroute/atlas/server"
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	cmocks "github.com/NEU-SNS/ReverseTraceroute/controller/mocks"
 	vpmocks "github.com/NEU-SNS/ReverseTraceroute/vpservice/mocks"
 	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
@@ -43,45 +42,30 @@ import (
 )
 
 type mockCache struct {
-	cache map[string][]byte
+	cache map[interface{}]interface{}
 }
 
-type mockItem struct {
-	key string
-	val []byte
-}
-
-func (mi *mockItem) Key() string {
-	return mi.key
-}
-
-func (mi *mockItem) Value() []byte {
-	return mi.val
-}
-
-func (mc *mockCache) Get(key string) (cache.Item, error) {
+func (mc *mockCache) Get(key interface{}) (interface{}, bool) {
 	if mc.cache == nil {
-		mc.cache = make(map[string][]byte)
+		mc.cache = make(map[interface{}]interface{})
 	}
-	if val, ok := mc.cache[key]; ok {
-		return &mockItem{key: key, val: val}, nil
-	}
-	return nil, cache.ErrorCacheMiss
+	val, ok := mc.cache[key]
+	return val, ok
 }
 
-func (mc *mockCache) GetMulti(keys []string) (map[string]cache.Item, error) {
-	panic("unimplemented")
-}
-func (mc *mockCache) Set(key string, val []byte) error {
+func (mc *mockCache) Add(key interface{}, val interface{}) bool {
 	if mc.cache == nil {
-		mc.cache = make(map[string][]byte)
+		mc.cache = make(map[interface{}]interface{})
 	}
 	mc.cache[key] = val
-	return nil
+	return false
 }
 
-func (mc *mockCache) SetWithExpire(string, []byte, int32) error {
-	panic("unimplemented")
+func (mc *mockCache) Remove(key interface{}) {
+	if mc.cache == nil {
+		mc.cache = make(map[interface{}]interface{})
+	}
+	delete(mc.cache, key)
 }
 
 func TestGetPathsWithToken(t *testing.T) {

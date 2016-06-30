@@ -419,7 +419,7 @@ func (rt runningTraces) TryAdd(ip uint32, dsts []uint32) []uint32 {
 			added = append(added, dsts[j])
 			j++
 		}
-		rt.dstToSrcs[ip] = added
+		rt.dstToSrcs[ip] = merged
 		return added
 	}
 	rt.dstToSrcs[ip] = dsts
@@ -433,6 +433,9 @@ type tokenCache struct {
 }
 
 func (tc *tokenCache) Add(ir *pb.IntersectionRequest) (uint32, error) {
+	if ir == nil {
+		return 0, fmt.Errorf("Cannot cache nil")
+	}
 	new := atomic.AddUint32(&tc.nextID, 1)
 	tc.ca.Add(fmt.Sprintf("%d", new), *ir)
 	return new, nil
