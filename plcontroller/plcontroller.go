@@ -314,7 +314,7 @@ func (c *PlController) recSpoof(ctx context.Context, rs *dm.Spoof) (*dm.NotifyRe
 		}
 	}()
 	if err != nil {
-		log.Error(err)
+		log.Error(err, " ", *rs)
 		return resp, err
 	}
 	err = c.spoofs.Register(*rs)
