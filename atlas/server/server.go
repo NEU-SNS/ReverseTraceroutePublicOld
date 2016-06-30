@@ -261,11 +261,11 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 		}
 		hops := t.GetHops()
 		if len(hops) == 0 {
-			return
+			continue
 		}
 		if hops[len(hops)-1].Addr != t.Dst {
 			log.Error("Traceroute did not reach destination")
-			return
+			continue
 		}
 		err = a.opts.trs.StoreAtlasTraceroute(t)
 		if err != nil {
