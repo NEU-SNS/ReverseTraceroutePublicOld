@@ -233,7 +233,6 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 			LoopAction: "1",
 			Loops:      "3",
 			CheckCache: true,
-			CheckDb:    true,
 			Staleness:  stale,
 		}
 		traces = append(traces, curr)
@@ -306,6 +305,7 @@ func (a *server) getSrcs(hop, dest uint32, stale int64) []uint32 {
 	for _, vp := range sites {
 		srcs = append(srcs, vp.Ip)
 	}
+	log.Debug("New sources: ", srcs)
 	return a.curr.TryAdd(dest, srcs)
 }
 
