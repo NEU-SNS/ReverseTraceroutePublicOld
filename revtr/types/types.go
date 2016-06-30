@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 // AdjacencySource is the interface for something that provides adjacnecies
 type AdjacencySource interface {
 	GetAdjacenciesByIP1(uint32) ([]Adjacency, error)
@@ -41,4 +43,10 @@ type AdjacencyToDest struct {
 	Address  uint32
 	Adjacent uint32
 	Cnt      uint32
+}
+
+// Cache is the interface for the cache that revtr uses
+type Cache interface {
+	Set(string, interface{}, time.Duration)
+	Get(string) (interface{}, bool)
 }
