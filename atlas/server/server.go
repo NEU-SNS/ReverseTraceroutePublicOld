@@ -53,6 +53,12 @@ var (
 	procCollector = prometheus.NewProcessCollectorPIDFn(func() (int, error) {
 		return os.Getpid(), nil
 	}, nameSpace)
+	tracerouteGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: nameSpace,
+		Subsystem: "measurements",
+		Name:      "traceroutes",
+		Help:      "The current number of running traceroutes",
+	})
 )
 
 func init() {
@@ -221,7 +227,7 @@ func (a *server) GetIntersectingPath(ir *pb.IntersectionRequest) (*pb.Intersecti
 
 func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	srcs := a.getSrcs(hop, dest, stale)
-	log.Debug("Sources to fill atlas for ", dest, " ", srcs)
+	log.Debug("Sources to fill atlas for ", dest, " ", srcs, " ", len(srcs), " new sources.")
 	var traces []*dm.TracerouteMeasurement
 	for _, src := range srcs {
 		curr := &dm.TracerouteMeasurement{
@@ -237,12 +243,14 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 		}
 		traces = append(traces, curr)
 	}
+	log.Debug("Running ", len(traces), " traces")
 	// if there are none to run, don't
 	if len(traces) == 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
 	defer cancel()
+	tracerouteGauge.Add(float64(len(traces)))
 	st, err := a.opts.cl.Traceroute(ctx, &dm.TracerouteArg{Traceroutes: traces})
 	if err != nil {
 		log.Error(err)
@@ -271,6 +279,7 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 			log.Error(err)
 		}
 	}
+	tracerouteGauge.Sub(float64(len(traces)))
 	a.curr.Remove(dest, srcs)
 }
 
