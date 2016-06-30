@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -17,7 +16,6 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	at "github.com/NEU-SNS/ReverseTraceroute/atlas/client"
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/controller/client"
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -178,7 +176,7 @@ type serverOptions struct {
 	vps                       vpservice.VPSource
 	as                        types.AdjacencySource
 	cs                        types.ClusterSource
-	ca                        cache.Cache
+	ca                        types.Cache
 	run                       runner.Runner
 	rootCA, certFile, keyFile string
 }
@@ -187,7 +185,7 @@ type serverOptions struct {
 type Option func(*serverOptions)
 
 // WithCache configures the server to use the cache c
-func WithCache(c cache.Cache) Option {
+func WithCache(c types.Cache) Option {
 	return func(so *serverOptions) {
 		so.ca = c
 	}
@@ -285,7 +283,7 @@ type revtrServer struct {
 	nextID *uint32
 	s      services
 	cm     clustermap.ClusterMap
-	ca     cache.Cache
+	ca     types.Cache
 	// mu protects the revtr maps
 	mu      *sync.Mutex
 	revtrs  map[uint32]revtrOutput
@@ -500,10 +498,10 @@ func (rs revtrServer) StartRevtr(ctx context.Context, id uint32) (<-chan Status,
 
 func (rs revtrServer) resolveHostname(ip string) string {
 	// TODO clean up error logging
-	item, err := rs.ca.Get(ip)
+	item, ok := rs.ca.Get(ip)
 	// If it's a cache miss, look through the vps
 	// if its found set it.
-	if err == cache.ErrorCacheMiss {
+	if !ok {
 		vps, err := rs.vps.GetVPs()
 		if err != nil {
 			log.Error(err)
@@ -513,9 +511,7 @@ func (rs revtrServer) resolveHostname(ip string) string {
 			ips, _ := util.Int32ToIPString(vp.Ip)
 			// found it, set the cache and return the hostname
 			if ips == ip {
-				if err := rs.ca.Set(ip, []byte(vp.Hostname)); err != nil {
-					log.Error(err)
-				}
+				rs.ca.Set(ip, vp.Hostname, time.Hour*4)
 				return vp.Hostname
 			}
 		}
@@ -525,45 +521,19 @@ func (rs revtrServer) resolveHostname(ip string) string {
 			log.Error(err)
 			// since the lookup failed, just set it blank for now
 			// after it expires we'll try again
-			if err := rs.ca.Set(ip, []byte{}); err != nil {
-				log.Error(err)
-			}
+			rs.ca.Set(ip, "", time.Hour*4)
 			return ""
 		}
-		if err := rs.ca.Set(ip, []byte(hns[0])); err != nil {
-			log.Error(err)
-		}
+		rs.ca.Set(ip, hns[0], time.Hour*4)
 		return hns[0]
 	}
-	// this is some kind of harder failure such as servers not found
-	// or responding. Just going to check the vp list at this point
-	if err != nil {
-		log.Error(err)
-		vps, err := rs.vps.GetVPs()
-		if err != nil {
-			log.Error(err)
-			return ""
-		}
-		for _, vp := range vps.GetVps() {
-			ips, _ := util.Int32ToIPString(vp.Ip)
-			// found it, set the cache and return the hostname
-			if ips == ip {
-				if err := rs.ca.Set(ip, []byte(vp.Hostname)); err != nil {
-					log.Error(err)
-				}
-			}
-			return vp.Hostname
-		}
-		return ""
-	}
-	// if we get here we succeeded in the cache lookup
-	return string(item.Value())
+	return item.(string)
 }
 
 func (rs revtrServer) getRTT(src, dst string) float32 {
 	key := fmt.Sprintf("%s:%s:rtt", src, dst)
-	item, err := rs.ca.Get(key)
-	if err == cache.ErrorCacheMiss {
+	item, ok := rs.ca.Get(key)
+	if !ok {
 		targ, _ := util.IPStringToInt32(dst)
 		src, _ := util.IPStringToInt32(src)
 		ping := &datamodel.PingMeasurement{
@@ -578,9 +548,7 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
 		if err != nil {
 			log.Error(err)
-			if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-				log.Error(err)
-			}
+			rs.ca.Set(key, float32(0), time.Minute*30)
 			return 0
 		}
 		for {
@@ -591,87 +559,19 @@ func (rs revtrServer) getRTT(src, dst string) float32 {
 			}
 			if err != nil {
 				log.Error(err)
-				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-					log.Error(err)
-				}
+				rs.ca.Set(key, float32(0), time.Minute*30)
 				return 0
 
 			}
 			if len(p.Responses) == 0 {
-				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-					log.Error(err)
-				}
+				rs.ca.Set(key, float32(0), time.Minute*30)
 				return 0
-
 			}
-			buf := new(bytes.Buffer)
-			err = binary.Write(buf, binary.LittleEndian, float32(p.Responses[0].Rtt)/1000)
-			if err != nil {
-				// I don't think writes to bytes.Buffer ever fail
-				// so this should never execute
-				log.Error(err)
-			}
-			if err := rs.ca.Set(key, buf.Bytes()); err != nil {
-				log.Error(err)
-			}
+			rs.ca.Set(key, float32(p.Responses[0].Rtt)/1000, time.Minute*30)
 			return float32(p.Responses[0].Rtt) / 1000
 		}
 	}
-	if err != nil {
-		// this is a failure of the cache system
-		// so just try and get the rtt
-		log.Error(err)
-		targ, _ := util.IPStringToInt32(dst)
-		src, _ := util.IPStringToInt32(src)
-		ping := &datamodel.PingMeasurement{
-			Src:     src,
-			Dst:     targ,
-			Count:   "1",
-			Timeout: 5,
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		st, err := rs.s.cl.Ping(ctx,
-			&datamodel.PingArg{Pings: []*datamodel.PingMeasurement{ping}})
-		if err != nil {
-			log.Error(err)
-			if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-				log.Error(err)
-			}
-			return 0
-		}
-		for {
-			p, err := st.Recv()
-			if err == io.EOF {
-				break
-
-			}
-			if err != nil {
-				log.Error(err)
-				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-					log.Error(err)
-				}
-				return 0
-
-			}
-			if len(p.Responses) == 0 {
-				if err := rs.ca.Set(key, []byte{0, 0, 0, 0}); err != nil {
-					log.Error(err)
-				}
-				return 0
-
-			}
-			return float32(p.Responses[0].Rtt) / 1000
-		}
-	}
-	read := bytes.NewReader(item.Value())
-	var rtt float32
-	err = binary.Read(read, binary.LittleEndian, &rtt)
-	if err != nil {
-		log.Error(err)
-		return 0
-	}
-	return rtt
+	return item.(float32)
 }
 
 func makePrintHTML(sc chan<- Status, rs revtrServer) func(*reversetraceroute.ReverseTraceroute) {

@@ -22,7 +22,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
-	"github.com/NEU-SNS/ReverseTraceroute/cache"
 	"github.com/NEU-SNS/ReverseTraceroute/config"
 	"github.com/NEU-SNS/ReverseTraceroute/httputils"
 	"github.com/NEU-SNS/ReverseTraceroute/log"
@@ -37,6 +36,7 @@ import (
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
 	"github.com/gengo/grpc-gateway/runtime"
 	"github.com/gorilla/websocket"
+	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -48,7 +48,6 @@ var (
 type AppConfig struct {
 	ServerConfig types.Config
 	DB           repo.Configs
-	CAConfig     cache.Config
 }
 
 func init() {
@@ -71,7 +70,6 @@ func init() {
 func main() {
 	conf := AppConfig{
 		ServerConfig: types.NewConfig(),
-		CAConfig:     cache.NewConfig(),
 	}
 	err := config.Parse(flag.CommandLine, &conf)
 	if err != nil {
@@ -104,7 +102,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ca := cache.New(*conf.CAConfig.Addrs)
 	serv := server.NewRevtrServer(server.WithVPSource(vps),
 		server.WithAdjacencySource(da),
 		server.WithClusterSource(da),
@@ -112,7 +109,7 @@ func main() {
 		server.WithRootCA(*conf.ServerConfig.RootCA),
 		server.WithCertFile(*conf.ServerConfig.CertFile),
 		server.WithKeyFile(*conf.ServerConfig.KeyFile),
-		server.WithCache(ca),
+		server.WithCache(cache.New(time.Minute*30, time.Minute*30)),
 		server.WithRunner(runner.New()))
 	mux := http.NewServeMux()
 	RegisterHome(vps, mux)
