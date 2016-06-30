@@ -254,15 +254,17 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	}
 	res := a.limit.ReserveN(time.Now(), len(traces))
 	if !res.OK() {
-		delay := res.Delay()
-		if delay == rate.InfDuration {
-			a.curr.Remove(dest, srcs)
-			log.Error("Cant run traces to fill atlas")
-			return
-		}
-		log.Debug("Sleeping for ", delay)
-		time.Sleep(delay)
+		log.Error("Burst too high for atlas traceroutes")
+		return
 	}
+	delay := res.Delay()
+	if delay == rate.InfDuration {
+		a.curr.Remove(dest, srcs)
+		log.Error("Cant run traces to fill atlas")
+		return
+	}
+	log.Debug("Sleeping for ", delay)
+	time.Sleep(delay)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
 	defer cancel()
 	tracerouteGauge.Add(float64(len(traces)))
