@@ -46,6 +46,7 @@ import (
 	vppb "github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -77,6 +78,7 @@ type server struct {
 	curr  runningTraces
 	opts  serverOptions
 	tc    *tokenCache
+	limit *rate.Limiter
 }
 
 type serverOptions struct {
@@ -133,6 +135,7 @@ func NewServer(opts ...Option) AtlasServer {
 		opt(&atlas.opts)
 	}
 	atlas.tc = newTokenCache(atlas.opts.ca)
+	atlas.limit = rate.NewLimiter(rate.Every(time.Millisecond*6), 15000)
 	return atlas
 }
 
@@ -248,6 +251,17 @@ func (a *server) fillAtlas(hop, dest uint32, stale int64) {
 	// if there are none to run, don't
 	if len(traces) == 0 {
 		return
+	}
+	res := a.limit.ReserveN(time.Now(), len(traces))
+	if !res.OK() {
+		delay := res.Delay()
+		if delay == rate.InfDuration {
+			a.curr.Remove(dest, srcs)
+			log.Error("Cant run traces to fill atlas")
+			return
+		}
+		log.Debug("Sleeping for ", delay)
+		time.Sleep(delay)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
 	defer cancel()
