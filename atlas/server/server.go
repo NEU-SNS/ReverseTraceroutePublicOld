@@ -63,6 +63,7 @@ var (
 
 func init() {
 	prometheus.MustRegister(procCollector)
+	prometheus.MustRegister(tracerouteGauge)
 }
 
 // AtlasServer is the interface for the atlas
