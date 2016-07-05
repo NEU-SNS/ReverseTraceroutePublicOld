@@ -31,6 +31,7 @@ import (
 	"bytes"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/datamodel"
 	"github.com/NEU-SNS/ReverseTraceroute/scamper"
@@ -88,17 +89,18 @@ func TestDisconnectSocket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to Dial socket: %v", err)
 	}
-	s.Stop()
 	sock, err := scamper.NewSocket(sockPath, c)
 	if err != nil {
 		t.Fatalf("Failed to create a socket: %v", err)
 	}
+	s.Stop()
+	<-time.After(time.Second * 1)
 	_, _, err = sock.DoMeasurement(&datamodel.PingMeasurement{
 		Src: 1111111111,
 		Dst: 2222222222,
 	})
-	if err != scamper.ErrFailedToIssueCmd {
-		t.Fatalf("TestDisconnectSocket, Expected[%v], Got[%v]", scamper.ErrFailedToIssueCmd, err)
+	if err != scamper.ErrSocketClosed {
+		t.Fatalf("TestDisconnectSocket, Expected[%v], Got[%v]", scamper.ErrSocketClosed, err)
 	}
 }
 
@@ -135,11 +137,12 @@ func TestCmd(t *testing.T) {
 		Src: 1111111111,
 		Dst: 2222222222,
 	}
-	c := scamper.Cmd{ID: 5}
+	c := scamper.Cmd{ID: 5, Arg: pm}
 	res := &bytes.Buffer{}
-	c.IssueCommand(res, pm)
+	c.IssueCommand(res)
 	t.Log(res.String())
 	res.Reset()
-	c.IssueCommand(res, tm)
+	c.Arg = tm
+	c.IssueCommand(res)
 	t.Log(res.String())
 }

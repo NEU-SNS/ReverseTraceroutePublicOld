@@ -3,6 +3,7 @@ package internal
 import (
 	"io"
 	"net"
+	"sync"
 
 	"log"
 )
@@ -12,6 +13,7 @@ type ScamperServer struct {
 	addr      string
 	responses map[string][]byte
 	donec     chan struct{}
+	conmu     sync.Mutex
 	conns     []io.Closer
 }
 
@@ -39,7 +41,9 @@ func (s *ScamperServer) process() {
 		if err != nil {
 			return
 		}
+		s.conmu.Lock()
 		s.conns = append(s.conns, con)
+		s.conmu.Unlock()
 		go func(c net.Conn) {
 			for {
 				var buf [512]byte
@@ -67,13 +71,13 @@ func makeKey(b []byte) string {
 }
 
 func (s *ScamperServer) Stop() error {
-	for _, c := range s.conns {
-		c.Close()
-	}
+	s.CloseConns()
 	return s.l.Close()
 }
 
 func (s *ScamperServer) CloseConns() {
+	s.conmu.Lock()
+	defer s.conmu.Unlock()
 	for _, c := range s.conns {
 		c.Close()
 	}
