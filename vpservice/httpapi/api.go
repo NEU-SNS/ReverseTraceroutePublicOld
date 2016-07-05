@@ -6,14 +6,18 @@ import (
 	"time"
 
 	"github.com/NEU-SNS/ReverseTraceroute/log"
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/server"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/types"
 )
 
 const (
-	v1Prefix   = "/api/v1/"
-	vpLabelKey = "vp"
+	v1Prefix    = "/api/v1/"
+	vpLabelKey  = "vp"
+	vpIPKey     = "ip"
+	vpSiteKey   = "site"
+	vpReasonKey = "reason"
 )
 
 // API is the http api of the vpservice
@@ -49,6 +53,8 @@ type quarantine struct {
 
 type manualQuarantine struct {
 	Hostname string    `json:"hostname"`
+	Site     string    `json:"site"`
+	IP       string    `json:"ip"`
 	Type     string    `json:"type"`
 	Expire   time.Time `json:"expire"`
 }
@@ -80,28 +86,56 @@ func (api API) quarantineVPS(r http.ResponseWriter, req *http.Request) {
 	}
 	var quars []types.Quarantine
 	for _, q := range mq.Quarantines {
-		if vp, ok := vpm[q.Hostname]; ok {
-			switch q.Type {
-			case "manual":
-				if q.Expire.IsZero() {
-					log.Error("Got manual quarantine with a zero expire ", q)
-					break
-				}
-				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
-			case "cant_run_code":
-				pq, err := api.s.GetLastQuarantine(vp.Ip)
-				if err != nil {
-					log.Error(err)
-				}
-				nq := types.NewDefaultQuarantine(*vp, pq, types.CantRunCode)
-				quars = append(quars, nq)
-			default:
-				if q.Expire.IsZero() {
-					log.Error("Got manual quarantine with a zero expire ", q)
-					break
-				}
-				quars = append(quars, types.NewManualQuarantine(*vp, q.Expire))
+		if q.Site == "" || q.Hostname == "" || q.IP == "" {
+			continue
+		}
+		switch q.Type {
+		case "manual":
+			if q.Expire.IsZero() {
+				log.Error("Got manual quarantine with a zero expire ", q)
+				break
 			}
+			ipi, err := util.IPStringToInt32(q.IP)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			quars = append(quars, types.NewManualQuarantine(pb.VantagePoint{
+				Ip:       ipi,
+				Site:     q.Site,
+				Hostname: q.Hostname,
+			}, q.Expire))
+		case "cant_run_code":
+			ipi, err := util.IPStringToInt32(q.IP)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			pq, err := api.s.GetLastQuarantine(ipi)
+			if err != nil {
+				log.Error(err)
+			}
+			nq := types.NewDefaultQuarantine(pb.VantagePoint{
+				Ip:       ipi,
+				Site:     q.Site,
+				Hostname: q.Hostname,
+			}, pq, types.CantRunCode)
+			quars = append(quars, nq)
+		default:
+			if q.Expire.IsZero() {
+				log.Error("Got manual quarantine with a zero expire ", q)
+				break
+			}
+			ipi, err := util.IPStringToInt32(q.IP)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			quars = append(quars, types.NewManualQuarantine(pb.VantagePoint{
+				Ip:       ipi,
+				Site:     q.Site,
+				Hostname: q.Hostname,
+			}, q.Expire))
 		}
 	}
 	if err := api.s.QuarantineVPs(quars); err != nil {
@@ -109,6 +143,11 @@ func (api API) quarantineVPS(r http.ResponseWriter, req *http.Request) {
 		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+}
+
+type vpReason struct {
+	VP     pb.VantagePoint
+	Reason string
 }
 
 func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
@@ -127,37 +166,41 @@ func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
 	if quar.Status == "resolved" {
 		return
 	}
-	var vps []string
+	var vps []vpReason
 	for _, al := range quar.Alerts {
 		if al.Status == "resolved" {
 			continue
 		}
-		vps = append(vps, al.Labels[vpLabelKey])
-	}
-	vpmap := make(map[string]*pb.VantagePoint)
-	currVps, err := api.s.GetVPs(&pb.VPRequest{})
-	if err != nil {
-		log.Error(err)
-		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	// We only quarantine vps that aren't quarantined
-	// GetVps only gets unquarantined nodes
-	for _, vp := range currVps.GetVps() {
-		vpmap[vp.Hostname] = vp
+		ipi, err := util.IPStringToInt32(al.Labels[vpIPKey])
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		vps = append(vps, vpReason{pb.VantagePoint{
+			Hostname: al.Labels[vpLabelKey],
+			Site:     al.Labels[vpSiteKey],
+			Ip:       ipi,
+		}, al.Labels[vpReasonKey]})
 	}
 	var toQuar []types.Quarantine
 	for _, vp := range vps {
-		if v, ok := vpmap[vp]; ok {
+		switch vp.Reason {
+		case "vp_up_down":
 			// We can ignore the error because regardless of what it is we
 			// use the value of quar
-			quar, _ := api.s.GetLastQuarantine(v.Ip)
-			q := types.NewDefaultQuarantine(*v, quar, types.CantPerformMeasurement)
+			quar, _ := api.s.GetLastQuarantine(vp.VP.Ip)
+			q := types.NewDefaultQuarantine(vp.VP, quar, types.CantPerformMeasurement)
+			toQuar = append(toQuar, q)
+		case "mostly_down":
+			// We can ignore the error because regardless of what it is we
+			// use the value of quar
+			quar, _ := api.s.GetLastQuarantine(vp.VP.Ip)
+			q := types.NewMDQuarantine(vp.VP, quar)
 			toQuar = append(toQuar, q)
 		}
 	}
 	if len(toQuar) > 0 {
-		err = api.s.QuarantineVPs(toQuar)
+		err := api.s.QuarantineVPs(toQuar)
 		if err != nil {
 			log.Error(err)
 			http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
