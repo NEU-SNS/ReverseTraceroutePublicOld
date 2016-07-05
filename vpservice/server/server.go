@@ -398,7 +398,9 @@ func (s server) tryUnquarantine() {
 			}
 			// if any should still be quarantined, update them in the db
 			if len(updateQuar) > 0 {
-
+				if err := s.opts.vpp.UpdateQuarantines(updateQuar); err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}
