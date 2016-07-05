@@ -51,6 +51,7 @@ type VPProvider interface {
 	GetQuarantined() ([]Quarantine, error)
 	GetLastQuarantine(uint32) (Quarantine, error)
 	UpdateQuarantines([]Quarantine) error
+	GetAllVPs() ([]*pb.VantagePoint, error)
 }
 
 // QuarantineReason is a reason to quarantine a vp

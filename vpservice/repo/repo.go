@@ -153,7 +153,8 @@ func (r *Repo) GetVPs() ([]*pb.VantagePoint, error) {
 	return scanVPs(res)
 }
 
-func (r *Repo) getAllVPS() ([]*pb.VantagePoint, error) {
+// GetAllVPS get all the vps including quarantines
+func (r *Repo) GetAllVPS() ([]*pb.VantagePoint, error) {
 	res, err := r.repo.GetReader().Query(getAllVPS)
 	if err != nil {
 		return nil, err
