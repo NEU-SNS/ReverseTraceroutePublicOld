@@ -167,6 +167,8 @@ const (
 	DefaultQuar QuarantineType = "DEFAULT"
 	// ManualQuar is a manual quarantine
 	ManualQuar QuarantineType = "MANUAL"
+	// MostlyDownQuar is a quarantine for being down too long
+	MostlyDownQuar QuarantineType = "MOSTLYDOWN"
 )
 
 type defaultQuarantine struct {
@@ -323,6 +325,10 @@ type mdQuarantine struct {
 	defaultQuarantine
 }
 
+func (md *mdQuarantine) Type() QuarantineType {
+	return MostlyDownQuar
+}
+
 // NewMDQuarantine creates an mdQuarantine
 func NewMDQuarantine(vp pb.VantagePoint, prevQuar Quarantine) Quarantine {
 	var q mdQuarantine
@@ -362,6 +368,13 @@ func GetQuarantine(t QuarantineType, data []byte) (Quarantine, error) {
 			return nil, err
 		}
 		return q, nil
+	case MostlyDownQuar:
+		q := &mdQuarantine{}
+		err := json.Unmarshal(data, q)
+		if err != nil {
+			return nil, err
+		}
+		return q, err
 	default:
 		return nil, fmt.Errorf("Unknown QuarantineType: %v", t)
 	}
