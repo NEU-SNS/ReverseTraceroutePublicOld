@@ -501,9 +501,11 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 					return
 				case probe, ok := <-rChan:
 					if !ok {
+						close(kill)
 						return
 					}
 					if probe == nil {
+						close(kill)
 						return
 					}
 					px := toPing(probe)
