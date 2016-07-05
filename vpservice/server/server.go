@@ -373,11 +373,13 @@ func (s server) tryUnquarantine() {
 			var unquar []types.Quarantine
 			var updateQuar []types.Quarantine
 			for _, q := range qs {
+				log.Debug("Checking Expired on ", q.GetExpire(), " at", time.Now())
 				if q.Expired(time.Now()) {
 					unquar = append(unquar, q)
 					continue
 				}
 				if q.Elapsed(time.Now()) {
+					log.Debug("Checking elapsed on ", q.GetBackoff(), " at", time.Now())
 					// If our backoff elapsed, see if the node is up and running
 					if vp, ok := vpmap[q.GetVP().Hostname]; ok {
 						if !shouldQuarantine(*vp) {
