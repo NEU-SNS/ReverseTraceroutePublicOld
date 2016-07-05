@@ -282,7 +282,7 @@ func (r *Repo) GetQuarantined() ([]types.Quarantine, error) {
 
 // UpdateActiveVPs updates the active vps in the database
 func (r *Repo) UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error) {
-	ovps, err := r.getAllVPS()
+	ovps, err := r.GetAllVPS()
 	if err != nil {
 		log.Error(err)
 		return nil, nil, ErrFailedToUpdateVPs
