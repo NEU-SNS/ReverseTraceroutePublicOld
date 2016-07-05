@@ -42,6 +42,7 @@ func (c *channel) Send(p *dm.Probe) {
 	}
 }
 
+// kill must always be closed when this is done
 func (sm *spoofMap) Add(notify chan *dm.Probe, kill chan struct{}, ids []uint32) {
 	sm.Lock()
 	defer sm.Unlock()
@@ -50,6 +51,15 @@ func (sm *spoofMap) Add(notify chan *dm.Probe, kill chan struct{}, ids []uint32)
 	for _, id := range ids {
 		sm.sm[id] = ch
 	}
+	// When the group is killed, remove any ids that were left over
+	go func() {
+		select {
+		case <-kill:
+			for _, id := range ids {
+				delete(sm.sm, id)
+			}
+		}
+	}()
 }
 
 func (sm *spoofMap) Notify(probe *dm.Probe) {
