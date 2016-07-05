@@ -153,8 +153,8 @@ func (r *Repo) GetVPs() ([]*pb.VantagePoint, error) {
 	return scanVPs(res)
 }
 
-// GetAllVPS get all the vps including quarantines
-func (r *Repo) GetAllVPS() ([]*pb.VantagePoint, error) {
+// GetAllVPs get all the vps including quarantines
+func (r *Repo) GetAllVPs() ([]*pb.VantagePoint, error) {
 	res, err := r.repo.GetReader().Query(getAllVPS)
 	if err != nil {
 		return nil, err
@@ -282,7 +282,7 @@ func (r *Repo) GetQuarantined() ([]types.Quarantine, error) {
 
 // UpdateActiveVPs updates the active vps in the database
 func (r *Repo) UpdateActiveVPs(vps []*pb.VantagePoint) ([]*pb.VantagePoint, []*pb.VantagePoint, error) {
-	ovps, err := r.GetAllVPS()
+	ovps, err := r.GetAllVPs()
 	if err != nil {
 		log.Error(err)
 		return nil, nil, ErrFailedToUpdateVPs
