@@ -356,7 +356,7 @@ func (s server) tryUnquarantine() {
 		select {
 		case t := <-tick.C:
 			log.Debug("Trying unquarantine for time: ", t)
-			vps, err := s.opts.vpp.GetVPs()
+			vps, err := s.opts.vpp.GetAllVPs()
 			if err != nil {
 				log.Error(err)
 				continue
