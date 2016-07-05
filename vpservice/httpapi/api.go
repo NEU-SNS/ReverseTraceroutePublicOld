@@ -186,15 +186,17 @@ func (api API) quarantineAlertVPS(r http.ResponseWriter, req *http.Request) {
 	for _, vp := range vps {
 		switch vp.Reason {
 		case "vp_up_down":
-			// We can ignore the error because regardless of what it is we
-			// use the value of quar
-			quar, _ := api.s.GetLastQuarantine(vp.VP.Ip)
+			quar, err := api.s.GetLastQuarantine(vp.VP.Ip)
+			if err != nil {
+				log.Error(err)
+			}
 			q := types.NewDefaultQuarantine(vp.VP, quar, types.CantPerformMeasurement)
 			toQuar = append(toQuar, q)
 		case "mostly_down":
-			// We can ignore the error because regardless of what it is we
-			// use the value of quar
-			quar, _ := api.s.GetLastQuarantine(vp.VP.Ip)
+			quar, err := api.s.GetLastQuarantine(vp.VP.Ip)
+			if err != nil {
+				log.Error(err)
+			}
 			q := types.NewMDQuarantine(vp.VP, quar)
 			toQuar = append(toQuar, q)
 		}
