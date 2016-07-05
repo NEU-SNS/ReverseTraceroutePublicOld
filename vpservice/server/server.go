@@ -423,6 +423,9 @@ func (s server) checkCapabilities() {
 	var onePerSite []*pb.VantagePoint
 	siteMap := make(map[string]*pb.VantagePoint)
 	for _, vp := range vps {
+		if _, ok := siteMap[vp.Site]; ok {
+			continue
+		}
 		siteMap[vp.Site] = vp
 	}
 	for _, vp := range siteMap {
