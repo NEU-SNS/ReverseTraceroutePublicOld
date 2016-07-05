@@ -251,14 +251,14 @@ func (dq *defaultQuarantine) Expired(now time.Time) bool {
 	if dq.Expire.IsZero() {
 		return false
 	}
-	if dq.Expire.After(now) || dq.Expire.Equal(now) {
+	if dq.Expire.Before(now) || dq.Expire.Equal(now) {
 		return true
 	}
 	return false
 }
 
 func (dq *defaultQuarantine) Elapsed(now time.Time) bool {
-	if dq.Backoff.After(now) || dq.Backoff.Equal(now) {
+	if dq.Backoff.Before(now) || dq.Backoff.Equal(now) {
 		return true
 	}
 	return false
