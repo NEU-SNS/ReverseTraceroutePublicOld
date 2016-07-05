@@ -284,6 +284,7 @@ func NewDefaultQuarantine(vp pb.VantagePoint, prevQuar Quarantine, reason Quaran
 			}
 		}
 	}
+	q.Backoff = time.Now().Add(q.InitialBackoff)
 	return &q
 }
 
@@ -320,6 +321,28 @@ func NewManualQuarantine(vp pb.VantagePoint, exp time.Time) Quarantine {
 // most of the interval desired
 type mdQuarantine struct {
 	defaultQuarantine
+}
+
+// NewMDQuarantine creates an mdQuarantine
+func NewMDQuarantine(vp pb.VantagePoint, prevQuar Quarantine) Quarantine {
+	var q mdQuarantine
+	q.VP = vp
+	q.Reason = DownTooLong
+	q.InitialBackoff = time.Hour*24*3 + (12 * time.Hour)
+	q.Multiplier = 2
+	q.MaxBackoff = time.Hour * 24 * 7
+	q.NextInitialBackoff = time.Hour * 24
+	if prevQuar != nil {
+		// If there is a previous quarantine of a different type we use default settings
+		// If they are the same type we use the smaller of the two backoffs
+		if prevQuar.Type() == DefaultQuar {
+			if prevQuar.GetCurrentBackoff() < q.InitialBackoff {
+				q.InitialBackoff = prevQuar.GetCurrentBackoff()
+			}
+		}
+	}
+	q.Backoff = time.Now().Add(q.InitialBackoff)
+	return &q
 }
 
 // GetQuarantine converts the data given into a quarantine of the given type

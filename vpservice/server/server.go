@@ -82,7 +82,7 @@ var (
 		Subsystem: "vantage_points",
 		Name:      "vp_status",
 		Help:      "The status of individual vantage points, 1 is online 0 is offline.",
-	}, []string{"vp"})
+	}, []string{"vp", "site", "ip"})
 	quarantinedVPGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: nameSpace,
 		Subsystem: "vantage_points",
@@ -213,8 +213,11 @@ type server struct {
 
 func (s server) QuarantineVPs(vps []types.Quarantine) error {
 	for _, vp := range vps {
+		ips, _ := util.Int32ToIPString(vp.GetVP().Ip)
 		// Now that a node is quarantened, remove it from the monitoring
-		onlineVPGaugeVec.DeleteLabelValues(vp.GetVP().Hostname)
+		onlineVPGaugeVec.DeleteLabelValues(vp.GetVP().Hostname,
+			vp.GetVP().Site,
+			ips)
 	}
 	return s.opts.vpp.QuarantineVPs(vps)
 }
@@ -340,12 +343,14 @@ func (s server) addOrUpdateVPs(vps []*datamodel.VantagePoint) {
 	// so skip them
 	for _, vp := range add {
 		if _, ok := quarMap[vp.Hostname]; !ok {
-			onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			onlineVPGaugeVec.WithLabelValues(vp.Hostname, vp.Site, ips).Set(1)
 		}
 	}
 	for _, vp := range rem {
 		if _, ok := quarMap[vp.Hostname]; !ok {
-			onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(-1)
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			onlineVPGaugeVec.WithLabelValues(vp.Hostname, vp.Site, ips).Set(-1)
 		}
 	}
 }
@@ -463,6 +468,8 @@ func (s server) checkCapabilities() {
 			})
 		}
 	}
+	log.Debug("Running ", len(tests)*4, " ping tests")
+	log.Debug("Running ", len(traceTests), " trace tests")
 	s.testRR(tests, vpm)
 	s.testTS(tests, vpm)
 	s.testSpoof(tests, vpm)
@@ -757,7 +764,8 @@ func doGauges(vps []*pb.VantagePoint, quar map[string]struct{}) {
 	spooferGauge.Set(spoofCnt)
 	siteMap := make(map[string]struct{})
 	for _, vp := range vps {
-		onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
+		ips, _ := util.Int32ToIPString(vp.Ip)
+		onlineVPGaugeVec.WithLabelValues(vp.Hostname, vp.Site, ips).Set(1)
 		siteMap[vp.Site] = struct{}{}
 	}
 	var siteCnt float64
@@ -796,7 +804,8 @@ func (s server) initGuages() {
 	}
 	for _, vp := range vps {
 		if _, ok := quarMap[vp.Hostname]; !ok {
-			onlineVPGaugeVec.WithLabelValues(vp.Hostname).Set(1)
+			ips, _ := util.Int32ToIPString(vp.Ip)
+			onlineVPGaugeVec.WithLabelValues(vp.Hostname, vp.Site, ips).Set(1)
 		}
 	}
 	doGauges(vps, quarMap)
