@@ -437,8 +437,11 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			}
 			log.Debug("Issuing TS probes")
 			revtr.Stats.TSProbes += len(tsToIssueSrcToProbe)
-			issueTimestamps(tsToIssueSrcToProbe, processTSCheckForRevHop,
+			err := issueTimestamps(tsToIssueSrcToProbe, processTSCheckForRevHop,
 				revtr.Staleness, b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 			log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
 			for src, probes := range tsToIssueSrcToProbe {
 				for _, probe := range probes {
@@ -464,8 +467,11 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			revtr.Stats.SpoofedTSProbes += len(val)
 		}
 		if len(receiverToSpooferToProbe) > 0 {
-			issueSpoofedTimestamps(receiverToSpooferToProbe,
+			err := issueSpoofedTimestamps(receiverToSpooferToProbe,
 				processTSCheckForRevHop, revtr.Staleness, b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 		if len(linuxBugToCheckSrcDstVpToRevHops) > 0 {
 			var linuxChecksSrcToProbe = make(map[string][][]string)
@@ -518,13 +524,19 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				}
 			}
 			revtr.Stats.TSProbes += len(tsToIssueSrcToProbe)
-			issueTimestamps(linuxChecksSrcToProbe,
+			err := issueTimestamps(linuxChecksSrcToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 			for _, val := range receiverToSpooferToProbe {
 				revtr.Stats.SpoofedTSProbes += len(val)
 			}
-			issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe,
+			err = issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 		receiverToSpooferToProbe = make(map[string]map[string][][]string)
 		for _, probe := range destDoesNotStamp {
@@ -569,9 +581,12 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			}
 		}
 		if len(destDoesNotStamp) > 0 {
-			issueSpoofedTimestamps(receiverToSpooferToProbe,
+			err := issueSpoofedTimestamps(receiverToSpooferToProbe,
 				processTSDestDoesNotStamp,
 				revtr.Staleness, b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 
 		// if you don't get a response, add it with false
@@ -603,10 +618,13 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				}
 			}
 			log.Debug("Issuing to verify for dest does not stamp")
-			issueTimestamps(destDoesNotStampToVerifySpooferToProbe,
+			err := issueTimestamps(destDoesNotStampToVerifySpooferToProbe,
 				processTSDestDoesNotStampToVerify,
 				revtr.Staleness,
 				b.opts.cl)
+			if err != nil {
+				log.Error(err)
+			}
 			for k := range maybeRevhopVPDstAdjToBool {
 				for _, origsrc := range vpDstAdjToInterestedSrcs[tripletTs{src: k.src, dst: k.dst, tsip: k.tsip}] {
 					revHopsVPDstToRevSeg[pair{src: origsrc, dst: k.dst}] =
