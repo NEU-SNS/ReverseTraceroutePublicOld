@@ -385,6 +385,7 @@ func (s server) tryUnquarantine() {
 						if !shouldQuarantine(*vp) {
 							// Up and running, remove it from the quarantines
 							unquar = append(unquar, q)
+							continue
 						}
 					}
 					// Not up or not running, set the next backoff and update in db
