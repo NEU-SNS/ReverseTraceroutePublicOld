@@ -508,6 +508,9 @@ func (rt *ReverseTraceroute) GetTimestampSpoofers(src, dst string, vpsource vpse
 		ips, _ := util.Int32ToIPString(vp.Ip)
 		spoofers = append(spoofers, ips)
 	}
+	if len(spoofers) > 5 {
+		return spoofers[:5]
+	}
 	return spoofers
 }
 
