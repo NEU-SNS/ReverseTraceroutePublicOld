@@ -42,6 +42,7 @@ import (
 // Cmd is a command that can run on scamper
 type Cmd struct {
 	ID          uint32
+	Arg         interface{}
 	userIDCache *string
 }
 
@@ -259,14 +260,14 @@ func (c Cmd) issueTraceroute(w io.Writer, t *dm.TracerouteMeasurement) error {
 	return err
 }
 
-func (c *Cmd) IssueCommand(w io.Writer, arg interface{}) error {
-	switch arg.(type) {
+// IssueCommand write the command to w
+func (c *Cmd) IssueCommand(w io.Writer) error {
+	switch c.Arg.(type) {
 	case *dm.PingMeasurement:
-		return c.issuePing(w, arg.(*dm.PingMeasurement))
+		return c.issuePing(w, c.Arg.(*dm.PingMeasurement))
 	case *dm.TracerouteMeasurement:
-		return c.issueTraceroute(w, arg.(*dm.TracerouteMeasurement))
+		return c.issueTraceroute(w, c.Arg.(*dm.TracerouteMeasurement))
 	default:
-		fmt.Errorf("Unknown arg type.")
+		return fmt.Errorf("Unknown arg type.")
 	}
-	return nil
 }

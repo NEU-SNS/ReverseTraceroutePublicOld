@@ -67,7 +67,9 @@ type cmdResponse struct {
 
 func (cm *cmdMap) forEach() <-chan cmdResponse {
 	c := make(chan cmdResponse)
+	cm.Lock()
 	go func() {
+		defer cm.Unlock()
 		for key, sock := range cm.cmds {
 			delete(cm.cmds, key)
 			c <- sock
@@ -122,6 +124,7 @@ type Socket struct {
 	rc          uint32
 	rw          *bufio.ReadWriter
 	done        chan struct{}
+	write       chan cmdResponse
 	// Access atomically
 	userID uint32
 	mu     sync.Mutex // Protect state
@@ -143,22 +146,22 @@ func NewSocket(fname string, con net.Conn) (*Socket, error) {
 		con:   con,
 		rw:    bufio.NewReadWriter(bufio.NewReader(con), bufio.NewWriter(con)),
 		done:  make(chan struct{}),
+		write: make(chan cmdResponse, 50),
 	}
 
 	go sock.readConn()
+	go sock.writeConn()
 	return sock, nil
 }
 
 // Stop closes the connection the socket represents
 func (s *Socket) Stop() {
+	log.Error("Closing socket")
 	if s == nil {
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s == nil {
-		return
-	}
 	for cmd := range s.cmds.forEach() {
 		close(cmd.done)
 	}
@@ -248,6 +251,52 @@ func (s *Socket) readConn() {
 	}
 }
 
+func (s *Socket) writeConn() {
+	tick := time.NewTicker(time.Millisecond * 10)
+	var writes int
+	for {
+		select {
+		case <-s.done:
+			return
+		case w := <-s.write:
+			writes++
+			err := w.cmd.IssueCommand(s.rw)
+			if err != nil {
+				log.Error(err)
+				s.rw.Writer.Reset(s.con)
+				writes = 0
+				continue
+			}
+			if writes > 10 {
+				s.flushWrite()
+				writes = 0
+			}
+		case <-tick.C:
+			if s.rw.Writer.Buffered() > 0 {
+				s.flushWrite()
+			}
+		}
+	}
+}
+
+func (s *Socket) flushWrite() {
+	err := s.con.SetWriteDeadline(time.Now().Add(time.Second * 10))
+	if err != nil {
+		log.Error(err)
+		s.rw.Writer.Reset(s.con)
+		return
+	}
+	err = s.rw.Flush()
+	for err == io.ErrShortWrite {
+		err = s.rw.Flush()
+	}
+	if err != nil {
+		log.Error(err)
+		s.rw.Writer.Reset(s.con)
+		return
+	}
+}
+
 func (s *Socket) handleErr(err error) {
 	s.Stop()
 	log.Error(err)
@@ -274,31 +323,28 @@ var (
 // DoMeasurement perform the measurement described by arg
 func (s *Socket) DoMeasurement(arg interface{}) (<-chan Response, uint32, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.state == open {
-		s.mu.Unlock()
 		id := s.getID()
-		cmd := Cmd{ID: id}
+		cmd := Cmd{ID: id, Arg: arg}
 		cr := cmdResponse{cmd: cmd, done: make(chan Response, 1)}
 		err := s.cmds.addCmd(cr)
 		if err != nil {
 			return nil, 0, err
 		}
-		err = s.con.SetWriteDeadline(time.Now().Add(time.Millisecond * 10))
 		if err != nil {
 			log.Error(err)
 			s.cmds.rmCmd(id)
 			return nil, 0, ErrFailedToIssueCmd
 		}
-		err = cmd.IssueCommand(s.con, arg)
 		if err != nil {
 			log.Error(err)
 			s.cmds.rmCmd(id)
 			return nil, 0, ErrFailedToIssueCmd
 		}
-
+		s.write <- cr
 		return cr.done, id, nil
 	}
-	s.mu.Unlock()
 	return nil, 0, ErrSocketClosed
 }
 
