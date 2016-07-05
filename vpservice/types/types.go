@@ -315,6 +315,12 @@ func NewManualQuarantine(vp pb.VantagePoint, exp time.Time) Quarantine {
 	return &q
 }
 
+// mdQuarantine is the quarantine type for a vp that has been down for
+// most of the interval desired
+type mdQuarantine struct {
+	defaultQuarantine
+}
+
 // GetQuarantine converts the data given into a quarantine of the given type
 func GetQuarantine(t QuarantineType, data []byte) (Quarantine, error) {
 	switch t {
