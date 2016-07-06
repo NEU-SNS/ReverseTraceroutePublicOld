@@ -135,7 +135,7 @@ func NewServer(opts ...Option) AtlasServer {
 		opt(&atlas.opts)
 	}
 	atlas.tc = newTokenCache(atlas.opts.ca)
-	atlas.limit = rate.NewLimiter(rate.Every(time.Millisecond*6), 15000)
+	atlas.limit = rate.NewLimiter(rate.Every(time.Millisecond*12), 5000)
 	return atlas
 }
 
