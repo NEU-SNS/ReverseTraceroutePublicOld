@@ -55,6 +55,8 @@ func (sm *spoofMap) Add(notify chan *dm.Probe, kill chan struct{}, ids []uint32)
 	go func() {
 		select {
 		case <-kill:
+			sm.Lock()
+			defer sm.Unlock()
 			for _, id := range ids {
 				delete(sm.sm, id)
 			}
