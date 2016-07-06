@@ -93,7 +93,7 @@ var (
 
 const (
 	defaultLimit = 250
-	testSize     = 100
+	testSize     = 50
 )
 
 func init() {
