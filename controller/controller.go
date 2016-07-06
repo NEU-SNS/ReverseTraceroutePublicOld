@@ -296,7 +296,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 		var remaining []*dm.PingMeasurement
 		var cacheKeys []string
 		for _, pm := range pm {
-			if pm.CheckCache && !pm.RR && pm.TimeStamp == "" {
+			if pm.CheckCache && pm.TimeStamp == "" {
 				key := pm.Key()
 				checkCache[key] = pm
 				cacheKeys = append(cacheKeys, key)
