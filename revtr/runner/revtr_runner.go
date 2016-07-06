@@ -1182,14 +1182,15 @@ func issueSpoofedRR(recv, dst string, srcs []string, staleness int64,
 		log.Debug("Creating spoofed ping from ", src, " to ", dst, " recieved by ", recv)
 		srci, _ := util.IPStringToInt32(src)
 		pms = append(pms, &datamodel.PingMeasurement{
-			Src:       srci,
-			Dst:       dsti,
-			SAddr:     recv,
-			Timeout:   5,
-			Count:     "1",
-			Staleness: staleness,
-			Spoof:     true,
-			RR:        true,
+			Src:        srci,
+			Dst:        dsti,
+			SAddr:      recv,
+			Timeout:    5,
+			Count:      "1",
+			Staleness:  staleness,
+			CheckCache: true,
+			Spoof:      true,
+			RR:         true,
 		})
 	}
 	var rrs []sprrhops
