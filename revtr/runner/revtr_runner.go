@@ -820,6 +820,7 @@ func issueTimestamps(issue map[string][][]string,
 				Timeout:    10,
 				Count:      "1",
 				CheckCache: true,
+				CheckDb:    true,
 				Staleness:  staleness,
 			}
 			pings = append(pings, p)
@@ -881,6 +882,7 @@ func issueSpoofedTimestamps(issue map[string]map[string][][]string,
 					Timeout:     40,
 					Count:       "1",
 					CheckCache:  true,
+					CheckDb:     true,
 					Staleness:   staleness,
 				}
 				pings = append(pings, p)
@@ -987,6 +989,7 @@ func issueTraceroute(cl client.Client, cm clustermap.ClusterMap,
 		Src:        srci,
 		Dst:        dsti,
 		CheckCache: true,
+		CheckDb:    true,
 		Staleness:  staleness,
 		Timeout:    30,
 		Wait:       "2",
@@ -1237,6 +1240,7 @@ func issueRR(src, dst string, staleness int64,
 		Timeout:    10,
 		Count:      "1",
 		CheckCache: true,
+		CheckDb:    true,
 		Staleness:  staleness,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
