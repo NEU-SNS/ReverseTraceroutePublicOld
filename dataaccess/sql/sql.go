@@ -860,13 +860,6 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 		log.Error(err)
 		return nil, err
 	}
-	defer rows.Close()
-	statsstmt, err := tx.Prepare(getPingStats)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	defer statsstmt.Close()
 	var pings []*dm.Ping
 	for rows.Next() {
 		p := new(dm.Ping)
@@ -894,6 +887,12 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 		return nil, err
 	}
 	rows.Close()
+	statsstmt, err := tx.Prepare(getPingStats)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	defer statsstmt.Close()
 	for _, p := range pings {
 		var recordRoute, tsonly, tsandaddr bool
 		recordRoute = hasFlag(p.Flags, "v4rr")
@@ -925,6 +924,7 @@ func hasFlag(flags []string, flag string) bool {
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
 	tx, err := db.GetReader().Begin()
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer func() {
@@ -934,6 +934,7 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 	}()
 	rows, err := tx.Query(getPingStaleness, src, dst, int(s.Minutes()))
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	var pings []*dm.Ping
