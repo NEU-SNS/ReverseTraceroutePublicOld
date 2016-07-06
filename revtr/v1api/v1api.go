@@ -125,7 +125,12 @@ func (v1 V1Api) submitRevtr(r http.ResponseWriter, req *http.Request) {
 	resp, err := v1.s.RunRevtr(&revtr)
 	if err != nil {
 		log.Error(err)
-		http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		switch err.(type) {
+		case server.SrcError, server.DstError:
+			http.Error(r, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		default:
+			http.Error(r, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 		return
 	}
 	r.Header().Set("Content-Type", "application/json")
