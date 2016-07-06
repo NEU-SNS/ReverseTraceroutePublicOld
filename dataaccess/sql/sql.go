@@ -594,13 +594,13 @@ const (
 		"WHERE ps.ping_id = ?;"
 	getRecordRoutes = "SELECT rr.response_id, rr.hop, rr.ip " +
 		"FROM record_routes rr " +
-		"WHERE rr.response_id = ? ORDER BY rr.hop;"
+		"WHERE rr.response_id = %d ORDER BY rr.hop;"
 	getTimeStamps = "SELECT ts.ts " +
 		"FROM timestamps ts " +
-		"WHERE ts.response_id = ? ORDER BY ts.`order`;"
+		"WHERE ts.response_id = %d ORDER BY ts.`order`;"
 	getTimeStampsAndAddr = "SELECT tsa.ip, tsa.ts " +
 		"FROM timestamp_addrs tsa " +
-		"WHERE tsa.response_id = ? ORDER BY tsa.`order`;"
+		"WHERE tsa.response_id = %d ORDER BY tsa.`order`;"
 )
 
 type rrHop struct {
@@ -692,8 +692,8 @@ func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 	return ret, nil
 }
 
-func getRR(id int64, pr *dm.PingResponse, stmt *sql.Stmt) error {
-	rows, err := stmt.Query(id)
+func getRR(id int64, pr *dm.PingResponse, tx *sql.Tx) error {
+	rows, err := tx.Query(fmt.Sprintf(getRecordRoutes, id))
 	if err != nil {
 		return err
 	}
@@ -714,8 +714,8 @@ func getRR(id int64, pr *dm.PingResponse, stmt *sql.Stmt) error {
 	pr.RR = hops
 	return nil
 }
-func getTS(id int64, pr *dm.PingResponse, stmt *sql.Stmt) error {
-	rows, err := stmt.Query(id)
+func getTS(id int64, pr *dm.PingResponse, tx *sql.Tx) error {
+	rows, err := tx.Query(fmt.Sprintf(getTimeStamps, id))
 	if err != nil {
 		return err
 	}
@@ -747,8 +747,8 @@ func getStats(p *dm.Ping, stmt *sql.Stmt) error {
 	return nil
 }
 
-func getTSAndAddr(id int64, pr *dm.PingResponse, stmt *sql.Stmt) error {
-	rows, err := stmt.Query(id)
+func getTSAndAddr(id int64, pr *dm.PingResponse, tx *sql.Tx) error {
+	rows, err := tx.Query(fmt.Sprintf(getTimeStampsAndAddr, id))
 	if err != nil {
 		return err
 	}
@@ -769,12 +769,30 @@ func getTSAndAddr(id int64, pr *dm.PingResponse, stmt *sql.Stmt) error {
 	return nil
 }
 
-func getResponses(ping *dm.Ping, rspstmt, rrstmt, tsstmt, tsaddrstmt *sql.Stmt,
-	rr, ts, tsaddr bool) error {
+type errorf func() error
+
+func logError(f errorf) {
+	if err := f(); err != nil {
+		log.Error(err)
+	}
+}
+
+func getResponses(ping *dm.Ping, tx *sql.Tx, rr, ts, tsaddr bool) error {
+	rspstmt, err := tx.Prepare(getPingResponses)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	defer func() {
+		if err := rspstmt.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
 	rows, err := rspstmt.Query(ping.Id)
 	if err != nil {
 		return err
 	}
+
 	var responses []*dm.PingResponse
 	var respIds []int64
 	for rows.Next() {
@@ -806,11 +824,11 @@ func getResponses(ping *dm.Ping, rspstmt, rrstmt, tsstmt, tsaddrstmt *sql.Stmt,
 	for i, resp := range responses {
 		switch {
 		case rr:
-			err = getRR(respIds[i], resp, rrstmt)
+			err = getRR(respIds[i], resp, tx)
 		case ts:
-			err = getTS(respIds[i], resp, tsstmt)
+			err = getTS(respIds[i], resp, tx)
 		case tsaddr:
-			err = getTSAndAddr(respIds[i], resp, tsaddrstmt)
+			err = getTSAndAddr(respIds[i], resp, tx)
 		}
 		if err != nil {
 			return err
@@ -829,6 +847,7 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
 	tx, err := db.GetReader().Begin()
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer func() {
@@ -838,31 +857,13 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 	}()
 	rows, err := tx.Query(getPingStalenessRR, src, dst, int(s.Minutes()))
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer rows.Close()
-	respstmt, err := tx.Prepare(getPingResponses)
-	if err != nil {
-		return nil, err
-	}
-	defer respstmt.Close()
-	rrstmt, err := tx.Prepare(getRecordRoutes)
-	if err != nil {
-		return nil, err
-	}
-	defer rrstmt.Close()
-	tsstmt, err := tx.Prepare(getTimeStamps)
-	if err != nil {
-		return nil, err
-	}
-	defer tsstmt.Close()
-	tsaddrstmt, err := tx.Prepare(getTimeStampsAndAddr)
-	if err != nil {
-		return nil, err
-	}
-	defer tsaddrstmt.Close()
 	statsstmt, err := tx.Prepare(getPingStats)
 	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	defer statsstmt.Close()
@@ -877,6 +878,8 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 			&recordRoute, &payload, &tsonly, &tsandaddr, &icmpsum,
 			&dl, &eight)
 		if err != nil {
+			log.Error(err)
+			rows.Close()
 			return nil, err
 		}
 		p.Start = &dm.Time{}
@@ -886,6 +889,8 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 		pings = append(pings, p)
 	}
 	if err := rows.Err(); err != nil {
+		log.Error(err)
+		rows.Close()
 		return nil, err
 	}
 	rows.Close()
@@ -894,13 +899,14 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 		recordRoute = hasFlag(p.Flags, "v4rr")
 		tsonly = hasFlag(p.Flags, "tsonly")
 		tsandaddr = hasFlag(p.Flags, "tsandaddr")
-		err = getResponses(p, respstmt, rrstmt, tsstmt, tsaddrstmt,
-			recordRoute, tsonly, tsandaddr)
+		err = getResponses(p, tx, recordRoute, tsonly, tsandaddr)
 		if err != nil {
+			log.Error(err)
 			return nil, err
 		}
 		err = getStats(p, statsstmt)
 		if err != nil {
+			log.Error(err)
 			return nil, err
 		}
 	}
@@ -930,32 +936,6 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	respstmt, err := tx.Prepare(getPingResponses)
-	if err != nil {
-		return nil, err
-	}
-	defer respstmt.Close()
-	rrstmt, err := tx.Prepare(getRecordRoutes)
-	if err != nil {
-		return nil, err
-	}
-	defer rrstmt.Close()
-	tsstmt, err := tx.Prepare(getTimeStamps)
-	if err != nil {
-		return nil, err
-	}
-	defer tsstmt.Close()
-	tsaddrstmt, err := tx.Prepare(getTimeStampsAndAddr)
-	if err != nil {
-		return nil, err
-	}
-	defer tsaddrstmt.Close()
-	statsstmt, err := tx.Prepare(getPingStats)
-	if err != nil {
-		return nil, err
-	}
-	defer statsstmt.Close()
 	var pings []*dm.Ping
 	for rows.Next() {
 		p := new(dm.Ping)
@@ -967,6 +947,8 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 			&recordRoute, &payload, &tsonly, &tsandaddr, &icmpsum,
 			&dl, &eight)
 		if err != nil {
+			log.Error(err)
+			rows.Close()
 			return nil, err
 		}
 		p.Start = &dm.Time{}
@@ -976,21 +958,30 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 		pings = append(pings, p)
 	}
 	if err := rows.Err(); err != nil {
+		log.Error(err)
+		rows.Close()
 		return nil, err
 	}
 	rows.Close()
+	statsstmt, err := tx.Prepare(getPingStats)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	defer statsstmt.Close()
 	for _, p := range pings {
 		var recordRoute, tsonly, tsandaddr bool
 		recordRoute = hasFlag(p.Flags, "v4rr")
 		tsonly = hasFlag(p.Flags, "tsonly")
 		tsandaddr = hasFlag(p.Flags, "tsandaddr")
-		err = getResponses(p, respstmt, rrstmt, tsstmt, tsaddrstmt,
-			recordRoute, tsonly, tsandaddr)
+		err = getResponses(p, tx, recordRoute, tsonly, tsandaddr)
 		if err != nil {
+			log.Error(err)
 			return nil, err
 		}
 		err = getStats(p, statsstmt)
 		if err != nil {
+			log.Error(err)
 			return nil, err
 		}
 	}
@@ -1276,33 +1267,16 @@ func (db *DB) GetUser(key string) (dm.User, error) {
 
 // GetPingBatch gets a batch of pings for user u with id bid
 func (db *DB) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
-	con := db.GetReader()
-	rows, err := con.Query(getPingBatch, u.Key, bid)
+	tx, err := db.GetReader().Begin()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	respstmt, err := db.GetReader().Prepare(getPingResponses)
-	if err != nil {
-		return nil, err
-	}
-	defer respstmt.Close()
-	rrstmt, err := db.GetReader().Prepare(getRecordRoutes)
-	if err != nil {
-		return nil, err
-	}
-	defer rrstmt.Close()
-	tsstmt, err := db.GetReader().Prepare(getTimeStamps)
-	if err != nil {
-		return nil, err
-	}
-	defer tsstmt.Close()
-	tsaddrstmt, err := db.GetReader().Prepare(getTimeStampsAndAddr)
-	if err != nil {
-		return nil, err
-	}
-	defer tsaddrstmt.Close()
-	statsstmt, err := db.GetReader().Prepare(getPingStats)
+	defer func() {
+		if err := tx.Commit(); err != nil {
+			log.Error(err)
+		}
+	}()
+	rows, err := tx.Query(getPingBatch, u.Key, bid)
 	if err != nil {
 		return nil, err
 	}
@@ -1317,14 +1291,31 @@ func (db *DB) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
 			&recordRoute, &payload, &tsonly, &tsandaddr, &icmpsum,
 			&dl, &eight)
 		if err != nil {
+			rows.Close()
 			return nil, err
 		}
 		p.Start = &dm.Time{}
 		p.Start.Sec = start / 1000000000
 		p.Start.Usec = (start % 1000000000) / 1000
 		p.Flags = makeFlags(spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight)
-		err = getResponses(p, respstmt, rrstmt, tsstmt, tsaddrstmt,
-			recordRoute, tsonly, tsandaddr)
+		pings = append(pings, p)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	statsstmt, err := tx.Prepare(getPingStats)
+	if err != nil {
+		return nil, err
+	}
+	defer statsstmt.Close()
+	for _, p := range pings {
+		var recordRoute, tsonly, tsandaddr bool
+		recordRoute = hasFlag(p.Flags, "v4rr")
+		tsonly = hasFlag(p.Flags, "tsonly")
+		tsandaddr = hasFlag(p.Flags, "tsandaddr")
+		err = getResponses(p, tx, recordRoute, tsonly, tsandaddr)
 		if err != nil {
 			return nil, err
 		}
@@ -1332,10 +1323,6 @@ func (db *DB) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
 		if err != nil {
 			return nil, err
 		}
-		pings = append(pings, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	return pings, nil
 }
