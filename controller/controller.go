@@ -85,6 +85,30 @@ var (
 		Name:      "traceroute_response_times",
 		Help:      "The time it takes for traceroutes to respond",
 	})
+	pingsFromCache = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: "cache",
+		Name:      "pings_from_cache",
+		Help:      "The number of pings retrieved from the cache.",
+	})
+	pingsFromDB = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: "db",
+		Name:      "pings_from_db",
+		Help:      "The number of pings retrieved from the db.",
+	})
+	tracesFromCache = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: "cache",
+		Name:      "traces_from_cache",
+		Help:      "The number of traceroutes retrieved from the cache.",
+	})
+	tracesFromDB = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: "db",
+		Name:      "traces_from_db",
+		Help:      "The number of traceroutes retrieved from the db.",
+	})
 )
 
 func init() {
@@ -94,6 +118,10 @@ func init() {
 	prometheus.MustRegister(errorCounter)
 	prometheus.MustRegister(pingResponseTimes)
 	prometheus.MustRegister(tracerouteResponseTimes)
+	prometheus.MustRegister(pingsFromCache)
+	prometheus.MustRegister(pingsFromDB)
+	prometheus.MustRegister(tracesFromCache)
+	prometheus.MustRegister(tracesFromDB)
 }
 
 // DataAccess defines the interface needed by a DB
@@ -208,6 +236,7 @@ func checkPingCache(ctx con.Context, keys []string, c ca.Cache) (map[string]*dm.
 				log.Error(err)
 				continue
 			}
+			pingsFromCache.Inc()
 			found[key] = ping
 		}
 		select {
@@ -240,6 +269,7 @@ func checkPingDb(ctx con.Context, check []*dm.PingMeasurement, db DataAccess) (m
 			eout <- err
 		}
 		for _, p := range found {
+			pingsFromDB.Inc()
 			foundMap[p.Key()] = p
 		}
 		select {
@@ -618,6 +648,7 @@ func checkTraceCache(ctx con.Context, keys []string, ca ca.Cache) (map[string]*d
 				log.Error(err)
 				continue
 			}
+			tracesFromCache.Inc()
 			found[key] = trace
 		}
 		select {
@@ -652,6 +683,7 @@ func checkTraceDb(ctx con.Context, check []*dm.TracerouteMeasurement, db DataAcc
 			return
 		}
 		for _, p := range found {
+			tracesFromDB.Inc()
 			foundMap[p.Key()] = p
 		}
 		select {

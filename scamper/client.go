@@ -33,6 +33,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type responseT string
@@ -54,6 +56,17 @@ var (
 	ErrorBadResponse = errors.New("Bad Response")
 	// ErrorTimeout returned when a command times out
 	ErrorTimeout = errors.New("Timeout")
+)
+
+var (
+	measurements = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "scamper_client_measurement_requests",
+		Help: "The number of measurement requests sent to scamper",
+	})
+	measurementsErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "scamper_client_measurement_request_errors",
+		Help: "The number of measurement requests that do not run due to an error",
+	})
 )
 
 // Response represents a response from scamper
@@ -176,12 +189,14 @@ func (c *Client) RemoveMeasurement(addr string, id uint32) error {
 
 // DoMeasurement run the measurement described by arg from the address addr
 func (c *Client) DoMeasurement(addr string, arg interface{}) (<-chan Response, uint32, error) {
+	measurements.Inc()
 	s, err := c.sockets.Get(addr)
 	if err != nil {
 		return nil, 0, err
 	}
 	ch, id, err := s.DoMeasurement(arg)
 	if err != nil {
+		measurementsErrors.Inc()
 		return nil, 0, err
 	}
 	return ch, id, nil

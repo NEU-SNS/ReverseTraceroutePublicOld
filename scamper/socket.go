@@ -45,6 +45,7 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/NEU-SNS/ReverseTraceroute/uuencode"
 	"github.com/NEU-SNS/ReverseTraceroute/warts"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -54,6 +55,32 @@ var (
 	// running
 	ErrorDupCommand = fmt.Errorf("Command already exists with the give Id")
 )
+
+var (
+	cmdsWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "scamper_socket_cmd_writes",
+		Help: "The number of scamper cmds written.",
+	}, []string{"vp"})
+	cmdsRead = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "scamper_socket_cmd_reads",
+		Help: "The number of scamper cmds results read.",
+	}, []string{"vp"})
+	bytesWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "scamper_socket_bytes_written",
+		Help: "The number of bytes written through the socket.",
+	}, []string{"vp"})
+	bytesRead = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "scamper_socket_bytes_read",
+		Help: "The number of bytes read from the socket.",
+	}, []string{"vp"})
+)
+
+func init() {
+	prometheus.MustRegister(cmdsWritten)
+	prometheus.MustRegister(cmdsRead)
+	prometheus.MustRegister(bytesWritten)
+	prometheus.MustRegister(bytesRead)
+}
 
 type cmdMap struct {
 	sync.Mutex
@@ -210,12 +237,16 @@ func (s *Socket) readResponse() (Response, error) {
 func (s *Socket) readConn() {
 	var filter []warts.WartsT
 	filter = append(filter, warts.PingT, warts.TracerouteT)
+	count := cmdsRead.WithLabelValues(s.IP())
+	bytes := bytesRead.WithLabelValues(s.IP())
 	for {
 		resp, err := s.readResponse()
 		if err != nil {
 			s.handleErr(err)
 			return
 		}
+		bytes.Add(float64(len(resp.Data)))
+		count.Inc()
 		if resp.Header {
 			continue
 		}
@@ -253,12 +284,15 @@ func (s *Socket) readConn() {
 
 func (s *Socket) writeConn() {
 	tick := time.NewTicker(time.Millisecond * 10)
+	count := cmdsWritten.WithLabelValues(s.IP())
+	bytes := bytesWritten.WithLabelValues(s.IP())
 	var writes int
 	for {
 		select {
 		case <-s.done:
 			return
 		case w := <-s.write:
+			count.Inc()
 			writes++
 			err := w.cmd.IssueCommand(s.rw)
 			if err != nil {
@@ -268,11 +302,13 @@ func (s *Socket) writeConn() {
 				continue
 			}
 			if writes > 10 {
+				bytes.Add(float64(s.rw.Writer.Buffered()))
 				s.flushWrite()
 				writes = 0
 			}
 		case <-tick.C:
 			if s.rw.Writer.Buffered() > 0 {
+				bytes.Add(float64(s.rw.Writer.Buffered()))
 				s.flushWrite()
 			}
 		}

@@ -31,6 +31,7 @@ import (
 	"fmt"
 
 	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -47,6 +48,37 @@ var (
 	// ErrorNoServers is when there are no servers set
 	ErrorNoServers = memcache.ErrNoServers
 )
+
+var (
+	cacheHits = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "cache_hits",
+		Help: "The number of cache hits.",
+	})
+	cacheMisses = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "cache_misses",
+		Help: "The number of cache misses.",
+	})
+	cacheErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "cache_errors",
+		Help: "The number of cache errors.",
+	})
+	cacheSets = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "cache_sets",
+		Help: "The number of cache sets.",
+	})
+	cacheGets = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "cache_gets",
+		Help: "The number of cache gets.",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(cacheHits)
+	prometheus.MustRegister(cacheMisses)
+	prometheus.MustRegister(cacheErrors)
+	prometheus.MustRegister(cacheSets)
+	prometheus.MustRegister(cacheGets)
+}
 
 func toError(err error) error {
 	if err == nil {
@@ -102,19 +134,29 @@ func New(servers ServerList) Cache {
 
 func (c *cache) Get(key string) (Item, error) {
 	if c.c == nil {
+		cacheErrors.Inc()
 		return nil, ErrorNoClient
 	}
+	cacheGets.Inc()
 	item, err := c.c.Get(key)
 	if err != nil {
+		if err == memcache.ErrCacheMiss {
+			cacheMisses.Inc()
+		} else {
+			cacheErrors.Inc()
+		}
 		return nil, toError(err)
 	}
+	cacheHits.Inc()
 	return toOutItem(item.Key, item.Value), nil
 }
 
 func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	if c.c == nil {
+		cacheErrors.Inc()
 		return nil, ErrorNoClient
 	}
+	cacheGets.Add(float64(len(keys)))
 	nkeys := len(keys)
 	ukeys := make([]string, nkeys)
 	for i, key := range keys {
@@ -122,32 +164,46 @@ func (c *cache) GetMulti(keys []string) (map[string]Item, error) {
 	}
 	multi, err := c.c.GetMulti(ukeys)
 	if err != nil {
+		cacheErrors.Inc()
 		return nil, toError(err)
 	}
 	ret := make(map[string]Item)
 	for k, v := range multi {
+		cacheHits.Inc()
 		ret[k] = toOutItem(v.Key, v.Value)
 	}
+	cacheMisses.Add(float64(len(keys) - len(ret)))
 	return ret, nil
 }
 
 func (c *cache) Set(key string, val []byte) error {
 	if c.c == nil {
+		cacheErrors.Inc()
 		return ErrorNoClient
 	}
 	// Default to 15 minute expire. This is set
 	// based on the old system, may need to be
 	// updated in the future
-	return c.SetWithExpire(key, val, 15*60)
+	err := c.SetWithExpire(key, val, 15*60)
+	if err != nil {
+		cacheErrors.Inc()
+	}
+	return toError(err)
 }
 
 func (c *cache) SetWithExpire(key string, val []byte, exp int32) error {
 	if c.c == nil {
+		cacheErrors.Inc()
 		return ErrorNoClient
 	}
-	return toError(c.c.Set(&memcache.Item{
+	cacheSets.Inc()
+	err := c.c.Set(&memcache.Item{
 		Key:        key,
 		Value:      val,
 		Expiration: exp,
-	}))
+	})
+	if err != nil {
+		cacheErrors.Inc()
+	}
+	return toError(err)
 }
