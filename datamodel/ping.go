@@ -49,10 +49,25 @@ func (p *Ping) CMarshal() []byte {
 
 // Key gets the key for a PM
 func (pm *PingMeasurement) Key() string {
+	if pm.RR {
+		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", pm.Src, pm.Dst, pm.SpooferAddr)
+	}
 	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", pm.Src, pm.Dst, pm.SpooferAddr)
+}
+
+func stringIn(ar []string, in string) bool {
+	for _, a := range ar {
+		if a == in {
+			return true
+		}
+	}
+	return false
 }
 
 // Key gets the key for a Ping
 func (p *Ping) Key() string {
+	if stringIn(p.Flags, "v4rr") {
+		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", p.Src, p.Dst, p.SpoofedFrom)
+	}
 	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", p.Src, p.Dst, p.SpoofedFrom)
 }

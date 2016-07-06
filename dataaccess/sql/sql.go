@@ -577,6 +577,12 @@ const (
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
 		"WHERE p.src = ? and p.dst = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
+	getPingStalenessRR = "SELECT p.id, p.src, p.dst, p.start, p.ping_sent, " +
+		"p.probe_size, p.user_id, p.ttl, p.wait, p.spoofed_from, " +
+		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, " +
+		"p.icmpsum, dl, p.`8` " +
+		"FROM pings p " +
+		"WHERE p.src = ? and p.dst = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute);"
 	getPingResponses = "SELECT pr.id, pr.ping_id, pr.`from`, pr.seq, " +
 		"pr.reply_size, pr.reply_ttl, pr.rtt, pr.probe_ipid, pr.reply_ipid, " +
 		"pr.icmp_type, pr.icmp_code, pr.tx, pr.rx " +
@@ -661,16 +667,25 @@ func makeFlags(spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, ei
 func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 	var ret []*dm.Ping
 	for _, pm := range in {
-		if pm.RR || pm.TimeStamp != "" {
+		if pm.TimeStamp != "" {
 			continue
 		}
 		var stale int64
 		if pm.Staleness == 0 {
 			stale = 60
 		}
-		ps, err := db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
-		if err != nil {
-			return nil, err
+		var ps []*dm.Ping
+		var err error
+		if pm.RR {
+			ps, err = db.getPingSrcDstStaleRR(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			ps, err = db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
+			if err != nil {
+				return nil, err
+			}
 		}
 		ret = append(ret, ps...)
 	}
@@ -837,6 +852,71 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 		var start int64
 		var spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight bool
 
+		err := rows.Scan(&p.Id, &p.Src, &p.Dst, &start,
+			&p.PingSent, &p.ProbeSize, &p.UserId, &p.Ttl,
+			&p.Wait, &p.SpoofedFrom, &p.Version, &spoofed,
+			&recordRoute, &payload, &tsonly, &tsandaddr, &icmpsum,
+			&dl, &eight)
+		if err != nil {
+			return nil, err
+		}
+		p.Start = &dm.Time{}
+		p.Start.Sec = start / 1000000000
+		p.Start.Usec = (start % 1000000000) / 1000
+		p.Flags = makeFlags(spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight)
+		err = getResponses(p, respstmt, rrstmt, tsstmt, tsaddrstmt,
+			recordRoute, tsonly, tsandaddr)
+		if err != nil {
+			return nil, err
+		}
+		err = getStats(p, statsstmt)
+		if err != nil {
+			return nil, err
+		}
+		pings = append(pings, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return pings, nil
+}
+
+func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
+	rows, err := db.GetReader().Query(getPingStalenessRR, src, dst, int(s.Minutes()))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	respstmt, err := db.GetReader().Prepare(getPingResponses)
+	if err != nil {
+		return nil, err
+	}
+	defer respstmt.Close()
+	rrstmt, err := db.GetReader().Prepare(getRecordRoutes)
+	if err != nil {
+		return nil, err
+	}
+	defer rrstmt.Close()
+	tsstmt, err := db.GetReader().Prepare(getTimeStamps)
+	if err != nil {
+		return nil, err
+	}
+	defer tsstmt.Close()
+	tsaddrstmt, err := db.GetReader().Prepare(getTimeStampsAndAddr)
+	if err != nil {
+		return nil, err
+	}
+	defer tsaddrstmt.Close()
+	statsstmt, err := db.GetReader().Prepare(getPingStats)
+	if err != nil {
+		return nil, err
+	}
+	defer statsstmt.Close()
+	var pings []*dm.Ping
+	for rows.Next() {
+		p := new(dm.Ping)
+		var spoofed, recordRoute, payload, tsonly, tsandaddr, icmpsum, dl, eight bool
+		var start int64
 		err := rows.Scan(&p.Id, &p.Src, &p.Dst, &start,
 			&p.PingSent, &p.ProbeSize, &p.UserId, &p.Ttl,
 			&p.Wait, &p.SpoofedFrom, &p.Version, &spoofed,
