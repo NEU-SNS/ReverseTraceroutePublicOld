@@ -420,21 +420,10 @@ func (s server) checkCapabilities() {
 		log.Error(err)
 		return
 	}
-	var onePerSite []*pb.VantagePoint
-	siteMap := make(map[string]*pb.VantagePoint)
-	for _, vp := range vps {
-		if _, ok := siteMap[vp.Site]; ok {
-			continue
-		}
-		siteMap[vp.Site] = vp
-	}
-	for _, vp := range siteMap {
-		onePerSite = append(onePerSite, vp)
-	}
-	log.Debug("Checking Capabilities for: ", onePerSite)
+	log.Debug("Checking Capabilities for: ", vps)
 	vpm := make(map[uint32]*pb.VantagePoint)
 	var tests []*datamodel.PingMeasurement
-	for _, vp := range onePerSite {
+	for _, vp := range vps {
 		vp.RecSpoof = false
 		vp.Spoof = false
 		vp.RecordRoute = false
@@ -443,7 +432,7 @@ func (s server) checkCapabilities() {
 		vp.Trace = false
 		vpm[vp.Ip] = vp
 		for _, d := range vps {
-			if d.Ip == vp.Ip {
+			if d.Ip == vp.Ip || d.Site == vp.Site {
 				continue
 			}
 			tests = append(tests, &datamodel.PingMeasurement{
@@ -455,9 +444,9 @@ func (s server) checkCapabilities() {
 		}
 	}
 	var traceTests []*datamodel.TracerouteMeasurement
-	for _, vp := range onePerSite {
+	for _, vp := range vps {
 		for _, d := range vps {
-			if d.Ip == vp.Ip {
+			if d.Ip == vp.Ip || d.Site == vp.Site {
 				continue
 			}
 			traceTests = append(traceTests, &datamodel.TracerouteMeasurement{
