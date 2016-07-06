@@ -33,7 +33,6 @@ import (
 
 	plc "github.com/NEU-SNS/ReverseTraceroute/controller/pb"
 	dm "github.com/NEU-SNS/ReverseTraceroute/datamodel"
-	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	con "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -52,7 +51,6 @@ type ControllerSender struct {
 
 // Send satisfies the Sender interface for a ControllerSender
 func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
-	log.Debug("Sending: ", sps)
 	if cs.conn == nil {
 		ip, _ := util.Int32ToIPString(addr)
 		saddr := fmt.Sprintf("%s:%d", ip, controllerPort)
@@ -82,6 +80,7 @@ func (cs *ControllerSender) Send(sps []*dm.Probe, addr uint32) error {
 	return err
 }
 
+// Close closes the connection the sender uses
 func (cs *ControllerSender) Close() error {
 	if cs.conn != nil {
 		return cs.conn.Close()
