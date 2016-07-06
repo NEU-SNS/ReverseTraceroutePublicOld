@@ -905,8 +905,9 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 		}
 		err = getStats(p, statsstmt)
 		if err != nil {
-			log.Error(err)
-			return nil, err
+			if err != sql.ErrNoRows {
+				return nil, err
+			}
 		}
 	}
 	return pings, nil
@@ -982,8 +983,9 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 		}
 		err = getStats(p, statsstmt)
 		if err != nil {
-			log.Error(err)
-			return nil, err
+			if err != sql.ErrNoRows {
+				return nil, err
+			}
 		}
 	}
 	return pings, nil
@@ -1322,7 +1324,9 @@ func (db *DB) GetPingBatch(u dm.User, bid int64) ([]*dm.Ping, error) {
 		}
 		err = getStats(p, statsstmt)
 		if err != nil {
-			return nil, err
+			if err != sql.ErrNoRows {
+				return nil, err
+			}
 		}
 	}
 	return pings, nil
