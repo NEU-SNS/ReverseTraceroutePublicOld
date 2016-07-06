@@ -573,13 +573,13 @@ const (
 		"WHERE p.src = ? and p.dst = ?;"
 	getPingStaleness = "SELECT p.id, p.src, p.dst, p.start, p.ping_sent, " +
 		"p.probe_size, p.user_id, p.ttl, p.wait, p.spoofed_from, " +
-		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, " +
+		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
 		"WHERE p.src = ? and p.dst = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
 	getPingStalenessRR = "SELECT p.id, p.src, p.dst, p.start, p.ping_sent, " +
 		"p.probe_size, p.user_id, p.ttl, p.wait, p.spoofed_from, " +
-		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, " +
+		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
 		"WHERE p.src = ? and p.dst = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute);"
