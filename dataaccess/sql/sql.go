@@ -882,32 +882,41 @@ func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 }
 
 func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
-	rows, err := db.GetReader().Query(getPingStalenessRR, src, dst, int(s.Minutes()))
+	tx, err := db.GetReader().Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := tx.Commit(); err != nil {
+			log.Error(err)
+		}
+	}()
+	rows, err := tx.Query(getPingStalenessRR, src, dst, int(s.Minutes()))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	respstmt, err := db.GetReader().Prepare(getPingResponses)
+	respstmt, err := tx.Prepare(getPingResponses)
 	if err != nil {
 		return nil, err
 	}
 	defer respstmt.Close()
-	rrstmt, err := db.GetReader().Prepare(getRecordRoutes)
+	rrstmt, err := tx.Prepare(getRecordRoutes)
 	if err != nil {
 		return nil, err
 	}
 	defer rrstmt.Close()
-	tsstmt, err := db.GetReader().Prepare(getTimeStamps)
+	tsstmt, err := tx.Prepare(getTimeStamps)
 	if err != nil {
 		return nil, err
 	}
 	defer tsstmt.Close()
-	tsaddrstmt, err := db.GetReader().Prepare(getTimeStampsAndAddr)
+	tsaddrstmt, err := tx.Prepare(getTimeStampsAndAddr)
 	if err != nil {
 		return nil, err
 	}
 	defer tsaddrstmt.Close()
-	statsstmt, err := db.GetReader().Prepare(getPingStats)
+	statsstmt, err := tx.Prepare(getPingStats)
 	if err != nil {
 		return nil, err
 	}
@@ -948,32 +957,41 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
 func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
-	rows, err := db.GetReader().Query(getPingStaleness, src, dst, int(s.Minutes()))
+	tx, err := db.GetReader().Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := tx.Commit(); err != nil {
+			log.Error(err)
+		}
+	}()
+	rows, err := tx.Query(getPingStaleness, src, dst, int(s.Minutes()))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	respstmt, err := db.GetReader().Prepare(getPingResponses)
+	respstmt, err := tx.Prepare(getPingResponses)
 	if err != nil {
 		return nil, err
 	}
 	defer respstmt.Close()
-	rrstmt, err := db.GetReader().Prepare(getRecordRoutes)
+	rrstmt, err := tx.Prepare(getRecordRoutes)
 	if err != nil {
 		return nil, err
 	}
 	defer rrstmt.Close()
-	tsstmt, err := db.GetReader().Prepare(getTimeStamps)
+	tsstmt, err := tx.Prepare(getTimeStamps)
 	if err != nil {
 		return nil, err
 	}
 	defer tsstmt.Close()
-	tsaddrstmt, err := db.GetReader().Prepare(getTimeStampsAndAddr)
+	tsaddrstmt, err := tx.Prepare(getTimeStampsAndAddr)
 	if err != nil {
 		return nil, err
 	}
 	defer tsaddrstmt.Close()
-	statsstmt, err := db.GetReader().Prepare(getPingStats)
+	statsstmt, err := tx.Prepare(getPingStats)
 	if err != nil {
 		return nil, err
 	}
