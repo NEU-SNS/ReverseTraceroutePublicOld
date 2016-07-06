@@ -240,6 +240,11 @@ func (s *Socket) readConn() {
 	count := cmdsRead.WithLabelValues(s.IP())
 	bytes := bytesRead.WithLabelValues(s.IP())
 	for {
+		select {
+		case <-s.done:
+			return
+		default:
+		}
 		resp, err := s.readResponse()
 		if err != nil {
 			s.handleErr(err)
