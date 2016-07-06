@@ -110,12 +110,14 @@ func (rv *RevSegment) RemoveHops(toDel []string, cm clustermap.ClusterMap) error
 				maxIndex = tmp
 			}
 		}
+		log.Debug("MaxIndex: ", maxIndex)
 		if maxIndex == len(rv.Segment) {
 			rv.Segment = nil
 		} else {
 			rv.Segment = rv.Segment[maxIndex+1 : len(rv.Segment)]
 		}
 	}
+	log.Debug("Segment after removing loopy hops: ", rv.Segment)
 	common = stringutil.StringSet(rv.Segment).Union(stringutil.StringSet(toDel))
 	if len(common) > 0 {
 		return fmt.Errorf("Still a loop, %v, %v, %v", toDel, rv.Segment, common)
