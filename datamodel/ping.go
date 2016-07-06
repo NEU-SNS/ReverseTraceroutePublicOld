@@ -30,6 +30,7 @@ package datamodel
 import (
 	"fmt"
 
+	"github.com/NEU-SNS/ReverseTraceroute/util"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -49,10 +50,11 @@ func (p *Ping) CMarshal() []byte {
 
 // Key gets the key for a PM
 func (pm *PingMeasurement) Key() string {
+	sa, _ := util.IPStringToInt32(pm.SAddr)
 	if pm.RR {
-		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", pm.Src, pm.Dst, pm.SpooferAddr)
+		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", pm.Src, pm.Dst, sa)
 	}
-	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", pm.Src, pm.Dst, pm.SpooferAddr)
+	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", pm.Src, pm.Dst, sa)
 }
 
 func stringIn(ar []string, in string) bool {
