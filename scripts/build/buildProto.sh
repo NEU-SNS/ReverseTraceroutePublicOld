@@ -26,12 +26,12 @@ protoc  -I$GOSRC --go_out=plugins=grpc:$GOSRC \
 protoc  -I$GOSRC --go_out=plugins=grpc:$GOSRC \
 	$GOSRC/github.com/NEU-SNS/ReverseTraceroute/atlas/pb/*.proto 
     
-PATH_REPLACE=Mgoogle/api/annotations.proto=github.com/gengo/grpc-gateway/third_party/googleapis/google/api,Mgoogle/protobuf/duration.proto=github.com/golang/protobuf/ptypes/duration
+PATH_REPLACE=Mgoogle/api/annotations.proto=github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api,Mgoogle/protobuf/duration.proto=github.com/golang/protobuf/ptypes/duration
 
 protoc -I/usr/local/include \
        -I.  \
        -I$GOPATH/src \
-       -I$GOPATH/src/github.com/gengo/grpc-gateway/third_party/googleapis \
+       -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
        --go_out=$PATH_REPLACE,plugins=grpc:$GOSRC \
        $GOSRC/github.com/NEU-SNS/ReverseTraceroute/revtr/pb/*.proto 
 
@@ -39,6 +39,6 @@ protoc -I/usr/local/include \
 protoc -I/usr/local/include \
        -I.  \
        -I$GOPATH/src \
-       -I$GOPATH/src/github.com/gengo/grpc-gateway/third_party/googleapis \
+       -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
        --grpc-gateway_out=logtostderr=true:$GOSRC \
        $GOSRC/github.com/NEU-SNS/ReverseTraceroute/revtr/pb/*.proto 
