@@ -35,6 +35,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/NEU-SNS/ReverseTraceroute/log"
 	"github.com/NEU-SNS/ReverseTraceroute/vpservice/pb"
 )
 
@@ -232,12 +233,14 @@ func (dq *defaultQuarantine) GetExpire() time.Time {
 func (dq *defaultQuarantine) NextBackoff() time.Time {
 	dq.Attempt++
 	back := dq.InitialBackoff * time.Duration(power(dq.Multiplier, dq.Attempt))
+	log.Debug("New back ", back)
 	var maxBack time.Duration
 	if back > dq.MaxBackoff {
 		maxBack = dq.MaxBackoff
 	} else {
 		maxBack = back
 	}
+	log.Debug("New backoff Max ", maxBack)
 	dq.CurrentBackoff = time.Duration(rand.Int63n(int64(maxBack))) + dq.InitialBackoff
 	dq.Backoff = time.Now().Add(dq.CurrentBackoff)
 	return dq.GetBackoff()
