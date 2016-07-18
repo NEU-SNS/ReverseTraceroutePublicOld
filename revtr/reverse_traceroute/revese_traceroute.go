@@ -149,6 +149,7 @@ func NewReverseTraceroute(src, dst string, id, stale uint32) *ReverseTraceroute 
 
 // TSSetUnresponsive sets the dst as unresponsive to ts probes
 func (rt *ReverseTraceroute) TSSetUnresponsive(dst string) {
+	log.Debug("Setting ", dst, " unresponsive")
 	rt.tsHopResponsive[dst] = 1
 }
 
