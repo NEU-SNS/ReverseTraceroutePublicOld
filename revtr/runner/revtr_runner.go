@@ -257,7 +257,7 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 		var segs []rt.Segment
 		// create segments for all the hops in the responses
 		for _, rr := range rrs {
-			log.Error("Creating segment for ", rr)
+			log.Debug("Creating segment for ", rr)
 			for i, hop := range rr.hops {
 				if hop == "0.0.0.0" {
 					continue
