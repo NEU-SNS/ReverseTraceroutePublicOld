@@ -27,7 +27,7 @@ package pb
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import _ "github.com/gengo/grpc-gateway/third_party/googleapis/google/api"
+import _ "github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis/google/api"
 import google_protobuf1 "github.com/golang/protobuf/ptypes/duration"
 
 import (

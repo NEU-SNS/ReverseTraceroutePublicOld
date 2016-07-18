@@ -34,8 +34,8 @@ import (
 	"github.com/NEU-SNS/ReverseTraceroute/revtr/v2api"
 	"github.com/NEU-SNS/ReverseTraceroute/util"
 	vpservice "github.com/NEU-SNS/ReverseTraceroute/vpservice/client"
-	"github.com/gengo/grpc-gateway/runtime"
 	"github.com/gorilla/websocket"
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 )

@@ -20,7 +20,7 @@ protos:
 	fi
 
 	go get -u github.com/golang/protobuf/protoc-gen-go;
-	go get -u github.com/gengo/grpc-gateway/protoc-gen-grpc-gateway;
+	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway;
 	./scripts/build/buildProto.sh
 
 	@ if [ $$? -ne 0 ]; then \
