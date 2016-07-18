@@ -1272,6 +1272,19 @@ func issueRR(src, dst string, staleness int64,
 	return nil, fmt.Errorf("no responses")
 }
 
+func stringSliceRIndex(ss []string, s string) int {
+	var rindex int
+	rindex = -1
+	for i, sss := range ss {
+		if sss == s {
+			rindex = i
+
+		}
+
+	}
+	return rindex
+}
+
 func processRR(src, dst string, hops []uint32,
 	removeLoops bool, cm clustermap.ClusterMap) rrhops {
 	if len(hops) == 0 {
@@ -1299,7 +1312,14 @@ func processRR(src, dst string, hops []uint32,
 	}
 	if found {
 		log.Debug("Found hops RR at: ", i)
-		hopss = hopss[i:]
+		// remove the destination cluster
+		// If the last hop is the destination cluster
+		// then we have no hops, otherwise get all the hops
+		if i == len(hops)-1 {
+			hopss = []string{}
+		} else {
+			hopss = hopss[i+1:]
+		}
 		// remove cluster level loops
 		if removeLoops {
 			var clusters []string
@@ -1307,13 +1327,12 @@ func processRR(src, dst string, hops []uint32,
 				clusters = append(clusters, cm.Get(hop))
 			}
 			var retHops []string
-			for i, hop := range hopss {
-				if i == 0 {
-					retHops = append(retHops, hop)
-					continue
-				}
-				if retHops[len(retHops)-1] != hop {
-					retHops = append(retHops, hop)
+			var currIndex int
+			for currIndex <= len(clusters)-1 {
+				ri := stringSliceRIndex(clusters, clusters[currIndex])
+				if ri >= currIndex {
+					retHops = append(retHops, hopss[ri])
+					currIndex = ri + 1
 				}
 			}
 			log.Debug("Got Hops: ", retHops)
