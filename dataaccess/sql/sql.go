@@ -233,6 +233,7 @@ WHERE
 `
 )
 
+// ClearAllVPs sets all vps in the plcontroller db to offline
 func (db *DB) ClearAllVPs() error {
 	_, err := db.GetWriter().Exec(clearAllVps)
 	if err != nil {
@@ -576,13 +577,13 @@ const (
 		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
-		"WHERE p.src = ? and p.dst = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
+		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
 	getPingStalenessRR = "SELECT p.id, p.src, p.dst, p.start, p.ping_sent, " +
 		"p.probe_size, p.user_id, p.ttl, p.wait, p.spoofed_from, " +
 		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
-		"WHERE p.src = ? and p.dst = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute);"
+		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute);"
 	getPingResponses = "SELECT pr.id, pr.ping_id, pr.`from`, pr.seq, " +
 		"pr.reply_size, pr.reply_ttl, pr.rtt, pr.probe_ipid, pr.reply_ipid, " +
 		"pr.icmp_type, pr.icmp_code, pr.tx, pr.rx " +
@@ -677,14 +678,30 @@ func (db *DB) GetPingsMulti(in []*dm.PingMeasurement) ([]*dm.Ping, error) {
 		var ps []*dm.Ping
 		var err error
 		if pm.RR {
-			ps, err = db.getPingSrcDstStaleRR(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
-			if err != nil {
-				return nil, err
+			if pm.Spoof {
+				spi, _ := util.IPStringToInt32(pm.SAddr)
+				ps, err = db.getPingSrcDstStaleRR(spi, pm.Dst, pm.Src, time.Duration(stale)*time.Minute)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				ps, err = db.getPingSrcDstStaleRR(pm.Src, pm.Dst, 0, time.Duration(stale)*time.Minute)
+				if err != nil {
+					return nil, err
+				}
 			}
 		} else {
-			ps, err = db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, time.Duration(stale)*time.Minute)
-			if err != nil {
-				return nil, err
+			if pm.Spoof {
+				spi, _ := util.IPStringToInt32(pm.SAddr)
+				ps, err = db.GetPingBySrcDstWithStaleness(spi, pm.Dst, pm.Src, time.Duration(stale)*time.Minute)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				ps, err = db.GetPingBySrcDstWithStaleness(pm.Src, pm.Dst, 0, time.Duration(stale)*time.Minute)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		ret = append(ret, ps...)
@@ -841,10 +858,10 @@ func getResponses(ping *dm.Ping, tx *sql.Tx, rr, ts, tsaddr bool) error {
 // GetPingBySrcDst gets pings with the given src/dst
 func (db *DB) GetPingBySrcDst(src, dst uint32) ([]*dm.Ping, error) {
 	// We only keep 24 hours worth of data in the db
-	return db.GetPingBySrcDstWithStaleness(src, dst, time.Hour*24)
+	return db.GetPingBySrcDstWithStaleness(src, dst, 0, time.Hour*24)
 }
 
-func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
+func (db *DB) getPingSrcDstStaleRR(src, dst, sp uint32, s time.Duration) ([]*dm.Ping, error) {
 	tx, err := db.GetReader().Begin()
 	if err != nil {
 		log.Error(err)
@@ -855,7 +872,7 @@ func (db *DB) getPingSrcDstStaleRR(src, dst uint32, s time.Duration) ([]*dm.Ping
 			log.Error(err)
 		}
 	}()
-	rows, err := tx.Query(getPingStalenessRR, src, dst, int(s.Minutes()))
+	rows, err := tx.Query(getPingStalenessRR, src, dst, sp, int(s.Minutes()))
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -922,7 +939,7 @@ func hasFlag(flags []string, flag string) bool {
 }
 
 // GetPingBySrcDstWithStaleness gets a ping with the src/dst that is newer than s
-func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]*dm.Ping, error) {
+func (db *DB) GetPingBySrcDstWithStaleness(src, dst, sp uint32, s time.Duration) ([]*dm.Ping, error) {
 	tx, err := db.GetReader().Begin()
 	if err != nil {
 		log.Error(err)
@@ -933,7 +950,7 @@ func (db *DB) GetPingBySrcDstWithStaleness(src, dst uint32, s time.Duration) ([]
 			log.Error(err)
 		}
 	}()
-	rows, err := tx.Query(getPingStaleness, src, dst, int(s.Minutes()))
+	rows, err := tx.Query(getPingStaleness, src, dst, sp, int(s.Minutes()))
 	if err != nil {
 		log.Error(err)
 		return nil, err
