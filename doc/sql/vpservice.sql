@@ -16,6 +16,24 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `backoff_strategies`
+--
+
+DROP TABLE IF EXISTS `backoff_strategies`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `backoff_strategies` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `initial_backoff` bigint(20) NOT NULL,
+  `multiplier` int(11) NOT NULL,
+  `maximum_backoff` bigint(20) NOT NULL,
+  `next_init_backoff` bigint(20) NOT NULL,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `dist_to_dest`
 --
 
@@ -61,11 +79,14 @@ DROP TABLE IF EXISTS `quarantine_events`;
 CREATE TABLE `quarantine_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `type` varchar(45) COLLATE utf8_unicode_ci NOT NULL,
+  `ip` int(10) unsigned NOT NULL,
   `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
   `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+  `quarantine_type` varchar(25) COLLATE utf8_unicode_ci NOT NULL,
+  `quarantine` blob NOT NULL,
   `time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,28 +97,12 @@ DROP TABLE IF EXISTS `quarantined_vps`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `quarantined_vps` (
-  `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
-  `added` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`hostname`),
-  KEY `added` (`added`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `quarantined_vps_new`
---
-
-DROP TABLE IF EXISTS `quarantined_vps_new`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `quarantined_vps_new` (
   `ip` int(10) unsigned NOT NULL,
   `hostname` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `site` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
-  `attempt` int(11) NOT NULL DEFAULT '1',
-  `retry` bigint(20) NOT NULL DEFAULT '0',
-  `last_attempt` datetime DEFAULT NULL,
+  `type` varchar(25) COLLATE utf8_unicode_ci NOT NULL DEFAULT 'DEFAULT',
   `added` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `quarantine` blob NOT NULL,
   PRIMARY KEY (`ip`),
   UNIQUE KEY `hostname_UNIQUE` (`hostname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
@@ -131,6 +136,8 @@ CREATE TABLE `vantage_points` (
   `record_route` tinyint(4) NOT NULL DEFAULT '0',
   `spoof` tinyint(4) NOT NULL DEFAULT '0',
   `rec_spoof` tinyint(4) NOT NULL DEFAULT '0',
+  `ping` tinyint(4) NOT NULL DEFAULT '0',
+  `trace` tinyint(4) NOT NULL DEFAULT '0',
   `last_check` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`ip`),
   KEY `rr` (`record_route`),
@@ -154,7 +161,7 @@ CREATE TABLE `vp_events` (
   `time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `hostname_time` (`hostname`,`time`)
-) ENGINE=InnoDB AUTO_INCREMENT=2052 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11330 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -166,4 +173,4 @@ CREATE TABLE `vp_events` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-16 10:43:56
+-- Dump completed on 2016-07-19  9:21:08
