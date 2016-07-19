@@ -1,0 +1,97 @@
+#!/bin/sh
+# plvp: The Planet Lab Vantage Point Flavor
+# 
+# chkconfig: 2345 95 95
+# description: PLVP server daemon
+#
+# processname: plvp
+# pidfile: /var/run/plvp.pid
+### BEGIN INIT INFO
+# Provides: plvp
+# Required-Start:    $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start plvp at boot time
+# Description:       Run the plvp at boot
+### END INIT INFO
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+
+RETVAL=0
+
+prog="plvp"
+log_dir="/var/log/$prog"
+log_file="$log_dir/$prog"
+lock_file="/var/lock/subsys/$prog"
+pid_file="/var/run/$prog.pid"
+exec="/home/uw_geoloc4/plvp/$prog"
+addit_args="-loglevel error"
+
+start() {
+    if ! [ -f $pid_file ]; then
+
+        printf "Starting $prog:\t"
+        echo "$(date)" >> $log_file
+        $exec $addit_args >> $log_file 2>&1 &
+        RETVAL=$?
+        PID=$!
+        if [ $RETVAL -eq 0 ]; then
+            echo "$PID" > ${pid_file}
+        else 
+            failure
+        fi
+        RETVAL=$?
+        if [ $RETVAL -eq 0 ]; then
+           success
+        else
+           failure
+        fi
+        echo
+    else
+        failure
+        echo
+        printf "$pid_file still exists...\n"
+        exit 7
+    fi
+}
+
+stop() {
+    printf "Stopping $prog:\t"
+    killproc $prog 
+    RETVAL=$?
+    echo
+    if [ $RETVAL -eq 0 ]; then
+        rm -f $lock_file
+        rm -f $pid_file
+    fi
+}
+
+case "$1" in 
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status $prog
+        RETVAL=$?
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    condrestart)
+        if [ -f /var/lock/subsys/$prog ]; then
+            stop
+            start
+        fi
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        ;;
+esac
+
+exit $RETVAL
