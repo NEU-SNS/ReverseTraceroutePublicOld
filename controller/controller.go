@@ -329,7 +329,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 		working := remaining
 		remaining = nil
 		for _, pm := range working {
-			if pm.CheckDb {
+			if pm.CheckDb && pm.TimeStamp == "" {
 				checkDb[pm.Key()] = pm
 				checkDbArg = append(checkDbArg, pm)
 				continue
@@ -461,7 +461,12 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 			id := c.nextSpoofID()
 			sp.Payload = fmt.Sprintf("%08x", id)
 			spoofIds = append(spoofIds, id)
-			sa, _ := util.IPStringToInt32(sp.SAddr)
+			log.Debug("Creating dm.Spoof for: ", *sp)
+			sa, err := util.IPStringToInt32(sp.SAddr)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
 			sdForSpoof[sds] = append(sdForSpoof[sds], &dm.Spoof{
 				Ip:  sp.Src,
 				Id:  id,
