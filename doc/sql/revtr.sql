@@ -59,7 +59,7 @@ CREATE TABLE `batch` (
   `user_id` int(10) unsigned NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2603 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2692 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -203,7 +203,35 @@ CREATE TABLE `reverse_traceroute_hops` (
   KEY `fk_reverse_traceroute_hops_1_idx` (`reverse_traceroute_id`),
   CONSTRAINT `fk_reverse_traceroute_hops_1` FOREIGN KEY (`reverse_traceroute_id`) REFERENCES `reverse_traceroutes` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_reverse_traceroute_hops_2` FOREIGN KEY (`hop_type`) REFERENCES `hop_types` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=2224660 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5650137 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `reverse_traceroute_stats`
+--
+
+DROP TABLE IF EXISTS `reverse_traceroute_stats`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `reverse_traceroute_stats` (
+  `revtr_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `rr_probes` int(10) NOT NULL,
+  `spoofed_rr_probes` int(10) NOT NULL,
+  `ts_probes` int(10) NOT NULL,
+  `spoofed_ts_probes` int(10) NOT NULL,
+  `rr_round_count` int(10) NOT NULL,
+  `rr_duration` bigint(20) NOT NULL,
+  `ts_round_count` int(10) NOT NULL,
+  `ts_duration` bigint(20) NOT NULL,
+  `tr_to_src_round_count` int(10) NOT NULL,
+  `tr_to_src_duration` bigint(20) NOT NULL,
+  `assume_symmetric_round_count` int(10) NOT NULL,
+  `assume_symmetric_duration` bigint(20) NOT NULL,
+  `background_trs_round_count` int(10) NOT NULL,
+  `background_trs_duration` bigint(20) NOT NULL,
+  PRIMARY KEY (`revtr_id`),
+  CONSTRAINT `fk_reverse_traceroute_stats_1` FOREIGN KEY (`revtr_id`) REFERENCES `reverse_traceroutes` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=906902 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -218,15 +246,14 @@ CREATE TABLE `reverse_traceroutes` (
   `src` int(10) unsigned NOT NULL,
   `dst` int(10) unsigned NOT NULL,
   `runtime` bigint(20) NOT NULL DEFAULT '0',
-  `rr_issued` int(10) unsigned NOT NULL DEFAULT '0',
-  `ts_issued` int(10) unsigned NOT NULL DEFAULT '0',
   `stop_reason` varchar(45) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `status` varchar(45) COLLATE utf8_unicode_ci NOT NULL DEFAULT 'RUNNING',
   `fail_reason` varchar(255) COLLATE utf8_unicode_ci DEFAULT '',
   `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `index2` (`src`,`dst`)
-) ENGINE=InnoDB AUTO_INCREMENT=211842 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+  KEY `index2` (`src`,`dst`),
+  KEY `date` (`date`)
+) ENGINE=InnoDB AUTO_INCREMENT=906902 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -261,7 +288,7 @@ CREATE TABLE `users` (
 /*!50001 SET collation_connection      = utf8_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`root`@`129.10.113.189` SQL SECURITY DEFINER */
-/*!50001 VIEW `m-lab_revtrs` AS select `rt`.`dst` AS `dst`,`rt`.`src` AS `src`,`rt`.`date` AS `date`,max((case when (`rth`.`order` = 0) then `rth`.`hop` else 0 end)) AS `hop1`,max((case when (`rth`.`order` = 1) then `rth`.`hop` else 0 end)) AS `hop2`,max((case when (`rth`.`order` = 2) then `rth`.`hop` else 0 end)) AS `hop3`,max((case when (`rth`.`order` = 3) then `rth`.`hop` else 0 end)) AS `hop4`,max((case when (`rth`.`order` = 4) then `rth`.`hop` else 0 end)) AS `hop5`,max((case when (`rth`.`order` = 5) then `rth`.`hop` else 0 end)) AS `hop6`,max((case when (`rth`.`order` = 6) then `rth`.`hop` else 0 end)) AS `hop7`,max((case when (`rth`.`order` = 7) then `rth`.`hop` else 0 end)) AS `hop8`,max((case when (`rth`.`order` = 8) then `rth`.`hop` else 0 end)) AS `hop9`,max((case when (`rth`.`order` = 9) then `rth`.`hop` else 0 end)) AS `hop10`,max((case when (`rth`.`order` = 10) then `rth`.`hop` else 0 end)) AS `hop11`,max((case when (`rth`.`order` = 11) then `rth`.`hop` else 0 end)) AS `hop12`,max((case when (`rth`.`order` = 12) then `rth`.`hop` else 0 end)) AS `hop13`,max((case when (`rth`.`order` = 13) then `rth`.`hop` else 0 end)) AS `hop14`,max((case when (`rth`.`order` = 14) then `rth`.`hop` else 0 end)) AS `hop15`,max((case when (`rth`.`order` = 15) then `rth`.`hop` else 0 end)) AS `hop16`,max((case when (`rth`.`order` = 16) then `rth`.`hop` else 0 end)) AS `hop17`,max((case when (`rth`.`order` = 17) then `rth`.`hop` else 0 end)) AS `hop18`,max((case when (`rth`.`order` = 18) then `rth`.`hop` else 0 end)) AS `hop19`,max((case when (`rth`.`order` = 19) then `rth`.`hop` else 0 end)) AS `hop20`,max((case when (`rth`.`order` = 20) then `rth`.`hop` else 0 end)) AS `hop21`,max((case when (`rth`.`order` = 21) then `rth`.`hop` else 0 end)) AS `hop22`,max((case when (`rth`.`order` = 22) then `rth`.`hop` else 0 end)) AS `hop23`,max((case when (`rth`.`order` = 23) then `rth`.`hop` else 0 end)) AS `hop24`,max((case when (`rth`.`order` = 24) then `rth`.`hop` else 0 end)) AS `hop25`,max((case when (`rth`.`order` = 25) then `rth`.`hop` else 0 end)) AS `hop26`,max((case when (`rth`.`order` = 26) then `rth`.`hop` else 0 end)) AS `hop27`,max((case when (`rth`.`order` = 27) then `rth`.`hop` else 0 end)) AS `hop28`,max((case when (`rth`.`order` = 28) then `rth`.`hop` else 0 end)) AS `hop29`,max((case when (`rth`.`order` = 29) then `rth`.`hop` else 0 end)) AS `hop30`,max((case when (`rth`.`order` = 0) then `rth`.`hop_type` else 0 end)) AS `type1`,max((case when (`rth`.`order` = 1) then `rth`.`hop_type` else 0 end)) AS `type2`,max((case when (`rth`.`order` = 2) then `rth`.`hop_type` else 0 end)) AS `type3`,max((case when (`rth`.`order` = 3) then `rth`.`hop_type` else 0 end)) AS `type4`,max((case when (`rth`.`order` = 4) then `rth`.`hop_type` else 0 end)) AS `type5`,max((case when (`rth`.`order` = 5) then `rth`.`hop_type` else 0 end)) AS `type6`,max((case when (`rth`.`order` = 6) then `rth`.`hop_type` else 0 end)) AS `type7`,max((case when (`rth`.`order` = 7) then `rth`.`hop_type` else 0 end)) AS `type8`,max((case when (`rth`.`order` = 8) then `rth`.`hop_type` else 0 end)) AS `type9`,max((case when (`rth`.`order` = 9) then `rth`.`hop_type` else 0 end)) AS `type10`,max((case when (`rth`.`order` = 10) then `rth`.`hop_type` else 0 end)) AS `type11`,max((case when (`rth`.`order` = 11) then `rth`.`hop_type` else 0 end)) AS `type12`,max((case when (`rth`.`order` = 12) then `rth`.`hop_type` else 0 end)) AS `type13`,max((case when (`rth`.`order` = 13) then `rth`.`hop_type` else 0 end)) AS `type14`,max((case when (`rth`.`order` = 14) then `rth`.`hop_type` else 0 end)) AS `type15`,max((case when (`rth`.`order` = 15) then `rth`.`hop_type` else 0 end)) AS `type16`,max((case when (`rth`.`order` = 16) then `rth`.`hop_type` else 0 end)) AS `type17`,max((case when (`rth`.`order` = 17) then `rth`.`hop_type` else 0 end)) AS `type18`,max((case when (`rth`.`order` = 18) then `rth`.`hop_type` else 0 end)) AS `type19`,max((case when (`rth`.`order` = 19) then `rth`.`hop_type` else 0 end)) AS `type20`,max((case when (`rth`.`order` = 20) then `rth`.`hop_type` else 0 end)) AS `type21`,max((case when (`rth`.`order` = 21) then `rth`.`hop_type` else 0 end)) AS `type22`,max((case when (`rth`.`order` = 22) then `rth`.`hop_type` else 0 end)) AS `type23`,max((case when (`rth`.`order` = 23) then `rth`.`hop_type` else 0 end)) AS `type24`,max((case when (`rth`.`order` = 24) then `rth`.`hop_type` else 0 end)) AS `type25`,max((case when (`rth`.`order` = 25) then `rth`.`hop_type` else 0 end)) AS `type26`,max((case when (`rth`.`order` = 26) then `rth`.`hop_type` else 0 end)) AS `type27`,max((case when (`rth`.`order` = 27) then `rth`.`hop_type` else 0 end)) AS `type28`,max((case when (`rth`.`order` = 28) then `rth`.`hop_type` else 0 end)) AS `type29`,max((case when (`rth`.`order` = 29) then `rth`.`hop_type` else 0 end)) AS `type30`,`rt`.`runtime` AS `runtime`,`rt`.`rr_issued` AS `rr_issued_count`,`rt`.`ts_issued` AS `ts_issued_count` from (`reverse_traceroutes` `rt` join `reverse_traceroute_hops` `rth` on((`rth`.`reverse_traceroute_id` = `rt`.`id`))) where (`rt`.`date` > (now() - interval 1 day)) group by `rt`.`src`,`rt`.`dst`,`rt`.`date` */;
+/*!50001 VIEW `m-lab_revtrs` AS select `rt`.`dst` AS `dst`,`rt`.`src` AS `src`,`rt`.`date` AS `date`,max((case when (`rth`.`order` = 0) then `rth`.`hop` else 0 end)) AS `hop1`,max((case when (`rth`.`order` = 1) then `rth`.`hop` else 0 end)) AS `hop2`,max((case when (`rth`.`order` = 2) then `rth`.`hop` else 0 end)) AS `hop3`,max((case when (`rth`.`order` = 3) then `rth`.`hop` else 0 end)) AS `hop4`,max((case when (`rth`.`order` = 4) then `rth`.`hop` else 0 end)) AS `hop5`,max((case when (`rth`.`order` = 5) then `rth`.`hop` else 0 end)) AS `hop6`,max((case when (`rth`.`order` = 6) then `rth`.`hop` else 0 end)) AS `hop7`,max((case when (`rth`.`order` = 7) then `rth`.`hop` else 0 end)) AS `hop8`,max((case when (`rth`.`order` = 8) then `rth`.`hop` else 0 end)) AS `hop9`,max((case when (`rth`.`order` = 9) then `rth`.`hop` else 0 end)) AS `hop10`,max((case when (`rth`.`order` = 10) then `rth`.`hop` else 0 end)) AS `hop11`,max((case when (`rth`.`order` = 11) then `rth`.`hop` else 0 end)) AS `hop12`,max((case when (`rth`.`order` = 12) then `rth`.`hop` else 0 end)) AS `hop13`,max((case when (`rth`.`order` = 13) then `rth`.`hop` else 0 end)) AS `hop14`,max((case when (`rth`.`order` = 14) then `rth`.`hop` else 0 end)) AS `hop15`,max((case when (`rth`.`order` = 15) then `rth`.`hop` else 0 end)) AS `hop16`,max((case when (`rth`.`order` = 16) then `rth`.`hop` else 0 end)) AS `hop17`,max((case when (`rth`.`order` = 17) then `rth`.`hop` else 0 end)) AS `hop18`,max((case when (`rth`.`order` = 18) then `rth`.`hop` else 0 end)) AS `hop19`,max((case when (`rth`.`order` = 19) then `rth`.`hop` else 0 end)) AS `hop20`,max((case when (`rth`.`order` = 20) then `rth`.`hop` else 0 end)) AS `hop21`,max((case when (`rth`.`order` = 21) then `rth`.`hop` else 0 end)) AS `hop22`,max((case when (`rth`.`order` = 22) then `rth`.`hop` else 0 end)) AS `hop23`,max((case when (`rth`.`order` = 23) then `rth`.`hop` else 0 end)) AS `hop24`,max((case when (`rth`.`order` = 24) then `rth`.`hop` else 0 end)) AS `hop25`,max((case when (`rth`.`order` = 25) then `rth`.`hop` else 0 end)) AS `hop26`,max((case when (`rth`.`order` = 26) then `rth`.`hop` else 0 end)) AS `hop27`,max((case when (`rth`.`order` = 27) then `rth`.`hop` else 0 end)) AS `hop28`,max((case when (`rth`.`order` = 28) then `rth`.`hop` else 0 end)) AS `hop29`,max((case when (`rth`.`order` = 29) then `rth`.`hop` else 0 end)) AS `hop30`,max((case when (`rth`.`order` = 0) then `rth`.`hop_type` else 0 end)) AS `type1`,max((case when (`rth`.`order` = 1) then `rth`.`hop_type` else 0 end)) AS `type2`,max((case when (`rth`.`order` = 2) then `rth`.`hop_type` else 0 end)) AS `type3`,max((case when (`rth`.`order` = 3) then `rth`.`hop_type` else 0 end)) AS `type4`,max((case when (`rth`.`order` = 4) then `rth`.`hop_type` else 0 end)) AS `type5`,max((case when (`rth`.`order` = 5) then `rth`.`hop_type` else 0 end)) AS `type6`,max((case when (`rth`.`order` = 6) then `rth`.`hop_type` else 0 end)) AS `type7`,max((case when (`rth`.`order` = 7) then `rth`.`hop_type` else 0 end)) AS `type8`,max((case when (`rth`.`order` = 8) then `rth`.`hop_type` else 0 end)) AS `type9`,max((case when (`rth`.`order` = 9) then `rth`.`hop_type` else 0 end)) AS `type10`,max((case when (`rth`.`order` = 10) then `rth`.`hop_type` else 0 end)) AS `type11`,max((case when (`rth`.`order` = 11) then `rth`.`hop_type` else 0 end)) AS `type12`,max((case when (`rth`.`order` = 12) then `rth`.`hop_type` else 0 end)) AS `type13`,max((case when (`rth`.`order` = 13) then `rth`.`hop_type` else 0 end)) AS `type14`,max((case when (`rth`.`order` = 14) then `rth`.`hop_type` else 0 end)) AS `type15`,max((case when (`rth`.`order` = 15) then `rth`.`hop_type` else 0 end)) AS `type16`,max((case when (`rth`.`order` = 16) then `rth`.`hop_type` else 0 end)) AS `type17`,max((case when (`rth`.`order` = 17) then `rth`.`hop_type` else 0 end)) AS `type18`,max((case when (`rth`.`order` = 18) then `rth`.`hop_type` else 0 end)) AS `type19`,max((case when (`rth`.`order` = 19) then `rth`.`hop_type` else 0 end)) AS `type20`,max((case when (`rth`.`order` = 20) then `rth`.`hop_type` else 0 end)) AS `type21`,max((case when (`rth`.`order` = 21) then `rth`.`hop_type` else 0 end)) AS `type22`,max((case when (`rth`.`order` = 22) then `rth`.`hop_type` else 0 end)) AS `type23`,max((case when (`rth`.`order` = 23) then `rth`.`hop_type` else 0 end)) AS `type24`,max((case when (`rth`.`order` = 24) then `rth`.`hop_type` else 0 end)) AS `type25`,max((case when (`rth`.`order` = 25) then `rth`.`hop_type` else 0 end)) AS `type26`,max((case when (`rth`.`order` = 26) then `rth`.`hop_type` else 0 end)) AS `type27`,max((case when (`rth`.`order` = 27) then `rth`.`hop_type` else 0 end)) AS `type28`,max((case when (`rth`.`order` = 28) then `rth`.`hop_type` else 0 end)) AS `type29`,max((case when (`rth`.`order` = 29) then `rth`.`hop_type` else 0 end)) AS `type30`,`rt`.`runtime` AS `runtime`,(`rts`.`rr_probes` + `rts`.`spoofed_rr_probes`) AS `rr_issued_count`,(`rts`.`ts_probes` + `rts`.`spoofed_ts_probes`) AS `ts_issued_count` from ((`reverse_traceroutes` `rt` join `reverse_traceroute_hops` `rth` on((`rth`.`reverse_traceroute_id` = `rt`.`id`))) join `reverse_traceroute_stats` `rts` on((`rts`.`revtr_id` = `rt`.`id`))) where (`rt`.`date` > (now() - interval 1 day)) group by `rt`.`src`,`rt`.`dst`,`rt`.`date` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -275,4 +302,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-16 10:43:13
+-- Dump completed on 2016-07-19  9:20:58

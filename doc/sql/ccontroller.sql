@@ -27,7 +27,7 @@ CREATE TABLE `ping_batch` (
   `user_id` int(10) unsigned NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=69 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -68,7 +68,7 @@ CREATE TABLE `ping_responses` (
   PRIMARY KEY (`id`),
   KEY `fk_ping_responses_1_idx` (`ping_id`),
   CONSTRAINT `pr_ping` FOREIGN KEY (`ping_id`) REFERENCES `pings` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=8293286 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=67779045 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -122,7 +122,7 @@ CREATE TABLE `pings` (
   KEY `src_dst` (`src`,`dst`) USING BTREE,
   KEY `record_route` (`record_route`),
   KEY `created` (`created`)
-) ENGINE=InnoDB AUTO_INCREMENT=17108343 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=118871350 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -231,7 +231,7 @@ CREATE TABLE `traceroute_hops` (
   KEY `fk_traceroute_hops_1_idx` (`traceroute_id`),
   KEY `traceroute_id` (`traceroute_id`),
   CONSTRAINT `traceroute` FOREIGN KEY (`traceroute_id`) REFERENCES `traceroutes` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=207528 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=81005906 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -267,7 +267,7 @@ CREATE TABLE `traceroutes` (
   KEY `src_dst` (`src`,`dst`) USING BTREE,
   KEY `start` (`start`),
   KEY `created` (`created`)
-) ENGINE=InnoDB AUTO_INCREMENT=16605 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=34137068 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -298,4 +298,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-16 10:43:29
+-- Dump completed on 2016-07-19  9:20:04

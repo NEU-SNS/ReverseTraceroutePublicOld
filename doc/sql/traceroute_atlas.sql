@@ -47,7 +47,7 @@ CREATE TABLE `atlas_traceroutes` (
   PRIMARY KEY (`Id`),
   KEY `index2` (`dest`,`date`) USING BTREE,
   KEY `index3` (`src`,`dest`,`date`)
-) ENGINE=InnoDB AUTO_INCREMENT=682 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -74,4 +74,4 @@ CREATE TABLE `ip_aliases` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-06-16 10:43:44
+-- Dump completed on 2016-07-19  9:20:49
