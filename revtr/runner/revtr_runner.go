@@ -78,6 +78,12 @@ func WithAdjacencySource(as types.AdjacencySource) RunOption {
 	}
 }
 
+func logRevtr(revtr *rt.ReverseTraceroute) log.Logger {
+	return log.WithFieldDepth(log.Fields{
+		"Revtr": revtr.LogStr,
+	}, 1)
+}
+
 type runner struct {
 }
 
@@ -106,7 +112,7 @@ func (r *runner) Run(revtrs []*rt.ReverseTraceroute,
 	batch.wg = &sync.WaitGroup{}
 	batch.wg.Add(len(revtrs))
 	for _, revtr := range revtrs {
-		log.Debug("Running ", revtr)
+		logRevtr(revtr).Debug("Running ", revtr)
 		go batch.run(revtr, rc)
 	}
 	go func() {
@@ -138,7 +144,7 @@ func (b *rtBatch) backoffEndhost(revtr *rt.ReverseTraceroute) step {
 	}
 	if next == nil {
 	}
-	log.Debug("Done backing off")
+	logRevtr(revtr).Debug("Done backing off")
 	return next
 }
 
@@ -175,7 +181,7 @@ func (b *rtBatch) trToSource(revtr *rt.ReverseTraceroute) step {
 		// no hops found move on
 		return b.recordRoute
 	}
-	log.Debug("Creating TRToSrc seg: ", hops, " ", revtr.Src, " ", hops.addr)
+	logRevtr(revtr).Debug("Creating TRToSrc seg: ", hops, " ", revtr.Src, " ", hops.addr)
 	segment := rt.NewTrtoSrcRevSegment(hops.hops, revtr.Src, hops.addr)
 	if !revtr.AddBackgroundTRSegment(segment, b.opts.cm) {
 		panic("Failed to add TR segment. That's not possible")
@@ -244,7 +250,7 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 		rrs, err := issueSpoofedRR(revtr.Src, target, vps,
 			revtr.Staleness, b.opts.cl, b.opts.cm)
 		if err != nil {
-			log.Error(err)
+			logRevtr(revtr).Error(err)
 		}
 		// we got some responses, even if there arent any addresses
 		// in the responses make the target as responsive
@@ -257,7 +263,7 @@ func (b *rtBatch) recordRoute(revtr *rt.ReverseTraceroute) step {
 		var segs []rt.Segment
 		// create segments for all the hops in the responses
 		for _, rr := range rrs {
-			log.Debug("Creating segment for ", rr)
+			logRevtr(revtr).Debug("Creating segment for ", rr)
 			for i, hop := range rr.hops {
 				if hop == "0.0.0.0" {
 					continue
@@ -303,7 +309,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 		dur := done.Sub(start)
 		revtr.Stats.TSDuration += dur
 	}()
-	log.Debug("Trying Timestamp")
+	logRevtr(revtr).Debug("Trying Timestamp")
 	var receiverToSpooferToProbe = make(map[string]map[string][][]string)
 	checkMapMagic := func(f, s string) {
 		if _, ok := receiverToSpooferToProbe[f]; !ok {
@@ -324,20 +330,20 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 	for {
 		adjs := revtr.GetTSAdjacents(target, b.opts.as)
 		if len(adjs) == 0 {
-			log.Debug("No adjacents for: ", target)
+			logRevtr(revtr).Debug("No adjacents for: ", target)
 			// No adjacencies left, move on to the next step
 			return b.backgroundTRS
 		}
 		var dstsDoNotStamp [][]string
 		var tsToIssueSrcToProbe = make(map[string][][]string)
 		if revtr.TSDstToStampsZero[target] {
-			log.Debug("tsDstToStampsZero wtf")
+			logRevtr(revtr).Debug("tsDstToStampsZero wtf")
 			for _, adj := range adjs {
 				dstsDoNotStamp = append(dstsDoNotStamp,
 					[]string{revtr.Src, target, adj})
 			}
 		} else if !revtr.TSSrcToHopToSendSpoofed[revtr.Src][target] {
-			log.Debug("Adding Spoofed TS to send")
+			logRevtr(revtr).Debug("Adding Spoofed TS to send")
 			for _, adj := range adjs {
 				tsToIssueSrcToProbe[revtr.Src] = append(
 					tsToIssueSrcToProbe[revtr.Src],
@@ -346,10 +352,10 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 						adj, adj, dummyIP})
 			}
 		} else {
-			log.Debug("TS Non of the above")
+			logRevtr(revtr).Debug("TS Non of the above")
 			spfs := revtr.GetTimestampSpoofers(revtr.Src, revtr.LastHop(), b.opts.vps)
 			if len(spfs) == 0 {
-				log.Debug("no spoofers left")
+				logRevtr(revtr).Debug("no spoofers left")
 				return b.backgroundTRS
 			}
 			for _, adj := range adjs {
@@ -380,7 +386,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 		var destDoesNotStamp []tripletTs
 
 		processTSCheckForRevHop := func(src, vp string, p *datamodel.Ping) {
-			log.Debug("Processing TS: ", p)
+			logRevtr(revtr).Debug("Processing TS: ", p)
 			dsts, _ := util.Int32ToIPString(p.Dst)
 			segClass := "SpoofTSAdjRevSegment"
 			if vp == "non_spoofed" {
@@ -391,7 +397,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			revtr.TSSetUnresponsive(dsts)
 			rps := p.GetResponses()
 			if len(rps) > 0 {
-				log.Debug("Response ", rps[0].Tsandaddr)
+				logRevtr(revtr).Debug("Response ", rps[0].Tsandaddr)
 			}
 			if len(rps) > 0 && len(rps[0].Tsandaddr) > 2 {
 				ts1 := rps[0].Tsandaddr[0]
@@ -418,11 +424,11 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					revtr.TSDstToStampsZero[dsts] = true
 					destDoesNotStamp = append(destDoesNotStamp, tripletTs{src: src, dst: dsts, tsip: ts2ips})
 				} else {
-					log.Debug("TS probe is ", vp, p, "no reverse hop found")
+					logRevtr(revtr).Debug("TS probe is ", vp, p, "no reverse hop found")
 				}
 			}
 		}
-		log.Debug("tsToIssueSrcToProbe ", tsToIssueSrcToProbe)
+		logRevtr(revtr).Debug("tsToIssueSrcToProbe ", tsToIssueSrcToProbe)
 		if len(tsToIssueSrcToProbe) > 0 {
 			// there should be a uniq thing here but I need to figure out how to do it
 			for src, probes := range tsToIssueSrcToProbe {
@@ -435,14 +441,14 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					revtr.TSSrcToHopToSendSpoofed[src][probe[0]] = true
 				}
 			}
-			log.Debug("Issuing TS probes")
+			logRevtr(revtr).Debug("Issuing TS probes")
 			revtr.Stats.TSProbes += len(tsToIssueSrcToProbe)
 			err := issueTimestamps(tsToIssueSrcToProbe, processTSCheckForRevHop,
 				revtr.Staleness, b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
-			log.Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
+			logRevtr(revtr).Debug("Done issuing TS probes ", tsToIssueSrcToProbe)
 			for src, probes := range tsToIssueSrcToProbe {
 				for _, probe := range probes {
 					// if we got a reply, would have set sendspoofed to false
@@ -451,7 +457,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					if revtr.TSSrcToHopToSendSpoofed[src][probe[0]] {
 						mySpoofers := revtr.GetTimestampSpoofers(src, probe[0], b.opts.vps)
 						for _, sp := range mySpoofers {
-							log.Debug("Adding spoofed TS probe to send")
+							logRevtr(revtr).Debug("Adding spoofed TS probe to send")
 							checkMapMagic(src, sp)
 							receiverToSpooferToProbe[src][sp] = append(receiverToSpooferToProbe[src][sp], probe)
 						}
@@ -462,7 +468,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				}
 			}
 		}
-		log.Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
+		logRevtr(revtr).Debug("receiverToSpooferToProbe: ", receiverToSpooferToProbe)
 		for _, val := range receiverToSpooferToProbe {
 			revtr.Stats.SpoofedTSProbes += len(val)
 		}
@@ -470,7 +476,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			err := issueSpoofedTimestamps(receiverToSpooferToProbe,
 				processTSCheckForRevHop, revtr.Staleness, b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
 		}
 		if len(linuxBugToCheckSrcDstVpToRevHops) > 0 {
@@ -503,14 +509,14 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					segClass = "TSAdjRevSegment"
 				}
 				if ts2.Ts != 0 {
-					log.Debug("TS probe is ", vp, p, "linux bug")
+					logRevtr(revtr).Debug("TS probe is ", vp, p, "linux bug")
 					// TODO keep track of linux bugs
 					// at least once, i observed a bug not stamp one probe, so
 					// this is important, probably then want to do the checks
 					// for revhops after all spoofers that are trying have tested
 					// for linux bugs
 				} else {
-					log.Debug("TS probe is ", vp, p, "not linux bug")
+					logRevtr(revtr).Debug("TS probe is ", vp, p, "not linux bug")
 					for _, revhop := range linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}] {
 
 						var seg rt.Segment
@@ -527,7 +533,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			err := issueTimestamps(linuxChecksSrcToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
 			for _, val := range receiverToSpooferToProbe {
 				revtr.Stats.SpoofedTSProbes += len(val)
@@ -535,7 +541,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 			err = issueSpoofedTimestamps(linuxChecksSpoofedReceiverToSpooferToProbe,
 				processTSCheckForLinuxBug, revtr.Staleness, b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
 		}
 		receiverToSpooferToProbe = make(map[string]map[string][][]string)
@@ -569,15 +575,15 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				// declare reverse hop
 				ts2ips, _ := util.Int32ToIPString(ts2.Ts)
 				revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []rt.Segment{rt.NewSpoofTSAdjRevSegmentTSZeroDoubleStamp([]string{ts2ips}, src, dsts, vp, false)}
-				log.Debug("TS Probe is ", vp, p, "reverse hop from dst that stamps 0!")
+				logRevtr(revtr).Debug("TS Probe is ", vp, p, "reverse hop from dst that stamps 0!")
 			} else if ts1.Ts != 0 {
-				log.Debug("TS probe is ", vp, p, "dst does not stamp, but spoofer ", vp, "got a stamp")
+				logRevtr(revtr).Debug("TS probe is ", vp, p, "dst does not stamp, but spoofer ", vp, "got a stamp")
 				ts1ips, _ := util.Int32ToIPString(ts1.Ip)
 				destDoesNotStampToVerifySpooferToProbe[vp] = append(destDoesNotStampToVerifySpooferToProbe[vp], []string{dsts, ts1ips, ts1ips, ts1ips, ts1ips})
 				// store something
 				vpDstAdjToInterestedSrcs[tripletTs{src: vp, dst: dsts, tsip: ts1ips}] = append(vpDstAdjToInterestedSrcs[tripletTs{src: vp, dst: dsts, tsip: ts1ips}], src)
 			} else {
-				log.Debug("TS probe is ", vp, p, "no reverse hop for dst that stamps 0")
+				logRevtr(revtr).Debug("TS probe is ", vp, p, "no reverse hop for dst that stamps 0")
 			}
 		}
 		if len(destDoesNotStamp) > 0 {
@@ -585,7 +591,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				processTSDestDoesNotStamp,
 				revtr.Staleness, b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
 		}
 
@@ -605,7 +611,7 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				ts1 := rps[0].Tsandaddr[0]
 				ts1ips, _ := util.Int32ToIPString(ts1.Ip)
 				if ts1.Ts == 0 {
-					log.Debug("Reverse hop! TS probe is ", vp, p, "dst does not stamp, but spoofer", vp, "got a stamp and didn't direclty")
+					logRevtr(revtr).Debug("Reverse hop! TS probe is ", vp, p, "dst does not stamp, but spoofer", vp, "got a stamp and didn't direclty")
 					maybeRevhopVPDstAdjToBool[tripletTs{src: src, dst: dsts, tsip: ts1ips}] = true
 				} else {
 					del := tripletTs{src: src, dst: dsts, tsip: ts1ips}
@@ -614,16 +620,16 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 							delete(vpDstAdjToInterestedSrcs, key)
 						}
 					}
-					log.Debug("Can't verify reverse hop! TS probe is ", vp, p, "potential hop stamped on non-spoofed path for VP")
+					logRevtr(revtr).Debug("Can't verify reverse hop! TS probe is ", vp, p, "potential hop stamped on non-spoofed path for VP")
 				}
 			}
-			log.Debug("Issuing to verify for dest does not stamp")
+			logRevtr(revtr).Debug("Issuing to verify for dest does not stamp")
 			err := issueTimestamps(destDoesNotStampToVerifySpooferToProbe,
 				processTSDestDoesNotStampToVerify,
 				revtr.Staleness,
 				b.opts.cl)
 			if err != nil {
-				log.Error(err)
+				logRevtr(revtr).Error(err)
 			}
 			for k := range maybeRevhopVPDstAdjToBool {
 				for _, origsrc := range vpDstAdjToInterestedSrcs[tripletTs{src: k.src, dst: k.dst, tsip: k.tsip}] {
@@ -691,11 +697,11 @@ func (b *rtBatch) backgroundTRS(revtr *rt.ReverseTraceroute) step {
 	revtr.Tokens = nil
 	tr, err := retreiveTraceroutes(tokens, b.opts.at, b.opts.cm)
 	if err != nil {
-		log.Error(err)
+		logRevtr(revtr).Error(err)
 		// Failed to find a intersection
 		return b.assumeSymmetric
 	}
-	log.Debug("Creating TRToSrc seg: ", tr.hops, " ", revtr.Src, " ", tr.addr)
+	logRevtr(revtr).Debug("Creating TRToSrc seg: ", tr.hops, " ", revtr.Src, " ", tr.addr)
 	segment := rt.NewTrtoSrcRevSegment(tr.hops, revtr.Src, tr.addr)
 	if !revtr.AddBackgroundTRSegment(segment, b.opts.cm) {
 		panic("Failed to add background TR segment. That's not possible")
@@ -716,11 +722,11 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 	}()
 	// if last hop is assumed, add one more from that tr
 	if reflect.TypeOf(revtr.CurrPath().LastSeg()) == reflect.TypeOf(&rt.DstSymRevSegment{}) {
-		log.Debug("Backing off along current path for ", revtr.Src, " ", revtr.Dst)
+		logRevtr(revtr).Debug("Backing off along current path for ", revtr.Src, " ", revtr.Dst)
 		// need to not ignore the hops in the last segment, so can't just
 		// call add_hops(revtr.hops + revtr.deadends)
 		newSeg := revtr.CurrPath().LastSeg().Clone().(*rt.DstSymRevSegment)
-		log.Debug("newSeg: ", newSeg)
+		logRevtr(revtr).Debug("newSeg: ", newSeg)
 		var allHops []string
 		for i, seg := range *revtr.CurrPath().Path {
 			// Skip the last one
@@ -730,15 +736,15 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 			allHops = append(allHops, seg.Hops()...)
 		}
 		allHops = append(allHops, revtr.Deadends()...)
-		log.Debug("all hops: ", allHops)
+		logRevtr(revtr).Debug("all hops: ", allHops)
 		err := newSeg.AddHop(allHops)
 		if err != nil {
-			log.Error(err)
+			logRevtr(revtr).Error(err)
 		}
-		log.Debug("New seg: ", newSeg)
+		logRevtr(revtr).Debug("New seg: ", newSeg)
 		added := revtr.AddAndReplaceSegment(newSeg)
 		if added {
-			log.Debug("Added hop from another DstSymRevSegment")
+			logRevtr(revtr).Debug("Added hop from another DstSymRevSegment")
 			if revtr.Reaches(b.opts.cm) {
 				return nil
 			}
@@ -749,7 +755,7 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 	trace, err := issueTraceroute(b.opts.cl, b.opts.cm,
 		revtr.Src, revtr.LastHop(), revtr.Staleness)
 	if err != nil {
-		log.Debug("Issue traceroute err: ", err)
+		logRevtr(revtr).Debug("Issue traceroute err: ", err)
 		revtr.ErrorDetails.WriteString("Error running traceroute\n")
 		revtr.ErrorDetails.WriteString(err.Error() + "\n")
 		revtr.FailCurrPath()
@@ -764,7 +770,7 @@ func (b *rtBatch) assumeSymmetric(revtr *rt.ReverseTraceroute) step {
 	var hToIgnore []string
 	hToIgnore = append(hToIgnore, revtr.Hops()...)
 	hToIgnore = append(hToIgnore, revtr.Deadends()...)
-	log.Debug("Attempting to add hop from tr ", trace.hops)
+	logRevtr(revtr).Debug("Attempting to add hop from tr ", trace.hops)
 	if revtr.AddSegments([]rt.Segment{
 		rt.NewDstSymRevSegment(revtr.Src,
 			revtr.LastHop(),
@@ -925,7 +931,7 @@ func (b *rtBatch) run(revtr *rt.ReverseTraceroute,
 		default:
 			currStep = currStep(revtr)
 			if currStep == nil {
-				log.Debug("Done running ", revtr)
+				logRevtr(revtr).Debug("Done running ", revtr)
 				ret <- revtr
 				return
 			}
