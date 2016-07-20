@@ -1217,6 +1217,9 @@ func issueSpoofedRR(recv, dst string, srcs []string, staleness int64,
 			continue
 		}
 		sspoofer, _ := util.Int32ToIPString(p.SpoofedFrom)
+		if len(pr[0].RR) == 0 {
+			log.Error("Got rr response with no hops")
+		}
 		rrs = append(rrs, sprrhops{
 			hops: processRR(recv, dst, pr[0].RR, true, cm),
 			vp:   sspoofer,
