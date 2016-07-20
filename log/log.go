@@ -44,6 +44,15 @@ func GetLogger() Logger {
 	return logger
 }
 
+// Fields are fields to add to a log entry
+type Fields map[string]interface{}
+
+// WithFields returns a logger that will log the next line
+// with the given fields
+func WithFields(f Fields) Logger {
+	return callerInfo().WithFields(logrus.Fields(f))
+}
+
 // Logger is the interface that the logging package supports
 type Logger interface {
 	Debugf(format string, args ...interface{})
