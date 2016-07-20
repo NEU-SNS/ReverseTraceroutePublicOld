@@ -57,7 +57,7 @@ const (
 // initialize it
 type ReverseTraceroute struct {
 	ID                      uint32
-	logStr                  string
+	LogStr                  string
 	Stats                   Stats
 	Paths                   *[]*ReversePath
 	DeadEnd                 map[string]bool
@@ -128,7 +128,7 @@ func NewReverseTraceroute(src, dst string, id, stale uint32) *ReverseTraceroute 
 	}
 	ret := ReverseTraceroute{
 		ID:                      id,
-		logStr:                  fmt.Sprintf("ID: %d :", id),
+		LogStr:                  fmt.Sprintf("ID: %d :", id),
 		Src:                     src,
 		Dst:                     dst,
 		Paths:                   &[]*ReversePath{NewReversePath(src, dst, nil)},
@@ -147,9 +147,15 @@ func NewReverseTraceroute(src, dst string, id, stale uint32) *ReverseTraceroute 
 	return &ret
 }
 
+func logRevtr(revtr *ReverseTraceroute) log.Logger {
+	return log.WithFieldDepth(log.Fields{
+		"Revtr": revtr.LogStr,
+	}, 1)
+}
+
 // TSSetUnresponsive sets the dst as unresponsive to ts probes
 func (rt *ReverseTraceroute) TSSetUnresponsive(dst string) {
-	log.Debug("Setting ", dst, " unresponsive")
+	logRevtr(rt).Debug("Setting ", dst, " unresponsive")
 	rt.tsHopResponsive[dst] = 1
 }
 
@@ -236,7 +242,7 @@ func (rt *ReverseTraceroute) Reaches(cm clustermap.ClusterMap) bool {
 	}
 	if reach && rt.onReach != nil {
 		rt.onReachOnce.Do(func() {
-			log.Debug("Calling onReach")
+			logRevtr(rt).Debug("Calling onReach")
 			rt.onReach(rt)
 		})
 	}
@@ -323,11 +329,11 @@ func (rt *ReverseTraceroute) AddSegments(segs []Segment, cm clustermap.ClusterMa
 			// add loop removal here
 			err := s.RemoveHops(basePath.Hops(), cm)
 			if err != nil {
-				log.Error(err)
+				logRevtr(rt).Error(err)
 				return false
 			}
 			if s.Length(false) == 0 {
-				log.Debug("Skipping loop-causing segment ", s)
+				logRevtr(rt).Debug("Skipping loop-causing segment ", s)
 				continue
 			}
 			*added = true
@@ -467,10 +473,10 @@ func (rt *ReverseTraceroute) GetTSAdjacents(hop string, as types.AdjacencySource
 	if _, ok := rt.TSHop2AdjsLeft[hop]; !ok {
 		err := rt.InitializeTSAdjacents(hop, as)
 		if err != nil {
-			log.Error(err)
+			logRevtr(rt).Error(err)
 		}
 	}
-	log.Debug(rt.Src, " ", rt.Dst, " ", rt.LastHop(), " ", len(rt.TSHop2AdjsLeft[hop]), " TS adjacents left to try")
+	logRevtr(rt).Debug(rt.Src, " ", rt.Dst, " ", rt.LastHop(), " ", len(rt.TSHop2AdjsLeft[hop]), " TS adjacents left to try")
 
 	// CASES:
 	// 1. no adjacents left return nil
@@ -502,7 +508,7 @@ func (rt *ReverseTraceroute) GetTimestampSpoofers(src, dst string, vpsource vpse
 	var spoofers []string
 	vps, err := vpsource.GetTSSpoofers(0)
 	if err != nil {
-		log.Error(err)
+		logRevtr(rt).Error(err)
 		return nil
 	}
 	for _, vp := range vps {
@@ -522,7 +528,7 @@ const (
 
 // InitializeRRVPs initializes the rr vps for a cls
 func (rt *ReverseTraceroute) InitializeRRVPs(cls string, vpsource vpservice.VPSource) error {
-	log.Debug("Initializing RR VPs individually for spoofers for ", cls)
+	logRevtr(rt).Debug("Initializing RR VPs individually for spoofers for ", cls)
 	rt.RRHop2RateLimit[cls] = RateLimit
 	spoofersForTarget := []string{"non_spoofed"}
 	clsi, _ := util.IPStringToInt32(cls)
@@ -550,15 +556,15 @@ func stringSliceIndexWithClusters(ss []string, seg string, cm clustermap.Cluster
 // AddBackgroundTRSegment need a different function because a TR segment might intersect
 // at an IP back up the TR chain, want to delete anything that has been added along the way
 func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment, cm clustermap.ClusterMap) bool {
-	log.Debug("Adding Background trSegment ", trSeg)
+	logRevtr(rt).Debug("Adding Background trSegment ", trSeg)
 	var found *ReversePath
 	// iterate through the paths, trying to find one that contains
 	// intersection point, chunk is a ReversePath
 	for _, chunk := range *rt.Paths {
 		var index int
-		log.Debug("Looking for ", trSeg.Hops()[0], " in ", chunk.Hops())
+		logRevtr(rt).Debug("Looking for ", trSeg.Hops()[0], " in ", chunk.Hops())
 		if index = stringSliceIndexWithClusters(chunk.Hops(), trSeg.Hops()[0], cm); index != -1 {
-			log.Debug("Intersected: ", trSeg.Hops()[0], " in ", chunk)
+			logRevtr(rt).Debug("Intersected: ", trSeg.Hops()[0], " in ", chunk)
 			chunk = chunk.Clone()
 			found = chunk
 			// Iterate through all the segments until you find the hop
@@ -587,8 +593,8 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment, cm clustermap
 		}
 	}
 	if found == nil {
-		log.Debug(trSeg)
-		log.Debug("Tried to add traceroute to Reverse Traceroute that didn't share an IP... what happened?!")
+		logRevtr(rt).Debug(trSeg)
+		logRevtr(rt).Debug("Tried to add traceroute to Reverse Traceroute that didn't share an IP... what happened?!")
 		return false
 	}
 	*rt.Paths = append(*rt.Paths, found)
@@ -617,7 +623,7 @@ func (rt *ReverseTraceroute) AddBackgroundTRSegment(trSeg Segment, cm clustermap
 // this reverse traceroute, return them, otherwise return [:non_spoofed] first
 // then set of spoofing VPs on subsequent calls
 func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]string, string) {
-	log.Debug("GettingRRVPs for ", dst)
+	logRevtr(rt).Debug("GettingRRVPs for ", dst)
 	// we either use destination or cluster, depending on how flag is set
 	hops := rt.CurrPath().LastSeg().Hops()
 	for _, hop := range hops {
@@ -627,7 +633,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 	}
 	// CASES:
 	segHops := stringutil.CloneStringSlice(rt.CurrPath().LastSeg().Hops())
-	log.Debug("segHops: ", segHops)
+	logRevtr(rt).Debug("segHops: ", segHops)
 	var target, cls *string
 	target = new(string)
 	cls = new(string)
@@ -635,8 +641,8 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 	for !foundVPs && len(segHops) > 0 {
 		*target, segHops = segHops[len(segHops)-1], segHops[:len(segHops)-1]
 		*cls = *target
-		log.Debug("Sending RR probes to: ", *cls)
-		log.Debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
+		logRevtr(rt).Debug("Sending RR probes to: ", *cls)
+		logRevtr(rt).Debug("RR VPS: ", rt.RRHop2VPSLeft[*cls])
 		// 0. destination seems to be unresponsive
 		if rt.rrSpoofRRResponsive[*cls] != -1 &&
 			rt.rrSpoofRRResponsive[*cls] >= maxUnresponsive {
@@ -654,13 +660,13 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 	if !foundVPs {
 		return nil, ""
 	}
-	log.Debug(rt.Src, " ", rt.Dst, " ", *target, " ", len(rt.RRHop2VPSLeft[*cls]), " RR VPs left to try")
+	logRevtr(rt).Debug(rt.Src, " ", rt.Dst, " ", *target, " ", len(rt.RRHop2VPSLeft[*cls]), " RR VPs left to try")
 	// 2. send non-spoofed version if it is in the next batch
 	min := rt.RRHop2RateLimit[*cls]
 	if len(rt.RRHop2VPSLeft[*cls]) < min {
 		min = len(rt.RRHop2VPSLeft[*cls])
 	}
-	log.Debug("Getting vps for: ", *cls, " min: ", min)
+	logRevtr(rt).Debug("Getting vps for: ", *cls, " min: ", min)
 	if stringutil.InArray(rt.RRHop2VPSLeft[*cls][0:min], "non_spoofed") {
 		rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][1:]
 		return []string{"non_spoofed"}, *target
@@ -678,7 +684,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 		*spoofer = rrev.SpoofSource
 	}
 	if notEmpty && *isRRRev {
-		log.Debug("Found recent spoofer to use ", *spoofer)
+		logRevtr(rt).Debug("Found recent spoofer to use ", *spoofer)
 		var newleft []string
 		for _, s := range rt.RRHop2VPSLeft[*cls] {
 			if s == *spoofer {
@@ -701,7 +707,7 @@ func (rt *ReverseTraceroute) GetRRVPs(dst string, vps vpservice.VPSource) ([]str
 	}
 	touse := rt.RRHop2VPSLeft[*cls][:min]
 	rt.RRHop2VPSLeft[*cls] = rt.RRHop2VPSLeft[*cls][min:]
-	log.Debug("Returning VPS for spoofing: ", touse)
+	logRevtr(rt).Debug("Returning VPS for spoofing: ", touse)
 	return touse, *target
 }
 
