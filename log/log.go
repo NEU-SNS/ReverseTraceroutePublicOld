@@ -50,7 +50,13 @@ type Fields map[string]interface{}
 // WithFields returns a logger that will log the next line
 // with the given fields
 func WithFields(f Fields) Logger {
-	return callerInfo().WithFields(logrus.Fields(f))
+	return callerInfo(0).WithFields(logrus.Fields(f))
+}
+
+// WithFieldDepth works like WithFields but allows to set the depth
+// so the line info is correct
+func WithFieldDepth(f Fields, depth int) Logger {
+	return callerInfo(depth).WithFields(logrus.Fields(f))
 }
 
 // Logger is the interface that the logging package supports
@@ -129,9 +135,9 @@ func (lo logOutput) Set(out string) error {
 	return nil
 }
 
-func callerInfo() *logrus.Entry {
+func callerInfo(depth int) *logrus.Entry {
 	// From std lib log library
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := runtime.Caller(2 + depth)
 	if !ok {
 		file = "???"
 		line = 0
@@ -150,97 +156,97 @@ func init() {
 }
 
 func Debugf(format string, args ...interface{}) {
-	callerInfo().Debugf(format, args...)
+	callerInfo(0).Debugf(format, args...)
 }
 
 func Infof(format string, args ...interface{}) {
-	callerInfo().Infof(format, args...)
+	callerInfo(0).Infof(format, args...)
 }
 
 func Printf(format string, args ...interface{}) {
-	callerInfo().Printf(format, args...)
+	callerInfo(0).Printf(format, args...)
 }
 
 func Warnf(format string, args ...interface{}) {
-	callerInfo().Warnf(format, args...)
+	callerInfo(0).Warnf(format, args...)
 }
 
 func Warningf(format string, args ...interface{}) {
-	callerInfo().Warnf(format, args...)
+	callerInfo(0).Warnf(format, args...)
 }
 
 func Errorf(format string, args ...interface{}) {
-	callerInfo().Errorf(format, args...)
+	callerInfo(0).Errorf(format, args...)
 }
 
 func Fatalf(format string, args ...interface{}) {
-	callerInfo().Fatalf(format, args...)
+	callerInfo(0).Fatalf(format, args...)
 }
 
 func Panicf(format string, args ...interface{}) {
-	callerInfo().Panicf(format, args...)
+	callerInfo(0).Panicf(format, args...)
 }
 
 func Debug(args ...interface{}) {
-	callerInfo().Debug(args...)
+	callerInfo(0).Debug(args...)
 }
 
 func Info(args ...interface{}) {
-	callerInfo().Info(args...)
+	callerInfo(0).Info(args...)
 }
 
 func Print(args ...interface{}) {
-	callerInfo().Info(args...)
+	callerInfo(0).Info(args...)
 }
 
 func Warn(args ...interface{}) {
-	callerInfo().Warn(args...)
+	callerInfo(0).Warn(args...)
 }
 
 func Warning(args ...interface{}) {
-	callerInfo().Warn(args...)
+	callerInfo(0).Warn(args...)
 }
 
 func Error(args ...interface{}) {
-	callerInfo().Error(args...)
+	callerInfo(0).Error(args...)
 }
 
 func Fatal(args ...interface{}) {
-	callerInfo().Fatal(args...)
+	callerInfo(0).Fatal(args...)
 }
 
 func Panic(args ...interface{}) {
-	callerInfo().Panic(args...)
+	callerInfo(0).Panic(args...)
 }
 
 func Debugln(args ...interface{}) {
-	callerInfo().Debugln(args...)
+	callerInfo(0).Debugln(args...)
 }
 
 func Infoln(args ...interface{}) {
-	callerInfo().Infoln(args...)
+	callerInfo(0).Infoln(args...)
 }
 
 func Println(args ...interface{}) {
-	callerInfo().Println(args...)
+	callerInfo(0).Println(args...)
 }
 
 func Warnln(args ...interface{}) {
-	callerInfo().Warnln(args...)
+	callerInfo(0).Warnln(args...)
 }
 
 func Warningln(args ...interface{}) {
-	callerInfo().Warnln(args...)
+	callerInfo(0).Warnln(args...)
 }
 
 func Errorln(args ...interface{}) {
-	callerInfo().Errorln(args...)
+	callerInfo(0).Errorln(args...)
 }
 
 func Fatalln(args ...interface{}) {
-	callerInfo().Fatalln(args...)
+	callerInfo(0).Fatalln(args...)
 }
 
 func Panicln(args ...interface{}) {
-	callerInfo().Panicln(args...)
+	callerInfo(0).Panicln(args...)
 }
