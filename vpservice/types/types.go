@@ -290,6 +290,7 @@ func NewDefaultQuarantine(vp pb.VantagePoint, prevQuar Quarantine, reason Quaran
 		}
 	}
 	q.Backoff = time.Now().Add(q.InitialBackoff)
+	q.CurrentBackoff = q.InitialBackoff
 	return &q
 }
 
@@ -351,6 +352,7 @@ func NewMDQuarantine(vp pb.VantagePoint, prevQuar Quarantine) Quarantine {
 		}
 	}
 	q.Backoff = time.Now().Add(q.InitialBackoff)
+	q.CurrentBackoff = q.InitialBackoff
 	return &q
 }
 
