@@ -269,6 +269,7 @@ func checkPingDb(ctx con.Context, check []*dm.PingMeasurement, db DataAccess) (m
 			eout <- err
 		}
 		for _, p := range found {
+			log.Debug("Got ping from db: ", p)
 			pingsFromDB.Inc()
 			foundMap[p.Key()] = p
 		}
@@ -544,6 +545,7 @@ func (c *controllerT) doPing(ctx con.Context, pm []*dm.PingMeasurement) <-chan *
 						return
 					}
 					px := toPing(probe)
+					log.Debug("Caching spoofed result with key: ", px.Key())
 					err := c.cache.SetWithExpire(px.Key(), px.CMarshal(), 5*60)
 					if err != nil {
 						log.Error(err)

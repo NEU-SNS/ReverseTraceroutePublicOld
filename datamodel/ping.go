@@ -69,7 +69,7 @@ func stringIn(ar []string, in string) bool {
 // Key gets the key for a Ping
 func (p *Ping) Key() string {
 	if stringIn(p.Flags, "v4rr") {
-		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", p.Src, p.Dst, p.SpoofedFrom)
+		return fmt.Sprintf("%s_%d_%d_%d", "XRRP", p.SpoofedFrom, p.Dst, p.Src)
 	}
-	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", p.Src, p.Dst, p.SpoofedFrom)
+	return fmt.Sprintf("%s_%d_%d_%d", "XXXP", p.SpoofedFrom, p.Dst, p.Src)
 }
