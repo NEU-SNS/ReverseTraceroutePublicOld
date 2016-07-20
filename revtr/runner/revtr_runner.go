@@ -393,16 +393,31 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 				checksrctohoptosendspoofedmagic(src)
 				revtr.TSSrcToHopToSendSpoofed[src][dsts] = false
 				segClass = "TSAdjRevSegment"
+			} else {
+				log.Debug("processing spoofed ts reply ", p)
 			}
 			revtr.TSSetUnresponsive(dsts)
 			rps := p.GetResponses()
 			if len(rps) > 0 {
 				logRevtr(revtr).Debug("Response ", rps[0].Tsandaddr)
 			}
-			if len(rps) > 0 && len(rps[0].Tsandaddr) > 2 {
-				ts1 := rps[0].Tsandaddr[0]
-				ts2 := rps[0].Tsandaddr[1]
-				ts3 := rps[0].Tsandaddr[2]
+			if len(rps) > 0 {
+				var ts1, ts2, ts3 *datamodel.TsAndAddr
+				ts1 = new(datamodel.TsAndAddr)
+				ts2 = new(datamodel.TsAndAddr)
+				ts3 = new(datamodel.TsAndAddr)
+				switch len(rps[0].Tsandaddr) {
+				case 0:
+				case 1:
+					ts1 = rps[0].Tsandaddr[0]
+				case 2:
+					ts1 = rps[0].Tsandaddr[0]
+					ts2 = rps[0].Tsandaddr[1]
+				case 3:
+					ts1 = rps[0].Tsandaddr[0]
+					ts2 = rps[0].Tsandaddr[1]
+					ts3 = rps[0].Tsandaddr[2]
+				}
 				if ts3.Ts != 0 {
 					ss, _ := util.Int32ToIPString(rps[0].Tsandaddr[2].Ip)
 					var seg rt.Segment
@@ -413,9 +428,18 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 					}
 					revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []rt.Segment{seg}
 				} else if ts2.Ts != 0 {
+					ts2ips, _ := util.Int32ToIPString(ts2.Ip)
 					if ts2.Ts-ts1.Ts > 3 || ts2.Ts < ts1.Ts {
 						// if 2nd slot is stamped with an increment from 1st, rev hop
-						ts2ips, _ := util.Int32ToIPString(ts2.Ip)
+						var seg rt.Segment
+						if segClass == "SpoofTSAdjRevSegment" {
+							seg = rt.NewSpoofTSAdjRevSegment([]string{ts2ips}, src, dsts, vp, false)
+						} else {
+							seg = rt.NewTSAdjRevSegment([]string{ts2ips}, src, dsts, false)
+						}
+						revHopsSrcDstToRevSeg[pair{src: src, dst: dsts}] = []rt.Segment{seg}
+					} else {
+						// else, if 2nd stamp is clsoe to 1st, need to check for linux bug
 						linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}] = append(linuxBugToCheckSrcDstVpToRevHops[triplet{src: src, dst: dsts, vp: vp}], ts2ips)
 					}
 				} else if ts1.Ts == 0 {
@@ -565,9 +589,25 @@ func (b *rtBatch) timestamp(revtr *rt.ReverseTraceroute) step {
 		processTSDestDoesNotStamp := func(src, vp string, p *datamodel.Ping) {
 			dsts, _ := util.Int32ToIPString(p.Dst)
 			rps := p.GetResponses()
-			ts1 := rps[0].Tsandaddr[0]
-			ts2 := rps[0].Tsandaddr[1]
-			ts4 := rps[0].Tsandaddr[3]
+			if len(rps) <= 0 {
+				return
+			}
+			var ts1, ts2, ts4 *datamodel.TsAndAddr
+			ts1 = new(datamodel.TsAndAddr)
+			ts2 = new(datamodel.TsAndAddr)
+			ts4 = new(datamodel.TsAndAddr)
+			switch len(rps[0].Tsandaddr) {
+			case 0:
+			case 1:
+				ts1 = rps[0].Tsandaddr[0]
+			case 2, 3:
+				ts1 = rps[0].Tsandaddr[0]
+				ts2 = rps[0].Tsandaddr[1]
+			case 4:
+				ts1 = rps[0].Tsandaddr[0]
+				ts2 = rps[0].Tsandaddr[1]
+				ts4 = rps[0].Tsandaddr[3]
+			}
 			// if 2 stamps, we assume one was forward, one was reverse
 			// if 1 or 4, we need to verify it was reverse
 			// 3 should not happend according to justine?
@@ -1191,7 +1231,7 @@ func issueSpoofedRR(recv, dst string, srcs []string, staleness int64,
 			Src:        srci,
 			Dst:        dsti,
 			SAddr:      recv,
-			Timeout:    10,
+			Timeout:    20,
 			Count:      "1",
 			Staleness:  staleness,
 			CheckCache: true,
