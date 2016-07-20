@@ -577,13 +577,13 @@ const (
 		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
-		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.start >= DATE_SUB(NOW(), interval ? minute);"
+		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.start >= DATE_SUB(NOW(), interval ? minute) order by p.start desc limit 1;"
 	getPingStalenessRR = "SELECT p.id, p.src, p.dst, p.start, p.ping_sent, " +
 		"p.probe_size, p.user_id, p.ttl, p.wait, p.spoofed_from, " +
 		"p.version, p.spoofed, p.record_route, p.payload, p.tsonly, p.tsandaddr, " +
 		"p.icmpsum, dl, p.`8` " +
 		"FROM pings p " +
-		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute);"
+		"WHERE p.src = ? and p.dst = ? and p.spoofed_from = ? and p.record_route and p.start >= DATE_SUB(NOW(), interval ? minute) order by p.start desc limit 1;"
 	getPingResponses = "SELECT pr.id, pr.ping_id, pr.`from`, pr.seq, " +
 		"pr.reply_size, pr.reply_ttl, pr.rtt, pr.probe_ipid, pr.reply_ipid, " +
 		"pr.icmp_type, pr.icmp_code, pr.tx, pr.rx " +
